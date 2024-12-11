@@ -1,4 +1,10 @@
-import type { NextAuthConfig } from 'next-auth';
+import { type NextAuthConfig } from "next-auth"
+
+declare module "next-auth" {
+  interface User {
+    rol?: number | null
+  }
+}
 
 export const authConfig = {
   pages: {
@@ -16,7 +22,18 @@ export const authConfig = {
       }
       return true;
     },
+    jwt({ token, user }) {
+      if (user) { // User is available during sign-in
+        token.rol = user.rol
+      }
+      return token
+    },
+    session({ session, token }) {
+      session.user.rol = token.rol as number
+      return session
+    }
   },
+  session: { strategy: "jwt" },
   providers: [], // Add providers with an empty array for now
   secret: process.env.AUTH_SECRET,
 } satisfies NextAuthConfig;
