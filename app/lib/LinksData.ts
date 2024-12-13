@@ -2,6 +2,8 @@ import {
   RectangleStackIcon,
   HomeIcon,
   DocumentDuplicateIcon,
+  UserGroupIcon,
+  Squares2X2Icon
 } from '@heroicons/react/24/outline';
 
 
@@ -23,5 +25,17 @@ export const links = [
     href: '/dashboard/tasks', 
     icon: RectangleStackIcon,
     roles: ["admin", "comercial", "directivo", "colaborador"]
+  },
+  { 
+    name: 'Clientes', 
+    href: '/dashboard/clients', 
+    icon: UserGroupIcon,
+    roles: ["admin", "comercial", "directivo"]
+  },
+  { 
+    name: 'Productos', 
+    href: '/dashboard/products', 
+    icon: Squares2X2Icon,
+    roles: ["admin", "comercial", "directivo"]
   },
 ];
