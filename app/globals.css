@@ -16,3 +16,11 @@
   overflow: clip;
   border-radius: 0.5rem;
 }
+
+.titleh1{
+  @apply text-2xl lg:text-4xl dark:text-dark-title
+}
+
+.subtitleh2{
+  @apply text-xl md:text-2xl dark:text-dark-subtitle
+}
