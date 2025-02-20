@@ -1,17 +1,17 @@
 "use client"
 
-
-
 import * as React from "react"
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Icons } from "@/components/icons"
+import { useRouter } from 'next/navigation'
 
 
 export function UserLoginForm() {
   const [isLoading, setIsLoading] = React.useState<boolean>(false)
+  const router = useRouter()
 
   async function onSubmit(event: React.SyntheticEvent) {
     event.preventDefault()
@@ -19,7 +19,9 @@ export function UserLoginForm() {
 
     setTimeout(() => {
       setIsLoading(false)
-    }, 3000)
+      // redirect to dashboard
+      router.push('/dashboard')
+    }, 1000)
   }
 
   return (

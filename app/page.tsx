@@ -3,11 +3,7 @@ import { ModeToggle } from "./components/ModeToggle"
 import { UserLoginForm } from "./components/login/UserLoginForm";
 import MICLogo from "./components/icons/MICLogo";
 
-export const metadata: Metadata = {
-  title: "Login",
-}
-
-export default function Home() {
+export default function LoginPage() {
   return (
     <>
       <div className="container relative h-[800px] flex-col items-center justify-center md:grid lg:max-w-none lg:h-screen lg:grid-cols-2 lg:px-0">
