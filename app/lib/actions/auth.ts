@@ -1,9 +1,11 @@
 'use server';
 
-import { SignupFormSchema, FormState } from "@/lib/definitions";
+import { SignupFormSchema, FormState, UserType } from "@/lib/definitions";
 import { createSession } from '@/lib/session'
 import { deleteSession } from '@/lib/session'
 import { redirect } from "next/navigation";
+import bcrypt from "bcrypt";
+import { getUserByEmail } from "../queries/users";
 
 
 export async function login(state: FormState, formData: FormData) {
@@ -23,19 +25,34 @@ export async function login(state: FormState, formData: FormData) {
   // 2. Prepare data for insertion into database
   const { email, password } = validatedFields.data;
   // e.g. Hash the user's password before storing it
-  // validar manualmente hellen.reyes@market-support.com 123456
-
-  if (email === 'hellen.reyes@market-support.com' && password === '123456') {
-    // 3. Create user session
-    await createSession("1")
-    // 4. Redirect user
-    redirect('/dashboard')
-  } else {
+  // comprobar en la base de datos el email
+  const res = await getUserByEmail(email);
+  if (res.length === 0) {
     return {
-      message: "Invalid email or password.",
+      errors: { general: "Datos incorrectos"},
     };
   }
 
+  const user: UserType = res[0];
+  
+  // comprobar la contraseña
+  if (!user.password) {
+    return {
+      errors: { general: "Datos incorrectos" },
+    };
+  }
+
+
+  const match = await bcrypt.compare(password, user.password);
+  if (!match) {
+    return {
+      errors: { general: "Datos incorrectos" },
+    };
+  }
+  // 3. Create a session
+  await createSession({ email: user.email, id: user.id, role: user.role });
+  // 4. Redirect to the dashboard
+  redirect('/dashboard');
 }
 
 export async function logout() {

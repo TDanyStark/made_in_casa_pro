@@ -26,7 +26,7 @@ export default async function middleware(req: NextRequest) {
     }
   }
   // 4. Redirect to /login if the user is not authenticated
-  if (isProtectedRoute && !session?.userId) {
+  if (isProtectedRoute && !session?.id) {
     // Evita redirigir si ya está en "/"
     if (req.nextUrl.pathname !== "/") {
       return NextResponse.redirect(new URL("/", req.nextUrl));
@@ -36,7 +36,7 @@ export default async function middleware(req: NextRequest) {
   // 5. Redirect to /dashboard if the user is authenticated
   if (
     isPublicRoute &&
-    session?.userId &&
+    session?.id &&
     !req.nextUrl.pathname.startsWith("/dashboard")
   ) {
     return NextResponse.redirect(new URL("/dashboard", req.nextUrl));

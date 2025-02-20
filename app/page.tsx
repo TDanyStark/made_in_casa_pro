@@ -1,4 +1,3 @@
-import { Metadata } from "next"
 import { ModeToggle } from "./components/ModeToggle"
 import { UserLoginForm } from "./components/login/UserLoginForm";
 import MICLogo from "./components/icons/MICLogo";

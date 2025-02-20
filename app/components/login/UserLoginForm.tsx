@@ -9,6 +9,7 @@ import { login } from "@/lib/actions/auth";
 
 export function UserLoginForm() {
   const [state, action, pending] = useActionState(login, undefined);
+  console.log(state);
 
   return (
     <div className="grid gap-6">
@@ -27,8 +28,9 @@ export function UserLoginForm() {
                 autoCapitalize="none"
                 autoComplete="email"
                 autoCorrect="off"
+                required
               />
-              {state?.errors?.email && (
+              {state?.errors && "email" in state.errors && (
                 <p className="text-xs text-red-500">{state.errors.email}</p>
               )}
             </div>
@@ -42,11 +44,13 @@ export function UserLoginForm() {
                 placeholder="Password"
                 type="password"
                 autoComplete="current-password"
+                required
               />
-              {state?.errors?.password && (
+              {state?.errors && "password" in state.errors && (
                 <p className="text-xs text-red-500">{state.errors.password}</p>
               )}
             </div>
+            
           </div>
           <Button disabled={pending} type="submit">
             {
@@ -56,6 +60,9 @@ export function UserLoginForm() {
             }
             Sign In with Email
           </Button>
+          {state?.errors && "general" in state.errors && (
+                <p className="text-xs text-red-500">{state.errors.general}</p>
+              )}
         </div>
       </form>
     </div>
