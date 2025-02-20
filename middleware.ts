@@ -1,51 +1,58 @@
 import { NextRequest, NextResponse } from "next/server";
 import { decrypt } from "@/lib/session";
 import { cookies } from "next/headers";
+import { UserRole } from "@/lib/definitions";
 
-// 1. Specify protected and public routes
-const protectedRoutes = ["/dashboard"];
-const publicRoutes = ["/"];
+// 🔹 Definir rutas protegidas y los roles que pueden acceder
+const routePermissions: Record<string, UserRole[]> = {
+  "/dashboard": [UserRole.COMERCIAL, UserRole.DIRECTIVO, UserRole.COLABORADOR, UserRole.ADMIN],
+  "/admin": [UserRole.ADMIN], // Solo administradores
+  "/reports": [UserRole.DIRECTIVO, UserRole.ADMIN], // Directivos y Admins
+  "/sales": [UserRole.COMERCIAL, UserRole.ADMIN], // Comerciales y Admins
+};
+
+// 🔹 Definir la única ruta pública
+const publicRoute = "/";
 
 export default async function middleware(req: NextRequest) {
-  // 2. Check if the current route is protected or public
   const path = req.nextUrl.pathname;
-  const isProtectedRoute = protectedRoutes.includes(path);
-  const isPublicRoute = publicRoutes.includes(path);
+  const isPublicRoute = path === publicRoute;
+  const allowedRoles = routePermissions[path];
 
   const cookie = (await cookies()).get("session")?.value;
-  let session;
+  let session = null;
 
-  if (!cookie) {
-    console.log("No session cookie found.");
-  } else {
+  // Intentar desencriptar la cookie de sesión
+  if (cookie) {
     try {
-      session = await decrypt(cookie);
+      session  = await decrypt(cookie);
     } catch (error) {
-      console.error("Session decryption failed:", error);
-      session = null; // Asegura que no se use un valor inválido
+      console.error("Error al desencriptar la sesión:", error);
+      session = null;
     }
   }
-  // 4. Redirect to /login if the user is not authenticated
-  if (isProtectedRoute && !session?.id) {
-    // Evita redirigir si ya está en "/"
-    if (req.nextUrl.pathname !== "/") {
-      return NextResponse.redirect(new URL("/", req.nextUrl));
-    }
-  }
+  const userRole: UserRole = Object.values(UserRole).includes(session?.role as UserRole) ? (session?.role as UserRole) ?? UserRole.NO_AUTHENTICADO : UserRole.NO_AUTHENTICADO; // Si no hay sesión, rol 0 (no autenticado)
 
-  // 5. Redirect to /dashboard if the user is authenticated
-  if (
-    isPublicRoute &&
-    session?.id &&
-    !req.nextUrl.pathname.startsWith("/dashboard")
-  ) {
+  // 🔹 1. Si el usuario autenticado intenta visitar "/", redirigir a /dashboard
+  if (isPublicRoute && session?.id) {
     return NextResponse.redirect(new URL("/dashboard", req.nextUrl));
   }
 
+  // 🔹 2. Si no hay sesión y la ruta es protegida, redirigir a /login
+  if (!session?.id && allowedRoles) {
+    return NextResponse.redirect(new URL("/", req.nextUrl));
+  }
+
+  // 🔹 3. Si el usuario tiene sesión pero no tiene permiso, redirigir a /dashboard
+  if (session?.id && allowedRoles && !allowedRoles.includes(userRole)) {
+    return NextResponse.redirect(new URL("/dashboard", req.nextUrl));
+  }
+
+  // 🔹 4. Permitir acceso si pasa todas las validaciones
   return NextResponse.next();
 }
 
-// Routes Middleware should not run on
+// 🔹 Rutas en las que NO se ejecutará el middleware (API, estáticos, imágenes)
 export const config = {
   matcher: ["/((?!api|_next/static|_next/image|.*\\.png$).*)"],
 };

@@ -30,4 +30,5 @@ export enum UserRole {
   DIRECTIVO = 2,
   COLABORADOR = 3,
   ADMIN = 4,
+  NO_AUTHENTICADO = 0
 }
