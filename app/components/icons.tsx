@@ -1,6 +1,6 @@
-import { Loader2, Github } from "lucide-react"
+import { Loader2, Power } from "lucide-react"
 
 export const Icons = {
   spinner: Loader2, // Ícono de carga con animación
-  gitHub: Github, // Ícono de GitHub
+  power: Power, // Ícono de apagado
 }

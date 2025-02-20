@@ -4,8 +4,7 @@ import { UserLoginForm } from "./components/login/UserLoginForm";
 import MICLogo from "./components/icons/MICLogo";
 
 export const metadata: Metadata = {
-  title: "Authentication",
-  description: "Authentication forms built using the components.",
+  title: "Login",
 }
 
 export default function Home() {
@@ -25,11 +24,9 @@ export default function Home() {
           <div className="relative z-20 mt-auto">
             <blockquote className="space-y-2">
               <p className="text-lg">
-                &ldquo;This library has saved me countless hours of work and
-                helped me deliver stunning designs to my clients faster than
-                ever before.&rdquo;
+                &ldquo;Si el plan A no funciona, recuerda que el abecedario tiene 26 letras más (¡y en Excel muchas más!).&rdquo;
               </p>
-              <footer className="text-sm">Sofia Davis</footer>
+              <footer className="text-sm">Sandy Baron</footer>
             </blockquote>
           </div>
         </div>
