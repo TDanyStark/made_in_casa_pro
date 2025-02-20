@@ -22,9 +22,9 @@ export default function NavLinks() {
             key={link.name}
             href={link.href}
             className={clsx(
-              'flex h-[48px] grow items-center justify-center gap-4 rounded-md bg-light-bg-2 dark:bg-dark-bg-2 p-3 text-base font-normal hover:bg-market-pink hover:text-white dark:hover:bg-secondary dark:hover:text-dark-subtitle md:flex-none md:justify-start md:p-2 md:px-3',
+              'flex h-[48px] grow items-center justify-center gap-4 rounded-md bg-light-bg-2 dark:bg-dark-bg-2 p-3 text-base font-normal hover:bg-market-purple hover:text-white dark:hover:bg-secondary dark:hover:text-dark-subtitle md:flex-none md:justify-start md:p-2 md:px-3',
               {
-                'bg-market-purple text-white': pathname === link.href || pathnameNotDashboard.startsWith(hrefNotDashboard),
+                'bg-market-pink text-white': pathname === link.href || pathnameNotDashboard.startsWith(hrefNotDashboard),
               }
             )}
           >

@@ -8,7 +8,7 @@ export default async function Page() {
   // Obtener la cookie "session"
   const cookie = (await cookies()).get("session")?.value;
 
-  let role: number | null = null;
+  let role: number = 0;
 
   if (cookie) {
     try {
@@ -23,8 +23,7 @@ export default async function Page() {
 
   return (
     <main>
-      <h1 className="primaryH1">Dashboard</h1>
-      {role !== null ? <p>Tu rol es: {UserRole[role]}</p> : <p>No autorizado</p>}
+      <h1 className="primaryH1">Dashboard - {UserRole[role]}</h1>
     </main>
   );
 }

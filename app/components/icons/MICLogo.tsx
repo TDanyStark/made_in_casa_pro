@@ -6,7 +6,7 @@ interface Props {
 export default function MICLogo({ onlyIcon = false, colorWhite = false }: Props) {
   return (
     <div
-      className={`flex flex-col gap-2 items-center leading-none ${colorWhite ? 'text-dark-title':'text-light-title'}  dark:text-dark-title`}
+      className={`flex flex-col gap-2 items-center leading-none ${colorWhite ? 'text-market-pink':'text-primary-foreground'}  dark:text-primary`}
     >
       <svg
         width="60px"
