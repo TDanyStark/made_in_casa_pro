@@ -1,7 +1,7 @@
 export default async function Page() {
   return (
-    <main>
+    <section>
       <h1 className="primaryH1">Projectos</h1>
-    </main>
+    </section>
   );
 }

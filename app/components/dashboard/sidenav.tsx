@@ -6,7 +6,7 @@ import { logout } from "@/lib/actions/auth";
 
 export default function SideNav() {
   return (
-    <div className="flex h-full flex-col px-3 py-4 md:px-2 bg-primary-foreground">
+    <aside className="flex h-full flex-col px-3 py-4 md:px-2 bg-primary-foreground">
       <Link
         className="mb-2 flex items-end justify-center rounded-md bg-mic-gradient p-4"
         href="/dashboard"
@@ -26,6 +26,6 @@ export default function SideNav() {
           </button>
         </form>
       </div>
-    </div>
+    </aside>
   );
 }
