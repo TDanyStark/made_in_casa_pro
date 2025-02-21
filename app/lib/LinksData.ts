@@ -40,3 +40,46 @@ export const links = [
     roles: [UserRole.ADMIN]
   },
 ];
+
+export const linksNotVisible = [
+  {
+    route: '/clients/create',
+    roles: [UserRole.ADMIN, UserRole.COMERCIAL, UserRole.DIRECTIVO]
+  },
+  {
+    route: '/clients/[id]/edit',
+    roles: [UserRole.ADMIN, UserRole.COMERCIAL, UserRole.DIRECTIVO]
+  },
+  {
+    route: '/products/create',
+    roles: [UserRole.ADMIN, UserRole.COMERCIAL, UserRole.DIRECTIVO]
+  },
+  {
+    route: '/products/[id]/edit',
+    roles: [UserRole.ADMIN, UserRole.COMERCIAL, UserRole.DIRECTIVO]
+  },
+  {
+    route: '/projects/create',
+    roles: [UserRole.ADMIN, UserRole.COMERCIAL, UserRole.DIRECTIVO]
+  },
+  {
+    route: '/projects/[id]/edit',
+    roles: [UserRole.ADMIN, UserRole.COMERCIAL, UserRole.DIRECTIVO]
+  },
+  {
+    route: '/tasks/create',
+    roles: [UserRole.ADMIN, UserRole.COMERCIAL, UserRole.DIRECTIVO]
+  },
+  {
+    route: '/tasks/[id]/edit',
+    roles: [UserRole.ADMIN, UserRole.COMERCIAL, UserRole.DIRECTIVO]
+  },
+  {
+    route: '/users/create',
+    roles: [UserRole.ADMIN]
+  },
+  {
+    route: '/users/[id]/edit',
+    roles: [UserRole.ADMIN]
+  },
+]

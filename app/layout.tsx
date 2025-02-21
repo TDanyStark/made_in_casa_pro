@@ -1,13 +1,15 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import { ThemeProvider } from "@/components/theme-provider";
+import QueryProvider from "./components/QueryProvider";
+import { Toaster } from "@/components/ui/sonner"
 
 export const metadata: Metadata = {
   title: {
-    template: '%s | Made in Casa Pro',
-    default: 'Made in Casa Pro',
+    template: "%s | Made in Casa Pro",
+    default: "Made in Casa Pro",
   },
-  description: 'Sistema de gestión de proyectos de market support',
+  description: "Sistema de gestión de proyectos de market support",
 };
 
 export default function RootLayout({
@@ -24,8 +26,9 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          {children}
+          <QueryProvider>{children}</QueryProvider>
         </ThemeProvider>
+        <Toaster />
       </body>
     </html>
   );

@@ -10,20 +10,21 @@ export default async function Layout({
 }: {
   children: React.ReactNode;
 }) {
-  const role = await getUserRole(); // Obtenemos el rol en el servidor
+  const role = await getUserRole();
+
   return (
-    <RoleProvider role={role}>
-      <main className="relative flex h-screen flex-col md:flex-row md:overflow-hidden">
-        <div className="absolute right-4 top-4 md:right-8 md:top-8">
-          <ModeToggle />
-        </div>
-        <div className="w-full flex-none md:w-64">
-          <SideNav />
-        </div>
-        <div className="flex-grow p-6 md:overflow-y-auto md:p-16">
-          {children}
-        </div>
-      </main>
-    </RoleProvider>
+      <RoleProvider role={role}>
+        <main className="relative flex h-screen flex-col md:flex-row md:overflow-hidden">
+          <div className="absolute right-4 top-4 md:right-8 md:top-8">
+            <ModeToggle />
+          </div>
+          <div className="w-full flex-none md:w-64">
+            <SideNav />
+          </div>
+          <div className="flex-grow p-6 md:overflow-y-auto md:p-16">
+            {children}
+          </div>
+        </main>
+      </RoleProvider>
   );
 }

@@ -32,3 +32,15 @@ export enum UserRole {
   ADMIN = 4,
   NO_AUTHENTICADO = 0
 }
+
+export type ClientType = {
+  id?: number;
+  name: string;
+  country_id: number;
+}
+
+export type CountryType = {
+  id: number;
+  name: string;
+  flag: string;
+}

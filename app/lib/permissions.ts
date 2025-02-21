@@ -1,9 +1,9 @@
-import { links } from "./LinksData";
+import { links, linksNotVisible } from "./LinksData";
 import { UserRole } from "./definitions";
 
-// 🔹 Generar un mapa de rutas con sus roles permitidos a partir de `links`
-export const routePermissions: Record<string, UserRole[]> = links.reduce((acc, link) => {
-  acc[link.href] = link.roles;
+// 🔹 Generar un mapa de rutas con sus roles permitidos a partir de `links` y `linksNotVisible`
+export const routePermissions: Record<string, UserRole[]> = [...links, ...linksNotVisible].reduce((acc, link) => {
+  acc['href' in link ? link.href : link.route] = link.roles;
   return acc;
 }, {} as Record<string, UserRole[]>);
 
