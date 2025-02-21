@@ -11,31 +11,31 @@ export const links = [
   },
   {
     name: 'Proyectos',
-    href: '/dashboard/projects',
+    href: '/projects',
     icon: Folder,
     roles: [UserRole.ADMIN, UserRole.COMERCIAL, UserRole.DIRECTIVO]
   },
   { 
     name: 'Tareas', 
-    href: '/dashboard/tasks', 
+    href: '/tasks', 
     icon: LayoutList,
     roles: [UserRole.ADMIN, UserRole.COMERCIAL, UserRole.DIRECTIVO]
   },
   { 
     name: 'Productos', 
-    href: '/dashboard/products', 
+    href: '/products', 
     icon: LibraryBig,
     roles: [UserRole.ADMIN, UserRole.COMERCIAL, UserRole.DIRECTIVO]
   },
   { 
     name: 'Clientes', 
-    href: '/dashboard/clients', 
+    href: '/clients', 
     icon: BookUser,
     roles: [UserRole.ADMIN, UserRole.COMERCIAL, UserRole.DIRECTIVO]
   },
   { 
     name: 'Usuarios', 
-    href: '/dashboard/users', 
+    href: '/users', 
     icon: Users,
     roles: [UserRole.ADMIN]
   },
