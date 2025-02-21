@@ -84,17 +84,17 @@ export function CreateCountrySelect({ field }: CreateCountrySelectProps) {
   };
 
   // llamar a useItemMutations
-  const {createItem} = useItemMutations<CountryType>("/countries");
+  const {createItem, dataCreate} = useItemMutations<CountryType>("/countries");
 
   const handleCreateCountry = () => {
     console.log(newCountryName, newCountryFlag);
     if (!newCountryName || !newCountryFlag) return;
-    const res = createItem.mutate({
+    createItem.mutate({
       name: newCountryName,
       flag: newCountryFlag,
       id: 0,
     });
-    console.log(res);
+    console.log(dataCreate);
     setNewCountryName("");
     setNewCountryFlag("");
     setIsCreating(false);

@@ -77,6 +77,7 @@ const useItemMutations = <T extends { id: number }>(
   // Retornar el estado de carga junto con las mutaciones
   return {
     createItem,
+    dataCreate: createItem.data,
     updateItem,
     deleteItem,
   };
