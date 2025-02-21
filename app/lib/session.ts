@@ -1,6 +1,7 @@
 import "server-only";
 import { JWTPayload, SignJWT, jwtVerify } from "jose";
 import { cookies } from "next/headers";
+import { UserRole } from "./definitions";
 
 const secretKey = process.env.SESSION_SECRET;
 const encodedKey = new TextEncoder().encode(secretKey);
@@ -42,4 +43,22 @@ export async function createSession(user: {email: string, id: number, role: numb
 export async function deleteSession() {
   const cookieStore = await cookies();
   cookieStore.delete("session");
+}
+
+export async function getUserRole(): Promise<UserRole> {
+  const cookie = (await cookies()).get("session")?.value;
+  let role: UserRole = UserRole.NO_AUTHENTICADO; // Valor por defecto
+
+  if (cookie) {
+    try {
+      const sessionData = await decrypt(cookie);
+      if (sessionData?.role) {
+        role = sessionData.role as UserRole;
+      }
+    } catch (error) {
+      console.error("Error al desencriptar la sesión:", error);
+    }
+  }
+
+  return role;
 }

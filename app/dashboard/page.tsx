@@ -1,25 +1,11 @@
-import { cookies } from "next/headers";
-import { decrypt } from "@/lib/session";
+import { getUserRole } from "@/lib/session";
 import { UserRole } from "@/lib/definitions";
 
 
 
 export default async function Page() {
   // Obtener la cookie "session"
-  const cookie = (await cookies()).get("session")?.value;
-
-  let role: number = 0;
-
-  if (cookie) {
-    try {
-      const sessionData = await decrypt(cookie);
-      if (sessionData) {
-        role = (sessionData as { role: number }).role;
-      }
-    } catch (error) {
-      console.error("Error al desencriptar la sesión:", error);
-    }
-  }
+  const role = await getUserRole();
 
   return (
     <main>

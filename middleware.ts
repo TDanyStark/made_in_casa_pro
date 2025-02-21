@@ -2,17 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { decrypt } from "@/lib/session";
 import { cookies } from "next/headers";
 import { UserRole } from "@/lib/definitions";
-
-// 🔹 Definir rutas protegidas y los roles que pueden acceder
-const routePermissions: Record<string, UserRole[]> = {
-  "/dashboard": [UserRole.COMERCIAL, UserRole.DIRECTIVO, UserRole.COLABORADOR, UserRole.ADMIN],
-  "/admin": [UserRole.ADMIN], // Solo administradores
-  "/reports": [UserRole.DIRECTIVO, UserRole.ADMIN], // Directivos y Admins
-  "/sales": [UserRole.COMERCIAL, UserRole.ADMIN], // Comerciales y Admins
-};
-
-// 🔹 Definir la única ruta pública
-const publicRoute = "/";
+import { routePermissions, publicRoute } from "@/lib/permissions";
 
 export default async function middleware(req: NextRequest) {
   const path = req.nextUrl.pathname;
@@ -25,20 +15,23 @@ export default async function middleware(req: NextRequest) {
   // Intentar desencriptar la cookie de sesión
   if (cookie) {
     try {
-      session  = await decrypt(cookie);
+      session = await decrypt(cookie);
     } catch (error) {
       console.error("Error al desencriptar la sesión:", error);
       session = null;
     }
   }
-  const userRole: UserRole = Object.values(UserRole).includes(session?.role as UserRole) ? (session?.role as UserRole) ?? UserRole.NO_AUTHENTICADO : UserRole.NO_AUTHENTICADO; // Si no hay sesión, rol 0 (no autenticado)
+
+  const userRole: UserRole = Object.values(UserRole).includes(session?.role as UserRole) 
+    ? (session?.role as UserRole) 
+    : UserRole.NO_AUTHENTICADO;
 
   // 🔹 1. Si el usuario autenticado intenta visitar "/", redirigir a /dashboard
   if (isPublicRoute && session?.id) {
     return NextResponse.redirect(new URL("/dashboard", req.nextUrl));
   }
 
-  // 🔹 2. Si no hay sesión y la ruta es protegida, redirigir a /login
+  // 🔹 2. Si no hay sesión y la ruta es protegida, redirigir a /
   if (!session?.id && allowedRoles) {
     return NextResponse.redirect(new URL("/", req.nextUrl));
   }
