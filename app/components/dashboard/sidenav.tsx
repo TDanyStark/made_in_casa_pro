@@ -24,7 +24,7 @@ export default function SideNav() {
         <NavLinks />
         <div className="hidden h-auto w-full grow rounded-md bg-light-bg-2 dark:bg-dark-bg-2 md:block"></div>
         <form action={action}>
-          <button className="flex h-[48px] w-full grow items-center justify-center gap-2 rounded-md bg-light-bg-2 dark:bg-dark-bg-2 p-3 text-base hover:bg-red-700 hover:text-dark-subtitle md:flex-none md:justify-between md:p-2 md:px-3"
+          <button className="flex h-[48px] w-full grow items-center justify-center gap-2 rounded-md bg-light-bg-2 dark:bg-dark-bg-2 p-3 text-base hover:bg-red-700 hover:text-dark-subtitle md:flex-none md:justify-between md:p-2 md:px-3 cursor-pointer"
             disabled={pending} type="submit">
             <div className="hidden md:block">Sign Out</div>
             <Icons.power strokeWidth={1.2}/>

@@ -110,5 +110,9 @@
   .primaryH1 {
     @apply text-primary text-3xl font-bold;
   }
+
+  .btn-primary {
+    @apply bg-primary text-primary-foreground px-4 py-2 rounded-md font-medium;
+  }
 }
 
