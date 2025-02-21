@@ -8,6 +8,8 @@ export default async function middleware(req: NextRequest) {
   const path = req.nextUrl.pathname;
   const isPublicRoute = path === publicRoute;
   const allowedRoles = routePermissions[path];
+  const headers = new Headers(req.headers);
+  headers.set("x-current-path", req.nextUrl.pathname);
 
   const cookie = (await cookies()).get("session")?.value;
   let session = null;
@@ -42,7 +44,7 @@ export default async function middleware(req: NextRequest) {
   }
 
   // 🔹 4. Permitir acceso si pasa todas las validaciones
-  return NextResponse.next();
+  return NextResponse.next({ headers });
 }
 
 // 🔹 Rutas en las que NO se ejecutará el middleware (API, estáticos, imágenes)

@@ -1,8 +1,6 @@
 import { getUserRole } from "@/lib/session";
 import { UserRole } from "@/lib/definitions";
 
-
-
 export default async function Page() {
   // Obtener la cookie "session"
   const role = await getUserRole();
