@@ -18,7 +18,7 @@ export default async function Page() {
               ))}
             </div>
           }>
-          <ListClients query="" currentPage={1} />
+          <ListClients/>
         </Suspense>
       </div>
     </section>

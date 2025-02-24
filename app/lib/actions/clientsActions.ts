@@ -31,9 +31,9 @@ export async function createClientAction(formData: FormData){
   redirect('/clients');
 }
 
-export async function fetchFilteredClientsAction(query: string, currentPage: number){
+export async function fetchFilteredClientsAction(){
   try {
-    const response = await fetchFilteredClients(query, currentPage);
+    const response = await fetchFilteredClients();
     return response;
   } catch (error) {
     console.error('Error al obtener clientes:', error);
