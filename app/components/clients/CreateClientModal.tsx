@@ -3,6 +3,8 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -22,10 +24,10 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { createClientAction } from "@/lib/actions/clientsActions";
-import { CreateCountrySelect } from "./CreateCountrySelect";
-import { useEffect, useState } from "react";
 import { Loader2 } from "lucide-react";
+import { CreateCountrySelect } from "./CreateCountrySelect";
+import useItemMutations from "@/hooks/useItemsMutation";
+import { ClientType } from "@/lib/definitions";
 
 const formSchema = z.object({
   name: z.string().nonempty("El nombre es obligatorio"),
@@ -36,24 +38,37 @@ const formSchema = z.object({
 
 export function CreateClientModal() {
   const [open, setOpen] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
   const form = useForm({
     resolver: zodResolver(formSchema),
     defaultValues: {
       name: "",
-      country_id: 0, // Aseguramos que inicie sin valor
+      country_id: 0,
     },
+  });
+
+  const router = useRouter();
+  const { createItem } = useItemMutations<ClientType>("/clients");
+
+  const handleSubmit = form.handleSubmit((data) => {
+    createItem.mutate(
+      { ...data, id: 0 },
+      {
+        onSuccess: () => {
+          setOpen(false);
+          router.refresh();
+        },
+        onError: (error) => {
+          console.error("Error creando cliente:", error);
+        },
+      }
+    );
   });
 
   useEffect(() => {
     if (!open) {
-      form.reset({
-        name: "",
-        country_id: 0,
-      });
-      setIsSubmitting(false); // Resetear el estado del botón cuando se cierre
+      form.reset();
     }
-  }, [form, open]);
+  }, [open, form]);
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -67,14 +82,7 @@ export function CreateClientModal() {
         <Form {...form}>
           <form
             id="create-client"
-            onSubmit={form.handleSubmit(async (data) => {
-              setIsSubmitting(true);
-              const formData = new FormData();
-              formData.append("name", data.name);
-              formData.append("country_id", data.country_id.toString());
-              await createClientAction(formData);
-              setIsSubmitting(false);
-            })}
+            onSubmit={handleSubmit}
             className="space-y-4 mt-4"
           >
             <FormField
@@ -86,7 +94,7 @@ export function CreateClientModal() {
                   <FormControl>
                     <Input placeholder="Empresa asombrosa" {...field} />
                   </FormControl>
-                  <FormMessage className="text-red-500" />
+                  <FormMessage />
                 </FormItem>
               )}
             />
@@ -99,14 +107,15 @@ export function CreateClientModal() {
                   <FormControl>
                     <CreateCountrySelect field={field} />
                   </FormControl>
-                  <FormMessage className="text-red-500" />
+                  <FormMessage />
                 </FormItem>
               )}
             />
 
             <DialogFooter>
-              <Button type="submit" disabled={isSubmitting}>
-                {isSubmitting ? <Loader2 className="animate-spin mr-2" /> : "Crear"}
+              <Button type="submit" disabled={createItem.isPending} className="flex gap-2">
+                {createItem.isPending && <Loader2 className="animate-spin mr-2" />}
+                Crear
               </Button>
             </DialogFooter>
           </form>

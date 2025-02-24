@@ -1,6 +1,6 @@
 /* eslint-disable @next/next/no-img-element */
 import { CardContent } from "@/components/ui/card";
-import { Building } from "lucide-react";
+import { Building, ExternalLink } from "lucide-react";
 
 import { ClientType } from "@/lib/definitions";
 import Link from "next/link";
@@ -19,14 +19,22 @@ const ListClients = async ({
 
   return (
     <div className="mx-auto py-8">
-      <div className="grid gap-8 lg:grid-cols-3 2xl:grid-cols-5">
+      <div className="grid gap-8 lg:grid-cols-3">
         {clientes.map((client: ClientType) => (
-          <Link className="border border-muted-foreground rounded-md" href={`/clients/${client.id}`} key={client.id}>
-            <CardContent className="p-6">
-              <div  className="block group">
+          <Link
+            className="border border-muted-foreground rounded-md group hover:border-market-green transition-colors duration-300"
+            href={`/clients/${client.id}`}
+            key={client.id}
+          >
+            <CardContent className="p-6 relative">
+              <ExternalLink
+                strokeWidth={1.2}
+                className="absolute top-3 right-3 text-muted-foreground transition-opacity duration-300 opacity-0 group-hover:text-market-green group-hover:opacity-100"
+              />
+              <div className="block group">
                 <div className="flex items-center mb-2">
-                  <Building className="h-8 w-8 mr-2 text-blue-500" />
-                  <h2 className="text-3xl font-semibold">
+                  <Building className="h-8 w-8 mr-2 text-market-green" />
+                  <h2 className="text-2xl font-semibold truncate whitespace-nowrap overflow-hidden">
                     {client.name}
                   </h2>
                 </div>
@@ -38,7 +46,9 @@ const ListClients = async ({
                     height="15"
                     className="mr-2"
                   />
-                  <span className="text-xl text-muted-foreground">{client.country_name}</span>
+                  <span className="text-lg text-muted-foreground">
+                    {client.country_name}
+                  </span>
                 </div>
               </div>
             </CardContent>

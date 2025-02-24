@@ -34,7 +34,7 @@ export enum UserRole {
 }
 
 export type ClientType = {
-  id?: number;
+  id: number;
   name: string;
   country_id?: number;
   country_name?: string;
