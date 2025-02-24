@@ -1,12 +1,12 @@
 /* eslint-disable @next/next/no-img-element */
 import React, { useState, useEffect, useRef } from "react";
 import { ControllerRenderProps } from "react-hook-form";
-import useGetItems from "@/lib/hooks/useGetItems";
-import { API_FLAG_URL, IMG_FLAG_EXT } from "@/variables";
+import useGetItems from "@/hooks/useGetItems";
+import { API_FLAG_URL, IMG_FLAG_EXT } from "@/config/constants";
 import { Plus } from "lucide-react";
 import { Input } from "../ui/input";
 import { Button } from "../ui/button";
-import useItemMutations from "@/lib/hooks/useItemsMutation";
+import useItemMutations from "@/hooks/useItemsMutation";
 import { CountryType } from "@/lib/definitions";
 import { Skeleton } from "../ui/skeleton";
 import { cn } from "@/lib/utils";

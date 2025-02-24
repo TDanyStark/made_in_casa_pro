@@ -2,7 +2,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
-import { createClient } from '../queries/clients';
+import { createClient, fetchFilteredClients } from '../queries/clients';
 import { redirect } from 'next/navigation';
 
 const ClientSchema = z.object({
@@ -22,10 +22,21 @@ export async function createClientAction(formData: FormData){
 
   try{
     await createClient(name, country_id);
-    revalidatePath('/clients');
-    redirect('/clients');
   } catch (error) {
     console.error('Error al crear cliente:', error);
     throw new Error('No se pudo crear el cliente');
+  }
+
+  revalidatePath('/clients');
+  redirect('/clients');
+}
+
+export async function fetchFilteredClientsAction(query: string, currentPage: number){
+  try {
+    const response = await fetchFilteredClients(query, currentPage);
+    return response;
+  } catch (error) {
+    console.error('Error al obtener clientes:', error);
+    throw new Error('No se pudieron obtener los clientes');
   }
 }

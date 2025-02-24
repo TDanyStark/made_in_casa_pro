@@ -25,6 +25,7 @@ import { Input } from "@/components/ui/input";
 import { createClientAction } from "@/lib/actions/clientsActions";
 import { CreateCountrySelect } from "./CreateCountrySelect";
 import { useEffect, useState } from "react";
+import { Loader2 } from "lucide-react";
 
 const formSchema = z.object({
   name: z.string().nonempty("El nombre es obligatorio"),
@@ -35,6 +36,7 @@ const formSchema = z.object({
 
 export function CreateClientModal() {
   const [open, setOpen] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const form = useForm({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -49,6 +51,7 @@ export function CreateClientModal() {
         name: "",
         country_id: 0,
       });
+      setIsSubmitting(false); // Resetear el estado del botón cuando se cierre
     }
   }, [form, open]);
 
@@ -65,10 +68,12 @@ export function CreateClientModal() {
           <form
             id="create-client"
             onSubmit={form.handleSubmit(async (data) => {
+              setIsSubmitting(true);
               const formData = new FormData();
               formData.append("name", data.name);
               formData.append("country_id", data.country_id.toString());
               await createClientAction(formData);
+              setIsSubmitting(false);
             })}
             className="space-y-4 mt-4"
           >
@@ -95,13 +100,14 @@ export function CreateClientModal() {
                     <CreateCountrySelect field={field} />
                   </FormControl>
                   <FormMessage className="text-red-500" />
-                  {/* Ahora muestra errores */}
                 </FormItem>
               )}
             />
 
             <DialogFooter>
-              <Button type="submit">Crear</Button>
+              <Button type="submit" disabled={isSubmitting}>
+                {isSubmitting ? <Loader2 className="animate-spin mr-2" /> : "Crear"}
+              </Button>
             </DialogFooter>
           </form>
         </Form>

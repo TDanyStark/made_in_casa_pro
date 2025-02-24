@@ -1,7 +1,7 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import axios from "axios";
 import { toast } from "sonner"
-import { URL_BACKEND_API } from "@/variables";
+import { URL_BACKEND_API } from "@/config/constants";
 
 const useItemMutations = <T extends { id: number }>(
   resource: string,
