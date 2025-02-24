@@ -9,8 +9,6 @@ import { login } from "@/lib/actions/auth";
 
 export function UserLoginForm() {
   const [state, action, pending] = useActionState(login, undefined);
-  console.log(state);
-
   return (
     <div className="grid gap-6">
       <form action={action}>

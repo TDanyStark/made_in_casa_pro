@@ -8,3 +8,14 @@ export async function getCountries() {
     throw new Error('No se pudieron obtener los países');
   }
 }
+
+export async function createCountry(name: string, flag: string) {
+  try {
+    return await turso.execute({
+      sql: `INSERT INTO countries (name, flag) VALUES (?, ?)`,
+      args: [name, flag],
+    });
+  } catch (error) {
+    throw new Error(String(error));
+  }
+}

@@ -8,3 +8,14 @@ export async function getClients() {
     throw new Error('No se pudieron obtener los clientes');
   }
 }
+
+export async function createClient(name: string, country_id: number) {
+  try {
+    return await turso.execute({
+      sql: `INSERT INTO clients (name, country_id) VALUES (?, ?)`,
+      args: [name, country_id],
+    });
+  } catch (error) {
+    throw new Error(String(error));
+  }
+}

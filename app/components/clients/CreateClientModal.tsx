@@ -22,7 +22,7 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { createClient } from "@/lib/actions/clientsActions";
+import { createClientAction } from "@/lib/actions/clientsActions";
 import { CreateCountrySelect } from "./CreateCountrySelect";
 import { useEffect, useState } from "react";
 
@@ -68,8 +68,7 @@ export function CreateClientModal() {
               const formData = new FormData();
               formData.append("name", data.name);
               formData.append("country_id", data.country_id.toString());
-              console.log(data);
-              await createClient(formData);
+              await createClientAction(formData);
             })}
             className="space-y-4 mt-4"
           >

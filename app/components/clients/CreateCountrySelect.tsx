@@ -8,6 +8,8 @@ import { Input } from "../ui/input";
 import { Button } from "../ui/button";
 import useItemMutations from "@/lib/hooks/useItemsMutation";
 import { CountryType } from "@/lib/definitions";
+import { Skeleton } from "../ui/skeleton";
+import { cn } from "@/lib/utils";
 
 interface Country {
   id: string;
@@ -84,21 +86,28 @@ export function CreateCountrySelect({ field }: CreateCountrySelectProps) {
   };
 
   // llamar a useItemMutations
-  const {createItem, dataCreate} = useItemMutations<CountryType>("/countries");
+  const {createItem} = useItemMutations<CountryType>("/countries");
 
-  const handleCreateCountry = () => {
-    console.log(newCountryName, newCountryFlag);
+  const handleCreateCountry = async (e: React.MouseEvent<HTMLButtonElement, MouseEvent>) => {
+    e.preventDefault();
     if (!newCountryName || !newCountryFlag) return;
-    createItem.mutate({
-      name: newCountryName,
-      flag: newCountryFlag,
-      id: 0,
-    });
-    console.log(dataCreate);
-    setNewCountryName("");
-    setNewCountryFlag("");
-    setIsCreating(false);
+  
+    try {
+      const response = await createItem.mutateAsync({
+        name: newCountryName,
+        flag: newCountryFlag,
+        id: 0,
+      });
+  
+      console.log("Respuesta del servidor:", response);
+      setNewCountryName("");
+      setNewCountryFlag("");
+      setIsCreating(false);
+    } catch (error) {
+      console.error("Error al crear el país:", error);
+    }
   };
+  
 
   if (isError)
     return <div className="text-red-500">Error al cargar los países</div>;
@@ -106,14 +115,17 @@ export function CreateCountrySelect({ field }: CreateCountrySelectProps) {
   return (
     <div className="space-y-2 relative" ref={containerRef}>
       {isLoading ? (
-        <div className="h-9 w-full mb-2 bg-gray-200 animate-pulse rounded" />
+        <Skeleton className="h-[36px]" />
       ) : (
         <div>
           {/* Trigger del "select" personalizado */}
           <button
             type="button"
             onClick={() => setIsOpen(!isOpen)}
-            className="w-full border border-gray-300 p-2 rounded text-left"
+            className={cn(
+              "w-full h-9 text-sm text-muted-foreground py-1 px-3 border border-secondary rounded-md flex items-center justify-between",
+              isOpen && "border-input outline-ring/50 outline-4", selectedCountry && "text-primary"
+            )}
           >
             {selectedCountry ? (
               <div className="flex items-center gap-2">
@@ -181,7 +193,7 @@ export function CreateCountrySelect({ field }: CreateCountrySelectProps) {
             value={newCountryName}
             onChange={(e) => setNewCountryName(e.target.value)}
             placeholder="Nombre del nuevo país"
-            className="flex-1 p-2 border border-gray-300 rounded"
+            className="flex-1 py-1 px-2 border border-gray-300 rounded"
           />
           <Input
             type="text"
@@ -189,16 +201,21 @@ export function CreateCountrySelect({ field }: CreateCountrySelectProps) {
             value={newCountryFlag}
             onChange={(e) => setNewCountryFlag(e.target.value)}
             placeholder="Bandera"
-            className="flex-1 p-2 border border-gray-300 rounded"
+            className="flex-1 py-1 px-2 border border-gray-300 rounded"
           />
           <Button
-            onClick={handleCreateCountry}
+            onClick={(e) => handleCreateCountry(e)}
           >
             <Plus className="w-4 h-4 mr-1" />
             Crear
           </Button>
           <Button
-            onClick={() => setIsCreating(false)}
+            onClick={() => {
+              setIsCreating(false);
+              setNewCountryName("");
+              setNewCountryFlag("");
+              setSearchTerm("");
+            }}
             variant={"secondary"}
           >
             Cancelar
