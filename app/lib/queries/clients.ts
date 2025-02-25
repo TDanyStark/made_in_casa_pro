@@ -22,7 +22,6 @@ export async function createClient(name: string, country_id: number) {
 
 export async function fetchFilteredClients() {
   try {
-
     const clients = await turso.execute(`
         SELECT c.id, c.name, co.name AS country_name, co.flag AS country_flag
         FROM clients c
