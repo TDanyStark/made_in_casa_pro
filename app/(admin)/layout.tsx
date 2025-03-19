@@ -14,7 +14,7 @@ export default async function Layout({
 
   return (
       <RoleProvider role={role}>
-        <main className="relative flex h-screen flex-col md:flex-row md:overflow-hidden">
+        <main className="relative flex min-h-screen flex-col md:flex-row md:overflow-hidden">
           <div className="absolute right-4 top-4 md:right-8 md:top-8">
             <ModeToggle />
           </div>

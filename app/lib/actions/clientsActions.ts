@@ -40,3 +40,8 @@ export async function fetchFilteredClientsAction(){
     throw new Error('No se pudieron obtener los clientes');
   }
 }
+
+export async function testAction(){
+  console.log('Test action');
+  return 3;
+}
