@@ -61,14 +61,14 @@ export async function createManager(managerData: Omit<ManagerType, 'id'>) {
         managerData.name,
         managerData.email,
         managerData.phone,
-        managerData.biography
+        managerData.biography || '' // Asegurarnos de que nunca sea undefined
       ]
     });
     
     revalidatePath(`/clients/${managerData.client_id}`);
     
     return {
-      id: result.lastInsertRowid,
+      id: Number(result.lastInsertRowid), // Convertir BigInt a Number
       ...managerData
     };
   } catch (error) {

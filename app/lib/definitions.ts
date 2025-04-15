@@ -46,10 +46,10 @@ export type CountryType = {
 }
 
 export type ManagerType = {
-  id: number;
+  id?: number;
   client_id: number;
   name: string;
   email: string;
   phone: string;
-  biography: string;
+  biography?: string;
 };

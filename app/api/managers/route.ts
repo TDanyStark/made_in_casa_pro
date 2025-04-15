@@ -9,7 +9,7 @@ const managerSchema = z.object({
   name: z.string().min(1),
   email: z.string().email(),
   phone: z.string().min(1),
-  biography: z.string().min(1),
+  biography: z.string(),
 });
 
 export async function POST(request: NextRequest) {
@@ -49,7 +49,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(newManager, { status: 201 });
   } catch (error) {
     console.error("Error creating manager:", error);
-    return NextResponse.json({ error: "Error al crear el gerente" }, { status: 500 });
+    return NextResponse.json({ error: "Error al crear el gerente "+ error }, { status: 500 });
   }
 }
 

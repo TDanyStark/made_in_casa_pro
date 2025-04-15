@@ -3,13 +3,14 @@ import axios from "axios";
 import { toast } from "sonner"
 import { URL_BACKEND_API } from "@/config/constants";
 
-const useItemMutations = <T extends { id: number }>(
+// Modificamos la definición para hacer el id opcional en las operaciones de creación
+const useItemMutations = <T extends { id?: number }>(
   resource: string,
   setIsOpen?: (state: boolean) => void
 ) => {
   const queryClient = useQueryClient();
 
-  // Create Mutation
+  // Create Mutation - ahora puede aceptar datos sin id
   const createItem = useMutation<unknown, Error, T>(
     {
       mutationFn: (newItem: T) =>
@@ -32,10 +33,11 @@ const useItemMutations = <T extends { id: number }>(
     },
   );
 
-  const updateItem = useMutation<unknown, Error, T>(
+  // Update Mutation - requiere un id válido
+  const updateItem = useMutation<unknown, Error, T & { id: number }>(
     {
-      mutationFn: (newItem: T) =>
-        axios.put(`${URL_BACKEND_API}/${resource}/${newItem.id}`, newItem).then(response => response.data),
+      mutationFn: (updatedItem: T & { id: number }) =>
+        axios.put(`${URL_BACKEND_API}/${resource}/${updatedItem.id}`, updatedItem).then(response => response.data),
       onSuccess: () => {
         queryClient.invalidateQueries({ queryKey: [resource] });
         toast.success(`${resource} actualizado exitosamente`);
@@ -54,6 +56,7 @@ const useItemMutations = <T extends { id: number }>(
     },
   );
 
+  // Delete Mutation
   const deleteItem = useMutation<unknown, Error, number>(
     {
       mutationFn: (id: number) =>
