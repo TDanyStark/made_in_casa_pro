@@ -4,7 +4,7 @@ import { URL_BACKEND_API } from "@/config/constants";
 
 
 const fetchItems = async (resource: string) => {
-  const response = await axios.get(`${URL_BACKEND_API}${resource}`);
+  const response = await axios.get(`${URL_BACKEND_API}/${resource}`);
   const data = response.data;
   return data;
 };

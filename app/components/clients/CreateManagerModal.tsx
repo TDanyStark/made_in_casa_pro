@@ -3,7 +3,7 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
-import { useState, useEffect } from "react";
+import { useEffect } from "react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -12,7 +12,6 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
 import {
   Form,
@@ -29,7 +28,6 @@ import useItemMutations from "@/hooks/useItemsMutation";
 import { RichTextEditor } from "./RichTextEditor";
 import { ManagerType } from "@/lib/definitions";
 
-// Estilos adicionales para el editor
 
 const formSchema = z.object({
   client_id: z.coerce.number().int().positive("Se requiere un cliente válido"),
@@ -44,9 +42,14 @@ const formSchema = z.object({
 
 type ManagerFormData = z.infer<typeof formSchema> & { id?: number };
 
+interface Props{
+  clientId: number;
+  openModal: boolean;
+  handleModal: (state: boolean) => void;
+}
+
 // Rich Text Editor Component
-export function CreateManagerModal({ clientId }: { clientId: number }) {
-  const [open, setOpen] = useState(false);
+export function CreateManagerModal({ clientId, openModal, handleModal }: Props) {
   const form = useForm<ManagerFormData>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -64,7 +67,7 @@ export function CreateManagerModal({ clientId }: { clientId: number }) {
     console.log(data);
     createItem.mutate(data, {
       onSuccess: () => {
-        setOpen(false);
+        handleModal(false);
       },
       onError: (error) => {
         console.error("Error creando gerente:", error);
@@ -73,7 +76,7 @@ export function CreateManagerModal({ clientId }: { clientId: number }) {
   });
 
   useEffect(() => {
-    if (!open) {
+    if (!openModal) {
       form.reset({
         client_id: clientId,
         name: "",
@@ -82,13 +85,10 @@ export function CreateManagerModal({ clientId }: { clientId: number }) {
         biography: "",
       });
     }
-  }, [open, form, clientId]);
+  }, [openModal, form, clientId]);
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button variant="default">Crear Gerente</Button>
-      </DialogTrigger>
+    <Dialog open={openModal} onOpenChange={handleModal}>
       <DialogContent className="sm:max-w-[525px]">
         {" "}
         {/* Increased width for better editor experience */}

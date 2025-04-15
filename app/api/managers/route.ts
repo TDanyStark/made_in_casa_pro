@@ -64,6 +64,7 @@ export async function GET(request: NextRequest) {
       managers = await getManagersByClientId(clientId);
     } else {
       managers = await getManagers();
+      console.log(managers);
     }
     
     return NextResponse.json(managers);

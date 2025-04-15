@@ -44,7 +44,8 @@ export async function getManagersByClientId(clientId: string) {
 
 export async function getManagers() {
   try {
-    return await turso.execute(`SELECT * FROM managers ORDER BY name ASC`);
+    const result = await turso.execute(`SELECT * FROM managers ORDER BY name ASC`);
+    return result.rows as unknown as ManagerType[];
   } catch (error) {
     console.error("Error fetching managers:", error);
     return [];
