@@ -17,7 +17,7 @@ const ListClients = ({
   const [search, setSearch] = useState("");
 
   const filteredClients = clients.filter((client) =>
-    client.name.toLowerCase().includes(search.toLowerCase()) || (client.country_name ?? "").toLowerCase().includes(search.toLowerCase())
+    client.name.toLowerCase().includes(search.toLowerCase()) || (client.country?.name ?? "").toLowerCase().includes(search.toLowerCase())
   );
 
   return(
@@ -53,14 +53,14 @@ const ListClients = ({
                 </div>
                 <div className="flex items-center pl-1">
                   <img
-                    src={`${API_FLAG_URL}${client.country_flag}${IMG_FLAG_EXT}`}
-                    alt={`Bandera de ${client.country_name}`}
+                    src={`${API_FLAG_URL}${client.country?.flag}${IMG_FLAG_EXT}`}
+                    alt={`Bandera de ${client.country?.name}`}
                     width="20"
                     height="15"
                     className="mr-2"
                   />
                   <span className="text-lg text-muted-foreground">
-                    {client.country_name}
+                    {client.country?.name}
                   </span>
                 </div>
               </div>

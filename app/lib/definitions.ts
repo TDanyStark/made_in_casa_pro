@@ -36,9 +36,7 @@ export enum UserRole {
 export type ClientType = {
   id: number;
   name: string;
-  country_id?: number;
-  country_name?: string;
-  country_flag?: string;
+  country?: CountryType;
 }
 
 export type CountryType = {
