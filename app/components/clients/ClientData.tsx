@@ -21,7 +21,7 @@ export async function ClientData({ id }: { id: string }) {
         <h1 className="primaryH1">{client.name}</h1>
       </div>
       <div className="mt-8">
-        <TabsManagersAndBrands />
+        <TabsManagersAndBrands clientId={parseInt(id)} />
       </div>
     </>
   );

@@ -44,3 +44,12 @@ export type CountryType = {
   name: string;
   flag: string;
 }
+
+export type ManagerType = {
+  id: number;
+  client_id: number;
+  name: string;
+  email: string;
+  phone: string;
+  biography: string;
+};

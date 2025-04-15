@@ -47,7 +47,7 @@ export function CreateClientModal() {
   });
 
   const router = useRouter();
-  const { createItem } = useItemMutations<ClientType>("/clients");
+  const { createItem } = useItemMutations<ClientType>("clients");
 
   const handleSubmit = form.handleSubmit((data) => {
     createItem.mutate(

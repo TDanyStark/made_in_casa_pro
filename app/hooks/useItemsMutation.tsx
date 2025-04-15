@@ -13,7 +13,7 @@ const useItemMutations = <T extends { id: number }>(
   const createItem = useMutation<unknown, Error, T>(
     {
       mutationFn: (newItem: T) =>
-        axios.post(`${URL_BACKEND_API}${resource}`, newItem).then(response => response.data),
+        axios.post(`${URL_BACKEND_API}/${resource}`, newItem).then(response => response.data),
       onSuccess: () => {
         queryClient.invalidateQueries({ queryKey: [resource] });
         toast.success(`${resource} creado exitosamente`);
@@ -35,7 +35,7 @@ const useItemMutations = <T extends { id: number }>(
   const updateItem = useMutation<unknown, Error, T>(
     {
       mutationFn: (newItem: T) =>
-        axios.put(`${URL_BACKEND_API}${resource}/${newItem.id}`, newItem).then(response => response.data),
+        axios.put(`${URL_BACKEND_API}/${resource}/${newItem.id}`, newItem).then(response => response.data),
       onSuccess: () => {
         queryClient.invalidateQueries({ queryKey: [resource] });
         toast.success(`${resource} actualizado exitosamente`);
@@ -57,7 +57,7 @@ const useItemMutations = <T extends { id: number }>(
   const deleteItem = useMutation<unknown, Error, number>(
     {
       mutationFn: (id: number) =>
-        axios.delete(`${URL_BACKEND_API}${resource}/${id}`).then(response => response.data),
+        axios.delete(`${URL_BACKEND_API}/${resource}/${id}`).then(response => response.data),
       onSuccess: () => {
         queryClient.invalidateQueries({ queryKey: [resource] });
         toast.success(`${resource} eliminado exitosamente`);
