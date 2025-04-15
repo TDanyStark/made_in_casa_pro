@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import "./styles/tiptap.css"; // Importamos los estilos globales de TipTap
 import { ThemeProvider } from "@/components/theme-provider";
 import QueryProvider from "./components/QueryProvider";
 import { Toaster } from "@/components/ui/sonner"

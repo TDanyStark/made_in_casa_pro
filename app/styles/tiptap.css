@@ -1,0 +1,50 @@
+/* Estilos globales para editores TipTap */
+
+/* Estilos para la selección de texto */
+.ProseMirror ::selection {
+  background-color: rgba(67, 56, 202, 0.3) !important;
+}
+
+.ProseMirror .ProseMirror-selectednode {
+  outline: 2px solid #4338ca !important;
+}
+
+/* Mejora de la visibilidad del cursor */
+.ProseMirror .ProseMirror-cursor {
+  border-left: 2px solid black;
+  border-left-color: currentColor;
+  margin-left: -1px;
+}
+
+/* Estilo para bloques seleccionados completos */
+.ProseMirror-selectednode {
+  outline: 2px solid #4338ca !important;
+  border-radius: 2px;
+}
+
+/* Modo oscuro */
+.dark .ProseMirror ::selection {
+  background-color: rgba(147, 197, 253, 0.3) !important; /* Color azul más claro para modo oscuro */
+}
+
+.dark .ProseMirror .ProseMirror-selectednode,
+.dark .ProseMirror-selectednode {
+  outline: 2px solid #93c5fd !important;
+}
+
+.tiptap.ProseMirror p:not(:first-child){
+  margin-top: 0.1rem !important;
+}
+
+.tiptap.ProseMirror h1{
+  margin-top: 1rem !important;
+  margin-bottom: 1rem !important;
+}
+
+.tiptap-button[data-active-state="on"]:not([disabled]), .tiptap-button[data-state="open"]:not([disabled]) {
+  background-color: var(--color-market-pink) !important;
+}
+
+.tiptap-button:hover{
+  background-color: var(--color-market-purple) !important;
+}
