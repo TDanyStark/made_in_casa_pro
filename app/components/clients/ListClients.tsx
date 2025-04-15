@@ -14,7 +14,6 @@ const ListClients = ({
 }: {
   clients: ClientType[];
 }) => {
-  console.log(clients);
   const [search, setSearch] = useState("");
 
   const filteredClients = clients.filter((client) =>
