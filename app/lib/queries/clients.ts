@@ -74,3 +74,5 @@ export async function getClientById(id: string): Promise<ClientType | null> {
     throw new Error('No se pudo obtener el cliente');
   }
 }
+
+// Managers

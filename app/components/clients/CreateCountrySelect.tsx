@@ -11,12 +11,6 @@ import { CountryType } from "@/lib/definitions";
 import { Skeleton } from "../ui/skeleton";
 import { cn } from "@/lib/utils";
 
-interface Country {
-  id: string;
-  name: string;
-  flag: string;
-}
-
 interface CreateCountrySelectProps {
   field: ControllerRenderProps<
     { name: string; country_id: number },
@@ -30,7 +24,7 @@ export function CreateCountrySelect({ field }: CreateCountrySelectProps) {
   const [newCountryName, setNewCountryName] = useState("");
   const [newCountryFlag, setNewCountryFlag] = useState("");
   const { data, isLoading, isError } = useGetItems("/countries");
-  const countries: Country[] = data?.countries ?? [];
+  const countries: CountryType[] = data?.countries ?? [];
   const flagInputRef = useRef<HTMLInputElement>(null);
   const [isOpen, setIsOpen] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);

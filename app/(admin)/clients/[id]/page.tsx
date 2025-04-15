@@ -5,7 +5,6 @@ import { ClientData } from "@/components/clients/ClientData";
 export default function ClientPage({ params }: { params: { id: string } }) {
   return (
     <section>
-      <h1 className="primaryH1">Información del Cliente</h1>
       <div className="mt-6">
         <Suspense
           fallback={

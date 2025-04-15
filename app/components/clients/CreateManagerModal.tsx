@@ -36,7 +36,7 @@ const formSchema = z.object({
   }),
 });
 
-export function CreateClientModal() {
+export function CreateManagerModal() {
   const [open, setOpen] = useState(false);
   const form = useForm({
     resolver: zodResolver(formSchema),
@@ -72,8 +72,8 @@ export function CreateClientModal() {
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger>
-        <Button variant="default">Crear Cliente</Button>
+      <DialogTrigger asChild>
+        <Button variant="default">Crear Gerente</Button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
@@ -125,4 +125,4 @@ export function CreateClientModal() {
   );
 }
 
-export default CreateClientModal;
+export default CreateManagerModal;
