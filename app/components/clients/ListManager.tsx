@@ -38,7 +38,7 @@ const ListManager = ({ clientId, managers, pageCount, currentPage, searchQuery =
   
   // Handle pagination
   const handlePageChange = (page: number) => {
-    replace(`${pathname}?${createQueryString({ page: page + 1, search: searchQuery || null })}`);
+    replace(`${pathname}?${createQueryString({ page: page, search: searchQuery || null })}`);
   };
   
   // Handle search

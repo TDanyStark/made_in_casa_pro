@@ -25,7 +25,7 @@ const Pagination = ({ currentPage, pageCount, onPageChange }: PaginationProps) =
       <Button
         variant="outline"
         size="sm"
-        onClick={() => onPageChange(currentPage - 2)}
+        onClick={() => onPageChange(currentPage - 1)}
         disabled={currentPage <= 1}
       >
         <span className="sr-only">Página anterior</span>
@@ -34,7 +34,7 @@ const Pagination = ({ currentPage, pageCount, onPageChange }: PaginationProps) =
       <Button
         variant="outline"
         size="sm"
-        onClick={() => onPageChange(currentPage)}
+        onClick={() => onPageChange(currentPage + 1)}
         disabled={currentPage >= pageCount}
       >
         <span className="sr-only">Página siguiente</span>
@@ -43,7 +43,7 @@ const Pagination = ({ currentPage, pageCount, onPageChange }: PaginationProps) =
       <Button
         variant="outline"
         size="sm"
-        onClick={() => onPageChange(pageCount - 1)}
+        onClick={() => onPageChange(pageCount)}
         disabled={currentPage >= pageCount}
       >
         <span className="sr-only">Última página</span>
