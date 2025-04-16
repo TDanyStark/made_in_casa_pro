@@ -53,3 +53,9 @@ export type ManagerType = {
   phone: string;
   biography?: string;
 };
+
+export type BrandType = {
+  id?: number;
+  manager_id: number;
+  name: string;
+};

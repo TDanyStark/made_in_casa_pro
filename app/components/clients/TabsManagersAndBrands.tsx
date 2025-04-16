@@ -31,7 +31,7 @@ export function TabsManagersAndBrands({ clientId }: { clientId: number }) {
       </TabsContent>
       <TabsContent value="brands" className="p-4">
       <Button variant="default" onClick={()=>{handleBrandModal(true)}}>Crear marca</Button>
-        <CreateBrandModal openModal={openBrandModal} handleModal={handleBrandModal} />
+        <CreateBrandModal clientId={clientId} openModal={openBrandModal} handleModal={handleBrandModal} />
       </TabsContent>
     </Tabs>
   );
