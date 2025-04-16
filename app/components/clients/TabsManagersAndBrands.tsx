@@ -29,7 +29,7 @@ export function TabsManagersAndBrands({ clientId }: { clientId: number }) {
           Crear gerente
         </Button>
         <CreateManagerModal
-          clientId={undefined}
+          clientId={clientId}
           openModal={openManagerModal}
           handleModal={handleManagerModal}
         />

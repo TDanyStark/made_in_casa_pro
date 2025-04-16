@@ -43,6 +43,7 @@ interface Props {
 }
 
 export function CreateBrandModal({ clientId, openModal, handleModal }: Props) {
+  console.log("clientId", clientId);
   const form = useForm<BrandFormData>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -180,15 +181,13 @@ export function CreateBrandModal({ clientId, openModal, handleModal }: Props) {
         </DialogContent>
       </Dialog>
 
-      {clientId && (
-        <CreateManagerModal
-          clientId={clientId}
-          openModal={isCreatingManager}
-          handleModal={(state) => setIsCreatingManager(state)}
-          onSuccess={handleManagerCreated}
-          initialName={newManagerName}
-        />
-      )}
+      <CreateManagerModal
+        clientId={clientId}
+        openModal={isCreatingManager}
+        handleModal={(state) => setIsCreatingManager(state)}
+        onSuccess={handleManagerCreated}
+        initialName={newManagerName}
+      />
     </>
   );
 }
