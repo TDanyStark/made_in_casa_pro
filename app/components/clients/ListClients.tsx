@@ -7,7 +7,7 @@ import { CardContent } from "../ui/card";
 import { Building, ExternalLink } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
-import { Input } from "../ui/input";
+import SearchBar from "@/components/search/search";
 
 const ListClients = ({
   clients,
@@ -20,15 +20,22 @@ const ListClients = ({
     client.name.toLowerCase().includes(search.toLowerCase()) || (client.country?.name ?? "").toLowerCase().includes(search.toLowerCase())
   );
 
+  const handleSearch = (searchValue: string) => {
+    setSearch(searchValue);
+  };
+
+  const handleReset = () => {
+    setSearch("");
+  };
+
   return(
   <>
     <div className="mt-6">
-      <Input
-        type="search"
-        placeholder="Buscar cliente"
-        className="w-full max-w-72"
-        value={search}
-        onChange={(e) => setSearch(e.target.value)}
+      <SearchBar
+        initialSearchValue={search}
+        placeholder="Buscar cliente o país..."
+        onSearch={handleSearch}
+        onReset={handleReset}
       />
     </div>
     <div className="mx-auto py-4">

@@ -2,7 +2,13 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Suspense } from "react";
 import { ClientData } from "@/components/clients/ClientData";
 
-export default function ClientPage({ params }: { params: { id: string } }) {
+
+type Props = {
+  params: Promise<{ id: string }>
+};
+
+export default async function ClientPage({ params }: Props) {
+  const { id } = await params;
   return (
     <section>
       <div className="mt-6">
@@ -14,10 +20,9 @@ export default function ClientPage({ params }: { params: { id: string } }) {
             </div>
           }
         >
-          <ClientData id={params.id} />
+          <ClientData id={id} />
         </Suspense>
       </div>
     </section>
   );
 }
-

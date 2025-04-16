@@ -52,6 +52,80 @@ export async function getManagers() {
   }
 }
 
+interface PaginationParams {
+  clientId?: string;
+  page?: number;
+  limit?: number;
+  search?: string;
+}
+
+export async function getManagersWithPagination({
+  clientId,
+  page = 1,
+  limit = 10,
+  search
+}: PaginationParams) {
+  try {
+    let sql = 'SELECT * FROM managers';
+    const args = [];
+    const countArgs = [];
+    
+    // Build WHERE clause
+    const conditions: string[] = [];
+    
+    if (clientId) {
+      conditions.push('client_id = ?');
+      args.push(clientId);
+      countArgs.push(clientId);
+    }
+    
+    if (search) {
+      conditions.push('(name LIKE ? OR email LIKE ? OR phone LIKE ?)');
+      const searchParam = `%${search}%`;
+      args.push(searchParam, searchParam, searchParam);
+      countArgs.push(searchParam, searchParam, searchParam);
+    }
+    
+    if (conditions.length > 0) {
+      sql += ' WHERE ' + conditions.join(' AND ');
+    }
+    
+    // Get total count for pagination
+    let countSql = 'SELECT COUNT(*) as count FROM managers';
+    if (conditions.length > 0) {
+      countSql += ' WHERE ' + conditions.join(' AND ');
+    }
+    
+    const countResult = await turso.execute({
+      sql: countSql,
+      args: countArgs
+    });
+    
+    const total = Number(countResult.rows[0].count);
+    
+    // Add pagination
+    const offset = (page - 1) * limit;
+    sql += ' ORDER BY name ASC LIMIT ? OFFSET ?';
+    args.push(limit, offset);
+
+    console.log(sql, args);
+    
+    // Execute query
+    const result = await turso.execute({
+      sql,
+      args
+    });
+    
+    return {
+      managers: result.rows as unknown as ManagerType[],
+      total
+    };
+  } catch (error) {
+    console.error("Error fetching managers with pagination:", error);
+    return { managers: [], total: 0 };
+  }
+}
+
 export async function createManager(managerData: Omit<ManagerType, 'id'>) {
   try {
     const result = await turso.execute({

@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { createManager, getManagerByEmail, getManagers, getManagersByClientId } from "@/lib/queries/managers";
+import { createManager, getManagerByEmail, getManagersWithPagination } from "@/lib/queries/managers";
 import { getClientById } from "@/lib/queries/clients";
+import { ITEMS_PER_PAGE } from "@/config/constants";
 
 // Schema for validating manager data
 const managerSchema = z.object({
@@ -57,17 +58,27 @@ export async function GET(request: NextRequest) {
   try {
     const url = new URL(request.url);
     const clientId = url.searchParams.get("client_id");
+    const page = parseInt(url.searchParams.get("page") || "1");
+    const limit = ITEMS_PER_PAGE;
+    const search = url.searchParams.get("search");
     
-    let managers;
+    // Get paginated results
+    const { managers, total } = await getManagersWithPagination({
+      clientId: clientId || undefined,
+      page,
+      limit,
+      search: search || undefined
+    });
     
-    if (clientId) {
-      managers = await getManagersByClientId(clientId);
-    } else {
-      managers = await getManagers();
-      console.log(managers);
-    }
+    // Calculate total pages
+    const pageCount = Math.ceil(total / limit);
     
-    return NextResponse.json(managers);
+    return NextResponse.json({
+      managers,
+      pageCount,
+      currentPage: page,
+      total
+    });
   } catch (error) {
     console.error("Error fetching managers:", error);
     return NextResponse.json({ error: "Error al obtener los gerentes" }, { status: 500 });

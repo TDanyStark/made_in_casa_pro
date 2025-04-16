@@ -81,7 +81,6 @@ export function CreateManagerModal({
 
   const { createItem } = useItemMutations<ManagerType>("managers");
   const { data: clients, isLoading: isLoadingClients } = useGetItems("clients");
-  console.log("clients", clients);
   const [clientOptions, setClientOptions] = useState<ClientOption[]>([]);
   const [isCreatingClient, setIsCreatingClient] = useState(false);
   const [newClientName, setNewClientName] = useState("");

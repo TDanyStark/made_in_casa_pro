@@ -2,9 +2,10 @@
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import CreateManagerModal from "./CreateManagerModal";
-import { useState } from "react";
 import { Button } from "../ui/button";
 import CreateBrandModal from "./CreateBrandModal";
+import ManagerTable from "./ManagerTable";
+import { useState } from "react";
 
 export function TabsManagersAndBrands({ clientId }: { clientId: number }) {
   const [openManagerModal, setOpenManagerModal] = useState(false);
@@ -19,12 +20,12 @@ export function TabsManagersAndBrands({ clientId }: { clientId: number }) {
   };
 
   return (
-    <Tabs defaultValue="managers" className="w-full">
-      <TabsList className="w-full max-w-96 grid grid-cols-2">
+    <Tabs defaultValue="managers">
+      <TabsList>
         <TabsTrigger value="managers">Gerentes</TabsTrigger>
         <TabsTrigger value="brands">Marcas</TabsTrigger>
       </TabsList>
-      <TabsContent value="managers" className="p-4 space-y-4">
+      <TabsContent value="managers" className="p-4">
         <Button variant="default" onClick={() => handleManagerModal(true)}>
           Crear gerente
         </Button>
@@ -33,6 +34,7 @@ export function TabsManagersAndBrands({ clientId }: { clientId: number }) {
           openModal={openManagerModal}
           handleModal={handleManagerModal}
         />
+        <ManagerTable clientId={clientId.toString()} />
       </TabsContent>
       <TabsContent value="brands" className="p-4">
         <Button variant="default" onClick={() => handleBrandModal(true)}>
