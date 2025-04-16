@@ -1,4 +1,4 @@
-import ManagerTableClient from "./ManagerTableClient";
+import ManagerTableClient from "./ListManagersClient";
 
 interface ManagerTableProps {
   clientId?: string;

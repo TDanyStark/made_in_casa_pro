@@ -53,7 +53,7 @@ const TableManagers = ({ managers, pageCount }: TableManagersProps) => {
   });
 
   return (
-    <div className="rounded-md border">
+    <div className="rounded-md border h-[404px]">
       <Table>
         <TableHeader>
           {table.getHeaderGroups().map((headerGroup) => (
