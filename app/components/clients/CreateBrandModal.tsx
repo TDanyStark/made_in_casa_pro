@@ -43,7 +43,6 @@ interface Props {
 }
 
 export function CreateBrandModal({ clientId, openModal, handleModal }: Props) {
-  console.log("clientId", clientId);
   const form = useForm<BrandFormData>({
     resolver: zodResolver(formSchema),
     defaultValues: {
