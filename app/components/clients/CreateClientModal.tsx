@@ -36,12 +36,23 @@ const formSchema = z.object({
   }),
 });
 
-export function CreateClientModal() {
+interface ModalControlProps {
+  isOpen: boolean;
+  setOpen: (state: boolean) => void;
+}
+
+interface Props {
+  modalControl?: ModalControlProps;
+  onSuccess?: (client: ClientType) => void;
+  initialName?: string;
+}
+
+export function CreateClientModal({ modalControl, onSuccess, initialName = "" }: Props = {}) {
   const [open, setOpen] = useState(false);
   const form = useForm({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      name: "",
+      name: initialName,
       country_id: 0,
     },
   });
@@ -49,13 +60,21 @@ export function CreateClientModal() {
   const router = useRouter();
   const { createItem } = useItemMutations<ClientType>("clients");
 
+  // Use either provided modal control or local state
+  const isOpen = modalControl?.isOpen ?? open;
+  const setIsOpen = modalControl?.setOpen ?? setOpen;
+
   const handleSubmit = form.handleSubmit((data) => {
     createItem.mutate(
       { ...data, id: 0 },
       {
-        onSuccess: () => {
-          setOpen(false);
-          router.refresh();
+        onSuccess: (data) => {
+          setIsOpen(false);
+          if (onSuccess && data) {
+            onSuccess(data as ClientType);
+          } else {
+            router.refresh();
+          }
         },
         onError: (error) => {
           console.error("Error creando cliente:", error);
@@ -65,16 +84,23 @@ export function CreateClientModal() {
   });
 
   useEffect(() => {
-    if (!open) {
-      form.reset();
+    if (!isOpen) {
+      form.reset({
+        name: initialName,
+        country_id: 0,
+      });
+    } else if (initialName) {
+      form.setValue("name", initialName);
     }
-  }, [open, form]);
+  }, [isOpen, initialName, form]);
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger>
-        <Button variant="default">Crear Cliente</Button>
-      </DialogTrigger>
+    <Dialog open={isOpen} onOpenChange={setIsOpen}>
+      {!modalControl && (
+        <DialogTrigger>
+          <Button variant="default">Crear Cliente</Button>
+        </DialogTrigger>
+      )}
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
           <DialogTitle>Crear Cliente</DialogTitle>

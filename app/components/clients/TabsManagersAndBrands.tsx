@@ -8,7 +8,6 @@ import CreateBrandModal from "./CreateBrandModal";
 
 export function TabsManagersAndBrands({ clientId }: { clientId: number }) {
   const [openManagerModal, setOpenManagerModal] = useState(false);
-
   const [openBrandModal, setOpenBrandModal] = useState(false);
 
   const handleManagerModal = (state: boolean) => {
@@ -26,12 +25,24 @@ export function TabsManagersAndBrands({ clientId }: { clientId: number }) {
         <TabsTrigger value="brands">Marcas</TabsTrigger>
       </TabsList>
       <TabsContent value="managers" className="p-4 space-y-4">
-        <Button variant="default" onClick={()=>{handleManagerModal(true)}}>Crear gerente</Button>
-        <CreateManagerModal clientId={clientId} openModal={openManagerModal} handleModal={handleManagerModal} />
+        <Button variant="default" onClick={() => handleManagerModal(true)}>
+          Crear gerente
+        </Button>
+        <CreateManagerModal
+          clientId={undefined}
+          openModal={openManagerModal}
+          handleModal={handleManagerModal}
+        />
       </TabsContent>
       <TabsContent value="brands" className="p-4">
-      <Button variant="default" onClick={()=>{handleBrandModal(true)}}>Crear marca</Button>
-        <CreateBrandModal clientId={clientId} openModal={openBrandModal} handleModal={handleBrandModal} />
+        <Button variant="default" onClick={() => handleBrandModal(true)}>
+          Crear marca
+        </Button>
+        <CreateBrandModal
+          clientId={clientId}
+          openModal={openBrandModal}
+          handleModal={handleBrandModal}
+        />
       </TabsContent>
     </Tabs>
   );

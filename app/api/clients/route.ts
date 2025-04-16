@@ -1,17 +1,16 @@
-import { createClient } from '@/lib/queries/clients';
+import { createClient, fetchFilteredClients } from '@/lib/queries/clients';
 import { revalidatePath } from 'next/cache';
-import { cookies } from 'next/headers';
+import { NextResponse } from 'next/server';
 
 export async function GET() {
-  const cookieStore = await cookies();
-  const token = cookieStore.get('session');
-
-  return Response.json({ 
-    message: 'Hello from Next.js!', 
-    token: token?.value // Accede al valor del JWT
-  });
+  try {
+    const clients = await fetchFilteredClients();
+    return NextResponse.json(clients);
+  } catch (error) {
+    console.error("Error fetching clients:", error);
+    return NextResponse.json({ error: "Error al obtener los clientes" }, { status: 500 });
+  }
 }
-
 
 export async function POST(request: Request) {
   const body = await request.json();
