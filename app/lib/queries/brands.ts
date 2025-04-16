@@ -45,18 +45,18 @@ export async function getBrands() {
 
 export async function createBrand(brandData: Omit<BrandType, 'id'>) {
   try {
-    // Obtenemos el manager para poder acceder luego al cliente en la revalidación
-    const manager = await getManagerById(brandData.manager_id.toString());
+    console.log("Brand data:", brandData);
     
     const result = await turso.execute({
       sql: `INSERT INTO brands (manager_id, name)
       VALUES (?, ?)`,
       args: [
         brandData.manager_id,
-        brandData.name,
+        brandData.name
       ]
     });
     
+    const manager = await getManagerById(brandData.manager_id.toString());
     // Revalidamos la ruta del cliente al que pertenece el manager
     if (manager && manager.client_id) {
       revalidatePath(`/clients/${manager.client_id}`);
