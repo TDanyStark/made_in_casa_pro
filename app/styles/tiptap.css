@@ -43,8 +43,200 @@
 
 .tiptap-button[data-active-state="on"]:not([disabled]), .tiptap-button[data-state="open"]:not([disabled]) {
   background-color: var(--color-market-pink) !important;
+  color: white !important;
 }
 
-.tiptap-button:hover{
-  background-color: var(--color-market-purple) !important;
+.tiptap {
+  width: 100%;
+  outline: none;
+  padding: 0.5rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background-color: var(--color-background);
+  color: var(--color-foreground);
+  min-height: 150px;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.tiptap:focus, .tiptap:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--color-ring);
+  border-color: var(--color-ring);
+}
+
+.tiptap ul, .tiptap ol {
+  padding-left: 1.5rem;
+}
+
+.tiptap ul li {
+  list-style-type: disc;
+}
+
+.tiptap ol li {
+  list-style-type: decimal;
+}
+
+.tiptap h1 {
+  font-size: 2rem;
+  font-weight: 700;
+  margin-top: 1rem;
+  margin-bottom: 0.5rem;
+  color: var(--color-foreground);
+}
+
+.tiptap h2 {
+  font-size: 1.75rem;
+  font-weight: 600;
+  margin-top: 0.75rem;
+  margin-bottom: 0.5rem;
+  color: var(--color-foreground);
+}
+
+.tiptap h3 {
+  font-size: 1.5rem;
+  font-weight: 600;
+  margin-top: 0.75rem;
+  margin-bottom: 0.5rem;
+  color: var(--color-foreground);
+}
+
+.tiptap h4 {
+  font-size: 1.25rem;
+  font-weight: 600;
+  margin-top: 0.5rem;
+  margin-bottom: 0.5rem;
+  color: var(--color-foreground);
+}
+
+.tiptap h5 {
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin-top: 0.5rem;
+  margin-bottom: 0.5rem;
+  color: var(--color-foreground);
+}
+
+.tiptap h6 {
+  font-size: 1rem;
+  font-weight: 600;
+  margin-top: 0.5rem;
+  margin-bottom: 0.5rem;
+  color: var(--color-foreground);
+}
+
+.tiptap strong {
+  font-weight: 700;
+}
+
+.tiptap a {
+  color: var(--color-market-purple);
+  text-decoration: underline;
+}
+
+.tiptap blockquote {
+  padding-left: 1rem;
+  border-left: 3px solid var(--color-border);
+  color: var(--color-muted-foreground);
+  font-style: italic;
+  margin: 1rem 0;
+}
+
+.tiptap code {
+  background-color: var(--color-muted);
+  color: var(--color-muted-foreground);
+  padding: 0.2rem 0.4rem;
+  border-radius: var(--radius-sm);
+  font-family: monospace;
+}
+
+.tiptap pre {
+  background-color: var(--color-secondary);
+  color: var(--color-secondary-foreground);
+  padding: 0.75rem;
+  border-radius: var(--radius);
+  font-family: monospace;
+  overflow-x: auto;
+  margin: 1rem 0;
+}
+
+.tiptap p {
+  margin: 0.5rem 0;
+}
+
+.tiptap .todo-item {
+  display: flex;
+  align-items: center;
+  margin: 0.5rem 0;
+}
+
+.tiptap .todo-checkbox {
+  margin-right: 0.5rem;
+  appearance: none;
+  width: 1rem;
+  height: 1rem;
+  border: 1px solid var(--color-border);
+  border-radius: 3px;
+  background-color: var(--color-background);
+  cursor: pointer;
+  position: relative;
+}
+
+.tiptap .todo-checkbox:checked {
+  background-color: var(--color-market-purple);
+  border-color: var(--color-market-purple);
+}
+
+.tiptap .todo-checkbox:checked::after {
+  content: '✓';
+  color: var(--color-primary-foreground);
+  position: absolute;
+  top: -2px;
+  left: 1px;
+  font-size: 0.8rem;
+}
+
+.tiptap .todo-content {
+  flex: 1;
+}
+
+/* Estilos para los botones de la barra de herramientas */
+.tiptap-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  padding: 0.5rem;
+  border: 1px solid var(--color-border);
+  border-bottom: none;
+  border-top-left-radius: var(--radius);
+  border-top-right-radius: var(--radius);
+  background-color: var(--color-muted);
+}
+
+.tiptap-button {
+  border: none;
+  background-color: transparent;
+  border-radius: var(--radius-sm);
+  padding: 0.35rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: var(--color-muted-foreground);
+  transition: all 0.2s;
+}
+
+.tiptap-button:hover {
+  background-color: var(--color-market-pink) !important;
+  color: white !important;
+}
+
+.tiptap-button.is-active {
+  background-color: var(--color-secondary);
+  color: white !important;
+}
+
+/* Cuando la barra de herramientas está presente, ajustar bordes del editor */
+.tiptap-toolbar + .tiptap {
+  border-top-left-radius: 0;
+  border-top-right-radius: 0;
 }

@@ -14,11 +14,11 @@
   z-index: 9999; /* Aumentado el z-index para que aparezca por encima de otros elementos */
   overflow: hidden;
   border-radius: var(--tt-radius-md, 0.375rem);
-  background-color: #333; /* Color de fondo personalizado */
+  background-color: var(--color-market-purple); /* Color de fondo personalizado */
   padding: 0.375rem 0.5rem;
   font-size: 0.75rem;
   font-weight: 500;
-  color: var(--tt-tooltip-text);
+  color: white;
   box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
   text-align: center;
 
