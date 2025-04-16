@@ -9,6 +9,7 @@ interface ManagersParams {
   clientId?: string;
   page?: string;
   search?: string;
+  endpoint: string; // Nuevo parámetro para el endpoint
 }
 
 interface ManagersResponse {
@@ -18,7 +19,7 @@ interface ManagersResponse {
   total: number;
 }
 
-const fetchManagers = async ({ clientId, page = "1", search }: ManagersParams): Promise<ManagersResponse> => {
+const fetchManagers = async ({ clientId, page = "1", search, endpoint }: ManagersParams): Promise<ManagersResponse> => {
   const searchParams = new URLSearchParams();
 
   if (clientId) {
@@ -33,20 +34,22 @@ const fetchManagers = async ({ clientId, page = "1", search }: ManagersParams): 
     searchParams.append("search", search);
   }
 
-  const apiUrl = `${URL_BACKEND_API || process.env.NEXT_PUBLIC_API_URL || ''}/managers?${searchParams.toString()}`;
+  const apiUrl = `${URL_BACKEND_API || process.env.NEXT_PUBLIC_API_URL || ''}/${endpoint}?${searchParams.toString()}`;
   
   try {
     const response = await axios.get(apiUrl);
     return response.data;
   } catch (error) {
-    console.error("Error fetching managers:", error);
+    console.error(`Error fetching ${endpoint}:`, error);
     throw error;
   }
 };
 
 export const useManagersQuery = (params: ManagersParams) => {
+  const { endpoint = "managers" } = params;
+  
   return useQuery({
-    queryKey: ['managers', params],
+    queryKey: [endpoint, params],
     queryFn: () => fetchManagers(params),
     staleTime: 1000 * 60 * 5, // 5 minutos
   });

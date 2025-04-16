@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, FormEvent, ChangeEvent } from "react";
+import { useState, FormEvent, ChangeEvent, KeyboardEvent } from "react";
 import { Search, RefreshCw } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -29,6 +29,13 @@ const SearchBar = ({
     setSearchInputValue(e.target.value);
   };
 
+  const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter' && e.ctrlKey) {
+      e.preventDefault();
+      onSearch(searchInputValue);
+    }
+  };
+
   const handleReset = () => {
     setSearchInputValue("");
     onReset();
@@ -44,6 +51,7 @@ const SearchBar = ({
           className="pl-8"
           value={searchInputValue}
           onChange={handleSearchInputChange}
+          onKeyDown={handleKeyDown}
         />
       </div>
       <Button type="submit" variant="secondary">
