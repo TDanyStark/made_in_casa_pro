@@ -41,7 +41,7 @@ export function TabsManagersAndBrands({ clientId }: { clientId: number }) {
           Crear marca
         </Button>
         <CreateBrandModal
-          clientId={clientId}
+          // clientId={clientId}
           openModal={openBrandModal}
           handleModal={handleBrandModal}
         />

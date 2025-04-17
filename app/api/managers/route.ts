@@ -74,7 +74,7 @@ export async function GET(request: NextRequest) {
     const pageCount = Math.ceil(total / limit);
     
     return NextResponse.json({
-      managers,
+      data: managers,
       pageCount,
       currentPage: page,
       total

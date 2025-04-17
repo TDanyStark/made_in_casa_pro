@@ -3,23 +3,24 @@
 import { useQuery } from '@tanstack/react-query';
 import { URL_BACKEND_API } from '@/config/constants';
 import axios from 'axios';
-import { ManagerType } from '@/lib/definitions';
 
+// Define the parameters interface
 interface ManagersParams {
   clientId?: string;
   page?: string;
   search?: string;
-  endpoint: string; // Nuevo parámetro para el endpoint
+  endpoint: string;
 }
 
-interface ManagersResponse {
-  managers: ManagerType[];
+// Generic response interface
+interface EndpointResponse<T> {
+  data: T[];
   pageCount: number;
   currentPage: number;
   total: number;
 }
 
-const getEndpoint = async ({ clientId, page = "1", search, endpoint }: ManagersParams): Promise<ManagersResponse> => {
+const getEndpoint = async <T>({ clientId, page = "1", search, endpoint }: ManagersParams): Promise<EndpointResponse<T>> => {
   const searchParams = new URLSearchParams();
 
   if (clientId) {
@@ -45,12 +46,12 @@ const getEndpoint = async ({ clientId, page = "1", search, endpoint }: ManagersP
   }
 };
 
-export const useGetEndpointQuery = (params: ManagersParams) => {
+export const useGetEndpointQuery = <T>(params: ManagersParams) => {
   const { endpoint = "managers" } = params;
   
   return useQuery({
     queryKey: [endpoint, params],
-    queryFn: () => getEndpoint(params),
+    queryFn: () => getEndpoint<T>(params),
     staleTime: 1000 * 60 * 5, // 5 minutos
   });
 };

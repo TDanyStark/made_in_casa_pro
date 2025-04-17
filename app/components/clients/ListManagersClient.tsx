@@ -9,6 +9,7 @@ import Pagination from "@/components/pagination/Pagination";
 import SearchBar from "@/components/search/search";
 import TableManagers from "./TableManagers";
 import { Skeleton } from "../ui/skeleton";
+import { ManagerType } from "@/lib/definitions";
 
 interface ManagerTableClientProps {
   clientId?: string;
@@ -27,7 +28,7 @@ export default function ListManagersClient({
   const page = searchParams.get("page") || "1";
 
   // Utilizar React Query para obtener los managers
-  const { data, isLoading, isError } = useGetEndpointQuery({
+  const { data, isLoading, isError } = useGetEndpointQuery<ManagerType>({
     clientId,
     page,
     search,
@@ -35,7 +36,7 @@ export default function ListManagersClient({
   });
 
   // Valores predeterminados si hay error o está cargando
-  const managers = data?.managers || [];
+  const managers = data?.data || [];
   const pageCount = data?.pageCount || 1;
   const currentPage = data?.currentPage || 1;
 

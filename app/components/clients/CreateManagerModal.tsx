@@ -4,7 +4,7 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -25,13 +25,14 @@ import {
 import { Input } from "@/components/ui/input";
 import { Loader2 } from "lucide-react";
 import useItemMutations from "@/hooks/useItemsMutation";
-import useGetItems from "@/hooks/useGetItems";
 import CreatableSelect from "react-select/creatable";
 
 import { RichTextEditor } from "./RichTextEditor";
 import { ClientType, ManagerType } from "@/lib/definitions";
 import CreateClientModal from "./CreateClientModal";
 import { API_FLAG_URL, IMG_FLAG_EXT } from "@/config/constants";
+import { useGetEndpointQuery } from "@/hooks/useGetEndpointQuery";
+import { debounce } from "lodash";
 
 const formSchema = z.object({
   client_id: z.coerce.number().int().positive("Se requiere un cliente válido"),
@@ -78,9 +79,14 @@ export function CreateManagerModal({
       biography: "",
     },
   });
-
+  const [searchTerm, setSearchTerm] = useState("");
   const { createItem } = useItemMutations<ManagerType>("managers");
-  const { data: clients, isLoading: isLoadingClients } = useGetItems("clients");
+  const { data, isLoading: isLoadingClients } = useGetEndpointQuery<ClientType>({
+    clientId: clientId?.toString(),
+    search: searchTerm,
+    endpoint: "clients",
+  });
+
   const [clientOptions, setClientOptions] = useState<ClientOption[]>([]);
   const [isCreatingClient, setIsCreatingClient] = useState(false);
   const [newClientName, setNewClientName] = useState("");
@@ -100,6 +106,18 @@ export function CreateManagerModal({
     });
   });
 
+  const clients: ClientType[] = useMemo(() => data?.data || [], [data]);
+
+  const debouncedSearch = debounce((value: string) => {
+    setSearchTerm(value);
+  }, 500);
+
+  const handleInputChange = (inputValue: string) => {
+    if (inputValue.trim()) {
+      debouncedSearch(inputValue);
+    }
+  };
+
   useEffect(() => {
     if (!openModal) {
       form.reset({
@@ -116,11 +134,13 @@ export function CreateManagerModal({
   }, [openModal, form, clientId, initialName]);
 
   useEffect(() => {
-    if (clients && Array.isArray(clients)) {
+    if (clients && clients.length > 0) {
       const options = clients.map((client: ClientType) => ({
         value: client.id,
         label: client.name,
-        countryFlag: client.country ? `${API_FLAG_URL}${client.country.flag}${IMG_FLAG_EXT}` : undefined,
+        countryFlag: client.country
+          ? `${API_FLAG_URL}${client.country.flag}${IMG_FLAG_EXT}`
+          : undefined,
       }));
       setClientOptions(options);
     }
@@ -137,12 +157,12 @@ export function CreateManagerModal({
       value: newClient.id,
       label: newClient.name,
     };
-    
+
     setClientOptions((prev) => [...prev, newOption]);
-    
+
     // Select the newly created client
     form.setValue("client_id", newClient.id);
-    
+
     setIsCreatingClient(false);
   };
 
@@ -151,12 +171,12 @@ export function CreateManagerModal({
     <div className="flex items-center gap-2">
       <span>{option.label}</span>
       {option.countryFlag && (
-        <img 
-          src={option.countryFlag} 
-          alt="Country flag" 
-          width={16} 
-          height={12} 
-          className="inline-block" 
+        <img
+          src={option.countryFlag}
+          alt="Country flag"
+          width={16}
+          height={12}
+          className="inline-block"
         />
       )}
     </div>
@@ -187,15 +207,26 @@ export function CreateManagerModal({
                           isLoading={isLoadingClients}
                           options={clientOptions}
                           placeholder="Selecciona o crea un cliente"
-                          value={clientOptions.find((option) => option.value === field.value)}
+                          value={clientOptions.find(
+                            (option) => option.value === field.value
+                          )}
                           onChange={(selectedOption) => {
                             field.onChange(selectedOption?.value);
                           }}
+                          onInputChange={handleInputChange}
                           onCreateOption={handleCreateClient}
-                          formatCreateLabel={(inputValue) => `Crear cliente "${inputValue}"`}
+                          formatCreateLabel={(inputValue) =>
+                            `Crear cliente "${inputValue}"`
+                          }
                           formatOptionLabel={formatOptionLabel}
                           className="react-select-container"
                           classNamePrefix="react-select"
+                          loadingMessage={() => "Cargando clientes..."}
+                          noOptionsMessage={({ inputValue }) =>
+                            inputValue
+                              ? "No se encontraron clientes"
+                              : "Escribe para buscar clientes"
+                          }
                         />
                       </FormControl>
                       <FormMessage />
@@ -282,11 +313,11 @@ export function CreateManagerModal({
         </DialogContent>
       </Dialog>
 
-      <CreateClientModal 
+      <CreateClientModal
         modalControl={{
-          isOpen: isCreatingClient, 
-          setOpen: setIsCreatingClient
-        }} 
+          isOpen: isCreatingClient,
+          setOpen: setIsCreatingClient,
+        }}
         initialName={newClientName}
         onSuccess={handleClientCreated}
       />

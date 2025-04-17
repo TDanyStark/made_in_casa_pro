@@ -59,3 +59,10 @@ export type BrandType = {
   manager_id: number;
   name: string;
 };
+
+export type ManagersParams ={
+  clientId?: string;
+  page?: string;
+  search?: string;
+  endpoint: string; // Nuevo parámetro para el endpoint
+}

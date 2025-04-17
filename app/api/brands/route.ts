@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { createBrand, getBrandById, getBrands, getBrandsByManagerId } from "@/lib/queries/brands";
+import { createBrand, getBrandById, getBrandsWithPagination } from "@/lib/queries/brands";
 import { getManagerById } from "@/lib/queries/managers";
+import { ITEMS_PER_PAGE } from "@/config/constants";
 
 // Schema para validar los datos de una marca
 const brandSchema = z.object({
@@ -52,11 +53,12 @@ export async function GET(request: NextRequest) {
     const url = new URL(request.url);
     const managerId = url.searchParams.get("manager_id");
     const id = url.searchParams.get("id");
+    const page = parseInt(url.searchParams.get("page") || "1");
+    const limit = ITEMS_PER_PAGE;
+    const search = url.searchParams.get("search");
     
-    let brandsResponse;
-    
+    // Si se solicita una marca específica por ID
     if (id) {
-      // Obtener una marca específica por ID
       const brand = await getBrandById(id);
       if (!brand) {
         return NextResponse.json(
@@ -64,16 +66,28 @@ export async function GET(request: NextRequest) {
           { status: 404 }
         );
       }
-      brandsResponse = brand;
-    } else if (managerId) {
-      // Obtener marcas por manager_id
-      brandsResponse = await getBrandsByManagerId(managerId);
-    } else {
-      // Obtener todas las marcas
-      brandsResponse = await getBrands();
+      return NextResponse.json(brand);
+    } 
+    // Si no hay ID específico, usar paginación
+    else {
+      // Get paginated results
+      const { brands, total } = await getBrandsWithPagination({
+        managerId: managerId || undefined,
+        page,
+        limit,
+        search: search || undefined
+      });
+      
+      // Calculate total pages
+      const pageCount = Math.ceil(total / limit);
+      
+      return NextResponse.json({
+        data: brands,
+        pageCount,
+        currentPage: page,
+        total
+      });
     }
-    
-    return NextResponse.json(brandsResponse);
   } catch (error) {
     console.error("Error al obtener marcas:", error);
     return NextResponse.json(

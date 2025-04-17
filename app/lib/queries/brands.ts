@@ -2,10 +2,7 @@ import {turso} from '../db';
 import { revalidatePath } from "next/cache";
 import { BrandType } from '../definitions';
 import { getManagerById } from './managers';
-
-// Esta función ya no es necesaria ya que obtendremos las marcas por manager_id
-// y el manager ya tiene la relación con el cliente
-// export async function getBrandsByClientId(clientId: string) { ... }
+import { ITEMS_PER_PAGE } from '@/config/constants';
 
 export async function getBrandsByManagerId(managerId: string) {
   try {
@@ -69,5 +66,77 @@ export async function createBrand(brandData: Omit<BrandType, 'id'>) {
   } catch (error) {
     console.error("Error creating brand:", error);
     throw error;
+  }
+}
+
+interface PaginationParams {
+  managerId?: string;
+  page?: number;
+  limit?: number;
+  search?: string;
+}
+
+export async function getBrandsWithPagination({
+  managerId,
+  page = 1,
+  limit = ITEMS_PER_PAGE,
+  search
+}: PaginationParams) {
+  try {
+    let sql = 'SELECT * FROM brands';
+    const args = [];
+    const countArgs = [];
+    
+    // Build WHERE clause
+    const conditions: string[] = [];
+    
+    if (managerId) {
+      conditions.push('manager_id = ?');
+      args.push(managerId);
+      countArgs.push(managerId);
+    }
+    
+    if (search) {
+      conditions.push('(name LIKE ?)');
+      const searchParam = `%${search}%`;
+      args.push(searchParam);
+      countArgs.push(searchParam);
+    }
+    
+    if (conditions.length > 0) {
+      sql += ' WHERE ' + conditions.join(' AND ');
+    }
+    
+    // Get total count for pagination
+    let countSql = 'SELECT COUNT(*) as count FROM brands';
+    if (conditions.length > 0) {
+      countSql += ' WHERE ' + conditions.join(' AND ');
+    }
+    
+    const countResult = await turso.execute({
+      sql: countSql,
+      args: countArgs
+    });
+    
+    const total = Number(countResult.rows[0].count);
+    
+    // Add pagination
+    const offset = (page - 1) * limit;
+    sql += ' LIMIT ? OFFSET ?';
+    args.push(limit, offset);
+
+    // Execute query
+    const result = await turso.execute({
+      sql,
+      args
+    });
+    
+    return {
+      brands: result.rows as unknown as BrandType[],
+      total
+    };
+  } catch (error) {
+    console.error("Error fetching brands with pagination:", error);
+    return { brands: [], total: 0 };
   }
 }

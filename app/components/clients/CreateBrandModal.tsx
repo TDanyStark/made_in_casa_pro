@@ -64,13 +64,13 @@ export function CreateBrandModal({ clientId, openModal, handleModal }: Props) {
   const { createItem } = useItemMutations<BrandFormData>("brands");
 
   // Query for managers usando React Query
-  const { data, isLoading: isLoadingManagers } = useGetEndpointQuery({
+  const { data, isLoading: isLoadingManagers } = useGetEndpointQuery<ManagerType>({
     clientId: clientId?.toString(),
     search: searchTerm,
     endpoint: "managers",
   });
 
-  const managers = useMemo(() => data?.managers || [], [data]);
+  const managers = useMemo(() => data?.data || [], [data]);
 
   // Actualizar las opciones cuando cambian los datos de managers
   useEffect(() => {
