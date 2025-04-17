@@ -42,8 +42,6 @@ export async function getBrands() {
 
 export async function createBrand(brandData: Omit<BrandType, 'id'>) {
   try {
-    console.log("Brand data:", brandData);
-    
     const result = await turso.execute({
       sql: `INSERT INTO brands (manager_id, name)
       VALUES (?, ?)`,

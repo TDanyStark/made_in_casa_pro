@@ -96,7 +96,6 @@ export function CreateBrandModal({ clientId, openModal, handleModal }: Props) {
   };
 
   const handleSubmit = form.handleSubmit((data) => {
-    console.log(data);
     createItem.mutate(data, {
       onSuccess: () => {
         handleModal(false);
