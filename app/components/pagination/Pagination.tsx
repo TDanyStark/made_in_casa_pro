@@ -16,7 +16,7 @@ const Pagination = ({ currentPage, pageCount, onPageChange }: PaginationProps) =
       <Button
         variant="outline"
         size="sm"
-        onClick={() => onPageChange(0)}
+        onClick={() => onPageChange(1)}
         disabled={currentPage <= 1}
       >
         <span className="sr-only">Primera página</span>

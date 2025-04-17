@@ -3,7 +3,8 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { debounce } from "lodash";
 
 import "@/styles/selects.css";
 
@@ -27,9 +28,9 @@ import { Input } from "@/components/ui/input";
 import { Loader2 } from "lucide-react";
 import useItemMutations from "@/hooks/useItemsMutation";
 import CreatableSelect from "react-select/creatable";
-import useGetItems from "@/hooks/useGetItems";
 import CreateManagerModal from "./CreateManagerModal";
 import { ManagerType } from "@/lib/definitions";
+import { useGetEndpointQuery } from "@/hooks/useGetEndpointQuery";
 
 const formSchema = z.object({
   manager_id: z.coerce.number().int().positive("Se requiere un gerente válido"),
@@ -52,23 +53,47 @@ export function CreateBrandModal({ clientId, openModal, handleModal }: Props) {
     },
   });
 
-  const { data: managers, isLoading: isLoadingManagers } = useGetItems("managers");
-  const [managerOptions, setManagerOptions] = useState<{ value: number; label: string }[]>([]);
+  const [managerOptions, setManagerOptions] = useState<
+    { value: number; label: string }[]
+  >([]);
   const [isCreatingManager, setIsCreatingManager] = useState(false);
   const [newManagerName, setNewManagerName] = useState("");
+  const [searchTerm, setSearchTerm] = useState("");
 
   // Item mutations for brands
   const { createItem } = useItemMutations<BrandFormData>("brands");
 
+  // Query for managers usando React Query
+  const { data, isLoading: isLoadingManagers } = useGetEndpointQuery({
+    clientId: clientId?.toString(),
+    search: searchTerm,
+    endpoint: "managers",
+  });
+
+  const managers = useMemo(() => data?.managers || [], [data]);
+
+  // Actualizar las opciones cuando cambian los datos de managers
   useEffect(() => {
-    if (managers && Array.isArray(managers)) {
+    if (managers && managers.length > 0) {
       const options = managers.map((manager) => ({
-        value: manager.id,
+        value: manager.id as number,
         label: manager.name,
       }));
       setManagerOptions(options);
     }
   }, [managers]);
+
+  // Implementar debounce para la búsqueda con React Query
+  const debouncedSearch = debounce((value: string) => {
+      setSearchTerm(value);
+    }, 500)
+
+  // Actualizar la búsqueda cuando cambia el texto
+  const handleInputChange = (inputValue: string) => {
+    if (inputValue.trim()) {
+      debouncedSearch(inputValue);
+    }
+  };
 
   const handleSubmit = form.handleSubmit((data) => {
     console.log(data);
@@ -93,12 +118,12 @@ export function CreateBrandModal({ clientId, openModal, handleModal }: Props) {
       value: manager.id as number,
       label: manager.name,
     };
-    
+
     setManagerOptions((prev) => [...prev, newOption]);
-    
+
     // Select the newly created manager
     form.setValue("manager_id", manager.id as number);
-    
+
     setIsCreatingManager(false);
   };
 
@@ -134,15 +159,26 @@ export function CreateBrandModal({ clientId, openModal, handleModal }: Props) {
                       <CreatableSelect
                         isLoading={isLoadingManagers}
                         options={managerOptions}
-                        placeholder="Selecciona o crea un gerente"
-                        value={managerOptions.find((option) => option.value === field.value)}
+                        placeholder="Busca o crea un gerente"
+                        value={managerOptions.find(
+                          (option) => option.value === field.value
+                        )}
                         onChange={(selectedOption) => {
                           field.onChange(selectedOption?.value);
                         }}
+                        onInputChange={handleInputChange}
                         onCreateOption={handleCreateManager}
-                        formatCreateLabel={(inputValue) => `Crear gerente "${inputValue}"`}
+                        formatCreateLabel={(inputValue) =>
+                          `Crear gerente "${inputValue}"`
+                        }
                         className="react-select-container"
                         classNamePrefix="react-select"
+                        loadingMessage={() => "Cargando gerentes..."}
+                        noOptionsMessage={({ inputValue }) =>
+                          inputValue
+                            ? "No se encontraron gerentes"
+                            : "Escribe para buscar gerentes"
+                        }
                       />
                     </FormControl>
                     <FormMessage />

@@ -61,11 +61,13 @@
   "devDependencies": {
     "@eslint/eslintrc": "^3",
     "@types/bcrypt": "^5.0.2",
+    "@types/lodash": "^4.17.16",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "15.1.7",
+    "lodash": "^4.17.21",
     "typescript": "^5"
   }
 }

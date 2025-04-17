@@ -1,6 +1,6 @@
 "use client";
 
-import { useManagersQuery } from "@/hooks/useManagersQuery";
+import { useGetEndpointQuery } from "@/hooks/useGetEndpointQuery";
 // import ListManager from "./ListManager";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 // import { ManagerType } from "@/lib/definitions";
@@ -27,7 +27,7 @@ export default function ListManagersClient({
   const page = searchParams.get("page") || "1";
 
   // Utilizar React Query para obtener los managers
-  const { data, isLoading, isError } = useManagersQuery({
+  const { data, isLoading, isError } = useGetEndpointQuery({
     clientId,
     page,
     search,

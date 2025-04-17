@@ -1,6 +1,7 @@
 import {turso} from '../db';
 import { revalidatePath } from "next/cache";
 import { ManagerType } from '../definitions';
+import { ITEMS_PER_PAGE } from '@/config/constants';
 
 export async function getManagerByEmail(email: string) {
   try {
@@ -62,7 +63,7 @@ interface PaginationParams {
 export async function getManagersWithPagination({
   clientId,
   page = 1,
-  limit = 10,
+  limit = ITEMS_PER_PAGE,
   search
 }: PaginationParams) {
   try {
@@ -105,11 +106,9 @@ export async function getManagersWithPagination({
     
     // Add pagination
     const offset = (page - 1) * limit;
-    sql += ' ORDER BY name ASC LIMIT ? OFFSET ?';
+    sql += ' LIMIT ? OFFSET ?';
     args.push(limit, offset);
 
-    console.log(sql, args);
-    
     // Execute query
     const result = await turso.execute({
       sql,

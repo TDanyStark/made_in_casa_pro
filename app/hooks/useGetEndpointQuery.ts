@@ -19,7 +19,7 @@ interface ManagersResponse {
   total: number;
 }
 
-const fetchManagers = async ({ clientId, page = "1", search, endpoint }: ManagersParams): Promise<ManagersResponse> => {
+const getEndpoint = async ({ clientId, page = "1", search, endpoint }: ManagersParams): Promise<ManagersResponse> => {
   const searchParams = new URLSearchParams();
 
   if (clientId) {
@@ -45,12 +45,12 @@ const fetchManagers = async ({ clientId, page = "1", search, endpoint }: Manager
   }
 };
 
-export const useManagersQuery = (params: ManagersParams) => {
+export const useGetEndpointQuery = (params: ManagersParams) => {
   const { endpoint = "managers" } = params;
   
   return useQuery({
     queryKey: [endpoint, params],
-    queryFn: () => fetchManagers(params),
+    queryFn: () => getEndpoint(params),
     staleTime: 1000 * 60 * 5, // 5 minutos
   });
 };
