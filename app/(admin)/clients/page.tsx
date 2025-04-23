@@ -3,7 +3,7 @@ import ListClientsInput from "@/components/clients/ListClientsInput";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Suspense } from "react";
 
-export default async function Page() {
+export default function Page() {
   const cantidadSkeletons = 10;
 
   return (

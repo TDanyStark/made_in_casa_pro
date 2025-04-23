@@ -13,6 +13,7 @@ export default async function ClientPage({ params }: Props) {
     <section>
       <div className="mt-6">
         <Suspense
+          key={id}
           fallback={
             <div className="flex gap-2">
               <Skeleton className="w-10 aspect-video" />

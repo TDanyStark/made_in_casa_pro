@@ -4,8 +4,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import CreateManagerModal from "./CreateManagerModal";
 import { Button } from "../ui/button";
 import CreateBrandModal from "./CreateBrandModal";
-import ManagerTable from "./ManagerTable";
 import { useState } from "react";
+import ListManagersClient from "./ListManagersClient";
 
 export function TabsManagersAndBrands({ clientId }: { clientId: number }) {
   const [openManagerModal, setOpenManagerModal] = useState(false);
@@ -34,14 +34,14 @@ export function TabsManagersAndBrands({ clientId }: { clientId: number }) {
           openModal={openManagerModal}
           handleModal={handleManagerModal}
         />
-        <ManagerTable clientId={clientId.toString()} />
+        <ListManagersClient clientId={clientId.toString()} />
       </TabsContent>
       <TabsContent value="brands" className="p-4">
         <Button variant="default" onClick={() => handleBrandModal(true)}>
           Crear marca
         </Button>
         <CreateBrandModal
-          // clientId={clientId}
+          clientId={clientId}
           openModal={openBrandModal}
           handleModal={handleBrandModal}
         />

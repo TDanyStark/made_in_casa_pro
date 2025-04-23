@@ -133,6 +133,8 @@ export function CreateManagerModal({
     }
   }, [openModal, form, clientId, initialName]);
 
+
+  // TODO: Cuando busco en la base de datos por pais no aparece los labels necesarios, habria que personalizar la busqueda dentro del Select
   useEffect(() => {
     if (clients && clients.length > 0) {
       const options = clients.map((client: ClientType) => ({

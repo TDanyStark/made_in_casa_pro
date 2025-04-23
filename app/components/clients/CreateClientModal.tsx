@@ -97,7 +97,7 @@ export function CreateClientModal({ modalControl, onSuccess, initialName = "" }:
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       {!modalControl && (
-        <DialogTrigger>
+        <DialogTrigger asChild>
           <Button variant="default">Crear Cliente</Button>
         </DialogTrigger>
       )}

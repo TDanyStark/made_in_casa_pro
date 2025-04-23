@@ -3,8 +3,6 @@ import SideNav from "@/components/dashboard/sidenav";
 import { ModeToggle } from "@/components/ModeToggle";
 import { getUserRole } from "@/lib/session";
 
-export const experimental_ppr = true;
-
 export default async function Layout({
   children,
 }: {

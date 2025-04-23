@@ -27,18 +27,22 @@ export const columns: ColumnDef<ManagerType>[] = [
     accessorKey: "id",
     header: "ID",
     cell: ({ row }) => <div className="text-center">{row.getValue("id")}</div>,
+    size: 40
   },
   {
     accessorKey: "name",
     header: "Nombre",
+    size: 250,
   },
   {
     accessorKey: "email",
     header: "Correo",
+    size: 250,
   },
   {
     accessorKey: "phone",
     header: "Teléfono",
+    size: 200,
   },
 ];
 
@@ -50,6 +54,7 @@ const TableManagers = ({ managers, pageCount }: TableManagersProps) => {
     getCoreRowModel: getCoreRowModel(),
     manualPagination: true,
     pageCount,
+    
   });
 
   return (
@@ -57,9 +62,16 @@ const TableManagers = ({ managers, pageCount }: TableManagersProps) => {
       <Table>
         <TableHeader>
           {table.getHeaderGroups().map((headerGroup) => (
-            <TableRow key={headerGroup.id}>
+            <TableRow key={headerGroup.id} className="grid-row">
               {headerGroup.headers.map((header) => (
-                <TableHead key={header.id}>
+                <TableHead
+                  key={header.id}
+                  style={{
+                    maxWidth: header.getSize() + "px",
+                    width: header.getSize() + "px",
+                    minWidth: header.getSize() + "px",
+                  }}
+                >
                   {header.isPlaceholder
                     ? null
                     : flexRender(
@@ -74,23 +86,19 @@ const TableManagers = ({ managers, pageCount }: TableManagersProps) => {
         <TableBody>
           {table.getRowModel().rows.length > 0 ? (
             table.getRowModel().rows.map((row) => (
-              <TableRow key={row.id}>
+              <TableRow key={row.id} className="grid-row">
                 {row.getVisibleCells().map((cell) => (
-                  <TableCell key={cell.id}>
-                    {flexRender(
-                      cell.column.columnDef.cell,
-                      cell.getContext()
-                    )}
+                  <TableCell
+                    key={cell.id}
+                  >
+                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
                   </TableCell>
                 ))}
               </TableRow>
             ))
           ) : (
             <TableRow>
-              <TableCell
-                colSpan={columns.length}
-                className="h-24 text-center"
-              >
+              <TableCell colSpan={columns.length} className="h-24 text-center">
                 No se encontraron resultados
               </TableCell>
             </TableRow>
