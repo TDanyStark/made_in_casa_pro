@@ -7,10 +7,19 @@ import CreateBrandModal from "./CreateBrandModal";
 import { useState } from "react";
 import ListManagersClient from "./ListManagersClient";
 import ListBrandsClient from "./ListBrandsClient";
+import { useSearchParams, usePathname, useRouter } from "next/navigation";
 
 export function TabsManagersAndBrands({ clientId }: { clientId: number }) {
   const [openManagerModal, setOpenManagerModal] = useState(false);
   const [openBrandModal, setOpenBrandModal] = useState(false);
+  
+  // Obtener los parámetros de la URL y configuración para actualizarla
+  const searchParams = useSearchParams();
+  const pathname = usePathname();
+  const { replace } = useRouter();
+  
+  // Obtener el tab actual de la URL o usar "managers" como valor predeterminado
+  const currentTab = searchParams.get("tab") || "managers";
 
   const handleManagerModal = (state: boolean) => {
     setOpenManagerModal(state);
@@ -19,9 +28,17 @@ export function TabsManagersAndBrands({ clientId }: { clientId: number }) {
   const handleBrandModal = (state: boolean) => {
     setOpenBrandModal(state);
   };
+  
+  // Función para actualizar la URL cuando cambia la pestaña
+  const handleTabChange = (value: string) => {
+    const params = new URLSearchParams(searchParams.toString());
+    console.log("params", params.toString());
+    params.set("tab", value);
+    replace(`${pathname}?${params.toString()}`);
+  };
 
   return (
-    <Tabs defaultValue="managers">
+    <Tabs defaultValue={currentTab} onValueChange={handleTabChange}>
       <TabsList>
         <TabsTrigger value="managers">Gerentes</TabsTrigger>
         <TabsTrigger value="brands">Marcas</TabsTrigger>
