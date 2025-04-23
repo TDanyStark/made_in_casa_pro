@@ -107,7 +107,14 @@ export async function getBrandsWithPagination({
   search
 }: PaginationParams) {
   try {
-    let sql = 'SELECT brands.*, managers.name as manager_name, managers.email as manager_email FROM brands JOIN managers ON brands.manager_id = managers.id';
+    // Modified query to use brand_manager table
+    let sql = `
+      SELECT bm.brand_id as id, b.name as brand_name, 
+             bm.manager_id, m.name as manager_name 
+      FROM brand_manager bm
+      JOIN brands b ON bm.brand_id = b.id
+      JOIN managers m ON bm.manager_id = m.id
+    `;
     const args = [];
     const countArgs = [];
     
@@ -115,22 +122,22 @@ export async function getBrandsWithPagination({
     const conditions: string[] = [];
     
     if (managerId) {
-      conditions.push('brands.manager_id = ?');
+      conditions.push('bm.manager_id = ?');
       args.push(managerId);
       countArgs.push(managerId);
     }
 
     if (clientId) {
-      conditions.push('managers.client_id = ?');
+      conditions.push('m.client_id = ?');
       args.push(clientId);
       countArgs.push(clientId);
     }
     
     if (search) {
-      conditions.push('(brands.name LIKE ?)');
+      conditions.push('(b.name LIKE ? OR m.name LIKE ?)');
       const searchParam = `%${search}%`;
-      args.push(searchParam);
-      countArgs.push(searchParam);
+      args.push(searchParam, searchParam);
+      countArgs.push(searchParam, searchParam);
     }
     
     if (conditions.length > 0) {
@@ -138,7 +145,12 @@ export async function getBrandsWithPagination({
     }
     
     // Get total count for pagination
-    let countSql = 'SELECT COUNT(*) as count FROM brands JOIN managers ON brands.manager_id = managers.id';
+    let countSql = `
+      SELECT COUNT(*) as count 
+      FROM brand_manager bm
+      JOIN brands b ON bm.brand_id = b.id
+      JOIN managers m ON bm.manager_id = m.id
+    `;
     if (conditions.length > 0) {
       countSql += ' WHERE ' + conditions.join(' AND ');
     }
@@ -150,9 +162,9 @@ export async function getBrandsWithPagination({
     
     const total = Number(countResult.rows[0].count);
     
-    // Add pagination
+    // Add order by and pagination
+    sql += ' ORDER BY b.name ASC LIMIT ? OFFSET ?';
     const offset = (page - 1) * limit;
-    sql += ' LIMIT ? OFFSET ?';
     args.push(limit, offset);
 
     // Execute query
@@ -161,13 +173,13 @@ export async function getBrandsWithPagination({
       args
     });
     
-    // Transform the result to match BrandType with manager property
+    // Transform the result to match BrandsAndManagersType
     const brands = result.rows.map((row) => ({
       id: row.id,
+      brand_name: row.brand_name,
       manager_id: row.manager_id,
-      name: row.name,
       manager_name: row.manager_name,
-    })) as BrandType[];
+    }));
     
     return {
       brands,
