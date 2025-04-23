@@ -138,7 +138,11 @@ export function CreateBrandModal({ clientId, openModal, handleModal }: Props) {
   return (
     <>
       <Dialog open={openModal} onOpenChange={handleModal}>
-        <DialogContent className="sm:max-w-[525px]">
+        <DialogContent 
+          className="sm:max-w-[525px]"
+          // @ts-expect-error - Esto evita que el diálogo capture el foco y permite que react-select funcione correctamente
+          tabIndex={false}
+          >
           <DialogHeader>
             <DialogTitle>Crear Marca</DialogTitle>
           </DialogHeader>

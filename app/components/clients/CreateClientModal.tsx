@@ -101,7 +101,11 @@ export function CreateClientModal({ modalControl, onSuccess, initialName = "" }:
           <Button variant="default">Crear Cliente</Button>
         </DialogTrigger>
       )}
-      <DialogContent className="sm:max-w-[425px]">
+      <DialogContent 
+        className="sm:max-w-[425px]"
+        // @ts-expect-error - Esto evita que el diálogo capture el foco y permite que react-select funcione correctamente
+        tabIndex={false}
+        >
         <DialogHeader>
           <DialogTitle>Crear Cliente</DialogTitle>
         </DialogHeader>
