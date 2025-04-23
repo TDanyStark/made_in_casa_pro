@@ -6,6 +6,7 @@ import { Button } from "../ui/button";
 import CreateBrandModal from "./CreateBrandModal";
 import { useState } from "react";
 import ListManagersClient from "./ListManagersClient";
+import ListBrandsClient from "./ListBrandsClient";
 
 export function TabsManagersAndBrands({ clientId }: { clientId: number }) {
   const [openManagerModal, setOpenManagerModal] = useState(false);
@@ -41,10 +42,11 @@ export function TabsManagersAndBrands({ clientId }: { clientId: number }) {
           Crear marca
         </Button>
         <CreateBrandModal
-          // clientId={clientId}
+          clientId={clientId}
           openModal={openBrandModal}
           handleModal={handleBrandModal}
         />
+        <ListBrandsClient clientId={clientId.toString()} />
       </TabsContent>
     </Tabs>
   );

@@ -69,6 +69,7 @@ export async function createBrand(brandData: Omit<BrandType, 'id'>) {
 
 interface PaginationParams {
   managerId?: string;
+  clientId?: string;
   page?: number;
   limit?: number;
   search?: string;
@@ -76,12 +77,13 @@ interface PaginationParams {
 
 export async function getBrandsWithPagination({
   managerId,
+  clientId,
   page = 1,
   limit = ITEMS_PER_PAGE,
   search
 }: PaginationParams) {
   try {
-    let sql = 'SELECT * FROM brands';
+    let sql = 'SELECT brands.*, managers.name as manager_name, managers.email as manager_email FROM brands JOIN managers ON brands.manager_id = managers.id';
     const args = [];
     const countArgs = [];
     
@@ -89,13 +91,19 @@ export async function getBrandsWithPagination({
     const conditions: string[] = [];
     
     if (managerId) {
-      conditions.push('manager_id = ?');
+      conditions.push('brands.manager_id = ?');
       args.push(managerId);
       countArgs.push(managerId);
     }
+
+    if (clientId) {
+      conditions.push('managers.client_id = ?');
+      args.push(clientId);
+      countArgs.push(clientId);
+    }
     
     if (search) {
-      conditions.push('(name LIKE ?)');
+      conditions.push('(brands.name LIKE ?)');
       const searchParam = `%${search}%`;
       args.push(searchParam);
       countArgs.push(searchParam);
@@ -106,7 +114,7 @@ export async function getBrandsWithPagination({
     }
     
     // Get total count for pagination
-    let countSql = 'SELECT COUNT(*) as count FROM brands';
+    let countSql = 'SELECT COUNT(*) as count FROM brands JOIN managers ON brands.manager_id = managers.id';
     if (conditions.length > 0) {
       countSql += ' WHERE ' + conditions.join(' AND ');
     }
@@ -129,8 +137,16 @@ export async function getBrandsWithPagination({
       args
     });
     
+    // Transform the result to match BrandType with manager property
+    const brands = result.rows.map((row) => ({
+      id: row.id,
+      manager_id: row.manager_id,
+      name: row.name,
+      manager_name: row.manager_name,
+    })) as BrandType[];
+    
     return {
-      brands: result.rows as unknown as BrandType[],
+      brands,
       total
     };
   } catch (error) {

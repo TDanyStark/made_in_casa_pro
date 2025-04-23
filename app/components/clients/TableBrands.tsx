@@ -6,7 +6,7 @@ import {
   getCoreRowModel,
   useReactTable,
 } from "@tanstack/react-table";
-import { ManagerType } from "@/lib/definitions";
+import { BrandType } from "@/lib/definitions";
 import {
   Table,
   TableBody,
@@ -17,13 +17,13 @@ import {
 } from "@/components/ui/table";
 import Link from "next/link";
 
-interface TableManagersProps {
-  managers: ManagerType[];
+interface TableBrandsProps {
+  brands: BrandType[];
   pageCount: number;
 }
 
-// Define columns for the managers table
-export const columns: ColumnDef<ManagerType>[] = [
+// Define columns for the brands table
+export const columns: ColumnDef<BrandType>[] = [
   {
     accessorKey: "id",
     header: "ID",
@@ -33,24 +33,24 @@ export const columns: ColumnDef<ManagerType>[] = [
   {
     accessorKey: "name",
     header: "Nombre",
-    size: 250,
+    size: 200,
   },
   {
-    accessorKey: "email",
-    header: "Correo",
-    size: 250,
+    accessorKey: "manager_id",
+    header: "ID Gerente",
+    size: 100,
   },
   {
-    accessorKey: "phone",
-    header: "Teléfono",
+    accessorKey: "manager_name",
+    header: "Gerente",
     size: 200,
   },
 ];
 
-const TableManagers = ({ managers, pageCount }: TableManagersProps) => {
+const TableBrands = ({ brands, pageCount }: TableBrandsProps) => {
   // Initialize the table
   const table = useReactTable({
-    data: managers,
+    data: brands,
     columns,
     getCoreRowModel: getCoreRowModel(),
     manualPagination: true,
@@ -93,7 +93,7 @@ const TableManagers = ({ managers, pageCount }: TableManagersProps) => {
                 {row.getVisibleCells().map((cell) => (
                   <TableCell key={cell.id} className="p-0">
                     <Link 
-                      href={`/managers/${row.getValue("id")}`}
+                      href={`/brands/${row.getValue("id")}`}
                       className="block w-full h-full cursor-pointer p-2"
                       >
                       {flexRender(
@@ -118,4 +118,4 @@ const TableManagers = ({ managers, pageCount }: TableManagersProps) => {
   );
 };
 
-export default TableManagers;
+export default TableBrands;

@@ -52,6 +52,7 @@ export async function GET(request: NextRequest) {
   try {
     const url = new URL(request.url);
     const managerId = url.searchParams.get("manager_id");
+    const clientId = url.searchParams.get("client_id");
     const id = url.searchParams.get("id");
     const page = parseInt(url.searchParams.get("page") || "1");
     const limit = ITEMS_PER_PAGE;
@@ -73,6 +74,7 @@ export async function GET(request: NextRequest) {
       // Get paginated results
       const { brands, total } = await getBrandsWithPagination({
         managerId: managerId || undefined,
+        clientId: clientId || undefined,
         page,
         limit,
         search: search || undefined
