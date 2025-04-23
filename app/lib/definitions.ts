@@ -54,14 +54,15 @@ export type ManagerType = {
   biography?: string;
 };
 
-export type ManagerTypeForBrands = {
-  name: string;
-  email: string;
-}
-
 export type BrandType = {
   id?: number;
   name: string;
+  manager_id: number;
+};
+
+export type BrandsAndManagersType = {
+  brand_id: number;
+  brand_name?: string;
   manager_id: number;
   manager_name?: string;
 };

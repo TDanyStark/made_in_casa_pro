@@ -42,25 +42,49 @@ export async function getBrands() {
 
 export async function createBrand(brandData: Omit<BrandType, 'id'>) {
   try {
-    const result = await turso.execute({
-      sql: `INSERT INTO brands (manager_id, name)
-      VALUES (?, ?)`,
-      args: [
-        brandData.manager_id,
-        brandData.name
-      ]
-    });
+    // Use the turso transaction API instead of manual BEGIN/COMMIT/ROLLBACK
+    const transaction = await turso.transaction('write');
     
-    const manager = await getManagerById(brandData.manager_id.toString());
-    // Revalidamos la ruta del cliente al que pertenece el manager
-    if (manager && manager.client_id) {
-      revalidatePath(`/clients/${manager.client_id}`);
+    try {
+      // 1. Crear el brand
+      const brandResult = await transaction.execute({
+        sql: `INSERT INTO brands (name)
+        VALUES (?)`,
+        args: [
+          brandData.name
+        ]
+      });
+      
+      const brandId = Number(brandResult.lastInsertRowid);
+      
+      // 2. Crear la relación en la tabla brand_manager
+      await transaction.execute({
+        sql: `INSERT INTO brand_manager (brand_id, manager_id)
+        VALUES (?, ?)`,
+        args: [
+          brandId,
+          brandData.manager_id
+        ]
+      });
+      
+      // Commit the transaction
+      await transaction.commit();
+      
+      const manager = await getManagerById(brandData.manager_id.toString());
+      // Revalidamos la ruta del cliente al que pertenece el manager
+      if (manager && manager.client_id) {
+        revalidatePath(`/clients/${manager.client_id}`);
+      }
+      
+      return {
+        id: brandId,
+        ...brandData
+      };
+    } catch (error) {
+      // If any error occurs during the transaction, roll it back
+      await transaction.rollback();
+      throw error;
     }
-    
-    return {
-      id: Number(result.lastInsertRowid), // Convertir BigInt a Number
-      ...brandData
-    };
   } catch (error) {
     console.error("Error creating brand:", error);
     throw error;
