@@ -54,7 +54,7 @@ export async function PATCH(
 
     // Build update query based on provided fields
     const updates: string[] = [];
-    const args: any[] = [];
+    const args: string[] = [];
 
     if (email !== undefined) {
       updates.push("email = ?");

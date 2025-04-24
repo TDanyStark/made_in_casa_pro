@@ -1,17 +1,18 @@
-import {turso} from '../db';
+import { turso } from "../db";
 import { revalidatePath } from "next/cache";
-import { ManagerType } from '../definitions';
-import { ITEMS_PER_PAGE } from '@/config/constants';
+import { ManagerType } from "../definitions";
+import { ITEMS_PER_PAGE } from "@/config/constants";
 
 export async function getManagerByEmail(email: string) {
   try {
     const result = await turso.execute({
       sql: `SELECT * FROM managers WHERE email = ?`,
-      args: [email]
+      args: [email],
     });
-    return result.rows.length > 0 ? result.rows[0] as unknown as ManagerType : null;
-  }
-  catch (error) {
+    return result.rows.length > 0
+      ? (result.rows[0] as unknown as ManagerType)
+      : null;
+  } catch (error) {
     console.error("Error fetching manager by email:", error);
     return null;
   }
@@ -33,11 +34,11 @@ export async function getManagerById(id: string) {
         LEFT JOIN countries co ON c.country_id = co.id
         WHERE m.id = ?
       `,
-      args: [id]
+      args: [id],
     });
-    
+
     if (result.rows.length === 0) return null;
-    
+
     const row = result.rows[0];
     return {
       id: row.id,
@@ -46,15 +47,19 @@ export async function getManagerById(id: string) {
       email: row.email,
       phone: row.phone,
       biography: row.biography,
-      client_info: row.client_id ? {
-        id: row.client_id,
-        name: row.client_name,
-        country: row.country_id ? {
-          id: row.country_id,
-          name: row.country_name,
-          flag: row.country_flag
-        } : undefined
-      } : undefined
+      client_info: row.client_id
+        ? {
+            id: row.client_id,
+            name: row.client_name,
+            country: row.country_id
+              ? {
+                  id: row.country_id,
+                  name: row.country_name,
+                  flag: row.country_flag,
+                }
+              : undefined,
+          }
+        : undefined,
     } as ManagerType;
   } catch (error) {
     console.error("Error fetching manager:", error);
@@ -66,7 +71,7 @@ export async function getManagersByClientId(clientId: string) {
   try {
     const result = await turso.execute({
       sql: `SELECT * FROM managers WHERE client_id = ? ORDER BY name ASC`,
-      args: [clientId]
+      args: [clientId],
     });
     return result.rows as unknown as ManagerType[];
   } catch (error) {
@@ -77,7 +82,9 @@ export async function getManagersByClientId(clientId: string) {
 
 export async function getManagers() {
   try {
-    const result = await turso.execute(`SELECT * FROM managers ORDER BY name ASC`);
+    const result = await turso.execute(
+      `SELECT * FROM managers ORDER BY name ASC`
+    );
     return result.rows as unknown as ManagerType[];
   } catch (error) {
     console.error("Error fetching managers:", error);
@@ -92,64 +99,48 @@ interface PaginationParams {
   search?: string;
 }
 
-export async function getManagersWithPagination({
-  clientId,
-  page = 1,
-  limit = ITEMS_PER_PAGE,
-  search
-}: PaginationParams) {
+export async function getManagersWithPagination({clientId, page = 1, limit = ITEMS_PER_PAGE, search,}: PaginationParams) {
   try {
-    let sql = 'SELECT * FROM managers';
+    let sql = "SELECT * FROM managers";
     const args = [];
     const countArgs = [];
-    
-    // Build WHERE clause
     const conditions: string[] = [];
-    
     if (clientId) {
-      conditions.push('client_id = ?');
+      conditions.push("client_id = ?");
       args.push(clientId);
       countArgs.push(clientId);
     }
-    
     if (search) {
-      conditions.push('(name LIKE ? OR email LIKE ? OR phone LIKE ?)');
+      conditions.push("(name LIKE ? OR email LIKE ? OR phone LIKE ?)");
       const searchParam = `%${search}%`;
       args.push(searchParam, searchParam, searchParam);
       countArgs.push(searchParam, searchParam, searchParam);
     }
-    
     if (conditions.length > 0) {
-      sql += ' WHERE ' + conditions.join(' AND ');
+      sql += " WHERE " + conditions.join(" AND ");
     }
-    
     // Get total count for pagination
-    let countSql = 'SELECT COUNT(*) as count FROM managers';
+    let countSql = "SELECT COUNT(*) as count FROM managers";
     if (conditions.length > 0) {
-      countSql += ' WHERE ' + conditions.join(' AND ');
+      countSql += " WHERE " + conditions.join(" AND ");
     }
-    
     const countResult = await turso.execute({
       sql: countSql,
-      args: countArgs
+      args: countArgs,
     });
-    
     const total = Number(countResult.rows[0].count);
-    
     // Add pagination
     const offset = (page - 1) * limit;
-    sql += ' LIMIT ? OFFSET ?';
+    sql += " LIMIT ? OFFSET ?";
     args.push(limit, offset);
-
     // Execute query
     const result = await turso.execute({
       sql,
-      args
+      args,
     });
-    
     return {
       managers: result.rows as unknown as ManagerType[],
-      total
+      total,
     };
   } catch (error) {
     console.error("Error fetching managers with pagination:", error);
@@ -157,7 +148,7 @@ export async function getManagersWithPagination({
   }
 }
 
-export async function createManager(managerData: Omit<ManagerType, 'id'>) {
+export async function createManager(managerData: Omit<ManagerType, "id">) {
   try {
     const result = await turso.execute({
       sql: `INSERT INTO managers (client_id, name, email, phone, biography)
@@ -167,15 +158,15 @@ export async function createManager(managerData: Omit<ManagerType, 'id'>) {
         managerData.name,
         managerData.email,
         managerData.phone,
-        managerData.biography || '' // Asegurarnos de que nunca sea undefined
-      ]
+        managerData.biography || "", // Asegurarnos de que nunca sea undefined
+      ],
     });
-    
+
     revalidatePath(`/clients/${managerData.client_id}`);
-    
+
     return {
       id: Number(result.lastInsertRowid), // Convertir BigInt a Number
-      ...managerData
+      ...managerData,
     };
   } catch (error) {
     console.error("Error creating manager:", error);

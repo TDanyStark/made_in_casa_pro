@@ -37,7 +37,7 @@ export default async function ManagerPage({ params }: Props) {
               <img
                 src={`/images/managers/manager_img.webp`}
                 alt="Fondo gradiente"
-                className="h-full w-52 rounded"
+                className="h-full w-52 rounded opacity-70"
               />
             </div>
             <div className="flex flex-col gap-4">
