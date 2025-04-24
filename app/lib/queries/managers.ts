@@ -100,6 +100,7 @@ interface PaginationParams {
 }
 
 export async function getManagersWithPagination({clientId, page = 1, limit = ITEMS_PER_PAGE, search,}: PaginationParams) {
+  
   try {
     let sql = "SELECT * FROM managers";
     const args = [];
@@ -170,6 +171,49 @@ export async function createManager(managerData: Omit<ManagerType, "id">) {
     };
   } catch (error) {
     console.error("Error creating manager:", error);
+    throw error;
+  }
+}
+
+export async function updateManager(id: string, updateData: { email?: string; phone?: string, name?: string }) {
+  try {
+    // Build update query based on provided fields
+    const updates: string[] = [];
+    const args: string[] = [];
+
+    if (updateData.email !== undefined) {
+      updates.push("email = ?");
+      args.push(updateData.email);
+    }
+
+    if (updateData.phone !== undefined) {
+      updates.push("phone = ?");
+      args.push(updateData.phone);
+    }
+
+    if (updateData.name !== undefined) {
+      updates.push("name = ?");
+      args.push(updateData.name);
+    }
+
+    // If no fields to update, return
+    if (updates.length === 0) {
+      return null;
+    }
+
+    // Add the ID as the last argument
+    args.push(id);
+
+    // Execute the update query
+    await turso.execute({
+      sql: `UPDATE managers SET ${updates.join(", ")} WHERE id = ?`,
+      args,
+    });
+
+    // Get and return the updated manager
+    return getManagerById(id);
+  } catch (error) {
+    console.error("Error updating manager:", error);
     throw error;
   }
 }

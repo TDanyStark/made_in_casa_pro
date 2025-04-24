@@ -22,7 +22,12 @@ interface Props {
   onUpdate?: (newValue: string) => void;
 }
 
-const ItemInfo = ({ label, value: initialValue, key_update, onUpdate }: Props) => {
+const ItemInfo = ({
+  label,
+  value: initialValue,
+  key_update,
+  onUpdate,
+}: Props) => {
   const params = useParams();
   const [copied, setCopied] = useState<boolean>(false);
   const [isEditing, setIsEditing] = useState(false);
@@ -79,7 +84,7 @@ const ItemInfo = ({ label, value: initialValue, key_update, onUpdate }: Props) =
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          [key_update ]: inputValue,
+          [key_update]: inputValue,
         }),
       });
 
@@ -116,19 +121,21 @@ const ItemInfo = ({ label, value: initialValue, key_update, onUpdate }: Props) =
         </div>
         <div className="w-full">
           <p className="text-sm text-gray-500 dark:text-gray-400">{label}</p>
-          {isEditing ? (
-            <div className="flex gap-2">
-              <AutoResizeInput
-                value={inputValue}
-                onChange={(e) => setInputValue(e.target.value)}
-                onKeyDown={handleKeyDown}
-                autoFocus
-                disabled={isSubmitting}
-              />
-            </div>
-          ) : (
-            <p className="font-medium h-[25px] text-gray-900 dark:text-white">{value}</p>
-          )}
+          <div className="font-medium ">
+            {isEditing ? (
+              <div className="flex gap-2">
+                <AutoResizeInput
+                  value={inputValue}
+                  onChange={(e) => setInputValue(e.target.value)}
+                  onKeyDown={handleKeyDown}
+                  autoFocus
+                  disabled={isSubmitting}
+                />
+              </div>
+            ) : (
+              <p className="h-[25px] text-gray-900 dark:text-white">{value}</p>
+            )}
+          </div>
         </div>
       </div>
       {isEditing && (

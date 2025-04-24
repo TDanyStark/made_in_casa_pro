@@ -2,6 +2,7 @@ import React, { useRef, useEffect, useState } from "react";
 
 interface AutoResizeInputProps {
   value: string;
+  height?: number;
   onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
   onKeyDown?: (e: React.KeyboardEvent<HTMLInputElement>) => void;
   autoFocus?: boolean;
@@ -11,6 +12,7 @@ interface AutoResizeInputProps {
 
 const AutoResizeInput =({
   value,
+  height = 25,
   onChange,
   onKeyDown,
   autoFocus,
@@ -49,13 +51,14 @@ const AutoResizeInput =({
         onKeyDown={onKeyDown}
         autoFocus={autoFocus}
         disabled={disabled}
-        className={`w-full h-[25px] font-medium p-0 border-0 border-b border-gray-400 focus:border-gray-600 focus:ring-0 outline-none text-gray-900 dark:text-white bg-transparent absolute top-0 left-0 ${className}`}
+        style={{ height: `${height}px` }}
+        className={`w-full p-0 border-0 border-b border-gray-400 focus:border-gray-600 focus:ring-0 outline-none text-gray-900 dark:text-white bg-transparent absolute top-0 left-0 ${className}`}
       />
 
       {/* Span oculto para medir el texto */}
       <span
         ref={spanRef}
-        className="invisible whitespace-pre font-medium"
+        className="invisible whitespace-pre"
       >
         {value || " "}
       </span>

@@ -1,6 +1,7 @@
 /* eslint-disable @next/next/no-img-element */
 import ItemBrands from "@/components/managers/ItemBrands";
 import ItemInfo from "@/components/managers/ItemInfo";
+import EditableText from "@/components/input/EditableText";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { ManagerType } from "@/lib/definitions";
 import { getBrandsByManagerId } from "@/lib/queries/brands";
@@ -26,7 +27,17 @@ export default async function ManagerPage({ params }: Props) {
   
   return (
     <section>
-      <h1 className="primaryH1">{name} <span className="waving-hand">👋🏻</span></h1>
+      <h1 className="primaryH1">
+        <span className="waving-hand mr-4">👋🏻</span>
+        <EditableText 
+          height={36}
+          value={name} 
+          endpoint="managers" 
+          fieldName="name" 
+          as="span"
+          endpointIdParam="id"
+        />
+      </h1>
       <div className="mt-6">
         <Card className="w-fit p-4 shadow-md rounded-lg">
           <CardHeader className="flex flex-col gap-2">
@@ -58,7 +69,7 @@ export default async function ManagerPage({ params }: Props) {
       </div>
       <div className="mt-6">
         <h2 className="text-2xl font-bold">Biografía</h2>
-        <p>{biography}</p>
+        {biography}
       </div>
     </section>
   );

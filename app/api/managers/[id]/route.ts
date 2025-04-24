@@ -1,21 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { getManagerByEmail, getManagerById } from "@/lib/queries/managers";
-import { turso } from "@/lib/db";
+import { getManagerByEmail, getManagerById, updateManager } from "@/lib/queries/managers";
 import { revalidatePath } from "next/cache";
 
 // Schema for validating manager update data
 const managerUpdateSchema = z.object({
   email: z.string().email().optional(),
   phone: z.string().min(1).optional(),
+  name: z.string().min(1).optional(),
 });
 
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = params;
+    // Await the params object before accessing its properties
+    const { id } = await params;
     const body = await request.json();
 
     // Validate the data against our schema
@@ -27,7 +28,7 @@ export async function PATCH(
       );
     }
 
-    const { email, phone } = validationResult.data;
+    const { email, phone, name } = validationResult.data;
 
     // Check if the manager exists
     const existingManager = await getManagerById(id);
@@ -52,42 +53,19 @@ export async function PATCH(
       }
     }
 
-    // Build update query based on provided fields
-    const updates: string[] = [];
-    const args: string[] = [];
-
-    if (email !== undefined) {
-      updates.push("email = ?");
-      args.push(email);
-    }
-
-    if (phone !== undefined) {
-      updates.push("phone = ?");
-      args.push(phone);
-    }
-
     // If no fields to update, return the existing manager
-    if (updates.length === 0) {
+    if (!email && !phone && !name) {
       return NextResponse.json(existingManager);
     }
 
-    // Add the ID as the last argument
-    args.push(id);
-
-    // Execute the update query
-    await turso.execute({
-      sql: `UPDATE managers SET ${updates.join(", ")} WHERE id = ?`,
-      args,
-    });
+    // Update manager using the model function
+    const updatedManager = await updateManager(id, { email, phone, name });
 
     // Revalidate paths
     revalidatePath(`/managers/${id}`);
     if (existingManager.client_id) {
       revalidatePath(`/clients/${existingManager.client_id}`);
     }
-
-    // Get the updated manager
-    const updatedManager = await getManagerById(id);
 
     return NextResponse.json(updatedManager);
   } catch (error) {
