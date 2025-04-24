@@ -1,28 +1,16 @@
-import ManagerTable from "@/components/clients/ManagerTable";
-import { Card, CardHeader, CardTitle } from "@/components/ui/card";
+import ListManagersClient from "@/components/clients/ListManagersClient";
 
-interface ManagersPageProps {
-  searchParams: {
-    page?: string;
-    search?: string;
-  };
-}
 
-export default function ManagersPage({ searchParams }: ManagersPageProps) {
-  const { page, search } = searchParams;
+export default function ManagersPage() {
   
   return (
-    <div className="container py-8">
-      <Card className="mb-6">
-        <CardHeader>
-          <CardTitle>Todos los Gerentes</CardTitle>
-        </CardHeader>
-      </Card>
+    <section className="container py-8">
+      <h1 className="primaryH1">Todos los Gerentes</h1>
       
-      <ManagerTable 
-        page={page}
-        search={search}
-      />
-    </div>
+      <div className="mt-6">
+        <ListManagersClient />
+      </div>
+      
+    </section>
   );
 }

@@ -14,7 +14,6 @@ import { ManagerType } from "@/lib/definitions";
 interface ManagerTableClientProps {
   clientId?: string;
   endpoint?: string; // Nuevo parámetro para especificar el endpoint
-  searchQuery?: string;
 }
 
 export default function ListManagersClient({

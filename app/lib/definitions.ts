@@ -52,6 +52,7 @@ export type ManagerType = {
   email: string;
   phone: string;
   biography?: string;
+  client_info?: ClientType;
 };
 
 export type BrandType = {
