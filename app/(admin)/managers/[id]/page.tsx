@@ -26,7 +26,7 @@ export default async function ManagerPage({ params }: Props) {
   
   return (
     <section>
-      <h1 className="primaryH1">{name} 👋🏻</h1>
+      <h1 className="primaryH1">{name} <span className="waving-hand">👋🏻</span></h1>
       <div className="mt-6">
         <Card className="w-full max-w-2xl p-4 shadow-md rounded-lg">
           <CardHeader className="flex flex-col gap-2">
