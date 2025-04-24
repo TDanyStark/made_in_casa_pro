@@ -1,82 +1,180 @@
 "use client";
 
-import {
-  Copy,
-  Mail,
-  Phone,
-  User,
-  Building,
-  Calendar,
-  MapPin,
-  Globe,
-  LucideIcon,
-} from "lucide-react";
+import { Copy, Mail, Phone, LucideIcon, Check, X, Pencil } from "lucide-react";
 import { useState } from "react";
 import { Button } from "../ui/button";
+import { toast } from "sonner";
+import { useParams } from "next/navigation";
+import AutoResizeInput from "../input/AutoResizeInput";
 
 // Tipo para las claves de icono disponibles
-export type IconKey =
-  | "mail"
-  | "phone"
-  | "user"
-  | "building"
-  | "calendar"
-  | "location"
-  | "globe";
+export type IconKey = "email" | "phone";
 
 const IconMap: Record<IconKey, LucideIcon> = {
-  mail: Mail,
+  email: Mail,
   phone: Phone,
-  user: User,
-  building: Building,
-  calendar: Calendar,
-  location: MapPin,
-  globe: Globe,
 };
 
 interface Props {
   label: string;
   value: string;
-  iconKey: IconKey;
+  key_update: IconKey;
+  onUpdate?: (newValue: string) => void;
 }
 
-const ItemInfo = ({ label, value, iconKey }: Props) => {
-  const [copied, setCopied] = useState<string | null>(null);
+const ItemInfo = ({ label, value: initialValue, key_update, onUpdate }: Props) => {
+  const params = useParams();
+  const [copied, setCopied] = useState<boolean>(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [value, setValue] = useState(initialValue);
+  const [inputValue, setInputValue] = useState(initialValue);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Obtén el componente de icono adecuado
-  const Icon = IconMap[iconKey];
+  const Icon = IconMap[key_update];
 
-  const copyToClipboard = (text: string, type: string) => {
+  const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
-    setCopied(type);
-    setTimeout(() => setCopied(null), 2000);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter") {
+      saveChanges();
+    } else if (e.key === "Escape") {
+      cancelEditing();
+    }
+  };
+
+  const cancelEditing = () => {
+    setInputValue(value);
+    setIsEditing(false);
+  };
+
+  const saveChanges = async () => {
+    if (inputValue === value) {
+      setIsEditing(false);
+      return;
+    }
+
+    if (!inputValue.trim()) {
+      toast.error("El campo no puede estar vacío");
+      return;
+    }
+
+    // Validar email básico si es campo de correo
+    if (key_update === "email" && !inputValue.includes("@")) {
+      toast.error("Por favor ingrese un correo electrónico válido");
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    try {
+      // Hacer la petición a la API
+      const response = await fetch(`/api/managers/${params.id}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          [key_update ]: inputValue,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Error al actualizar");
+      }
+
+      // Actualizar el estado local con el nuevo valor
+      setValue(inputValue);
+
+      // Llamar al callback onUpdate si existe
+      if (onUpdate) {
+        onUpdate(inputValue);
+      }
+
+      // Actualizar la UI y mostrar toast de éxito
+      toast.success(`${label} actualizado correctamente`);
+      setIsEditing(false);
+    } catch (error: Error | unknown) {
+      toast.error((error as Error).message || "Error al actualizar");
+      setInputValue(value); // Revertir al valor original
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
-    <div className="flex justify-between group bg-gray-100/80 dark:bg-gray-800/50 p-3 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-800 transition-colors gap-6">
-      <div className="flex items-start gap-3">
+    <div className="flex justify-between group bg-gray-100/80 dark:bg-gray-800/50 p-3 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-800 transition-colors gap-2">
+      <div className="flex items-start gap-3 w-full">
         <div className="bg-accent dark:bg-gray-800 p-2 rounded-full">
           <Icon className="h-6 w-6 text-market-green" strokeWidth={2.4} />
         </div>
-        <div>
+        <div className="w-full">
           <p className="text-sm text-gray-500 dark:text-gray-400">{label}</p>
-          <p className="font-medium text-gray-900 dark:text-white">{value}</p>
+          {isEditing ? (
+            <div className="flex gap-2">
+              <AutoResizeInput
+                value={inputValue}
+                onChange={(e) => setInputValue(e.target.value)}
+                onKeyDown={handleKeyDown}
+                autoFocus
+                disabled={isSubmitting}
+              />
+            </div>
+          ) : (
+            <p className="font-medium h-[25px] text-gray-900 dark:text-white">{value}</p>
+          )}
         </div>
       </div>
-      <div className="flex items-center">
-        <Button
-          variant="ghost"
-          size="icon"
-          className="opacity-0 group-hover:opacity-100 transition-opacity text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
-          onClick={() => copyToClipboard(value, label.toLowerCase())}
-        >
-          {copied === label.toLowerCase() ? (
-            <span className="text-xs text-primary">¡Copiado!</span>
-          ) : (
-            <Copy className="h-4 w-4" />
-          )}
-        </Button>
-      </div>
+      {isEditing && (
+        <div className="flex items-center gap-1">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={saveChanges}
+            disabled={isSubmitting}
+          >
+            <Check className="h-4 w-4 text-green-600" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={cancelEditing}
+            disabled={isSubmitting}
+          >
+            <X className="h-4 w-4 text-red-600" />
+          </Button>
+        </div>
+      )}
+      {!isEditing && (
+        <div className="flex items-center gap-1">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="opacity-0 group-hover:opacity-100 transition-opacity text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
+            onClick={() => setIsEditing(true)}
+          >
+            <Pencil className="h-4 w-4" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="opacity-0 group-hover:opacity-100 transition-opacity text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
+            onClick={() => copyToClipboard(value)}
+          >
+            {copied ? (
+              <span className="text-xs text-primary">¡Copiado!</span>
+            ) : (
+              <Copy className="h-4 w-4" />
+            )}
+          </Button>
+        </div>
+      )}
     </div>
   );
 };

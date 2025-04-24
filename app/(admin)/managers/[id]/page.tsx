@@ -28,25 +28,29 @@ export default async function ManagerPage({ params }: Props) {
     <section>
       <h1 className="primaryH1">{name} <span className="waving-hand">👋🏻</span></h1>
       <div className="mt-6">
-        <Card className="w-full max-w-2xl p-4 shadow-md rounded-lg">
+        <Card className="w-fit p-4 shadow-md rounded-lg">
           <CardHeader className="flex flex-col gap-2">
-            <h2 className="text-2xl font-bold">Información de contacto</h2>
+            <h2 className="text-2xl font-bold">Información</h2>
           </CardHeader>
           <CardContent className="flex gap-4">
             <div>
               <img
                 src={`/images/managers/manager_img.webp`}
                 alt="Fondo gradiente"
-                className="h-full rounded"
+                className="h-full w-52 rounded"
               />
             </div>
             <div className="flex flex-col gap-4">
               <ItemInfo
-                iconKey="mail"
+                key_update="email"
                 label="Correo electrónico"
                 value={email}
               />
-              <ItemInfo iconKey="phone" label="Teléfono" value={phone} />
+              <ItemInfo 
+                key_update="phone" 
+                label="Teléfono" 
+                value={phone} 
+              />
               <ItemBrands brands={brands} />
             </div>
           </CardContent>
