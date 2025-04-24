@@ -1,6 +1,4 @@
 import { createCountry, getCountries } from '@/lib/queries/countries';
-import { cookies } from 'next/headers';
-
 export async function GET() {
   // const cookieStore = await cookies();
   // const token = cookieStore.get('session');
@@ -10,9 +8,9 @@ export async function GET() {
   const countries = res.rows;
   return Response.json({ 
     countries: countries
-
   });
 }
+
 
 interface PostRequestBody {
   name: string;

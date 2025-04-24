@@ -40,8 +40,18 @@ export function TabsManagersAndBrands({ clientId }: { clientId: number }) {
   return (
     <Tabs defaultValue={currentTab} onValueChange={handleTabChange}>
       <TabsList>
-        <TabsTrigger value="managers">Gerentes</TabsTrigger>
-        <TabsTrigger value="brands">Marcas</TabsTrigger>
+        <TabsTrigger 
+          value="managers" 
+          className="data-[state=active]:bg-primary/10 dark:data-[state=active]:bg-primary/20"
+        >
+          Gerentes
+        </TabsTrigger>
+        <TabsTrigger 
+          value="brands"
+          className="data-[state=active]:bg-primary/10 dark:data-[state=active]:bg-primary/20"
+        >
+          Marcas
+        </TabsTrigger>
       </TabsList>
       <TabsContent value="managers" className="p-4">
         <Button variant="default" onClick={() => handleManagerModal(true)}>

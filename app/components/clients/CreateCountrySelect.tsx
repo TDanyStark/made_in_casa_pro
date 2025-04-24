@@ -1,15 +1,18 @@
 /* eslint-disable @next/next/no-img-element */
-import React, { useState, useEffect, useRef } from "react";
+"use client";
+
+import { useState, useEffect, useMemo } from "react";
 import { ControllerRenderProps } from "react-hook-form";
-import useGetItems from "@/hooks/useGetItems";
+import CreatableSelect from "react-select/creatable";
 import { API_FLAG_URL, IMG_FLAG_EXT } from "@/config/constants";
-import { Plus } from "lucide-react";
-import { Input } from "../ui/input";
-import { Button } from "../ui/button";
+import { Skeleton } from "../ui/skeleton";
+import useGetItems from "@/hooks/useGetItems";
 import useItemMutations from "@/hooks/useItemsMutation";
 import { CountryType } from "@/lib/definitions";
-import { Skeleton } from "../ui/skeleton";
-import { cn } from "@/lib/utils";
+
+// Importar los estilos de los selects
+import "@/styles/selects.css";
+import { toast } from "sonner";
 
 interface CreateCountrySelectProps {
   field: ControllerRenderProps<
@@ -18,82 +21,72 @@ interface CreateCountrySelectProps {
   >;
 }
 
+interface CountryOption {
+  value: number;
+  label: string;
+  flag: string;
+}
+
 export function CreateCountrySelect({ field }: CreateCountrySelectProps) {
-  const [searchTerm, setSearchTerm] = useState("");
   const [isCreating, setIsCreating] = useState(false);
   const [newCountryName, setNewCountryName] = useState("");
   const [newCountryFlag, setNewCountryFlag] = useState("");
+  const [countryOptions, setCountryOptions] = useState<CountryOption[]>([]);
+  
+  // Obtener los países usando el hook de consulta
   const { data, isLoading, isError } = useGetItems("/countries");
-  const countries: CountryType[] = data?.countries ?? [];
-  const flagInputRef = useRef<HTMLInputElement>(null);
-  const [isOpen, setIsOpen] = useState(false);
-  const searchInputRef = useRef<HTMLInputElement>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
-
-  const selectedCountry = countries.find(
-    (c) => String(c.id) === String(field.value)
-  );
-
-  // Enfoca el input de bandera al iniciar el modo de creación
+  console.log("data", data);
+  const countries: CountryType[] = useMemo(() => data?.countries ?? [], [data]);
+  
+  // Preparar opciones para react-select
   useEffect(() => {
-    if (isCreating && flagInputRef.current) {
-      setTimeout(() => {
-        flagInputRef.current?.focus();
-      }, 0);
+    if (countries && countries.length > 0) {
+      const options = countries.map((country) => ({
+        value: country.id as number,
+        label: country.name,
+        flag: country.flag,
+      }));
+      setCountryOptions(options);
     }
-  }, [isCreating]);
+  }, [countries]);
 
-  // Enfoca el input de búsqueda cuando se abre el dropdown
-  useEffect(() => {
-    if (isOpen) {
-      setTimeout(() => {
-        searchInputRef.current?.focus();
-      }, 0);
-    }
-  }, [isOpen, searchTerm, isCreating]);
 
-  // Cierra el dropdown al hacer clic fuera del componente
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (
-        containerRef.current &&
-        !containerRef.current.contains(event.target as Node)
-      ) {
-        setIsOpen(false);
-      }
-    };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
+  // Hook para crear un nuevo país
+  const { createItem } = useItemMutations<CountryType>("/countries");
 
-  const filteredCountries = countries.filter((country) =>
-    country.name.toLowerCase().includes(searchTerm.toLowerCase())
-  );
-
-  // Si no hay coincidencias y se presiona Enter, activa el modo de creación
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Enter" && searchTerm && filteredCountries.length === 0) {
-      e.preventDefault();
-      setIsCreating(true);
-      setNewCountryName(searchTerm);
-    }
+  // Manejar la creación de un nuevo país
+  const handleCreateCountry = async (inputValue: string) => {
+    setIsCreating(true);
+    setNewCountryName(inputValue);
   };
 
-  // llamar a useItemMutations
-  const {createItem} = useItemMutations<CountryType>("/countries");
-
-  const handleCreateCountry = async (e: React.MouseEvent<HTMLButtonElement, MouseEvent>) => {
-    e.preventDefault();
-    if (!newCountryName || !newCountryFlag) return;
+  // Confirmar la creación del país
+  const confirmCreateCountry = async () => {
+    if (!newCountryName || !newCountryFlag) {
+      toast.error("Por favor, completa todos los campos.");
+      return;
+    };
   
     try {
       const response = await createItem.mutateAsync({
         name: newCountryName,
         flag: newCountryFlag,
         id: 0,
-      });
-  
-      console.log("Respuesta del servidor:", response);
+      }) as CountryType;
+      
+      // Agregar el nuevo país a las opciones
+      const newOption = {
+        value: response.id as number,
+        label: response.name,
+        flag: response.flag,
+      };
+      
+      setCountryOptions((prev) => [...prev, newOption]);
+      
+      // Seleccionar el país recién creado
+      field.onChange(response.id);
+      
+      // Limpiar campos
       setNewCountryName("");
       setNewCountryFlag("");
       setIsCreating(false);
@@ -101,121 +94,93 @@ export function CreateCountrySelect({ field }: CreateCountrySelectProps) {
       console.error("Error al crear el país:", error);
     }
   };
-  
 
-  if (isError)
-    return <div className="text-red-500">Error al cargar los países</div>;
+  // Formatear las opciones para mostrar la bandera junto al nombre
+  const formatOptionLabel = (option: CountryOption) => (
+    <div className="flex items-center gap-2">
+      <span>{option.label}</span>
+      <img
+        src={`${API_FLAG_URL}${option.flag}${IMG_FLAG_EXT}`}
+        alt=""
+        width={16}
+        height={12}
+        className="inline-block"
+      />
+    </div>
+  );
 
-  return (
-    <div className="space-y-2 relative" ref={containerRef}>
-      {isLoading ? (
-        <Skeleton className="h-[36px]" />
-      ) : (
-        <div>
-          {/* Trigger del "select" personalizado */}
-          <button
-            type="button"
-            onClick={() => setIsOpen(!isOpen)}
-            className={cn(
-              "w-full h-9 text-sm text-muted-foreground py-1 px-3 border border-secondary rounded-md flex items-center justify-between",
-              isOpen && "border-input outline-ring/50 outline-4", selectedCountry && "text-primary"
-            )}
-          >
-            {selectedCountry ? (
-              <div className="flex items-center gap-2">
-                {selectedCountry.name}
-                <img
-                  src={`${API_FLAG_URL}${selectedCountry.flag}${IMG_FLAG_EXT}`}
-                  alt={selectedCountry.name}
-                  width="20"
-                  height="15"
-                  className="mr-2"
-                />
-              </div>
-            ) : ("Seleccione un país")}
-          </button>
-          {/* Dropdown */}
-          {isOpen && !isCreating && (
-            <div className="absolute z-10 bg-background mt-1 w-full rounded shadow">
-              <div className="p-2">
-                <Input
-                  type="text"
-                  placeholder="Buscar país..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  onKeyDown={handleKeyDown}
-                  ref={searchInputRef}
-                  className="w-full p-2 border border-gray-300 rounded mb-2"
-                />
-                <ul className="max-h-60 overflow-auto">
-                  {filteredCountries.map((country) => (
-                    <li
-                      key={country.id}
-                      onClick={() => {
-                        field.onChange(country.id);
-                        setIsOpen(false);
-                        setSearchTerm("");
-                      }}
-                      className="p-2 hover:bg-secondary flex items-center gap-2 cursor-pointer rounded"
-                    >
-                      {country.name}
-                      <img
-                        src={`${API_FLAG_URL}${country.flag}${IMG_FLAG_EXT}`}
-                        alt={country.name}
-                        width="20"
-                        height="15"
-                      />
-                    </li>
-                  ))}
-                  {filteredCountries.length === 0 && searchTerm && !isCreating && (
-                    <li className="p-2 text-sm text-gray-500">
-                      Presione Enter para crear &quot;{searchTerm}&quot;
-                    </li>
-                  )}
-                </ul>
-              </div>
-            </div>
-          )}
-        </div>
-      )}
+  // Cuando isCreating es true, mostrar campos adicionales para crear un país
+  useEffect(() => {
+    if (!isCreating) {
+      setNewCountryName("");
+      setNewCountryFlag("");
+    }
+  }, [isCreating]);
 
-      {/* Sección para crear un nuevo país */}
-      {isCreating && (
-        <div className="flex items-center gap-2 mt-2">
-          <Input
+  if (isError) return <div className="text-red-500">Error al cargar los países</div>;
+
+  // Si está creando un país, mostrar el formulario para completar la información
+  if (isCreating) {
+    return (
+      <div className="space-y-2">
+        <div className="flex gap-2 items-center">
+          <input
             type="text"
             value={newCountryName}
             onChange={(e) => setNewCountryName(e.target.value)}
-            placeholder="Nombre del nuevo país"
-            className="flex-1 py-1 px-2 border border-gray-300 rounded"
+            placeholder="Nombre del país"
+            className="flex-1 h-9 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs"
+            autoFocus
           />
-          <Input
+          <input
             type="text"
-            ref={flagInputRef}
             value={newCountryFlag}
             onChange={(e) => setNewCountryFlag(e.target.value)}
-            placeholder="Bandera"
-            className="flex-1 py-1 px-2 border border-gray-300 rounded"
+            placeholder="Código de bandera"
+            className="flex-1 h-9 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs"
           />
-          <Button
-            onClick={(e) => handleCreateCountry(e)}
+        </div>
+        <div className="flex gap-2 justify-end">
+          <button 
+            type="button"
+            onClick={confirmCreateCountry}
+            className="bg-primary text-primary-foreground shadow-sm hover:bg-primary/90 h-9 rounded-md px-3 py-1 text-sm"
           >
-            <Plus className="w-4 h-4 mr-1" />
-            Crear
-          </Button>
-          <Button
-            onClick={() => {
-              setIsCreating(false);
-              setNewCountryName("");
-              setNewCountryFlag("");
-              setSearchTerm("");
-            }}
-            variant={"secondary"}
+            Guardar
+          </button>
+          <button 
+            type="button"
+            onClick={() => setIsCreating(false)} 
+            className="bg-secondary text-secondary-foreground shadow-xs hover:bg-secondary/80 h-9 rounded-md px-3 py-1 text-sm"
           >
             Cancelar
-          </Button>
+          </button>
         </div>
-      )}
-    </div>
+      </div>
+    );
+  }
+
+  return isLoading ? (
+    <Skeleton className="h-[36px]" />
+  ) : (
+    <CreatableSelect
+      options={countryOptions}
+      placeholder="Seleccione un país"
+      value={countryOptions.find(option => option.value === field.value)}
+      onChange={(selectedOption) => {
+        field.onChange(selectedOption?.value);
+      }}
+      onCreateOption={handleCreateCountry}
+      formatCreateLabel={(inputValue) => `Crear país "${inputValue}"`}
+      formatOptionLabel={formatOptionLabel}
+      className="react-select-container"
+      classNamePrefix="react-select"
+      loadingMessage={() => "Cargando países..."}
+      noOptionsMessage={({ inputValue }) =>
+        inputValue
+          ? "No se encontraron países"
+          : "Escribe para buscar países"
+      }
+    />
   );
 }

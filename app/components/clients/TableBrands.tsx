@@ -36,11 +36,6 @@ export const columns: ColumnDef<BrandType>[] = [
     size: 200,
   },
   {
-    accessorKey: "manager_id",
-    header: "ID Gerente",
-    size: 100,
-  },
-  {
     accessorKey: "manager_name",
     header: "Gerente",
     size: 200,
