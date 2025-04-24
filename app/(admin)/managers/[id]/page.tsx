@@ -1,4 +1,5 @@
 /* eslint-disable @next/next/no-img-element */
+import ItemBrands from "@/components/managers/ItemBrands";
 import ItemInfo from "@/components/managers/ItemInfo";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { ManagerType } from "@/lib/definitions";
@@ -37,6 +38,7 @@ export default async function ManagerPage({ params }: Props) {
                 value={email}
               />
               <ItemInfo iconKey="phone" label="Teléfono" value={phone} />
+              <ItemBrands />
             </div>
           </CardContent>
         </Card>

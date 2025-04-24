@@ -19,6 +19,8 @@ export async function getManagerByEmail(email: string) {
 
 export async function getManagerById(id: string) {
   try {
+    // simulta 2 segundos
+    await new Promise(resolve => setTimeout(resolve, 2000));
     const result = await turso.execute({
       sql: `
         SELECT 
