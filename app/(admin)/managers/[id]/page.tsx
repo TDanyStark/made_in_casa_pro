@@ -3,6 +3,7 @@ import ItemBrands from "@/components/managers/ItemBrands";
 import ItemInfo from "@/components/managers/ItemInfo";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { ManagerType } from "@/lib/definitions";
+import { getBrandsByManagerId } from "@/lib/queries/brands";
 import { getManagerById } from "@/lib/queries/managers";
 
 type Props = {
@@ -15,6 +16,14 @@ export default async function ManagerPage({ params }: Props) {
   const manager = await getManagerById(id);
   const { name, email, phone, biography } = manager as ManagerType;
 
+  const brandsData = await getBrandsByManagerId(id);
+  // Serializa las marcas para asegurarse de que solo se pasan objetos planos al componente cliente
+  const brands = brandsData.map(brand => ({
+    id: brand.id,
+    name: brand.name,
+    manager_id: brand.manager_id
+  }));
+  
   return (
     <section>
       <h1 className="primaryH1">{name} 👋🏻</h1>
@@ -38,7 +47,7 @@ export default async function ManagerPage({ params }: Props) {
                 value={email}
               />
               <ItemInfo iconKey="phone" label="Teléfono" value={phone} />
-              <ItemBrands />
+              <ItemBrands brands={brands} />
             </div>
           </CardContent>
         </Card>

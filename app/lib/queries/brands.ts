@@ -7,7 +7,16 @@ import { ITEMS_PER_PAGE } from '@/config/constants';
 export async function getBrandsByManagerId(managerId: string) {
   try {
     const result = await turso.execute({
-      sql: `SELECT * FROM brands WHERE manager_id = ? ORDER BY name ASC`,
+      sql: `
+        SELECT 
+          bm.brand_id as id,
+          b.name as name,
+          bm.manager_id as manager_id
+        FROM brand_manager bm
+        JOIN brands b ON bm.brand_id = b.id
+        WHERE bm.manager_id = ? 
+        ORDER BY b.name ASC
+      `,
       args: [managerId]
     });
     return result.rows as unknown as BrandType[];
