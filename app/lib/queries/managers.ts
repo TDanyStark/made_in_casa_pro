@@ -20,10 +20,42 @@ export async function getManagerByEmail(email: string) {
 export async function getManagerById(id: string) {
   try {
     const result = await turso.execute({
-      sql: `SELECT * FROM managers WHERE id = ?`,
+      sql: `
+        SELECT 
+          m.*,
+          c.id AS client_id, 
+          c.name AS client_name,
+          co.id AS country_id,
+          co.name AS country_name,
+          co.flag AS country_flag
+        FROM managers m
+        LEFT JOIN clients c ON m.client_id = c.id
+        LEFT JOIN countries co ON c.country_id = co.id
+        WHERE m.id = ?
+      `,
       args: [id]
     });
-    return result.rows.length > 0 ? result.rows[0] as unknown as ManagerType : null;
+    
+    if (result.rows.length === 0) return null;
+    
+    const row = result.rows[0];
+    return {
+      id: row.id,
+      client_id: row.client_id,
+      name: row.name,
+      email: row.email,
+      phone: row.phone,
+      biography: row.biography,
+      client_info: row.client_id ? {
+        id: row.client_id,
+        name: row.client_name,
+        country: row.country_id ? {
+          id: row.country_id,
+          name: row.country_name,
+          flag: row.country_flag
+        } : undefined
+      } : undefined
+    } as ManagerType;
   } catch (error) {
     console.error("Error fetching manager:", error);
     return null;
