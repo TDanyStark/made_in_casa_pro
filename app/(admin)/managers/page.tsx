@@ -1,4 +1,4 @@
-import ListManagersClient from "@/components/clients/ListManagersClient";
+import ListManagersClient from "@/components/managers/ListManagersClient";
 
 
 export default function ManagersPage() {

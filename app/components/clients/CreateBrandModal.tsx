@@ -28,7 +28,7 @@ import { Input } from "@/components/ui/input";
 import { Loader2 } from "lucide-react";
 import useItemMutations from "@/hooks/useItemsMutation";
 import CreatableSelect from "react-select/creatable";
-import CreateManagerModal from "./CreateManagerModal";
+import CreateManagerModal from "@/components/managers/CreateManagerModal";
 import { ManagerType } from "@/lib/definitions";
 import { useGetEndpointQuery } from "@/hooks/useGetEndpointQuery";
 

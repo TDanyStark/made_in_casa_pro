@@ -1,11 +1,11 @@
 "use client";
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import CreateManagerModal from "./CreateManagerModal";
+import CreateManagerModal from "@/components/managers/CreateManagerModal";
 import { Button } from "../ui/button";
 import CreateBrandModal from "./CreateBrandModal";
 import { useState } from "react";
-import ListManagersClient from "./ListManagersClient";
+import ListManagersClient from "../managers/ListManagersClient";
 import ListBrandsClient from "./ListBrandsClient";
 import { useSearchParams, usePathname, useRouter } from "next/navigation";
 
