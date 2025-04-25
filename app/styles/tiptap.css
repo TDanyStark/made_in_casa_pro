@@ -46,18 +46,6 @@
   color: white !important;
 }
 
-.tiptap {
-  width: 100%;
-  outline: none;
-  padding: 0.5rem;
-  border: none;
-  border-radius: var(--radius);
-  background-color: var(--color-background);
-  color: var(--color-foreground);
-  min-height: 150px;
-  transition: border-color 0.2s, box-shadow 0.2s;
-}
-
 .tiptap:focus, .tiptap:focus-visible {
   outline: none;
   box-shadow: 0 0 0 2px var(--color-ring);
@@ -215,7 +203,7 @@
 .tiptap-button {
   border: none;
   background-color: transparent;
-  border-radius: var(--radius-sm);
+  border-radius: none;
   padding: 0.35rem;
   display: flex;
   align-items: center;
@@ -241,7 +229,21 @@
   border-top-right-radius: 0;
 }
 
-.tiptap.ProseMirror.ProseMirror-focused{
+.tiptap {
+  width: 100%;
+  outline: none;
+  padding: 1.5rem;
+  border: none;
+  background-color: var(--color-background);
+  color: var(--color-foreground);
+  min-height: 150px;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  background: var(--color-muted);
+}
+
+.tiptap:focus, .tiptap:focus-visible {
   outline: none !important;
   outline-offset:0 !important;
+  border-radius: none !important;
+  box-shadow: none !important;
 }

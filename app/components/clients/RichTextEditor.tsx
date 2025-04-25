@@ -37,8 +37,8 @@ export const RichTextEditor = ({
     editorProps: {
       attributes: {
         class: noBorder 
-          ? "min-h-[250px] px-3 py-2 focus:outline-none border-none" 
-          : "min-h-[250px] border border-input rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 focus-visible:ring-ring",
+          ? "min-h-[250px] px-3 py-2 focus:outline-none border-none max-w-[950px]" 
+          : "min-h-[250px] border border-input rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 focus-visible:ring-ring max-w-[950px]",
       },
     },
   });
