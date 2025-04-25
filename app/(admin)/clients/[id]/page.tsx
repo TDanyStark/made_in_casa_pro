@@ -11,7 +11,7 @@ export default async function ClientPage({ params }: Props) {
   const { id } = await params;
   return (
     <section>
-      <div className="mt-6">
+      <div>
         <Suspense
           key={id}
           fallback={

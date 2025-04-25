@@ -2,6 +2,7 @@ import { API_FLAG_URL, IMG_FLAG_EXT } from "@/config/constants";
 import { ClientType } from "@/lib/definitions";
 import { getClientById } from "@/lib/queries/clients";
 import { TabsManagersAndBrands } from "./TabsManagersAndBrands";
+import { Breadcrumbs } from "../navigation/Breadcrumbs";
 
 /* eslint-disable @next/next/no-img-element */
 export async function ClientData({ id }: { id: string }) {
@@ -13,6 +14,12 @@ export async function ClientData({ id }: { id: string }) {
 
   return (
     <>
+      <Breadcrumbs
+        customLabels={{
+          [`/clients`]: "Clientes",
+          [`/clients/${id}`]: client.name,
+        }}
+      />
       <div className="flex gap-2">
         <img
           src={`${API_FLAG_URL}${client.country?.flag}${IMG_FLAG_EXT}`}

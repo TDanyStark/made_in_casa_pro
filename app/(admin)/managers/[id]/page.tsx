@@ -9,6 +9,7 @@ import { ManagerType } from "@/lib/definitions";
 import { getBrandsByManagerId } from "@/lib/queries/brands";
 import { getManagerById } from "@/lib/queries/managers";
 import Link from "next/link";
+import { Breadcrumbs } from "@/components/navigation/Breadcrumbs";
 
 type Props = {
   params: Promise<{ id: string }>;
@@ -43,6 +44,12 @@ export default async function ManagerPage({ params }: Props) {
   
   return (
     <section>
+      <Breadcrumbs
+        customLabels={{
+          [`/managers`]: "Gerentes",
+          [`/managers/${id}`]: name || 'Detalle de gerente'
+        }}
+      />
       <h1 className="primaryH1">
         <span className="waving-hand mr-4">👋🏻</span>
         <EditableText 
