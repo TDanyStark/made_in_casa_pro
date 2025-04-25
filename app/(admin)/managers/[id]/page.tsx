@@ -33,7 +33,7 @@ export default async function ManagerPage({ params }: Props) {
         <EditableText 
           height={36}
           value={name} 
-          endpoint="managers" 
+          endpoint={`managers/${id}`} 
           fieldName="name" 
           as="span"
           endpointIdParam="id"

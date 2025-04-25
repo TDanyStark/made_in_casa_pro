@@ -5,7 +5,6 @@ import { Check, X, Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import AutoResizeInput from "./AutoResizeInput";
-import { useParams } from "next/navigation";
 
 interface EditableTextProps {
   value: string;
@@ -28,13 +27,11 @@ const EditableText = ({
   children,
   onUpdate,
   as: Component = "span",
-  endpointIdParam = "id"
 }: EditableTextProps) => {
   const [isEditing, setIsEditing] = useState(false);
   const [value, setValue] = useState(initialValue);
   const [inputValue, setInputValue] = useState(initialValue);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const params = useParams();
   
   // Actualizar el valor local si cambia el valor inicial (desde props)
   useEffect(() => {
@@ -69,16 +66,8 @@ const EditableText = ({
     setIsSubmitting(true);
 
     try {
-      // Obtener el ID del parámetro de ruta
-      const id = params[endpointIdParam];
-      console.log("ID from params:", id);
-      
-      if (!id) {
-        throw new Error("No se pudo encontrar el ID en la URL");
-      }
-
       // Hacer la petición a la API
-      const response = await fetch(`/api/${endpoint}/${id}`, {
+      const response = await fetch(`/api/${endpoint}`, {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
