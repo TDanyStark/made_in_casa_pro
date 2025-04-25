@@ -6,6 +6,7 @@ import { Button } from "../ui/button";
 import { toast } from "sonner";
 import { useParams } from "next/navigation";
 import AutoResizeInput from "../input/AutoResizeInput";
+import { patch } from "@/lib/services/apiService";
 
 // Tipo para las claves de icono disponibles
 export type IconKey = "email" | "phone";
@@ -77,21 +78,13 @@ const ItemInfo = ({
     setIsSubmitting(true);
 
     try {
-      // Hacer la petición a la API
-      const response = await fetch(`/api/managers/${params.id}`, {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          [key_update]: inputValue,
-        }),
+      // Usar el servicio API centralizado 
+      const response = await patch(`managers/${params.id}`, {
+        [key_update]: inputValue,
       });
 
-      const data = await response.json();
-
       if (!response.ok) {
-        throw new Error(data.error || "Error al actualizar");
+        throw new Error(response.error || "Error al actualizar");
       }
 
       // Actualizar el estado local con el nuevo valor

@@ -5,6 +5,7 @@ import { Check, X, Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import AutoResizeInput from "./AutoResizeInput";
+import { patch } from "@/lib/services/apiService";
 
 interface EditableTextProps {
   value: string;
@@ -66,22 +67,13 @@ const EditableText = ({
     setIsSubmitting(true);
 
     try {
-      // Hacer la petición a la API
-      const response = await fetch(`/api/${endpoint}`, {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          [fieldName]: inputValue,
-        }),
+      // Usar el servicio de API centralizado
+      const response = await patch(endpoint, {
+        [fieldName]: inputValue,
       });
 
-      const data = await response.json();
-      console.log("Response data:", data);
-
       if (!response.ok) {
-        throw new Error(data.error || "Error al actualizar");
+        throw new Error(response.error || "Error al actualizar");
       }
 
       // Actualizar el estado local con el nuevo valor

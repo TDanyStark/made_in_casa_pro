@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { RichTextEditor } from "../clients/RichTextEditor";
 import { toast } from "sonner";
 import { Loader2, Check } from "lucide-react";
+import { patch } from "@/lib/services/apiService";
 
 type BiographyEditorProps = {
   initialContent: string;
@@ -30,20 +31,13 @@ export function BiographyEditor({ initialContent }: BiographyEditorProps) {
     setIsSubmitting(true);
     
     try {
-      // Make API request to update biography
-      const response = await fetch(`/api/managers/${params.id}`, {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          biography: content,
-        }),
+      // Usar el servicio de API centralizado
+      const response = await patch(`managers/${params.id}`, {
+        biography: content,
       });
 
       if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || "Error al actualizar la biografía");
+        throw new Error(response.error || "Error al actualizar la biografía");
       }
 
       // Update original content to match new content
