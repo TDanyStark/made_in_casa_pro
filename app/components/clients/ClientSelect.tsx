@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/form";
 import { Control } from "react-hook-form";
 import { FormField } from "@/components/ui/form";
-import { ManagerFormData } from "./CreateManagerModal";
+import { ManagerFormData } from "@/components/managers/CreateManagerModal";
 
 // Este tipo debe coincidir con la definición en su proyecto
 interface ClientType {

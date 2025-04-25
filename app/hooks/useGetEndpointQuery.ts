@@ -5,7 +5,7 @@ import { URL_BACKEND_API } from '@/config/constants';
 import axios from 'axios';
 
 // Define the parameters interface
-interface ManagersParams {
+interface ParamsUrl {
   clientId?: string;
   page?: string;
   search?: string;
@@ -20,7 +20,7 @@ interface EndpointResponse<T> {
   total: number;
 }
 
-const getEndpoint = async <T>({ clientId, page = "1", search, endpoint }: ManagersParams): Promise<EndpointResponse<T>> => {
+const getEndpoint = async <T>({ clientId, page = "1", search, endpoint }: ParamsUrl): Promise<EndpointResponse<T>> => {
   const searchParams = new URLSearchParams();
 
   if (clientId) {
@@ -46,8 +46,8 @@ const getEndpoint = async <T>({ clientId, page = "1", search, endpoint }: Manage
   }
 };
 
-export const useGetEndpointQuery = <T>(params: ManagersParams) => {
-  const { endpoint = "managers" } = params;
+export const useGetEndpointQuery = <T>(params: ParamsUrl) => {
+  const { endpoint } = params;
   
   return useQuery({
     queryKey: [endpoint, params],

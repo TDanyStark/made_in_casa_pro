@@ -1,9 +1,7 @@
 "use client";
 
 import { useGetEndpointQuery } from "@/hooks/useGetEndpointQuery";
-// import ListManager from "./ListManager";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-// import { ManagerType } from "@/lib/definitions";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import Pagination from "@/components/pagination/Pagination";
 import SearchBar from "@/components/search/search";
