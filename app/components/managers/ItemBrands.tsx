@@ -9,7 +9,7 @@ interface ItemBrandsProps {
 
 const ItemBrands = ({ brands = [] }: ItemBrandsProps) => {
   return (
-    <div className="flex justify-between group bg-gray-100/80 dark:bg-gray-800/50 p-3 rounded-lg gap-6">
+    <div className="flex justify-between group bg-gray-100/80 dark:bg-gray-800/50 p-3 rounded-lg gap-6 max-w-[450px]">
       <div>
         <h3>Marcas</h3>
         <div className="flex gap-2 mt-2 flex-wrap">
