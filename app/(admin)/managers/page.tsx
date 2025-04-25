@@ -11,7 +11,6 @@ export default function ManagersPage() {
         ]}
       />
       <h1 className="primaryH1">Todos los Gerentes</h1>
-
       <div className="mt-6">
         <ListManagersClient />
       </div>

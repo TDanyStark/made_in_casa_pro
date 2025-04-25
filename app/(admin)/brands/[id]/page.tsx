@@ -2,6 +2,7 @@ import { getBrandById } from "@/lib/queries/brands";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Breadcrumbs } from "@/components/navigation/Breadcrumbs";
+import EditableText from "@/components/input/EditableText";
 
 type Props = {
   params: Promise<{ id: string }>;
@@ -23,19 +24,27 @@ export default async function page({ params }: Props){
     );
   }
 
+  const { name } = brand;
+
   // Si la marca existe, mostrar la información con breadcrumbs
   return (
-    <div>
+    <section>
       <Breadcrumbs 
         customLabels={{
-          [`/brands/${id}`]: brand.name || 'Detalle de marca'
+          [`/brands/${id}`]: name || 'Detalle de marca'
         }}
       />
-      
-      <section>
-        <h1 className="primaryH1">{brand.name}</h1>
-        {/* Resto de la información de la marca */}
-      </section>
-    </div>
+      <h1 className="primaryH1">
+        <span className="waving-hand mr-4">👋🏻</span>
+        <EditableText 
+          height={36}
+          value={name} 
+          endpoint={`brands/${id}`} 
+          fieldName="name" 
+          as="span"
+          endpointIdParam="id"
+        />
+      </h1>
+    </section>
   );
 }

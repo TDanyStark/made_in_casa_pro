@@ -144,6 +144,34 @@ export async function createBrand(brandData: Omit<BrandType, 'id'>) {
   }
 }
 
+export async function updateBrand(id: string, updateData: Partial<BrandType>) {
+  try {
+    const { name } = updateData;
+    
+    // Only update fields that are provided
+    if (name) {
+      await turso.execute({
+        sql: `UPDATE brands SET name = ? WHERE id = ?`,
+        args: [name, id]
+      });
+      
+      // Get the updated brand to return
+      const updatedBrand = await getBrandById(id);
+      
+      // Revalidate paths
+      revalidatePath(`/brands/${id}`);
+      
+      return updatedBrand;
+    }
+    
+    // If no fields to update, just return the existing brand
+    return getBrandById(id);
+  } catch (error) {
+    console.error("Error updating brand:", error);
+    throw error;
+  }
+}
+
 interface PaginationParams {
   managerId?: string;
   clientId?: string;
