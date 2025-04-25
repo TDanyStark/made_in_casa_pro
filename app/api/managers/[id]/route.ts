@@ -8,6 +8,7 @@ const managerUpdateSchema = z.object({
   email: z.string().email().optional(),
   phone: z.string().min(1).optional(),
   name: z.string().min(1).optional(),
+  biography: z.string().optional(),
 });
 
 export async function PATCH(
@@ -28,7 +29,7 @@ export async function PATCH(
       );
     }
 
-    const { email, phone, name } = validationResult.data;
+    const { email, phone, name, biography } = validationResult.data;
 
     // Check if the manager exists
     const existingManager = await getManagerById(id);
@@ -54,12 +55,12 @@ export async function PATCH(
     }
 
     // If no fields to update, return the existing manager
-    if (!email && !phone && !name) {
+    if (!email && !phone && !name && !biography) {
       return NextResponse.json(existingManager);
     }
 
     // Update manager using the model function
-    const updatedManager = await updateManager(id, { email, phone, name });
+    const updatedManager = await updateManager(id, { email, phone, name, biography });
 
     // Revalidate paths
     revalidatePath(`/managers/${id}`);

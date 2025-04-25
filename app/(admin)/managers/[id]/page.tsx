@@ -2,6 +2,7 @@
 import ItemBrands from "@/components/managers/ItemBrands";
 import ItemInfo from "@/components/managers/ItemInfo";
 import EditableText from "@/components/input/EditableText";
+import BiographyEditor from "@/components/managers/BiographyEditor";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { ManagerType } from "@/lib/definitions";
 import { getBrandsByManagerId } from "@/lib/queries/brands";
@@ -68,8 +69,7 @@ export default async function ManagerPage({ params }: Props) {
         </Card>
       </div>
       <div className="mt-6">
-        <h2 className="text-2xl font-bold">Biografía</h2>
-        {biography}
+        <BiographyEditor initialContent={biography || ""} />
       </div>
     </section>
   );

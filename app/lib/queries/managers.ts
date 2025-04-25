@@ -175,7 +175,7 @@ export async function createManager(managerData: Omit<ManagerType, "id">) {
   }
 }
 
-export async function updateManager(id: string, updateData: { email?: string; phone?: string, name?: string }) {
+export async function updateManager(id: string, updateData: { email?: string; phone?: string, name?: string, biography?: string }) {
   try {
     // Build update query based on provided fields
     const updates: string[] = [];
@@ -194,6 +194,11 @@ export async function updateManager(id: string, updateData: { email?: string; ph
     if (updateData.name !== undefined) {
       updates.push("name = ?");
       args.push(updateData.name);
+    }
+
+    if (updateData.biography !== undefined) {
+      updates.push("biography = ?");
+      args.push(updateData.biography);
     }
 
     // If no fields to update, return

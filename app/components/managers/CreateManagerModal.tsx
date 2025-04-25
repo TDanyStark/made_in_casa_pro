@@ -25,9 +25,9 @@ import { Input } from "@/components/ui/input";
 import { Loader2 } from "lucide-react";
 import useItemMutations from "@/hooks/useItemsMutation";
 
-import { RichTextEditor } from "./RichTextEditor";
-import { ClientSelect } from "./ClientSelect";
+import { ClientSelect } from "@/components/clients/ClientSelect";
 import { ManagerType } from "@/lib/definitions";
+import { RichTextEditor } from "../clients/RichTextEditor";
 
 const formSchema = z.object({
   client_id: z.coerce.number().int().positive("Se requiere un cliente válido"),

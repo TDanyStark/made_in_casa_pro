@@ -29,7 +29,7 @@
 
 .dark .ProseMirror .ProseMirror-selectednode,
 .dark .ProseMirror-selectednode {
-  outline: 2px solid #93c5fd !important;
+  outline: none !important;
 }
 
 .tiptap.ProseMirror p:not(:first-child){
@@ -50,7 +50,7 @@
   width: 100%;
   outline: none;
   padding: 0.5rem;
-  border: 1px solid var(--color-border);
+  border: none;
   border-radius: var(--radius);
   background-color: var(--color-background);
   color: var(--color-foreground);
@@ -239,4 +239,9 @@
 .tiptap-toolbar + .tiptap {
   border-top-left-radius: 0;
   border-top-right-radius: 0;
+}
+
+.tiptap.ProseMirror.ProseMirror-focused{
+  outline: none !important;
+  outline-offset:0 !important;
 }

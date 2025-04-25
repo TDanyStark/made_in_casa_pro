@@ -19,11 +19,14 @@ export const RichTextEditor = ({
   value,
   onChange,
   placeholder,
+  noBorder = false,
 }: {
   value: string;
   onChange: (value: string) => void;
   placeholder?: string;
+  noBorder?: boolean;
 }) => {
+  console.log(noBorder, "noBorder");
   const editor = useEditor({
     immediatelyRender: false,
     extensions: [StarterKit, TaskList, TaskItem.configure({ nested: true }), Underline, Superscript, Subscript],
@@ -33,8 +36,9 @@ export const RichTextEditor = ({
     },
     editorProps: {
       attributes: {
-        class:
-          "min-h-[250px] border border-input rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 focus-visible:ring-ring",
+        class: noBorder 
+          ? "min-h-[250px] px-3 py-2 focus:outline-none border-none" 
+          : "min-h-[250px] border border-input rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 focus-visible:ring-ring",
       },
     },
   });
@@ -42,8 +46,8 @@ export const RichTextEditor = ({
   return (
     <div className="rich-text-editor">
       <EditorContext.Provider value={{ editor }}>
-        <div className="toolbar flex items-center flex-wrap gap-2 mb-2 p-2 border border-input rounded-md">
-          <div className="tiptap-button-group" data-orientation="horizontal">
+        <div className="toolbar flex items-center flex-wrap gap-2 mb-2 p-2 border border-input rounded-md max-w-fit">
+          <div className="tiptap-button-group " data-orientation="horizontal">
             <MarkButton type="bold" />
             <MarkButton type="italic" />
             <MarkButton type="strike" />
