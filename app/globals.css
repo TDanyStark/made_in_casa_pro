@@ -163,7 +163,7 @@ button{
 
 .waving-hand {
   display: inline-block;
-  animation: waveHand 2s ease-in-out;
+  animation: waveHand 2s ease-in-out 3;
   transform-origin: center 75%;
 }
 
