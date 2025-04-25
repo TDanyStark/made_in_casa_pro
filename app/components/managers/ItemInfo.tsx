@@ -133,7 +133,7 @@ const ItemInfo = ({
                 />
               </div>
             ) : (
-              <p className="h-[25px] text-gray-900 dark:text-white">{value}</p>
+              <p className="h-[24px] border-b border-transparent text-gray-900 dark:text-white">{value}</p>
             )}
           </div>
         </div>
