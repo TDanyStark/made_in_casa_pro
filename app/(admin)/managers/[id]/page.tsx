@@ -4,9 +4,11 @@ import ItemInfo from "@/components/managers/ItemInfo";
 import EditableText from "@/components/input/EditableText";
 import BiographyEditor from "@/components/managers/BiographyEditor";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { ManagerType } from "@/lib/definitions";
 import { getBrandsByManagerId } from "@/lib/queries/brands";
 import { getManagerById } from "@/lib/queries/managers";
+import Link from "next/link";
 
 type Props = {
   params: Promise<{ id: string }>;
@@ -16,6 +18,19 @@ export default async function ManagerPage({ params }: Props) {
   const { id } = await params;
   // obtener la  información del gerente usando el id getManagerById
   const manager = await getManagerById(id);
+
+  // si el gerente no existe, redirigir a la página de error
+  if (!manager) {
+    return (
+      <section>
+        <h1 className="primaryH1">Gerente no encontrado</h1>
+        <Button asChild className="mt-4">
+          <Link href="/managers">Volver a la lista de gerentes</Link>
+        </Button>
+      </section>
+    );
+  }
+
   const { name, email, phone, biography } = manager as ManagerType;
 
   const brandsData = await getBrandsByManagerId(id);

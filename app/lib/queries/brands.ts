@@ -29,10 +29,54 @@ export async function getBrandsByManagerId(managerId: string) {
 export async function getBrandById(id: string) {
   try {
     const result = await turso.execute({
-      sql: `SELECT * FROM brands WHERE id = ?`,
+      sql: `
+        SELECT 
+          b.id as id,
+          b.name as name,
+          bm.manager_id,
+          m.name as manager_name,
+          m.email as manager_email,
+          m.phone as manager_phone,
+          c.id as client_id,
+          c.name as client_name,
+          co.id as country_id,
+          co.name as country_name,
+          co.flag as country_flag
+        FROM brands b
+        JOIN brand_manager bm ON b.id = bm.brand_id
+        JOIN managers m ON bm.manager_id = m.id
+        JOIN clients c ON m.client_id = c.id
+        LEFT JOIN countries co ON c.country_id = co.id
+        WHERE b.id = ?
+      `,
       args: [id]
     });
-    return result.rows.length > 0 ? result.rows[0] as unknown as BrandType : null;
+    
+    if (result.rows.length === 0) return null;
+    
+    const row = result.rows[0];
+    
+    return {
+      id: row.id,
+      name: row.name,
+      manager_id: row.manager_id,
+      manager: {
+        id: row.manager_id,
+        client_id: row.client_id,
+        name: row.manager_name,
+        email: row.manager_email,
+        phone: row.manager_phone,
+        client_info: {
+          id: row.client_id,
+          name: row.client_name,
+          country: row.country_id ? {
+            id: row.country_id,
+            name: row.country_name,
+            flag: row.country_flag
+          } : undefined
+        }
+      }
+    } as BrandType;
   } catch (error) {
     console.error("Error fetching brand:", error);
     return null;
