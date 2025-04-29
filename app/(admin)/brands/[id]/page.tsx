@@ -53,8 +53,8 @@ export default async function page({ params }: Props) {
           endpointIdParam="id"
         />
       </h1>
-      <div className="flex flex-col gap-4 mt-4">
-        <Card className="w-fit p-4 shadow-md rounded-lg">
+      <div className="flex flex-col lg:flex-row lg:items-start lg:flex-wrap gap-4 mt-4">
+        <Card className="w-fit p-4 shadow-md rounded-lg mb-4">
           <CardHeader className="flex flex-col gap-2">
             <h2 className="text-2xl font-semibold">Información de la Marca</h2>
           </CardHeader>
@@ -79,7 +79,6 @@ export default async function page({ params }: Props) {
             </div>
           </CardContent>
         </Card>
-        <hr />
         <BrandManagerHistory brandId={id} />
       </div>
     </section>
