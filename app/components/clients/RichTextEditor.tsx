@@ -26,7 +26,6 @@ export const RichTextEditor = ({
   placeholder?: string;
   noBorder?: boolean;
 }) => {
-  console.log(noBorder, "noBorder");
   const editor = useEditor({
     immediatelyRender: false,
     extensions: [StarterKit, TaskList, TaskItem.configure({ nested: true }), Underline, Superscript, Subscript],

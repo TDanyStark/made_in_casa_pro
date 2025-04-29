@@ -43,11 +43,27 @@ export const links = [
 
 export const linksNotVisible = [
   {
-    route: '/clients/create',
+    route: '/clients',
     roles: [UserRole.ADMIN, UserRole.COMERCIAL, UserRole.DIRECTIVO]
   },
   {
-    route: '/clients/[id]/edit',
+    route: '/clients/[id]',
+    roles: [UserRole.ADMIN, UserRole.COMERCIAL, UserRole.DIRECTIVO]
+  },
+  {
+    route: '/brands',
+    roles: [UserRole.ADMIN, UserRole.COMERCIAL, UserRole.DIRECTIVO]
+  },
+  {
+    route: '/brands/[id]',
+    roles: [UserRole.ADMIN, UserRole.COMERCIAL, UserRole.DIRECTIVO]
+  },
+  {
+    route: '/managers',
+    roles: [UserRole.ADMIN, UserRole.COMERCIAL, UserRole.DIRECTIVO]
+  },
+  {
+    route: '/managers/[id]',
     roles: [UserRole.ADMIN, UserRole.COMERCIAL, UserRole.DIRECTIVO]
   },
   {

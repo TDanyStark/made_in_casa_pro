@@ -2,12 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { decrypt } from "@/lib/session";
 import { cookies } from "next/headers";
 import { UserRole } from "@/lib/definitions";
-import { routePermissions, publicRoute } from "@/lib/permissions";
+import { publicRoute, checkRoutePermission } from "@/lib/permissions";
 
 export default async function middleware(req: NextRequest) {
   const path = req.nextUrl.pathname;
   const isPublicRoute = path === publicRoute;
-  const allowedRoles = routePermissions[path];
   const headers = new Headers(req.headers);
   headers.set("x-current-path", req.nextUrl.pathname);
 
@@ -28,26 +27,33 @@ export default async function middleware(req: NextRequest) {
     ? (session?.role as UserRole) 
     : UserRole.NO_AUTHENTICADO;
 
-  // 🔹 1. Si el usuario autenticado intenta visitar "/", redirigir a /dashboard
+  // 1. Si es ruta pública y el usuario está autenticado, redirigir a dashboard
   if (isPublicRoute && session?.id) {
     return NextResponse.redirect(new URL("/dashboard", req.nextUrl));
   }
 
-  // 🔹 2. Si no hay sesión y la ruta es protegida, redirigir a /
-  if (!session?.id && allowedRoles) {
+  // 2. Si el usuario no está autenticado y la ruta no es pública
+  if (!session?.id && !isPublicRoute) {
     return NextResponse.redirect(new URL("/", req.nextUrl));
   }
 
-  // 🔹 3. Si el usuario tiene sesión pero no tiene permiso, redirigir a /dashboard
-  if (session?.id && allowedRoles && !allowedRoles.includes(userRole)) {
-    return NextResponse.redirect(new URL("/dashboard", req.nextUrl));
+  // 3. Si el usuario está autenticado, verificar permisos para la ruta
+  if (session?.id && !isPublicRoute) {
+    // Usar la nueva función que maneja rutas dinámicas
+    const hasPermission = checkRoutePermission(path, userRole);
+    
+    if (!hasPermission) {
+      return NextResponse.redirect(new URL("/dashboard", req.nextUrl));
+    }
   }
 
-  // 🔹 4. Permitir acceso si pasa todas las validaciones
+  // 4. Permitir el acceso si pasa todas las validaciones
   return NextResponse.next({ headers });
 }
 
 // 🔹 Rutas en las que NO se ejecutará el middleware (API, estáticos, imágenes)
 export const config = {
-  matcher: ["/((?!api|_next/static|_next/image|.*\\.png$).*)"],
+  matcher: [
+    '/((?!api|_next/static|_next/image|favicon\\.ico|.*\\.png|.*\\.webp|.*\\.jpg|.*\\.ico).*)',
+  ],
 };
