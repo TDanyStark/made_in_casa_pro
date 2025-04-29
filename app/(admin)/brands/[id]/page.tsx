@@ -71,7 +71,7 @@ export default async function page({ params }: Props) {
           </CardContent>
         </Card>
         <Card>
-          <p>Detalles adicionales que pueden ser relevantes.</p>
+          <p>Historial.</p>
         </Card>
       </div>
     </section>
