@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { getManagerByEmail, getManagerById, updateManager } from "@/lib/queries/managers";
 import { revalidatePath } from "next/cache";
+import { validateApiRole, validateHttpMethod } from "@/lib/services/api-auth";
+import { UserRole } from "@/lib/definitions";
 
 // Schema for validating manager update data
 const managerUpdateSchema = z.object({
@@ -15,6 +17,21 @@ export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  // Validate HTTP method
+  const methodValidation = validateHttpMethod(request, ["PATCH"]);
+  if (!methodValidation.isValidMethod) {
+    return methodValidation.response;
+  }
+
+  // Validate user role (only admins and commercial roles can update managers)
+  const roleValidation = validateApiRole(request, [
+    UserRole.ADMIN,
+    UserRole.COMERCIAL,
+    UserRole.DIRECTIVO,
+  ]);
+  if (!roleValidation.isAuthorized) {
+    return roleValidation.response;
+  }
   try {
     // Await the params object before accessing its properties
     const { id } = await params;

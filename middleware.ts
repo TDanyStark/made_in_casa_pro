@@ -7,6 +7,7 @@ import { publicRoute, checkRoutePermission } from "@/lib/permissions";
 export default async function middleware(req: NextRequest) {
   const path = req.nextUrl.pathname;
   const isPublicRoute = path === publicRoute;
+  const isApiRoute = path.startsWith('/api/');
   const headers = new Headers(req.headers);
   headers.set("x-current-path", req.nextUrl.pathname);
 
@@ -27,6 +28,12 @@ export default async function middleware(req: NextRequest) {
     ? (session?.role as UserRole) 
     : UserRole.NO_AUTHENTICADO;
 
+  // Guardar la información de la sesión y el rol en los headers para endpoints API
+  if (session?.id) {
+    headers.set("x-user-id", session.id.toString());
+    headers.set("x-user-role", userRole.toString());
+  }
+
   // 1. Si es ruta pública y el usuario está autenticado, redirigir a dashboard
   if (isPublicRoute && session?.id) {
     return NextResponse.redirect(new URL("/dashboard", req.nextUrl));
@@ -34,11 +41,15 @@ export default async function middleware(req: NextRequest) {
 
   // 2. Si el usuario no está autenticado y la ruta no es pública
   if (!session?.id && !isPublicRoute) {
+    // Para rutas API, devolver 401 Unauthorized en lugar de redirigir
+    if (isApiRoute) {
+      return NextResponse.json({ error: "No autorizado" }, { status: 401, headers });
+    }
     return NextResponse.redirect(new URL("/", req.nextUrl));
   }
 
-  // 3. Si el usuario está autenticado, verificar permisos para la ruta
-  if (session?.id && !isPublicRoute) {
+  // 3. Si el usuario está autenticado, verificar permisos para la ruta (excluyendo APIs que se manejarán en los endpoints)
+  if (session?.id && !isPublicRoute && !isApiRoute) {
     // Usar la nueva función que maneja rutas dinámicas
     const hasPermission = checkRoutePermission(path, userRole);
     
@@ -51,9 +62,9 @@ export default async function middleware(req: NextRequest) {
   return NextResponse.next({ headers });
 }
 
-// 🔹 Rutas en las que NO se ejecutará el middleware (API, estáticos, imágenes)
+// 🔹 Incluir las rutas API en el matcher del middleware
 export const config = {
   matcher: [
-    '/((?!api|_next/static|_next/image|favicon\\.ico|.*\\.png|.*\\.webp|.*\\.jpg|.*\\.ico).*)',
+    '/((?!_next/static|_next/image|favicon\\.ico|.*\\.png|.*\\.webp|.*\\.jpg|.*\\.ico).*)',
   ],
 };

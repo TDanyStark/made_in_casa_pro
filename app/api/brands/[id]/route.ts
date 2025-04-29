@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { getBrandById, updateBrand } from "@/lib/queries/brands";
 import { revalidatePath } from "next/cache";
+import { validateApiRole, validateHttpMethod } from "@/lib/services/api-auth";
+import { UserRole } from "@/lib/definitions";
 
 // Schema for validating brand update data
 const brandUpdateSchema = z.object({
@@ -13,6 +15,20 @@ export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  // Validar método HTTP
+      const methodValidation = validateHttpMethod(request, ['PATCH']);
+      if (!methodValidation.isValidMethod) {
+        return methodValidation.response;
+      }
+    
+      const roleValidation = validateApiRole(request, [
+        UserRole.ADMIN, 
+        UserRole.COMERCIAL, 
+        UserRole.DIRECTIVO
+      ]);
+      if (!roleValidation.isAuthorized) {
+        return roleValidation.response;
+      }
   try {
     // Await the params object before accessing its properties
     const { id } = await params;

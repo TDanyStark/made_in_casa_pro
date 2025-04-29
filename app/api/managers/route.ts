@@ -3,6 +3,8 @@ import { z } from "zod";
 import { createManager, getManagerByEmail, getManagersWithPagination } from "@/lib/queries/managers";
 import { getClientById } from "@/lib/queries/clients";
 import { ITEMS_PER_PAGE } from "@/config/constants";
+import { validateApiRole, validateHttpMethod } from "@/lib/services/api-auth";
+import { UserRole } from "@/lib/definitions";
 
 // Schema for validating manager data
 const managerSchema = z.object({
@@ -14,6 +16,22 @@ const managerSchema = z.object({
 });
 
 export async function POST(request: NextRequest) {
+  // Validar método HTTP
+  const methodValidation = validateHttpMethod(request, ['POST']);
+  if (!methodValidation.isValidMethod) {
+    return methodValidation.response;
+  }
+
+  // Validar rol del usuario (solo administradores y comerciales pueden crear gerentes)
+  const roleValidation = validateApiRole(request, [
+    UserRole.ADMIN, 
+    UserRole.COMERCIAL, 
+    UserRole.DIRECTIVO
+  ]);
+  if (!roleValidation.isAuthorized) {
+    return roleValidation.response;
+  }
+
   try {
     const body = await request.json();
 
@@ -37,7 +55,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "El correo electrónico ya está en uso" }, { status: 409 });
     }
 
-
     // Create the manager using the query function
     const newManager = await createManager({
       client_id,
@@ -55,6 +72,23 @@ export async function POST(request: NextRequest) {
 }
 
 export async function GET(request: NextRequest) {
+  // Validar método HTTP
+  const methodValidation = validateHttpMethod(request, ['GET']);
+  if (!methodValidation.isValidMethod) {
+    return methodValidation.response;
+  }
+
+  // Validar rol del usuario (permitir a todos los usuarios autenticados ver gerentes)
+  const roleValidation = validateApiRole(request, [
+    UserRole.ADMIN, 
+    UserRole.COMERCIAL, 
+    UserRole.DIRECTIVO,
+    UserRole.COLABORADOR
+  ]);
+  if (!roleValidation.isAuthorized) {
+    return roleValidation.response;
+  }
+  
   try {
     const url = new URL(request.url);
     const clientId = url.searchParams.get("client_id");
