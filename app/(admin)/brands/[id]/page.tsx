@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Breadcrumbs } from "@/components/navigation/Breadcrumbs";
 import EditableText from "@/components/input/EditableText";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import ItemInfo from "@/components/managers/ItemInfo";
+import ItemManager from "@/components/brands/ItemManager";
 
 type Props = {
   params: Promise<{ id: string }>;
@@ -28,7 +28,6 @@ export default async function page({ params }: Props) {
   }
 
   const { name, manager } = brand;
-  const email = manager?.email || "Correo no disponible";
   const name_manager = manager?.name || "Nombre no disponible";
   const id_manager = manager?.id || "ID no disponible";
 
@@ -65,18 +64,8 @@ export default async function page({ params }: Props) {
               />
             </div>
             <div className="flex flex-col gap-4">
-            <ItemInfo
-                key_update="name"
-                endpoint={`managers/${id_manager}`}
-                label="Nombre Gerente"
-                value={name_manager}
-              />
-            <ItemInfo
-                key_update="email"
-                endpoint={`managers/${id_manager}`}
-                label="Email Gerente"
-                value={email}
-              />
+              <ItemManager name={name_manager} link={`/managers/${id_manager}`} />
+              {/* agregar componente de cambio de gerente a una marca */}
             </div>
           </CardContent>
         </Card>

@@ -9,12 +9,11 @@ export async function getBrandsByManagerId(managerId: string) {
     const result = await turso.execute({
       sql: `
         SELECT 
-          bm.brand_id as id,
+          b.id as id,
           b.name as name,
-          bm.manager_id as manager_id
-        FROM brand_manager bm
-        JOIN brands b ON bm.brand_id = b.id
-        WHERE bm.manager_id = ? 
+          b.manager_id as manager_id
+        FROM brands b
+        WHERE b.manager_id = ? 
         ORDER BY b.name ASC
       `,
       args: [managerId]
@@ -33,7 +32,7 @@ export async function getBrandById(id: string) {
         SELECT 
           b.id as id,
           b.name as name,
-          bm.manager_id,
+          b.manager_id,
           m.name as manager_name,
           m.email as manager_email,
           m.phone as manager_phone,
@@ -43,8 +42,7 @@ export async function getBrandById(id: string) {
           co.name as country_name,
           co.flag as country_flag
         FROM brands b
-        JOIN brand_manager bm ON b.id = bm.brand_id
-        JOIN managers m ON bm.manager_id = m.id
+        JOIN managers m ON b.manager_id = m.id
         JOIN clients c ON m.client_id = c.id
         LEFT JOIN countries co ON c.country_id = co.id
         WHERE b.id = ?
@@ -95,49 +93,28 @@ export async function getBrands() {
 
 export async function createBrand(brandData: Omit<BrandType, 'id'>) {
   try {
-    // Use the turso transaction API instead of manual BEGIN/COMMIT/ROLLBACK
-    const transaction = await turso.transaction('write');
+    // No need for transaction since we're only doing a single operation now
+    const brandResult = await turso.execute({
+      sql: `INSERT INTO brands (name, manager_id)
+      VALUES (?, ?)`,
+      args: [
+        brandData.name,
+        brandData.manager_id
+      ]
+    });
     
-    try {
-      // 1. Crear el brand
-      const brandResult = await transaction.execute({
-        sql: `INSERT INTO brands (name)
-        VALUES (?)`,
-        args: [
-          brandData.name
-        ]
-      });
-      
-      const brandId = Number(brandResult.lastInsertRowid);
-      
-      // 2. Crear la relación en la tabla brand_manager
-      await transaction.execute({
-        sql: `INSERT INTO brand_manager (brand_id, manager_id)
-        VALUES (?, ?)`,
-        args: [
-          brandId,
-          brandData.manager_id
-        ]
-      });
-      
-      // Commit the transaction
-      await transaction.commit();
-      
-      const manager = await getManagerById(brandData.manager_id.toString());
-      // Revalidamos la ruta del cliente al que pertenece el manager
-      if (manager && manager.client_id) {
-        revalidatePath(`/clients/${manager.client_id}`);
-      }
-      
-      return {
-        id: brandId,
-        ...brandData
-      };
-    } catch (error) {
-      // If any error occurs during the transaction, roll it back
-      await transaction.rollback();
-      throw error;
+    const brandId = Number(brandResult.lastInsertRowid);
+    
+    const manager = await getManagerById(brandData.manager_id.toString());
+    // Revalidamos la ruta del cliente al que pertenece el manager
+    if (manager && manager.client_id) {
+      revalidatePath(`/clients/${manager.client_id}`);
     }
+    
+    return {
+      id: brandId,
+      ...brandData
+    };
   } catch (error) {
     console.error("Error creating brand:", error);
     throw error;
@@ -146,13 +123,28 @@ export async function createBrand(brandData: Omit<BrandType, 'id'>) {
 
 export async function updateBrand(id: string, updateData: Partial<BrandType>) {
   try {
-    const { name } = updateData;
+    const { name, manager_id } = updateData;
+    const updates = [];
+    const args = [];
     
-    // Only update fields that are provided
+    // Build update statement based on provided fields
     if (name) {
+      updates.push('name = ?');
+      args.push(name);
+    }
+    
+    if (manager_id) {
+      updates.push('manager_id = ?');
+      args.push(manager_id);
+    }
+    
+    if (updates.length > 0) {
+      // Add the id at the end of args for WHERE clause
+      args.push(id);
+      
       await turso.execute({
-        sql: `UPDATE brands SET name = ? WHERE id = ?`,
-        args: [name, id]
+        sql: `UPDATE brands SET ${updates.join(', ')} WHERE id = ?`,
+        args
       });
       
       // Get the updated brand to return
@@ -188,13 +180,12 @@ export async function getBrandsWithPagination({
   search
 }: PaginationParams) {
   try {
-    // Modified query to use brand_manager table
+    // Modified query to use manager_id from brands table
     let sql = `
-      SELECT bm.brand_id as id, b.name as brand_name, 
-             bm.manager_id, m.name as manager_name 
-      FROM brand_manager bm
-      JOIN brands b ON bm.brand_id = b.id
-      JOIN managers m ON bm.manager_id = m.id
+      SELECT b.id as id, b.name as brand_name, 
+             b.manager_id, m.name as manager_name 
+      FROM brands b
+      JOIN managers m ON b.manager_id = m.id
     `;
     const args = [];
     const countArgs = [];
@@ -203,7 +194,7 @@ export async function getBrandsWithPagination({
     const conditions: string[] = [];
     
     if (managerId) {
-      conditions.push('bm.manager_id = ?');
+      conditions.push('b.manager_id = ?');
       args.push(managerId);
       countArgs.push(managerId);
     }
@@ -228,9 +219,8 @@ export async function getBrandsWithPagination({
     // Get total count for pagination
     let countSql = `
       SELECT COUNT(*) as count 
-      FROM brand_manager bm
-      JOIN brands b ON bm.brand_id = b.id
-      JOIN managers m ON bm.manager_id = m.id
+      FROM brands b
+      JOIN managers m ON b.manager_id = m.id
     `;
     if (conditions.length > 0) {
       countSql += ' WHERE ' + conditions.join(' AND ');
@@ -254,7 +244,7 @@ export async function getBrandsWithPagination({
       args
     });
     
-    // Transform the result to match BrandsAndManagersType
+    // Transform the result
     const brands = result.rows.map((row) => ({
       id: row.id,
       brand_name: row.brand_name,
