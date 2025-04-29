@@ -7,6 +7,7 @@ import EditableText from "@/components/input/EditableText";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import ItemManager from "@/components/brands/ItemManager";
 import ChangeManager from "@/components/brands/ChangeManager";
+import BrandManagerHistory from "@/components/brands/BrandManagerHistory";
 
 type Props = {
   params: Promise<{ id: string }>;
@@ -30,7 +31,8 @@ export default async function page({ params }: Props) {
 
   const { name, manager } = brand;
   const name_manager = manager?.name || "Nombre no disponible";
-  const id_manager = manager?.id || "ID no disponible";
+  const id_manager = manager?.id || 0;
+  const clientId = manager?.client_id || 0;
 
   // Si la marca existe, mostrar la información con breadcrumbs
   return (
@@ -51,8 +53,8 @@ export default async function page({ params }: Props) {
           endpointIdParam="id"
         />
       </h1>
-      <div className="flex flex-col lg:flex-row gap-4 mt-4">
-        <Card className="p-4 shadow-md rounded-lg">
+      <div className="flex flex-col gap-4 mt-4">
+        <Card className="w-fit p-4 shadow-md rounded-lg">
           <CardHeader className="flex flex-col gap-2">
             <h2 className="text-2xl font-semibold">Información de la Marca</h2>
           </CardHeader>
@@ -65,14 +67,20 @@ export default async function page({ params }: Props) {
               />
             </div>
             <div className="flex flex-col gap-4">
-              <ItemManager name={name_manager} link={`/managers/${id_manager}`} />
-              <ChangeManager brand={brand} />
+              <ItemManager
+                name={name_manager}
+                link={`/managers/${id_manager}`}
+              />
+              <ChangeManager
+                brandId={Number(id)}
+                managerId={id_manager}
+                clientId={clientId || 0}
+              />
             </div>
           </CardContent>
         </Card>
-        <Card>
-          <p>Historial.</p>
-        </Card>
+        <hr />
+        <BrandManagerHistory brandId={id} />
       </div>
     </section>
   );

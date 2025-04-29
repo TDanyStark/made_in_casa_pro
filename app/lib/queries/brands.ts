@@ -166,7 +166,7 @@ export async function updateBrand(id: string, updateData: Partial<BrandType>) {
           currentBrand.manager_id !== manager_id
         ) {
           await transaction.execute({
-            sql: "INSERT INTO brand_manager_history (brand_id, previous_manager_id, new_manager_id, changed_at) VALUES (?, ?, ?, datetime('now'))",
+            sql: "INSERT INTO brand_manager_history (brand_id, previous_manager_id, new_manager_id, changed_at) VALUES (?, ?, ?, datetime('now', '-5 hours'))",
             args: [id, currentBrand.manager_id, manager_id],
           });
         }
@@ -291,5 +291,47 @@ export async function getBrandsWithPagination({
   } catch (error) {
     console.error("Error fetching brands with pagination:", error);
     return { brands: [], total: 0 };
+  }
+}
+
+// Function to get brand manager history including the current manager
+export async function getBrandManagerHistory(brandId: string) {
+  try {
+    
+    // Query for past manager changes from history table
+    const historyResult = await turso.execute({
+      sql: `
+        SELECT 
+          bmh.id,
+          bmh.brand_id,
+          bmh.previous_manager_id,
+          prev_m.name as previous_manager_name,
+          bmh.new_manager_id,
+          new_m.name as new_manager_name,
+          bmh.changed_at
+        FROM brand_manager_history bmh
+        JOIN managers prev_m ON bmh.previous_manager_id = prev_m.id
+        JOIN managers new_m ON bmh.new_manager_id = new_m.id
+        WHERE bmh.brand_id = ?
+        ORDER BY bmh.changed_at DESC
+      `,
+      args: [brandId],
+    });
+    
+    // Format the history entries
+    const historyEntries = historyResult.rows.map(row => ({
+      id: row.id,
+      brandId: row.brand_id,
+      previousManagerId: row.previous_manager_id,
+      previousManagerName: row.previous_manager_name,
+      newManagerId: row.new_manager_id,
+      newManagerName: row.new_manager_name,
+      changedAt: row.changed_at
+    }));
+    
+    return historyEntries;
+  } catch (error) {
+    console.error("Error fetching brand manager history:", error);
+    return [];
   }
 }

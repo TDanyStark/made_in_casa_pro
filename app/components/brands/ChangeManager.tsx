@@ -20,10 +20,11 @@ import {
 import { Loader2 } from "lucide-react";
 import CreatableSelect from "react-select/creatable";
 import CreateManagerModal from "@/components/managers/CreateManagerModal";
-import { BrandType, ManagerType } from "@/lib/definitions";
+import { ManagerType } from "@/lib/definitions";
 import { useGetEndpointQuery } from "@/hooks/useGetEndpointQuery";
 import { patch } from "@/lib/services/apiService";
 import { useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
 
 const formSchema = z.object({
   manager_id: z.coerce.number().int().positive("Se requiere un gerente válido"),
@@ -32,15 +33,17 @@ const formSchema = z.object({
 type ChangeManagerFormData = z.infer<typeof formSchema>;
 
 interface Props {
-  brand: BrandType;
+  brandId: number;
+  managerId: number;
+  clientId: number;
   onSuccess?: () => void;
 }
 
-export function ChangeManager({ brand, onSuccess }: Props) {
+export function ChangeManager({ brandId, managerId, clientId, onSuccess }: Props) {
   const form = useForm<ChangeManagerFormData>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      manager_id: brand?.manager_id,
+      manager_id: managerId,
     },
   });
 
@@ -52,13 +55,13 @@ export function ChangeManager({ brand, onSuccess }: Props) {
   const [searchTerm, setSearchTerm] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { refresh } = useRouter();
+  const queryClient = useQueryClient()
 
-  // Recuperar client_id del manager actual
-  const clientId = brand?.manager?.client_info?.id?.toString();
+
 
   // Query para gerentes usando React Query
   const { data, isLoading: isLoadingManagers } = useGetEndpointQuery<ManagerType>({
-    clientId,
+    clientId: String(clientId),
     search: searchTerm,
     endpoint: "managers",
   });
@@ -90,9 +93,8 @@ export function ChangeManager({ brand, onSuccess }: Props) {
   };
 
   const handleSubmit = form.handleSubmit(async (data) => {
-    console.log("Data to submit:", data);
     // si el manager_id es el mismo al actual no hacer la peticion
-    if (data.manager_id === brand.manager_id) {
+    if (data.manager_id === managerId) {
       toast.error("El gerente ya está asignado a esta marca");
       return;
     }
@@ -100,7 +102,7 @@ export function ChangeManager({ brand, onSuccess }: Props) {
     
     try {
       // Usar el servicio de API centralizado para actualizar el gerente de la marca
-      const response = await patch(`brands/${brand.id}`, {
+      const response = await patch(`brands/${brandId}`, {
         manager_id: data.manager_id
       });
 
@@ -110,6 +112,12 @@ export function ChangeManager({ brand, onSuccess }: Props) {
 
       // Mostrar notificación de éxito
       toast.success("Gerente asignado correctamente");
+      
+      // Invalidar la consulta de historial correctamente usando el mismo formato de clave
+      // que se usa en useFetchWithParameter
+      queryClient.invalidateQueries({ 
+        queryKey: ["brandHistory", String(brandId)],
+      });
       
       // Llamar al callback onSuccess si existe
       if (onSuccess) {
@@ -145,9 +153,7 @@ export function ChangeManager({ brand, onSuccess }: Props) {
     setIsCreatingManager(false);
   };
 
-  console.log(form.watch("manager_id"), brand.manager_id);
-
-  if (!brand) {
+  if (!brandId) {
     return null;
   }
 
@@ -199,7 +205,7 @@ export function ChangeManager({ brand, onSuccess }: Props) {
 
             <Button
               type="submit"
-              disabled={isSubmitting || isLoadingManagers || form.watch("manager_id") === brand.manager_id} 
+              disabled={isSubmitting || isLoadingManagers || form.watch("manager_id") === managerId} 
               className="flex w-full gap-2"
             >
               {isSubmitting && (
@@ -212,7 +218,7 @@ export function ChangeManager({ brand, onSuccess }: Props) {
       </div>
 
       <CreateManagerModal
-        clientId={parseInt(clientId || "0")}
+        clientId={clientId || 0}
         openModal={isCreatingManager}
         handleModal={(state) => setIsCreatingManager(state)}
         onSuccess={handleManagerCreated}
