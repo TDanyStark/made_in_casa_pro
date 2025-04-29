@@ -23,10 +23,9 @@ import CreateManagerModal from "@/components/managers/CreateManagerModal";
 import { BrandType, ManagerType } from "@/lib/definitions";
 import { useGetEndpointQuery } from "@/hooks/useGetEndpointQuery";
 import { patch } from "@/lib/services/apiService";
+import { useRouter } from "next/navigation";
 
 const formSchema = z.object({
-  id: z.coerce.number().int().positive("Se requiere un id válido"),
-  name: z.string().min(1, "Se requiere un nombre"),
   manager_id: z.coerce.number().int().positive("Se requiere un gerente válido"),
 });
 
@@ -41,8 +40,6 @@ export function ChangeManager({ brand, onSuccess }: Props) {
   const form = useForm<ChangeManagerFormData>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      id: brand?.id,
-      name: brand?.name,
       manager_id: brand?.manager_id,
     },
   });
@@ -54,6 +51,7 @@ export function ChangeManager({ brand, onSuccess }: Props) {
   const [newManagerName, setNewManagerName] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const { refresh } = useRouter();
 
   // Recuperar client_id del manager actual
   const clientId = brand?.manager?.client_info?.id?.toString();
@@ -102,7 +100,7 @@ export function ChangeManager({ brand, onSuccess }: Props) {
     
     try {
       // Usar el servicio de API centralizado para actualizar el gerente de la marca
-      const response = await patch(`brands/${data.id}`, {
+      const response = await patch(`brands/${brand.id}`, {
         manager_id: data.manager_id
       });
 
@@ -116,6 +114,9 @@ export function ChangeManager({ brand, onSuccess }: Props) {
       // Llamar al callback onSuccess si existe
       if (onSuccess) {
         onSuccess();
+      }else {
+        // Si no hay callback, recargar la página
+        refresh();
       }
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Error al asignar el gerente");
@@ -143,6 +144,8 @@ export function ChangeManager({ brand, onSuccess }: Props) {
 
     setIsCreatingManager(false);
   };
+
+  console.log(form.watch("manager_id"), brand.manager_id);
 
   if (!brand) {
     return null;
@@ -179,7 +182,7 @@ export function ChangeManager({ brand, onSuccess }: Props) {
                       formatCreateLabel={(inputValue) =>
                         `Crear gerente "${inputValue}"`
                       }
-                      className="react-select-container"
+                      className="react-select-container min-w-72"
                       classNamePrefix="react-select"
                       loadingMessage={() => "Cargando gerentes..."}
                       noOptionsMessage={({ inputValue }) =>
@@ -196,7 +199,7 @@ export function ChangeManager({ brand, onSuccess }: Props) {
 
             <Button
               type="submit"
-              disabled={isSubmitting || isLoadingManagers} 
+              disabled={isSubmitting || isLoadingManagers || form.watch("manager_id") === brand.manager_id} 
               className="flex w-full gap-2"
             >
               {isSubmitting && (
