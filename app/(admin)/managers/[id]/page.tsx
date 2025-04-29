@@ -77,11 +77,13 @@ export default async function ManagerPage({ params }: Props) {
             <div className="flex flex-col gap-4">
               <ItemInfo
                 key_update="email"
+                endpoint={`managers/${id}`}
                 label="Correo electrónico"
                 value={email}
               />
               <ItemInfo 
                 key_update="phone" 
+                endpoint={`managers/${id}`} 
                 label="Teléfono" 
                 value={phone} 
               />

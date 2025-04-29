@@ -1,14 +1,17 @@
+/* eslint-disable @next/next/no-img-element */
 import { getBrandById } from "@/lib/queries/brands";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Breadcrumbs } from "@/components/navigation/Breadcrumbs";
 import EditableText from "@/components/input/EditableText";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import ItemInfo from "@/components/managers/ItemInfo";
 
 type Props = {
   params: Promise<{ id: string }>;
 };
 
-export default async function page({ params }: Props){
+export default async function page({ params }: Props) {
   const { id } = await params;
   const brand = await getBrandById(id);
 
@@ -24,27 +27,63 @@ export default async function page({ params }: Props){
     );
   }
 
-  const { name } = brand;
+  const { name, manager } = brand;
+  const email = manager?.email || "Correo no disponible";
+  const name_manager = manager?.name || "Nombre no disponible";
+  const id_manager = manager?.id || "ID no disponible";
 
   // Si la marca existe, mostrar la información con breadcrumbs
   return (
     <section>
-      <Breadcrumbs 
+      <Breadcrumbs
         customLabels={{
-          [`/brands/${id}`]: name || 'Detalle de marca'
+          [`/brands/${id}`]: name || "Detalle de marca",
         }}
       />
       <h1 className="primaryH1">
         <span className="waving-hand mr-4">👋🏻</span>
-        <EditableText 
+        <EditableText
           height={36}
-          value={name} 
-          endpoint={`brands/${id}`} 
-          fieldName="name" 
+          value={name}
+          endpoint={`brands/${id}`}
+          fieldName="name"
           as="span"
           endpointIdParam="id"
         />
       </h1>
+      <div className="flex flex-col lg:flex-row gap-4 mt-4">
+        <Card className="p-4 shadow-md rounded-lg">
+          <CardHeader className="flex flex-col gap-2">
+            <h2 className="text-2xl font-semibold">Información de la Marca</h2>
+          </CardHeader>
+          <CardContent className="flex gap-4">
+            <div>
+              <img
+                src={`/images/brands/brand_img.webp`}
+                alt="Fondo gradiente"
+                className="h-full w-52 rounded opacity-70"
+              />
+            </div>
+            <div className="flex flex-col gap-4">
+            <ItemInfo
+                key_update="name"
+                endpoint={`managers/${id_manager}`}
+                label="Nombre Gerente"
+                value={name_manager}
+              />
+            <ItemInfo
+                key_update="email"
+                endpoint={`managers/${id_manager}`}
+                label="Email Gerente"
+                value={email}
+              />
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <p>Detalles adicionales que pueden ser relevantes.</p>
+        </Card>
+      </div>
     </section>
   );
 }

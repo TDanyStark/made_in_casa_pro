@@ -4,21 +4,22 @@ import { Copy, Mail, Phone, LucideIcon, Check, X, Pencil } from "lucide-react";
 import { useState } from "react";
 import { Button } from "../ui/button";
 import { toast } from "sonner";
-import { useParams } from "next/navigation";
 import AutoResizeInput from "../input/AutoResizeInput";
 import { patch } from "@/lib/services/apiService";
 
 // Tipo para las claves de icono disponibles
-export type IconKey = "email" | "phone";
+export type IconKey = "email" | "phone" | "name";
 
 const IconMap: Record<IconKey, LucideIcon> = {
   email: Mail,
   phone: Phone,
+  name: Pencil,
 };
 
 interface Props {
   label: string;
   value: string;
+  endpoint: string;
   key_update: IconKey;
   onUpdate?: (newValue: string) => void;
 }
@@ -26,10 +27,10 @@ interface Props {
 const ItemInfo = ({
   label,
   value: initialValue,
+  endpoint,
   key_update,
   onUpdate,
 }: Props) => {
-  const params = useParams();
   const [copied, setCopied] = useState<boolean>(false);
   const [isEditing, setIsEditing] = useState(false);
   const [value, setValue] = useState(initialValue);
@@ -79,7 +80,7 @@ const ItemInfo = ({
 
     try {
       // Usar el servicio API centralizado 
-      const response = await patch(`managers/${params.id}`, {
+      const response = await patch(`${endpoint}`, {
         [key_update]: inputValue,
       });
 
