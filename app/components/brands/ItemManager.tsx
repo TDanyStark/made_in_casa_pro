@@ -33,7 +33,7 @@ const ItemManager = ({ name, link }: ItemManagerProps) => {
         <div className="w-full">
           <p className="text-sm text-gray-500 dark:text-gray-400">Gerente</p>
           <div className="font-medium">
-            <p className="h-[24px] border-b border-transparent text-gray-900 dark:text-white">
+            <p className="h-[24px] border-b border-transparent text-gray-900 dark:text-white text-nowrap">
               {name}
             </p>
           </div>

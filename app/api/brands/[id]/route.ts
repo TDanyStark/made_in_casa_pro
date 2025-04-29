@@ -6,6 +6,7 @@ import { revalidatePath } from "next/cache";
 // Schema for validating brand update data
 const brandUpdateSchema = z.object({
   name: z.string().min(1).optional(),
+  manager_id: z.coerce.number().int().positive().optional(),
 });
 
 export async function PATCH(
@@ -26,7 +27,7 @@ export async function PATCH(
       );
     }
 
-    const { name } = validationResult.data;
+    const { name, manager_id } = validationResult.data;
 
     // Check if the brand exists
     const existingBrand = await getBrandById(id);
@@ -38,12 +39,12 @@ export async function PATCH(
     }
 
     // If no fields to update, return the existing brand
-    if (!name) {
+    if (!name && !manager_id) {
       return NextResponse.json(existingBrand);
     }
 
     // Update brand using the model function
-    const updatedBrand = await updateBrand(id, { name });
+    const updatedBrand = await updateBrand(id, { name, manager_id });
 
     // Revalidate paths
     revalidatePath(`/brands/${id}`);

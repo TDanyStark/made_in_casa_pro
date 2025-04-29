@@ -6,6 +6,7 @@ import { Breadcrumbs } from "@/components/navigation/Breadcrumbs";
 import EditableText from "@/components/input/EditableText";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import ItemManager from "@/components/brands/ItemManager";
+import ChangeManager from "@/components/brands/ChangeManager";
 
 type Props = {
   params: Promise<{ id: string }>;
@@ -65,7 +66,7 @@ export default async function page({ params }: Props) {
             </div>
             <div className="flex flex-col gap-4">
               <ItemManager name={name_manager} link={`/managers/${id_manager}`} />
-              {/* agregar componente de cambio de gerente a una marca */}
+              <ChangeManager brand={brand} />
             </div>
           </CardContent>
         </Card>
