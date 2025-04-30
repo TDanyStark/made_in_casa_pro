@@ -42,13 +42,13 @@ export function TabsManagersAndBrands({ clientId }: { clientId: number }) {
       <TabsList>
         <TabsTrigger 
           value="managers" 
-          className="data-[state=active]:bg-primary/10 dark:data-[state=active]:bg-primary/20"
+          className="select-none data-[state=active]:bg-primary/10 dark:data-[state=active]:bg-primary/20"
         >
           Gerentes
         </TabsTrigger>
         <TabsTrigger 
           value="brands"
-          className="data-[state=active]:bg-primary/10 dark:data-[state=active]:bg-primary/20"
+          className="select-none data-[state=active]:bg-primary/10 dark:data-[state=active]:bg-primary/20"
         >
           Marcas
         </TabsTrigger>

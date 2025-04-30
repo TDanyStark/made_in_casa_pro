@@ -1,0 +1,84 @@
+"use client";
+
+import { useState } from "react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { patch } from "@/lib/services/apiService";
+import { toast } from "sonner";
+
+interface CheckboxChangeStateProps {
+  label: string;
+  id?: string;
+  initialChecked: boolean;
+  endpoint: string;
+  fieldName: string;
+  className?: string;
+  onUpdate?: (newValue: boolean) => void;
+  disabled?: boolean;
+}
+
+const CheckboxChangeState = ({
+  label = "Aceptar unidades de negocio",
+  id = "checkbox-state",
+  initialChecked,
+  endpoint,
+  fieldName,
+  className = "",
+  onUpdate,
+  disabled = false,
+}: CheckboxChangeStateProps) => {
+  const [isChecked, setIsChecked] = useState(initialChecked);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleCheckedChange = async (checked: boolean) => {
+    if (disabled || isSubmitting) return;
+    
+    setIsSubmitting(true);
+    
+    try {
+      // Usar el servicio de API centralizado
+      const response = await patch(endpoint, {
+        [fieldName]: checked
+      });
+
+      if (!response.ok) {
+        throw new Error(response.error || "Error al actualizar");
+      }
+
+      // Actualizar el estado local
+      setIsChecked(checked);
+      
+      // Llamar al callback onUpdate si existe
+      if (onUpdate) {
+        onUpdate(checked);
+      }
+
+      toast.success("Actualizado correctamente");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Error al actualizar");
+      // Revertir al valor anterior si falla
+      setIsChecked(isChecked);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <div className={`flex items-center space-x-2 mt-4 ${className}`}>
+      <Checkbox 
+        className="w-6 h-6" 
+        id={id} 
+        checked={isChecked}
+        onCheckedChange={handleCheckedChange}
+        disabled={disabled || isSubmitting}
+      />
+      <label
+        htmlFor={id}
+        className={`leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer select-none ${disabled || isSubmitting ? 'text-muted-foreground opacity-70' : 'text-muted-foreground'}`}
+      >
+        {label}
+      </label>
+    </div>
+  );
+};
+
+export default CheckboxChangeState;

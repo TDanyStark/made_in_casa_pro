@@ -1,6 +1,7 @@
 import {turso} from '../db';
 import { ClientType } from '../definitions';
 import { ITEMS_PER_PAGE } from '@/config/constants';
+import { revalidatePath } from "next/cache";
 
 export async function getClients() {
   try {
@@ -49,7 +50,7 @@ export async function getClientById(id: string): Promise<ClientType | null> {
   try {
     const client = await turso.execute({
       sql: `
-        SELECT c.id, c.name, co.id AS country_id, co.name AS country_name, co.flag AS country_flag
+        SELECT c.id, c.name, co.id AS country_id, co.name AS country_name, c.accept_business_units, co.flag AS country_flag
         FROM clients c
         LEFT JOIN countries co ON c.country_id = co.id
         WHERE c.id = ?
@@ -62,6 +63,7 @@ export async function getClientById(id: string): Promise<ClientType | null> {
       return {
         id: row.id,
         name: String(row.name || ''), // Ensure name is a string
+        accept_business_units: Boolean(row.accept_business_units),
         country: row.country_id ? {
           id: row.country_id,
           name: String(row.country_name || ''), // Ensure country_name is a string
@@ -152,6 +154,56 @@ export async function getClientsWithPagination({
   } catch (error) {
     console.error("Error fetching clients with pagination:", error);
     return { clients: [], total: 0 };
+  }
+}
+
+export async function updateClient(id: string, updateData: { 
+  name?: string; 
+  country_id?: number;
+  accept_business_units?: boolean;
+}) {
+  try {
+    // Construir la consulta de actualización basada en los campos proporcionados
+    const updates: string[] = [];
+    const args = [];
+
+    if (updateData.name !== undefined) {
+      updates.push("name = ?");
+      args.push(updateData.name);
+    }
+
+    if (updateData.country_id !== undefined) {
+      updates.push("country_id = ?");
+      args.push(updateData.country_id);
+    }
+
+    if (updateData.accept_business_units !== undefined) {
+      updates.push("accept_business_units = ?");
+      args.push(updateData.accept_business_units ? 1 : 0); // Convertir boolean a 1/0 para SQLite
+    }
+
+    // Si no hay campos para actualizar, devolver null
+    if (updates.length === 0) {
+      return null;
+    }
+
+    // Añadir el ID al final de los argumentos para la cláusula WHERE
+    args.push(id);
+
+    // Ejecutar la consulta de actualización
+    await turso.execute({
+      sql: `UPDATE clients SET ${updates.join(", ")} WHERE id = ?`,
+      args,
+    });
+
+    // Revalidar rutas
+    revalidatePath(`/clients/${id}`);
+
+    // Obtener y devolver el cliente actualizado
+    return getClientById(id);
+  } catch (error) {
+    console.error("Error updating client:", error);
+    throw error;
   }
 }
 

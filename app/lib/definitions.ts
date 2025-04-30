@@ -45,6 +45,7 @@ export type LinksType = {
 export type ClientType = {
   id: number;
   name: string;
+  accept_business_units?: boolean;
   country?: CountryType;
 }
 
