@@ -30,12 +30,6 @@ export default async function middleware(req: NextRequest) {
     ? (session?.role as UserRole) 
     : UserRole.NO_AUTHENTICADO;
 
-  // Guardar la información de la sesión y el rol en los headers para endpoints API
-  if (session?.id) {
-    headers.set("x-user-id", session.id.toString());
-    headers.set("x-user-role", userRole.toString());
-  }
-
   // 1. Si es ruta pública y el usuario está autenticado, redirigir a dashboard
   if (isPublicRoute && session?.id) {
     return NextResponse.redirect(new URL("/dashboard", req.nextUrl));
@@ -45,8 +39,8 @@ export default async function middleware(req: NextRequest) {
   if (!session?.id && !isPublicRoute) {
     // Para rutas API, devolver 401 Unauthorized en lugar de redirigir
     if (isApiRoute) {
-      return NextResponse.next({ headers });
-      // return NextResponse.json({ error: "No autorizado" }, { status: 401, headers });
+      // return NextResponse.next({ headers });
+      return NextResponse.json({ error: "No autorizado" }, { status: 401, headers });
     }
     return NextResponse.redirect(new URL("/", req.nextUrl));
   }
