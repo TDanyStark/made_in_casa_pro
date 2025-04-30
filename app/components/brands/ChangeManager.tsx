@@ -67,7 +67,6 @@ export function ChangeManager({ brandId, managerId, clientId, onSuccess }: Props
   });
 
   const managers = useMemo(() => data?.data || [], [data]);
-  console.log(managers)
 
   // Actualizar las opciones cuando cambian los datos de managers
   useEffect(() => {
