@@ -1,3 +1,5 @@
+import { LucideProps } from 'lucide-react'
+import { ForwardRefExoticComponent, RefAttributes } from 'react'
 import { z } from 'zod'
 
 export const SignupFormSchema = z.object({
@@ -31,6 +33,13 @@ export enum UserRole {
   COLABORADOR = 3,
   ADMIN = 4,
   NO_AUTHENTICADO = 0
+}
+
+export type LinksType = {
+  name?: string;
+  route: string;
+  icon?: ForwardRefExoticComponent<Omit<LucideProps, "ref"> & RefAttributes<SVGSVGElement>>;
+  roles: UserRole[];
 }
 
 export type ClientType = {

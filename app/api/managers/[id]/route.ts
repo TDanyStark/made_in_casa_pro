@@ -24,7 +24,7 @@ export async function PATCH(
   }
 
   // Validate user role (only admins and commercial roles can update managers)
-  const roleValidation = validateApiRole(request, [
+  const roleValidation = await validateApiRole(request, [
     UserRole.ADMIN,
     UserRole.COMERCIAL,
     UserRole.DIRECTIVO,

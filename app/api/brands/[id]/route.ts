@@ -21,7 +21,7 @@ export async function PATCH(
         return methodValidation.response;
       }
     
-      const roleValidation = validateApiRole(request, [
+      const roleValidation = await validateApiRole(request, [
         UserRole.ADMIN, 
         UserRole.COMERCIAL, 
         UserRole.DIRECTIVO

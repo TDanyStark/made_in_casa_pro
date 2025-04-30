@@ -1,47 +1,47 @@
 import { House, Folder, LayoutList, BookUser, LibraryBig, Users } from 'lucide-react';
-import { UserRole } from './definitions';
+import { LinksType, UserRole } from './definitions';
 
 
-export const links = [
+export const links: LinksType[] = [
   { 
     name: 'Inicio', 
-    href: '/dashboard', 
+    route: '/dashboard', 
     icon: House,
     roles: [UserRole.COMERCIAL, UserRole.DIRECTIVO, UserRole.COLABORADOR, UserRole.ADMIN]
   },
   {
     name: 'Proyectos',
-    href: '/projects',
+    route: '/projects',
     icon: Folder,
     roles: [UserRole.ADMIN, UserRole.COMERCIAL, UserRole.DIRECTIVO]
   },
   { 
     name: 'Tareas', 
-    href: '/tasks', 
+    route: '/tasks', 
     icon: LayoutList,
     roles: [UserRole.ADMIN, UserRole.COMERCIAL, UserRole.DIRECTIVO]
   },
   { 
     name: 'Productos', 
-    href: '/products', 
+    route: '/products', 
     icon: LibraryBig,
     roles: [UserRole.ADMIN, UserRole.COMERCIAL, UserRole.DIRECTIVO]
   },
   { 
     name: 'Clientes', 
-    href: '/clients', 
+    route: '/clients', 
     icon: BookUser,
     roles: [UserRole.ADMIN, UserRole.COMERCIAL, UserRole.DIRECTIVO]
   },
   { 
     name: 'Usuarios', 
-    href: '/users', 
+    route: '/users', 
     icon: Users,
     roles: [UserRole.ADMIN]
   },
 ];
 
-export const linksNotVisible = [
+export const linksNotVisible: LinksType[] = [
   {
     route: '/clients',
     roles: [UserRole.ADMIN, UserRole.COMERCIAL, UserRole.DIRECTIVO]

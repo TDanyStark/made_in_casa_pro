@@ -23,7 +23,7 @@ export async function POST(request: NextRequest) {
   }
 
   // Validar rol del usuario (solo administradores y comerciales pueden crear gerentes)
-  const roleValidation = validateApiRole(request, [
+  const roleValidation = await validateApiRole(request, [
     UserRole.ADMIN, 
     UserRole.COMERCIAL, 
     UserRole.DIRECTIVO
@@ -79,7 +79,7 @@ export async function GET(request: NextRequest) {
   }
 
   // Validar rol del usuario (permitir a todos los usuarios autenticados ver gerentes)
-  const roleValidation = validateApiRole(request, [
+  const roleValidation = await validateApiRole(request, [
     UserRole.ADMIN, 
     UserRole.COMERCIAL, 
     UserRole.DIRECTIVO,

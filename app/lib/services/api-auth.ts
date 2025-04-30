@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { UserRole } from "@/lib/definitions";
+import { cookies } from "next/headers";
+import { decrypt } from "../session";
 
 /**
  * Verifica si el usuario tiene uno de los roles permitidos para acceder a un endpoint API.
@@ -9,12 +11,25 @@ import { UserRole } from "@/lib/definitions";
  * @param allowedRoles Arreglo de roles que tienen permiso para acceder
  * @returns Un objeto con { isAuthorized, response, userRole }, donde response es undefined si está autorizado, o un NextResponse con error si no
  */
-export function validateApiRole(
+export async function validateApiRole(
   request: NextRequest,
   allowedRoles: UserRole[]
 ) {
-  const userRoleHeader = request.headers.get('x-user-role');
-  
+  const cookie = (await cookies()).get("session")?.value;
+  // obtener el rol del usuario desde la cookie de sesión
+  const session = cookie ? await decrypt(cookie) : null;
+  // Si no hay cookie de sesión, el usuario no está autenticado 
+  if (!session) {
+    return {
+      isAuthorized: false,
+      userRole: UserRole.NO_AUTHENTICADO,
+      response: NextResponse.json(
+        { error: "No autorizado" },
+        { status: 401 }
+      )
+    };
+  }
+  const userRoleHeader =  session.role;
   // Si no hay header de rol, el usuario no está autenticado
   if (!userRoleHeader) {
     return {
@@ -28,7 +43,7 @@ export function validateApiRole(
   }
 
   // Convertir el header de rol a un número para compararlo con UserRole enum
-  const userRole = parseInt(userRoleHeader);
+  const userRole = userRoleHeader as UserRole;
   
   // Verificar si el rol del usuario está en la lista de roles permitidos
   if (!allowedRoles.includes(userRole)) {
