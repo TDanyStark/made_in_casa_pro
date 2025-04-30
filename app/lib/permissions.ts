@@ -8,7 +8,7 @@ export const routePermissions: Record<string, UserRole[]> = [...links, ...linksN
 }, {} as Record<string, UserRole[]>);
 
 // 🔹 Definir la única ruta pública
-export const publicRoute = "/";
+export const publicRoutes = ["/"];
 
 // 🔹 Función para verificar permisos de rutas, incluyendo rutas dinámicas
 export function checkRoutePermission(

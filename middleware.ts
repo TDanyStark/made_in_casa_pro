@@ -2,11 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { decrypt } from "@/lib/session";
 import { cookies } from "next/headers";
 import { UserRole } from "@/lib/definitions";
-import { publicRoute, checkRoutePermission } from "@/lib/permissions";
+import { checkRoutePermission, publicRoutes } from "@/lib/permissions";
+
+// Changed publicRoute from a single route to an array of public routes
 
 export default async function middleware(req: NextRequest) {
   const path = req.nextUrl.pathname;
-  const isPublicRoute = path === publicRoute;
+  const isPublicRoute = publicRoutes.includes(path);
   const isApiRoute = path.startsWith('/api/');
   const headers = new Headers(req.headers);
   headers.set("x-current-path", req.nextUrl.pathname);
