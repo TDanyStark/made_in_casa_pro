@@ -57,7 +57,12 @@ export function BrandSelect({
     endpoint: "brands",
   });
 
+  console.log("data", data);
+  console.log("brandsOptions", brandOptions);
+  console.log("searchTerm", searchTerm);
+
   const brands = useMemo(() => data?.data || [], [data]);
+  console.log(brands);
 
   const debouncedSearch = debounce((value: string) => {
     setSearchTerm(value);
@@ -70,7 +75,7 @@ export function BrandSelect({
   };
 
   useEffect(() => {
-    if (brands && brands.length > 0) {
+    if (brands) {
       const options = brands.map((brand: BrandsAndManagersType) => ({
         value: brand.id as number,
         label: brand.brand_name,
@@ -85,24 +90,6 @@ export function BrandSelect({
     setIsCreatingBrand(true);
   };
 
-  // const handleBrandCreated = (newBrand: BrandType) => {
-  //   // Add the new brand to the options
-  //   const newOption = {
-  //     value: newBrand.id as number,
-  //     label: newBrand.name,
-  //     managerId: newBrand.manager_id,
-  //     managerName: newBrand.manager?.name,
-  //   };
-
-  //   setBrandOptions((prev) => [...prev, newOption]);
-
-  //   // Select the newly created brand and notify parent
-  //   if (onChange) {
-  //     onChange(newBrand.id as number);
-  //   }
-
-  //   setIsCreatingBrand(false);
-  // };
 
   const filterOption = () => true;
 

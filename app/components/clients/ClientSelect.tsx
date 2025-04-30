@@ -76,7 +76,7 @@ export function ClientSelect({
   };
 
   useEffect(() => {
-    if (clients && clients.length > 0) {
+    if (clients) {
       const options = clients.map((client: ClientType) => ({
         value: client.id,
         label: client.name,
