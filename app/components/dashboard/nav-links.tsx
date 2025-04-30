@@ -15,7 +15,7 @@ export default function NavLinks() {
       {links
         .filter((link) => link.roles.includes(role)) // Filtrar enlaces según el rol
         .map((link) => {
-          const LinkIcon = link.icon;
+          const LinkIcon = link.icon as React.FC<React.SVGProps<SVGSVGElement>>;
 
           return (
             <Link
