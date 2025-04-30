@@ -32,7 +32,7 @@ import { ClientType } from "@/lib/definitions";
 const formSchema = z.object({
   name: z.string().nonempty("El nombre es obligatorio"),
   country_id: z.coerce.number().refine((val) => !isNaN(val) && val > 0, {
-    message: "No puede estar vacío",
+    message: "Debe de escoger un pais",
   }),
 });
 

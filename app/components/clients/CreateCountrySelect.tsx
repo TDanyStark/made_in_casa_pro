@@ -4,7 +4,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { ControllerRenderProps } from "react-hook-form";
 import CreatableSelect from "react-select/creatable";
-import { API_FLAG_URL, IMG_FLAG_EXT } from "@/config/constants";
+import { API_FLAG_CODE, API_FLAG_URL, IMG_FLAG_EXT } from "@/config/constants";
 import { Skeleton } from "../ui/skeleton";
 import useGetItems from "@/hooks/useGetItems";
 import useItemMutations from "@/hooks/useItemsMutation";
@@ -139,6 +139,19 @@ export function CreateCountrySelect({ field }: CreateCountrySelectProps) {
             placeholder="Código de bandera"
             className="flex-1 h-9 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs"
           />
+        </div>
+        <div>
+          <p>
+            Para obtener el código de la bandera, visita{" "}
+            <a
+              href={`${API_FLAG_CODE}s?q=${newCountryName}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-blue-500 underline"
+            >
+              AQUÍ
+            </a>{" "}
+          </p>
         </div>
         <div className="flex gap-2 justify-end">
           <button 
