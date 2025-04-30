@@ -32,6 +32,8 @@ const CheckboxChangeState = ({
   const handleCheckedChange = async (checked: boolean) => {
     if (disabled || isSubmitting) return;
     
+    // Actualización optimista
+    setIsChecked(checked);
     setIsSubmitting(true);
     
     try {
@@ -41,11 +43,10 @@ const CheckboxChangeState = ({
       });
 
       if (!response.ok) {
+        // Si hay error, revertimos el cambio
+        setIsChecked(!checked);
         throw new Error(response.error || "Error al actualizar");
       }
-
-      // Actualizar el estado local
-      setIsChecked(checked);
       
       // Llamar al callback onUpdate si existe
       if (onUpdate) {
@@ -55,8 +56,7 @@ const CheckboxChangeState = ({
       toast.success("Actualizado correctamente");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Error al actualizar");
-      // Revertir al valor anterior si falla
-      setIsChecked(isChecked);
+      // Ya no necesitamos revertir aquí, ya lo hicimos arriba en caso de error
     } finally {
       setIsSubmitting(false);
     }
