@@ -5,6 +5,7 @@ export default function Page() {
     <section>
       <h1 className="primaryH1">Projectos</h1>
       <MyComponent />
+      
     </section>
   );
 }
