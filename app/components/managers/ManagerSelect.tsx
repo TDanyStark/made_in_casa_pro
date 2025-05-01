@@ -11,7 +11,7 @@ import {
   FormMessage,
   FormField
 } from "@/components/ui/form";
-import { Control } from "react-hook-form";
+import { Control, UseFormReturn } from "react-hook-form";
 import CreateManagerModal from "./CreateManagerModal";
 import { ManagerType } from "@/lib/definitions";
 import { BrandFormData } from "../clients/CreateBrandModal";
@@ -21,8 +21,8 @@ interface ManagerOption {
   label: string;
 }
 
-
 interface ManagerSelectProps {
+  form: UseFormReturn<BrandFormData>; 
   control: Control<BrandFormData>;
   name: "manager_id" | "name";
   label?: string;
@@ -34,6 +34,7 @@ interface ManagerSelectProps {
 }
 
 export function ManagerSelect({
+  form,
   control,
   name,
   label = "Gerente",
@@ -94,6 +95,9 @@ export function ManagerSelect({
     if (onChange) {
       onChange(newManager.id as number);
     }
+    
+    // Actualizar el valor en el formulario usando la API pública de React Hook Form
+    form.setValue(name, newManager.id as number);
 
     setIsCreatingManager(false);
   };

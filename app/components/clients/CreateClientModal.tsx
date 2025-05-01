@@ -111,7 +111,11 @@ export function CreateClientModal({ modalControl, onSuccess, initialName = "" }:
         <Form {...form}>
           <form
             id="create-client"
-            onSubmit={handleSubmit}
+            onSubmit={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              handleSubmit(e);
+            }}
             className="space-y-4 mt-4"
           >
             <FormField

@@ -88,10 +88,15 @@ export function CreateBrandModal({ clientId, openModal, handleModal }: Props) {
           <Form {...form}>
             <form
               id="create-brand"
-              onSubmit={handleSubmit}
+              onSubmit={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                handleSubmit(e);
+              }}
               className="space-y-4 mt-4"
             >
               <ManagerSelect 
+                form={form}
                 control={form.control}
                 name="manager_id"
                 clientId={clientId}
@@ -112,6 +117,7 @@ export function CreateBrandModal({ clientId, openModal, handleModal }: Props) {
               />
               
               <BusinessUnitBrandSelect
+                form={form}
                 control={form.control}
                 name="business_unit_id"
               />

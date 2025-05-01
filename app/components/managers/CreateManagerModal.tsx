@@ -112,7 +112,11 @@ export function CreateManagerModal({
           <Form {...form}>
             <form
               id="create-manager"
-              onSubmit={handleSubmit}
+              onSubmit={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                handleSubmit(e);
+              }}
               className="space-y-4 mt-4"
             >
               {!clientId && (
@@ -184,8 +188,12 @@ export function CreateManagerModal({
 
               <DialogFooter>
                 <Button
-                  type="submit"
-                  form="create-manager"
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    handleSubmit(e);
+                  }}
                   disabled={createItem.isPending}
                   className="flex gap-2"
                 >
