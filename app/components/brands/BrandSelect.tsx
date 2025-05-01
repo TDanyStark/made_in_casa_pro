@@ -57,10 +57,6 @@ export function BrandSelect({
     endpoint: "brands",
   });
 
-  console.log("data", data);
-  console.log("brandsOptions", brandOptions);
-  console.log("searchTerm", searchTerm);
-
   const brands = useMemo(() => data?.data || [], [data]);
   console.log(brands);
 

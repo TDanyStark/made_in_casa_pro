@@ -27,10 +27,12 @@ import { Input } from "@/components/ui/input";
 import { Loader2 } from "lucide-react";
 import useItemMutations from "@/hooks/useItemsMutation";
 import { ManagerSelect } from "@/components/managers/ManagerSelect";
+import { BusinessUnitBrandSelect } from "@/components/brands/BusinessUnitBrandSelect";
 
 const formSchema = z.object({
   manager_id: z.coerce.number().int('Se requiere un gerente válido').positive("Se requiere un gerente válido"),
   name: z.string().nonempty("El nombre de la marca es obligatorio"),
+  business_unit_id: z.coerce.number().int().positive().optional(),
 });
 
 export type BrandFormData = z.infer<typeof formSchema> & { id?: number };
@@ -46,6 +48,7 @@ export function CreateBrandModal({ clientId, openModal, handleModal }: Props) {
     resolver: zodResolver(formSchema),
     defaultValues: {
       name: "",
+      business_unit_id: undefined,
     },
   });
 
@@ -67,6 +70,7 @@ export function CreateBrandModal({ clientId, openModal, handleModal }: Props) {
     if (!openModal) {
       form.reset({
         name: "",
+        business_unit_id: undefined,
       });
     }
   }, [openModal, form]);
@@ -105,6 +109,11 @@ export function CreateBrandModal({ clientId, openModal, handleModal }: Props) {
                     <FormMessage />
                   </FormItem>
                 )}
+              />
+              
+              <BusinessUnitBrandSelect
+                control={form.control}
+                name="business_unit_id"
               />
 
               <DialogFooter>

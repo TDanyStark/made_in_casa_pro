@@ -90,7 +90,7 @@ export async function GET(request: NextRequest) {
     const clientId = url.searchParams.get("client_id");
     const id = url.searchParams.get("id");
     const page = parseInt(url.searchParams.get("page") || "1");
-    const limit = ITEMS_PER_PAGE;
+    const limit = parseInt(url.searchParams.get("limit") || ITEMS_PER_PAGE.toString());
     const search = url.searchParams.get("search");
     
     // Si se solicita una marca específica por ID
@@ -104,8 +104,7 @@ export async function GET(request: NextRequest) {
       }
       return NextResponse.json(brand);
     } 
-    // Si no hay ID específico, usar paginación
-    else {
+    else {// Si no hay ID específico, usar paginación
       // Get paginated results
       const { brands, total } = await getBrandsWithPagination({
         managerId: managerId || undefined,

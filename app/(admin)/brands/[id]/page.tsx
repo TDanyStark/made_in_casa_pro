@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import ItemManager from "@/components/brands/ItemManager";
 import ChangeManager from "@/components/brands/ChangeManager";
 import BrandManagerHistory from "@/components/brands/BrandManagerHistory";
+import { BusinessUnitBrandSelect } from "@/components/brands/BusinessUnitBrandSelect";
 
 type Props = {
   params: Promise<{ id: string }>;
@@ -29,7 +30,7 @@ export default async function page({ params }: Props) {
     );
   }
 
-  const { name, manager } = brand;
+  const { name, manager, business_unit_id } = brand;
   const name_manager = manager?.name || "Nombre no disponible";
   const id_manager = manager?.id || 0;
   const clientId = manager?.client_id || 0;
@@ -76,6 +77,10 @@ export default async function page({ params }: Props) {
                 managerId={id_manager}
                 clientId={clientId || 0}
               />
+              
+              <div className="mt-4 w-full">
+                  
+              </div>
             </div>
           </CardContent>
         </Card>

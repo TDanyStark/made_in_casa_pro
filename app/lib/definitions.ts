@@ -69,6 +69,7 @@ export type BrandType = {
   id?: number;
   name: string;
   manager_id: number;
+  business_unit_id?: number;
   manager?: ManagerType;
 };
 
@@ -84,4 +85,9 @@ export type ManagersParams ={
   page?: string;
   search?: string;
   endpoint: string; // Nuevo parámetro para el endpoint
+}
+
+export interface BusinessUnitType {
+  id: number;
+  name: string;
 }

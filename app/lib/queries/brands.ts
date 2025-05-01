@@ -33,6 +33,7 @@ export async function getBrandById(id: string) {
           b.id as id,
           b.name as name,
           b.manager_id,
+          b.business_unit_id,
           m.name as manager_name,
           m.email as manager_email,
           m.phone as manager_phone,
@@ -58,6 +59,7 @@ export async function getBrandById(id: string) {
       id: row.id,
       name: row.name,
       manager_id: row.manager_id,
+      business_unit_id: row.business_unit_id,
       manager: {
         id: row.manager_id,
         client_id: row.client_id,
@@ -215,7 +217,7 @@ export async function getBrandsWithPagination({
     // Modified query to use manager_id from brands table
     let sql = `
       SELECT b.id as id, b.name as brand_name, 
-             b.manager_id, m.name as manager_name 
+            b.manager_id, m.name as manager_name 
       FROM brands b
       JOIN managers m ON b.manager_id = m.id
     `;
