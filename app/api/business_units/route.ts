@@ -20,7 +20,8 @@ export async function POST(request: NextRequest) {
   // Validate user role (only admins and managers can create business units)
   const roleValidation = await validateApiRole(request, [
     UserRole.ADMIN, 
-    UserRole.DIRECTIVO
+    UserRole.DIRECTIVO,
+    UserRole.COMERCIAL
   ]);
   if (!roleValidation.isAuthorized) {
     return roleValidation.response;

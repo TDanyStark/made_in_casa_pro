@@ -76,65 +76,6 @@ export function BusinessUnitBrandSelect({
     }
   }, [businessUnits]);
 
-  const handleCreateBusinessUnit = async (inputValue: string) => {
-    setIsCreatingBusinessUnit(true);
-    
-    try {
-      // Create new business unit using apiService
-      const response = await post<BusinessUnitType>('business_units', { name: inputValue });
-      
-      if (!response.ok) {
-        throw new Error(response.error || 'Error al crear la unidad de negocio');
-      }
-      
-      const newBusinessUnit = response.data as BusinessUnitType;
-      
-      // Update the options
-      setBusinessUnitOptions(prev => [
-        ...prev, 
-        { value: newBusinessUnit.id, label: newBusinessUnit.name }
-      ]);
-      
-      // If this is being used in brand detail page, update the brand's business unit
-      if (brandId) {
-        try {
-          const updateResponse = await patch<BusinessUnitType>(`brands/${brandId}`, { 
-            business_unit_id: newBusinessUnit.id 
-          });
-          
-          if (!updateResponse.ok) {
-            throw new Error(updateResponse.error || 'Error al actualizar la marca');
-          }
-          
-          // Invalidate queries to refresh data
-          queryClient.invalidateQueries({ queryKey: ['brands'] });
-          queryClient.invalidateQueries({ queryKey: [`brand-${brandId}`] });
-          
-          toast.success(`Unidad de negocio "${inputValue}" asignada a esta marca`);
-        } catch (error) {
-          toast.error('Error al asignar la unidad de negocio a la marca');
-          console.error(error);
-        }
-      } else {
-        // Just notify the creation 
-        toast.success(`Unidad de negocio "${inputValue}" creada con éxito`);
-        
-        // Call onChange if provided
-        if (onChange) onChange(newBusinessUnit.id);
-      }
-      
-      // Invalidate business units query to refresh the list
-      queryClient.invalidateQueries({ queryKey: ['business_units'] });
-      
-      return newBusinessUnit.id;
-    } catch (error) {
-      toast.error(`Error al crear la unidad de negocio: ${error instanceof Error ? error.message : 'Error desconocido'}`);
-      console.error(error);
-    } finally {
-      setIsCreatingBusinessUnit(false);
-    }
-  };
-
   // Handle selecting an existing business unit for a brand
   const handleSelectBusinessUnit = async (businessUnitId: number) => {
     if (!brandId) return;
@@ -150,7 +91,7 @@ export function BusinessUnitBrandSelect({
       
       // Invalidate queries to refresh data
       queryClient.invalidateQueries({ queryKey: ['brands'] });
-      queryClient.invalidateQueries({ queryKey: [`brand-${brandId}`] });
+      queryClient.invalidateQueries({ queryKey: ['brands', String(brandId)] });
       
       const businessUnit = businessUnitOptions.find(option => option.value === businessUnitId);
       toast.success(`Unidad de negocio "${businessUnit?.label}" asignada a esta marca`);
@@ -166,44 +107,108 @@ export function BusinessUnitBrandSelect({
     <FormField
       control={control}
       name={name}
-      render={({ field }) => (
-        <FormItem>
-          <FormLabel>{label}</FormLabel>
-          <FormControl>
-            <CreatableSelect
-              isLoading={isLoading || isCreatingBusinessUnit}
-              options={businessUnitOptions}
-              placeholder={placeholder}
-              required={required}
-              value={businessUnitOptions.find(
-                (option) => option.value === field.value
-              )}
-              onChange={(selectedOption) => {
-                field.onChange(selectedOption?.value);
-                if (onChange) onChange(selectedOption?.value);
-                if (brandId && selectedOption?.value) {
-                  handleSelectBusinessUnit(selectedOption.value);
+      render={({ field }) => {
+        // Mover la función handleCreateBusinessUnit aquí para tener acceso a field
+        const handleCreateBusinessUnit = async (inputValue: string) => {
+          setIsCreatingBusinessUnit(true);
+          
+          try {
+            // Create new business unit using apiService
+            const response = await post<BusinessUnitType>('business_units', { name: inputValue });
+            
+            if (!response.ok) {
+              throw new Error(response.error || 'Error al crear la unidad de negocio');
+            }
+            
+            const newBusinessUnit = response.data as BusinessUnitType;
+            
+            // Update the options
+            setBusinessUnitOptions(prev => [
+              ...prev, 
+              { value: newBusinessUnit.id, label: newBusinessUnit.name }
+            ]);
+            
+            // Actualizar el valor del campo del formulario con el nuevo business unit
+            field.onChange(newBusinessUnit.id);
+            
+            if (brandId) {
+              try {
+                const updateResponse = await patch<BusinessUnitType>(`brands/${brandId}`, { 
+                  business_unit_id: newBusinessUnit.id 
+                });
+                
+                if (!updateResponse.ok) {
+                  throw new Error(updateResponse.error || 'Error al actualizar la marca');
                 }
-              }}
-              onInputChange={handleInputChange}
-              onCreateOption={handleCreateBusinessUnit}
-              formatCreateLabel={(inputValue) =>
-                `Crear unidad de negocio "${inputValue}"`
+                
+                // Invalidate queries to refresh data
+                queryClient.invalidateQueries({ queryKey: ['brands'] });
+                queryClient.invalidateQueries({ queryKey: ['brands', String(brandId)] });
+                
+                toast.success(`Unidad de negocio "${inputValue}" asignada a esta marca`);
+              } catch (error) {
+                toast.error('Error al asignar la unidad de negocio a la marca');
+                console.error(error);
               }
-              filterOption={filterOption}
-              isDisabled={disabled}
-              classNamePrefix="react-select"
-              loadingMessage={() => "Cargando unidades de negocio..."}
-              noOptionsMessage={({ inputValue }) =>
-                inputValue
-                  ? "No se encontraron unidades de negocio"
-                  : "Escribe para buscar unidades de negocio"
-              }
-            />
-          </FormControl>
-          <FormMessage />
-        </FormItem>
-      )}
+            } else {
+              // Just notify the creation 
+              toast.success(`Unidad de negocio "${inputValue}" creada con éxito`);
+              
+              // Call onChange if provided
+              if (onChange) onChange(newBusinessUnit.id);
+            }
+            
+            // Invalidate business units query to refresh the list
+            queryClient.invalidateQueries({ queryKey: ['business_units'] });
+            
+            return newBusinessUnit.id;
+          } catch (error) {
+            toast.error(`Error al crear la unidad de negocio: ${error instanceof Error ? error.message : 'Error desconocido'}`);
+            console.error(error);
+          } finally {
+            setIsCreatingBusinessUnit(false);
+          }
+        };
+        
+        return (
+          <FormItem>
+            <FormLabel>{label}</FormLabel>
+            <FormControl>
+              <CreatableSelect
+                isLoading={isLoading || isCreatingBusinessUnit}
+                options={businessUnitOptions}
+                placeholder={placeholder}
+                required={required}
+                value={businessUnitOptions.find(
+                  (option) => option.value === field.value
+                )}
+                onChange={(selectedOption) => {
+                  field.onChange(selectedOption?.value);
+                  if (onChange) onChange(selectedOption?.value);
+                  if (brandId && selectedOption?.value) {
+                    handleSelectBusinessUnit(selectedOption.value);
+                  }
+                }}
+                onInputChange={handleInputChange}
+                onCreateOption={handleCreateBusinessUnit}
+                formatCreateLabel={(inputValue) =>
+                  `Crear unidad de negocio "${inputValue}"`
+                }
+                filterOption={filterOption}
+                isDisabled={disabled}
+                classNamePrefix="react-select"
+                loadingMessage={() => "Cargando unidades de negocio..."}
+                noOptionsMessage={({ inputValue }) =>
+                  inputValue
+                    ? "No se encontraron unidades de negocio"
+                    : "Escribe para buscar unidades de negocio"
+                }
+              />
+            </FormControl>
+            <FormMessage />
+          </FormItem>
+        );
+      }}
     />
   );
 }

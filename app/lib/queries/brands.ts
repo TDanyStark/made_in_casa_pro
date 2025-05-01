@@ -126,7 +126,7 @@ export async function createBrand(brandData: Omit<BrandType, "id">) {
 
 export async function updateBrand(id: string, updateData: Partial<BrandType>) {
   try {
-    const { name, manager_id } = updateData;
+    const { name, manager_id, business_unit_id } = updateData;
     const updates = [];
     const args = [];
 
@@ -145,6 +145,11 @@ export async function updateBrand(id: string, updateData: Partial<BrandType>) {
     if (manager_id) {
       updates.push("manager_id = ?");
       args.push(manager_id);
+    }
+
+    if (business_unit_id) {
+      updates.push("business_unit_id = ?");
+      args.push(business_unit_id);
     }
 
     if (updates.length > 0) {
