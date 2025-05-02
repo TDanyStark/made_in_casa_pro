@@ -9,6 +9,9 @@ import ItemManager from "@/components/brands/ItemManager";
 import ChangeManager from "@/components/brands/ChangeManager";
 import BrandManagerHistory from "@/components/brands/BrandManagerHistory";
 import { BusinessUnitBrandSelect } from "@/components/brands/BusinessUnitBrandSelect";
+import ItemInfo from "@/components/managers/ItemInfo";
+import { BriefcaseBusiness } from "lucide-react";
+import { API_FLAG_URL, IMG_FLAG_EXT } from "@/config/constants";
 
 type Props = {
   params: Promise<{ id: string }>;
@@ -72,6 +75,21 @@ export default async function page({ params }: Props) {
               <ItemManager
                 name={name_manager}
                 link={`/managers/${id_manager}`}
+              />
+              <ItemInfo
+                icon={BriefcaseBusiness}
+                href={`/clients/${manager?.client_info?.id}`}
+                label="Cliente"
+                value={
+                  <div className="flex items-center gap-2">
+                    {manager?.client_info?.name || "Sin cliente"}
+                    <img
+                      className="inline-block h-auto w-4"
+                      src={`${API_FLAG_URL}${manager?.client_info?.country?.flag}${IMG_FLAG_EXT}`}
+                      alt={manager?.client_info?.name || "Client image"}
+                    />
+                  </div>
+                }
               />
               <ChangeManager
                 brandId={Number(id)}
