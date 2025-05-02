@@ -95,7 +95,7 @@ export function BrandSelect({
       <span>{option.label}</span>
       {option.managerName && (
         <span className="text-xs text-muted-foreground">
-          Gerente: {option.managerName}
+          {option.managerName}
         </span>
       )}
     </div>

@@ -94,3 +94,46 @@ export async function PATCH(
     );
   }
 }
+
+export async function GET(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  // Validate HTTP method
+  const methodValidation = validateHttpMethod(request, ["GET"]);
+  if (!methodValidation.isValidMethod) {
+    return methodValidation.response;
+  }
+
+  // Validate user role (only admins and commercial roles can view managers)
+  const roleValidation = await validateApiRole(request, [
+    UserRole.ADMIN,
+    UserRole.COMERCIAL,
+    UserRole.DIRECTIVO,
+  ]);
+  if (!roleValidation.isAuthorized) {
+    return roleValidation.response;
+  }
+
+  try {
+    // Await the params object before accessing its properties
+    const { id } = await params;
+
+    // Get manager by ID
+    const manager = await getManagerById(id);
+    if (!manager) {
+      return NextResponse.json(
+        { error: "El gerente no existe" },
+        { status: 404 }
+      );
+    }
+
+    return NextResponse.json(manager);
+  } catch (error) {
+    console.error("Error fetching manager:", error);
+    return NextResponse.json(
+      { error: "Error al obtener el gerente: " + error },
+      { status: 500 }
+    );
+  }
+}

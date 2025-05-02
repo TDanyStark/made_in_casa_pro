@@ -5,4 +5,4 @@ export const IMG_FLAG_EXT = ".png";
 
 export const API_FLAG_CODE = "https://flagpedia.net/";
 
-export const ITEMS_PER_PAGE = 2;
+export const ITEMS_PER_PAGE = 10;

@@ -9,10 +9,10 @@ import ListManagersClient from "../managers/ListManagersClient";
 import ListBrandsClient from "./ListBrandsClient";
 import { useSearchParams, usePathname, useRouter } from "next/navigation";
 
-export function TabsManagersAndBrands({ clientId }: { clientId: number }) {
+export function TabsManagersAndBrands({ clientId}: { clientId: number; }) {
   const [openManagerModal, setOpenManagerModal] = useState(false);
   const [openBrandModal, setOpenBrandModal] = useState(false);
-  
+
   // Obtener los parámetros de la URL y configuración para actualizarla
   const searchParams = useSearchParams();
   const pathname = usePathname();

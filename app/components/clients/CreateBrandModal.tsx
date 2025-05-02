@@ -3,7 +3,7 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 
 import "@/styles/selects.css";
 
@@ -28,9 +28,16 @@ import { Loader2 } from "lucide-react";
 import useItemMutations from "@/hooks/useItemsMutation";
 import { ManagerSelect } from "@/components/managers/ManagerSelect";
 import { BusinessUnitBrandSelect } from "@/components/brands/BusinessUnitBrandSelect";
+import { get } from "@/lib/services/apiService";
+import { ManagerType } from "@/lib/definitions";
+import { toast } from "sonner";
+import { Skeleton } from "../ui/skeleton";
 
 const formSchema = z.object({
-  manager_id: z.coerce.number().int('Se requiere un gerente válido').positive("Se requiere un gerente válido"),
+  manager_id: z.coerce
+    .number()
+    .int("Se requiere un gerente válido")
+    .positive("Se requiere un gerente válido"),
   name: z.string().nonempty("El nombre de la marca es obligatorio"),
   business_unit_id: z.coerce.number().int().positive().optional(),
 });
@@ -44,6 +51,9 @@ interface Props {
 }
 
 export function CreateBrandModal({ clientId, openModal, handleModal }: Props) {
+  const [showBusinessUnit, setShowBusinessUnit] = useState<boolean>(false);
+  const [loadingManagerData, setLoadingManagerData] = useState<boolean>(false);
+
   const form = useForm<BrandFormData>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -51,12 +61,48 @@ export function CreateBrandModal({ clientId, openModal, handleModal }: Props) {
       business_unit_id: undefined,
     },
   });
+  const managerId = form.watch("manager_id");
+
+  useEffect(() => {
+    // hacer peticion fetch a managers/[id] para obtener el cliente
+    const fetchManager = async () => {
+      try {
+        setLoadingManagerData(true);
+        const response = await get<ManagerType>(`/managers/${managerId}`);
+        if (!response.ok) {
+          toast.error(
+            "Error al obtener el gerente. Por favor, inténtalo de nuevo más tarde."
+          );
+          return;
+        }
+        const data = response.data;
+        const accept_business_units = data?.client_info?.accept_business_units;
+        setShowBusinessUnit(accept_business_units || false);
+      } catch (error) {
+        console.error("Error fetching manager data:", error);
+        toast.error("Error al obtener información del gerente");
+      } finally {
+        setLoadingManagerData(false);
+      }
+    };
+
+    if (managerId) {
+      fetchManager();
+    } else {
+      setShowBusinessUnit(false);
+    }
+  }, [managerId]);
 
   // Item mutations for brands
   const { createItem } = useItemMutations<BrandFormData>("brands");
 
   const handleSubmit = form.handleSubmit((data) => {
-    createItem.mutate(data, {
+    // If business_unit is not shown, ensure it's not included in the data
+    const submitData = showBusinessUnit
+      ? data
+      : { ...data, business_unit_id: undefined };
+
+    createItem.mutate(submitData, {
       onSuccess: () => {
         handleModal(false);
       },
@@ -72,16 +118,14 @@ export function CreateBrandModal({ clientId, openModal, handleModal }: Props) {
         name: "",
         business_unit_id: undefined,
       });
+      setShowBusinessUnit(false);
     }
   }, [openModal, form]);
 
   return (
     <>
       <Dialog open={openModal} onOpenChange={handleModal}>
-        <DialogContent 
-          className="sm:max-w-[525px]"
-          tabIndex={undefined}
-          >
+        <DialogContent className="sm:max-w-[525px]" tabIndex={undefined}>
           <DialogHeader>
             <DialogTitle>Crear Marca</DialogTitle>
           </DialogHeader>
@@ -95,7 +139,7 @@ export function CreateBrandModal({ clientId, openModal, handleModal }: Props) {
               }}
               className="space-y-4 mt-4"
             >
-              <ManagerSelect 
+              <ManagerSelect
                 form={form}
                 control={form.control}
                 name="manager_id"
@@ -115,12 +159,21 @@ export function CreateBrandModal({ clientId, openModal, handleModal }: Props) {
                   </FormItem>
                 )}
               />
-              
-              <BusinessUnitBrandSelect
-                form={form}
-                control={form.control}
-                name="business_unit_id"
-              />
+              {
+                loadingManagerData && (
+                  <div className="space-y-2">
+                    <Skeleton className="h-[14px] w-1/2" />
+                    <Skeleton className="h-[38px] w-full" />
+                  </div>
+                )
+              }
+              {showBusinessUnit && !loadingManagerData && (
+                <BusinessUnitBrandSelect
+                  form={form}
+                  control={form.control}
+                  name="business_unit_id"
+                />
+              )}
 
               <DialogFooter>
                 <Button

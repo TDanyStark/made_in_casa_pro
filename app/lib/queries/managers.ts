@@ -26,6 +26,7 @@ export async function getManagerById(id: string) {
           m.*,
           c.id AS client_id, 
           c.name AS client_name,
+          c.accept_business_units,
           co.id AS country_id,
           co.name AS country_name,
           co.flag AS country_flag
@@ -51,6 +52,7 @@ export async function getManagerById(id: string) {
         ? {
             id: row.client_id,
             name: row.client_name,
+            accept_business_units: Boolean(row.accept_business_units),
             country: row.country_id
               ? {
                   id: row.country_id,

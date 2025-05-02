@@ -39,6 +39,7 @@ export async function getBrandById(id: string) {
           m.phone as manager_phone,
           c.id as client_id,
           c.name as client_name,
+          c.accept_business_units,
           co.id as country_id,
           co.name as country_name,
           co.flag as country_flag
@@ -69,6 +70,7 @@ export async function getBrandById(id: string) {
         client_info: {
           id: row.client_id,
           name: row.client_name,
+          accept_business_units: Boolean(row.accept_business_units),
           country: row.country_id
             ? {
                 id: row.country_id,
@@ -101,9 +103,9 @@ export async function createBrand(brandData: Omit<BrandType, "id">) {
   try {
     // No need for transaction since we're only doing a single operation now
     const brandResult = await turso.execute({
-      sql: `INSERT INTO brands (name, manager_id)
-      VALUES (?, ?)`,
-      args: [brandData.name, brandData.manager_id],
+      sql: `INSERT INTO brands (name, manager_id, business_unit_id)
+      VALUES (?, ?, ?)`,
+      args: [brandData.name, brandData.manager_id, brandData.business_unit_id ?? null],
     });
 
     const brandId = Number(brandResult.lastInsertRowid);

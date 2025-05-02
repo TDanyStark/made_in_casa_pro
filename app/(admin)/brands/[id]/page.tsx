@@ -34,8 +34,9 @@ export default async function page({ params }: Props) {
   const name_manager = manager?.name || "Nombre no disponible";
   const id_manager = manager?.id || 0;
   const clientId = manager?.client_id || 0;
+  const accept_business_units =
+    manager?.client_info?.accept_business_units || false;
 
-  // Si la marca existe, mostrar la información con breadcrumbs
   return (
     <section>
       <Breadcrumbs
@@ -77,15 +78,17 @@ export default async function page({ params }: Props) {
                 managerId={id_manager}
                 clientId={clientId || 0}
               />
-              
-              <div className="mt-4 w-[388px] max-w-full">
-                <BusinessUnitBrandSelect 
-                  standalone 
-                  brandId={id}
-                  value={business_unit_id || undefined}
-                  label="Unidad de Negocio"
-                />
-              </div>
+
+              {accept_business_units && (
+                <div className="mt-4 w-[388px] max-w-full">
+                  <BusinessUnitBrandSelect
+                    standalone
+                    brandId={id}
+                    value={business_unit_id || undefined}
+                    label="Unidad de Negocio"
+                  />
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>

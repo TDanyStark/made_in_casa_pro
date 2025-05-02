@@ -8,6 +8,7 @@ import { UserRole } from "@/lib/definitions";
 
 // Schema para validar los datos de una marca
 const brandSchema = z.object({
+  business_unit_id: z.number().int().positive().optional(),
   manager_id: z.number().int().positive(),
   name: z.string().min(1),
 });
