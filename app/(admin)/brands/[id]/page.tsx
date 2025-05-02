@@ -78,8 +78,13 @@ export default async function page({ params }: Props) {
                 clientId={clientId || 0}
               />
               
-              <div className="mt-4 w-full">
-                  
+              <div className="mt-4 w-[388px] max-w-full">
+                <BusinessUnitBrandSelect 
+                  standalone 
+                  brandId={id}
+                  value={business_unit_id || undefined}
+                  label="Unidad de Negocio"
+                />
               </div>
             </div>
           </CardContent>
