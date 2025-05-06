@@ -18,7 +18,7 @@ import { FormDataTest } from "../projects/ClientComponent";
 
 interface BrandOption {
   value: number;
-  label?: string;
+  label: string;
   managerId?: number;
   managerName?: string;
 }
@@ -89,7 +89,7 @@ export function BrandSelect({
   };
 
   const handleBrandCreated = (newBrand: BrandType) => {
-    // Add the new manager to the options
+    // Add the new brand to the options
     const newOption = {
       value: newBrand.id as number,
       label: newBrand.name,

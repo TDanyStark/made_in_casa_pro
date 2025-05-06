@@ -75,7 +75,7 @@ export type BrandType = {
 
 export type BrandsAndManagersType = {
   id: number;
-  brand_name?: string;
+  brand_name: string;
   manager_id: number;
   manager_name?: string;
 };
