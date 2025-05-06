@@ -58,7 +58,6 @@ export function BrandSelect({
   });
 
   const brands = useMemo(() => data?.data || [], [data]);
-  console.log(brands);
 
   const debouncedSearch = debounce((value: string) => {
     setSearchTerm(value);
