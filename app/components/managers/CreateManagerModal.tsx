@@ -37,10 +37,8 @@ const formSchema = z.object({
     .email("Correo electrónico inválido")
     .nonempty("El correo electrónico es obligatorio"),
   phone: z.string().nonempty("El teléfono es obligatorio"),
-  biography: z.string(),
+  biography: z.string().optional(),
 });
-
-export type ManagerFormData = z.infer<typeof formSchema> & { id?: number };
 
 interface Props {
   clientId?: number;
@@ -58,7 +56,7 @@ export function CreateManagerModal({
   onSuccess,
   initialName = "",
 }: Props) {
-  const form = useForm<ManagerFormData>({
+  const form = useForm<ManagerType>({
     resolver: zodResolver(formSchema),
     defaultValues: {
       client_id: clientId || 0,
@@ -176,7 +174,7 @@ export function CreateManagerModal({
                     <FormLabel>Biografía</FormLabel>
                     <FormControl>
                       <RichTextEditor
-                        value={field.value}
+                        value={field.value || ""}
                         onChange={field.onChange}
                         placeholder="Información sobre el gerente..."
                       />

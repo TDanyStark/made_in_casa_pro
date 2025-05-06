@@ -29,7 +29,7 @@ import useItemMutations from "@/hooks/useItemsMutation";
 import { ManagerSelect } from "@/components/managers/ManagerSelect";
 import { BusinessUnitBrandSelect } from "@/components/brands/BusinessUnitBrandSelect";
 import { get } from "@/lib/services/apiService";
-import { ManagerType } from "@/lib/definitions";
+import { BrandType, ManagerType } from "@/lib/definitions";
 import { toast } from "sonner";
 import { Skeleton } from "../ui/skeleton";
 
@@ -42,19 +42,18 @@ const formSchema = z.object({
   business_unit_id: z.coerce.number().int().positive().optional(),
 });
 
-export type BrandFormData = z.infer<typeof formSchema> & { id?: number };
-
 interface Props {
   clientId?: number;
   openModal: boolean;
   handleModal: (state: boolean) => void;
+  onSuccess?: (brand: BrandType) => void;
 }
 
-export function CreateBrandModal({ clientId, openModal, handleModal }: Props) {
+export function CreateBrandModal({ clientId, openModal, handleModal, onSuccess }: Props) {
   const [showBusinessUnit, setShowBusinessUnit] = useState<boolean>(false);
   const [loadingManagerData, setLoadingManagerData] = useState<boolean>(false);
 
-  const form = useForm<BrandFormData>({
+  const form = useForm<BrandType>({
     resolver: zodResolver(formSchema),
     defaultValues: {
       name: "",
@@ -94,7 +93,7 @@ export function CreateBrandModal({ clientId, openModal, handleModal }: Props) {
   }, [managerId]);
 
   // Item mutations for brands
-  const { createItem } = useItemMutations<BrandFormData>("brands");
+  const { createItem } = useItemMutations<BrandType>("brands");
 
   const handleSubmit = form.handleSubmit((data) => {
     // If business_unit is not shown, ensure it's not included in the data
@@ -103,7 +102,10 @@ export function CreateBrandModal({ clientId, openModal, handleModal }: Props) {
       : { ...data, business_unit_id: undefined };
 
     createItem.mutate(submitData, {
-      onSuccess: () => {
+      onSuccess: (data) => {
+        if (onSuccess && data) {
+          onSuccess(data as BrandType);
+        }
         handleModal(false);
       },
       onError: (error) => {

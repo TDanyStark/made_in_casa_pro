@@ -23,13 +23,13 @@ const formSchema = z.object({
   name: z.string(),
 });
 
-type FormData = z.infer<typeof formSchema>;
+export type FormDataTest = z.infer<typeof formSchema>;
 
 export default function BrandSelectDemo() {
   const [selectedBrand, setSelectedBrand] = useState<{ id: number, name: string } | null>(null);
 
   // Inicializar el formulario con react-hook-form
-  const form = useForm<FormData>({
+  const form = useForm<FormDataTest>({
     resolver: zodResolver(formSchema),
     defaultValues: {
       brand_id: undefined,
@@ -38,7 +38,7 @@ export default function BrandSelectDemo() {
   });
 
   // Función que maneja el envío del formulario
-  const onSubmit = (data: FormData) => {
+  const onSubmit = (data: FormDataTest) => {
     console.log('Formulario enviado:', data);
     // Buscar el nombre de la marca seleccionada
     if (data.brand_id) {
@@ -72,6 +72,7 @@ export default function BrandSelectDemo() {
                   <FormLabel>Selecciona una Marca</FormLabel>
                   <FormControl>
                     <BrandSelect
+                      form={form}
                       control={form.control}
                       name="brand_id"
                       label="Marca"

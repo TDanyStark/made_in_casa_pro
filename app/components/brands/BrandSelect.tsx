@@ -10,10 +10,11 @@ import {
   FormLabel, 
   FormMessage 
 } from "@/components/ui/form";
-import { Control } from "react-hook-form";
+import { Control, UseFormReturn } from "react-hook-form";
 import { FormField } from "@/components/ui/form";
 import CreateBrandModal from "../clients/CreateBrandModal";
-import { BrandsAndManagersType } from "@/lib/definitions";
+import { BrandsAndManagersType, BrandType } from "@/lib/definitions";
+import { FormDataTest } from "../projects/ClientComponent";
 
 interface BrandOption {
   value: number;
@@ -29,6 +30,7 @@ interface FormData {
 }
 
 interface BrandSelectProps {
+  form: UseFormReturn<FormDataTest>; 
   control: Control<FormData>;
   name: "name" | "brand_id" | "id";
   label?: string;
@@ -39,6 +41,7 @@ interface BrandSelectProps {
 }
 
 export function BrandSelect({
+  form,
   control,
   name,
   label = "Marca",
@@ -84,6 +87,24 @@ export function BrandSelect({
   const handleCreateBrand = () => {
     setIsCreatingBrand(true);
   };
+
+  const handleBrandCreated = (newBrand: BrandType) => {
+    // Add the new manager to the options
+    const newOption = {
+      value: newBrand.id as number,
+      label: newBrand.name,
+    };
+    setBrandOptions((prevOptions) => [...prevOptions, newOption]);
+
+    // Select the newly created manager and notify parent
+    if (onChange) {
+      onChange(newBrand.id as number);
+    }
+
+    form.setValue(name, newBrand.id as number);
+
+    setIsCreatingBrand(false);
+  }
 
 
   const filterOption = () => true;
@@ -146,6 +167,7 @@ export function BrandSelect({
       <CreateBrandModal
         openModal={isCreatingBrand}
         handleModal={(state) => setIsCreatingBrand(state)}
+        onSuccess={handleBrandCreated}
       />
     </>
   );
