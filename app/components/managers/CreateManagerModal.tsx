@@ -104,6 +104,7 @@ export function CreateManagerModal({
         <DialogContent 
           className="sm:max-w-[525px]" 
           tabIndex={undefined}
+          aria-describedby={undefined}
         >
           <DialogHeader>
             <DialogTitle>Crear Gerente</DialogTitle>

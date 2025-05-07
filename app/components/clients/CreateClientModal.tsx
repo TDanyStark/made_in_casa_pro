@@ -104,6 +104,7 @@ export function CreateClientModal({ modalControl, onSuccess, initialName = "" }:
       <DialogContent 
         className="sm:max-w-[425px]"
         tabIndex={undefined}
+        aria-describedby={undefined}
         >
         <DialogHeader>
           <DialogTitle>Crear Cliente</DialogTitle>

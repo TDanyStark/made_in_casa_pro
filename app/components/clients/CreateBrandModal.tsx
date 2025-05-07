@@ -50,7 +50,13 @@ interface Props {
   onSuccess?: (brand: BrandType) => void;
 }
 
-export function CreateBrandModal({ clientId, openModal, handleModal, onSuccess, initialName = "" }: Props) {
+export function CreateBrandModal({
+  clientId,
+  openModal,
+  handleModal,
+  onSuccess,
+  initialName = "",
+}: Props) {
   const [showBusinessUnit, setShowBusinessUnit] = useState<boolean>(false);
   const [loadingManagerData, setLoadingManagerData] = useState<boolean>(false);
 
@@ -131,7 +137,11 @@ export function CreateBrandModal({ clientId, openModal, handleModal, onSuccess, 
   return (
     <>
       <Dialog open={openModal} onOpenChange={handleModal}>
-        <DialogContent className="sm:max-w-[525px]" tabIndex={undefined}>
+        <DialogContent
+          className="sm:max-w-[525px]"
+          tabIndex={undefined}
+          aria-describedby={undefined}
+        >
           <DialogHeader>
             <DialogTitle>Crear Marca</DialogTitle>
           </DialogHeader>
@@ -165,14 +175,12 @@ export function CreateBrandModal({ clientId, openModal, handleModal, onSuccess, 
                   </FormItem>
                 )}
               />
-              {
-                loadingManagerData && (
-                  <div className="space-y-2">
-                    <Skeleton className="h-[14px] w-1/2" />
-                    <Skeleton className="h-[38px] w-full" />
-                  </div>
-                )
-              }
+              {loadingManagerData && (
+                <div className="space-y-2">
+                  <Skeleton className="h-[14px] w-1/2" />
+                  <Skeleton className="h-[38px] w-full" />
+                </div>
+              )}
               {showBusinessUnit && !loadingManagerData && (
                 <BusinessUnitBrandSelect
                   form={form}
