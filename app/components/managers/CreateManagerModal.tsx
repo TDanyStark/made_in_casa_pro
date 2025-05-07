@@ -68,6 +68,21 @@ export function CreateManagerModal({
   });
   const { createItem } = useItemMutations<ManagerType>("managers");
 
+  useEffect(() => {
+    if (!openModal) {
+      form.reset({
+        client_id: clientId || 0,
+        name: initialName,
+        email: "",
+        phone: "",
+        biography: "",
+      });
+    } 
+    if (initialName) {
+      form.setValue("name", initialName);
+    }
+  }, [openModal, form, clientId, initialName]);
+
   const handleSubmit = form.handleSubmit((data) => {
     console.log(data);
     createItem.mutate(data, {
@@ -82,20 +97,6 @@ export function CreateManagerModal({
       },
     });
   });
-
-  useEffect(() => {
-    if (!openModal) {
-      form.reset({
-        client_id: clientId || 0,
-        name: initialName,
-        email: "",
-        phone: "",
-        biography: "",
-      });
-    } else if (initialName) {
-      form.setValue("name", initialName);
-    }
-  }, [openModal, form, clientId, initialName]);
 
   return (
     <>

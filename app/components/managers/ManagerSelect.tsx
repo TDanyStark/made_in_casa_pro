@@ -13,8 +13,7 @@ import {
 } from "@/components/ui/form";
 import { Control, UseFormReturn } from "react-hook-form";
 import CreateManagerModal from "./CreateManagerModal";
-import { ManagerType } from "@/lib/definitions";
-import { BrandFormData } from "../clients/CreateBrandModal";
+import { BrandType, ManagerType } from "@/lib/definitions";
 
 interface ManagerOption {
   value: number;
@@ -22,8 +21,8 @@ interface ManagerOption {
 }
 
 interface ManagerSelectProps {
-  form: UseFormReturn<BrandFormData>; 
-  control: Control<BrandFormData>;
+  form: UseFormReturn<BrandType>; 
+  control: Control<BrandType>;
   name: "manager_id" | "name";
   label?: string;
   placeholder?: string;
@@ -82,6 +81,10 @@ export function ManagerSelect({
     setNewManagerName(inputValue);
   };
 
+  const handleResetSearch = () => {
+    setSearchTerm("");
+  };
+
   const handleManagerCreated = (newManager: ManagerType) => {
     // Add the new manager to the options
     const newOption = {
@@ -125,6 +128,7 @@ export function ManagerSelect({
                 }}
                 onInputChange={handleInputChange}
                 onCreateOption={handleCreateManager}
+                onBlur={handleResetSearch}
                 formatCreateLabel={(inputValue) =>
                   `Crear gerente "${inputValue}"`
                 }

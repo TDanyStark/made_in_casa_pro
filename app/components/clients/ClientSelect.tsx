@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/form";
 import { Control } from "react-hook-form";
 import { FormField } from "@/components/ui/form";
-import { ManagerFormData } from "@/components/managers/CreateManagerModal";
+import { ManagerType } from "@/lib/definitions";
 
 // Este tipo debe coincidir con la definición en su proyecto
 interface ClientType {
@@ -35,7 +35,7 @@ interface ClientOption {
 }
 
 interface ClientSelectProps {
-  control: Control<ManagerFormData>;
+  control: Control<ManagerType>;
   name: "client_id" | "name" | "email" | "phone" | "biography" | "id";
   label?: string;
   placeholder?: string;
@@ -92,6 +92,10 @@ export function ClientSelect({
   const handleCreateClient = (inputValue: string) => {
     setIsCreatingClient(true);
     setNewClientName(inputValue);
+  };
+
+  const handleResetSearch = () => {
+    setSearchTerm("");
   };
 
   const handleClientCreated = (newClient: ClientType) => {
@@ -157,6 +161,7 @@ export function ClientSelect({
                 }}
                 onInputChange={handleInputChange}
                 onCreateOption={handleCreateClient}
+                onBlur={handleResetSearch}
                 formatCreateLabel={(inputValue) =>
                   `Crear cliente "${inputValue}"`
                 }

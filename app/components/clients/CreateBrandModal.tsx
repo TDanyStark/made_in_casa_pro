@@ -45,18 +45,19 @@ const formSchema = z.object({
 interface Props {
   clientId?: number;
   openModal: boolean;
+  initialName?: string;
   handleModal: (state: boolean) => void;
   onSuccess?: (brand: BrandType) => void;
 }
 
-export function CreateBrandModal({ clientId, openModal, handleModal, onSuccess }: Props) {
+export function CreateBrandModal({ clientId, openModal, handleModal, onSuccess, initialName = "" }: Props) {
   const [showBusinessUnit, setShowBusinessUnit] = useState<boolean>(false);
   const [loadingManagerData, setLoadingManagerData] = useState<boolean>(false);
 
   const form = useForm<BrandType>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      name: "",
+      name: initialName,
       business_unit_id: undefined,
     },
   });
@@ -92,6 +93,19 @@ export function CreateBrandModal({ clientId, openModal, handleModal, onSuccess }
     }
   }, [managerId]);
 
+  useEffect(() => {
+    if (!openModal) {
+      form.reset({
+        name: initialName,
+        business_unit_id: undefined,
+      });
+      setShowBusinessUnit(false);
+    }
+    if (initialName) {
+      form.setValue("name", initialName);
+    }
+  }, [openModal, form, initialName]);
+
   // Item mutations for brands
   const { createItem } = useItemMutations<BrandType>("brands");
 
@@ -113,16 +127,6 @@ export function CreateBrandModal({ clientId, openModal, handleModal, onSuccess }
       },
     });
   });
-
-  useEffect(() => {
-    if (!openModal) {
-      form.reset({
-        name: "",
-        business_unit_id: undefined,
-      });
-      setShowBusinessUnit(false);
-    }
-  }, [openModal, form]);
 
   return (
     <>

@@ -53,7 +53,7 @@ export function BrandSelect({
   const [searchTerm, setSearchTerm] = useState("");
   const [brandOptions, setBrandOptions] = useState<BrandOption[]>([]);
   const [isCreatingBrand, setIsCreatingBrand] = useState(false);
-
+  const [newBrandName, setNewBrandName] = useState<string>("");
 
   const { data, isLoading: isLoadingBrands } = useGetEndpointQuery<BrandsAndManagersType>({
     search: searchTerm,
@@ -72,6 +72,10 @@ export function BrandSelect({
     }
   };
 
+  const handleResetSearch = () => {
+    setSearchTerm("");
+  };
+
   useEffect(() => {
     if (brands) {
       const options = brands.map((brand: BrandsAndManagersType) => ({
@@ -84,8 +88,9 @@ export function BrandSelect({
     }
   }, [brands]);
 
-  const handleCreateBrand = () => {
+  const handleCreateBrand = (inputValue: string) => {
     setIsCreatingBrand(true);
+    setNewBrandName(inputValue);
   };
 
   const handleBrandCreated = (newBrand: BrandType) => {
@@ -105,7 +110,6 @@ export function BrandSelect({
 
     setIsCreatingBrand(false);
   }
-
 
   const filterOption = () => true;
 
@@ -143,6 +147,7 @@ export function BrandSelect({
                   if (onChange) onChange(selectedOption?.value);
                 }}
                 onInputChange={handleInputChange}
+                onBlur={handleResetSearch}
                 onCreateOption={handleCreateBrand}
                 formatCreateLabel={(inputValue) =>
                   `Crear marca "${inputValue}"`
@@ -166,6 +171,7 @@ export function BrandSelect({
 
       <CreateBrandModal
         openModal={isCreatingBrand}
+        initialName={newBrandName}
         handleModal={(state) => setIsCreatingBrand(state)}
         onSuccess={handleBrandCreated}
       />
