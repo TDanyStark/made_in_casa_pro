@@ -1,26 +1,36 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
+import {
+  ColumnDef,
+  flexRender,
+  getCoreRowModel,
+  useReactTable,
+} from "@tanstack/react-table";
 import { UserType } from "@/lib/definitions";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import Link from "next/link";
+import { useQuery } from "@tanstack/react-query";
 
 interface RoleType {
   id: number;
   role: string;
 }
 
-export default function TableUsers() {
-  const { data: users, isLoading: usersLoading, error: usersError } = useQuery({
-    queryKey: ["users"],
-    queryFn: async () => {
-      const response = await fetch("/api/users");
-      if (!response.ok) {
-        throw new Error("Error al cargar usuarios");
-      }
-      return response.json();
-    },
-  });
+interface TableUsersProps {
+  users: UserType[];
+  pageCount?: number;
+}
 
-  const { data: roles, isLoading: rolesLoading } = useQuery({
+const TableUsers = ({ users = [], pageCount = 1 }: TableUsersProps) => {
+  // Consulta para obtener roles
+  const { data: roles } = useQuery({
     queryKey: ["roles"],
     queryFn: async () => {
       const response = await fetch("/api/roles");
@@ -37,53 +47,128 @@ export default function TableUsers() {
     const role = roles.find((r: RoleType) => r.id === roleId);
     return role ? role.role : `Rol ${roleId}`;
   };
+    // Define columns for the users table
+  const columns: ColumnDef<UserType>[] = [
+    {
+      accessorKey: "id",
+      header: "ID",
+      cell: ({ row }) => <div className="text-center">{row.getValue("id")}</div>,
+      size: 40,
+    },    {
+      accessorKey: "name",
+      header: "Nombre",
+      cell: ({ row }) => <div>{row.getValue("name")}</div>,
+      size: 200,
+    },
+    {
+      accessorKey: "email",
+      header: "Correo",
+      cell: ({ row }) => <div>{row.getValue("email")}</div>,
+      size: 200,
+    },
+    {
+      accessorKey: "rol_id",
+      header: "Rol",
+      cell: ({ row }) => {
+        return getRoleName(row.getValue("rol_id"));
+      },
+      size: 150,
+    },
+    {      id: "actions",
+      header: "Acciones",
+      cell: () => {
+        return (
+          <div className="flex space-x-2 justify-end pr-2">
+            <button className="text-indigo-600 hover:text-indigo-900">
+              Editar
+            </button>
+            <button className="text-red-600 hover:text-red-900">
+              Eliminar
+            </button>
+          </div>
+        );
+      },
+      size: 150,
+    },
+  ];
 
-  if (usersLoading || rolesLoading) return <p>Cargando usuarios...</p>;
-  if (usersError) return <p>Error al cargar usuarios: {(usersError as Error).message}</p>;
+  // Initialize the table
+  const table = useReactTable({
+    data: users,
+    columns,
+    getCoreRowModel: getCoreRowModel(),
+    manualPagination: true,
+    pageCount,
+  });
 
   return (
-    <div className="rounded-md border">
-      <table className="min-w-full divide-y divide-gray-200">
-        <thead className="bg-gray-50">
-          <tr>
-            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-              Nombre
-            </th>
-            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-              Email
-            </th>
-            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-              Rol
-            </th>
-            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-              Acciones
-            </th>
-          </tr>
-        </thead>
-        <tbody className="bg-white divide-y divide-gray-200">
-          {users && users.map((user: UserType) => (
-            <tr key={user.id}>
-              <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                {user.name}
-              </td>
-              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                {user.email}
-              </td>
-              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                {getRoleName(user.rol_id)}
-              </td>
-              <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                <button className="text-indigo-600 hover:text-indigo-900 mr-2">
-                  Editar
-                </button>
-                <button className="text-red-600 hover:text-red-900">
-                  Eliminar
-                </button>
-              </td>
-            </tr>
+    <div className="rounded-md border h-[404px]">
+      <Table>
+        <TableHeader>
+          {table.getHeaderGroups().map((headerGroup) => (
+            <TableRow key={headerGroup.id} className="grid-row">
+              {headerGroup.headers.map((header) => (
+                <TableHead
+                  key={header.id}
+                  style={{
+                    maxWidth: header.getSize() + "px",
+                    width: header.getSize() + "px",
+                    minWidth: header.getSize() + "px",
+                  }}
+                >
+                  {header.isPlaceholder
+                    ? null
+                    : flexRender(
+                        header.column.columnDef.header,
+                        header.getContext()
+                      )}
+                </TableHead>
+              ))}
+            </TableRow>
           ))}
-        </tbody>
-      </table>
+        </TableHeader>
+        <TableBody>
+          {table.getRowModel().rows.length > 0 ? (
+            table.getRowModel().rows.map((row) => (
+              <TableRow
+                key={row.id}
+                className="grid-row hover:bg-muted transition-colors"
+              >
+                {row.getVisibleCells().map((cell) => (
+                  <TableCell key={cell.id} className="p-0">
+                    {cell.column.id !== "actions" ? (
+                      <Link 
+                        href={`/users/${row.getValue("id")}`}
+                        className="block w-full h-full cursor-pointer p-2"
+                      >
+                        {flexRender(
+                          cell.column.columnDef.cell,
+                          cell.getContext()
+                        )}
+                      </Link>
+                    ) : (
+                      <div className="p-2">
+                        {flexRender(
+                          cell.column.columnDef.cell,
+                          cell.getContext()
+                        )}
+                      </div>
+                    )}
+                  </TableCell>
+                ))}
+              </TableRow>
+            ))
+          ) : (
+            <TableRow>
+              <TableCell colSpan={columns.length} className="h-24 text-center">
+                No se encontraron resultados
+              </TableCell>
+            </TableRow>
+          )}
+        </TableBody>
+      </Table>
     </div>
   );
-}
+};
+
+export default TableUsers;

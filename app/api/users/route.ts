@@ -1,22 +1,57 @@
-import { NextResponse } from "next/server";
-import { createUser, getUsers } from "@/lib/queries/users";
+import { NextRequest, NextResponse } from "next/server";
+import { createUser, getUsersWithPagination } from "@/lib/queries/users";
 import { hashPassword } from "@/lib/utils";
+import { ITEMS_PER_PAGE } from "@/config/constants";
+import { validateApiRole, validateHttpMethod } from "@/lib/services/api-auth";
+import { UserRole } from "@/lib/definitions";
 
-export async function GET() {
+export async function GET(request: NextRequest) {
+  // Validar método HTTP
+  const methodValidation = validateHttpMethod(request, ['GET']);
+  if (!methodValidation.isValidMethod) {
+    return methodValidation.response;
+  }
+
+  // Validar rol del usuario (permitir a todos los usuarios autenticados ver usuarios)
+  const roleValidation = await validateApiRole(request, [
+    UserRole.ADMIN
+  ]);
+  if (!roleValidation.isAuthorized) {
+    return roleValidation.response;
+  }
+  
   try {
-    const result = await getUsers();
+    const url = new URL(request.url);
+    const page = parseInt(url.searchParams.get("page") || "1");
+    const limit = ITEMS_PER_PAGE;
+    const search = url.searchParams.get("search");
+    
+    // Get paginated results
+    const { users, total } = await getUsersWithPagination({
+      page,
+      limit,
+      search: search || undefined
+    });
     
     // Filtrar la información sensible como contraseñas
-    const users = result.rows.map(user => ({
+    const filteredUsers = users.map(user => ({
       id: user.id,
       name: user.name,
       email: user.email,
       rol_id: user.rol_id
     }));
     
-    return NextResponse.json(users);
+    // Calculate total pages
+    const pageCount = Math.ceil(total / limit);
+    
+    return NextResponse.json({
+      data: filteredUsers,
+      pageCount,
+      currentPage: page,
+      total
+    });
   } catch (error) {
-    console.error('Error en GET /api/users:', error);
+    console.error('Error fetching users:', error);
     return NextResponse.json(
       { error: 'Error al obtener los usuarios' },
       { status: 500 }
@@ -24,7 +59,21 @@ export async function GET() {
   }
 }
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
+  // Validar método HTTP
+  const methodValidation = validateHttpMethod(request, ['POST']);
+  if (!methodValidation.isValidMethod) {
+    return methodValidation.response;
+  }
+
+  // Validar rol del usuario (solo administradores pueden crear usuarios)
+  const roleValidation = await validateApiRole(request, [
+    UserRole.ADMIN
+  ]);
+  if (!roleValidation.isAuthorized) {
+    return roleValidation.response;
+  }
+  
   try {
     const { name, email, password, rol_id } = await request.json();
     
