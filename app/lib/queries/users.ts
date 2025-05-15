@@ -41,11 +41,11 @@ export async function getUserByEmail(email: string): Promise<UserType[]> {
   }
 }
 
-export async function createUser(name: string, email: string, password: string) {
+export async function createUser(name: string, email: string, password: string, rol_id: number) {
   try {
     return await turso.execute({
-      sql: `INSERT INTO users (name, email, password) VALUES (?, ?, ?)`,
-      args: [name, email, password],
+      sql: `INSERT INTO users (name, email, password, rol_id) VALUES (?, ?, ?, ?)`,
+      args: [name, email, password, rol_id],
     });
   } catch (error) {
     console.error('Error al crear el usuario:', error);
