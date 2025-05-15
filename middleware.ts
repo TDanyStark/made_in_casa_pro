@@ -20,14 +20,15 @@ export default async function middleware(req: NextRequest) {
   if (cookie) {
     try {
       session = await decrypt(cookie);
+      console.log("Sesión desencriptada:", session);
     } catch (error) {
       console.error("Error al desencriptar la sesión:", error);
       session = null;
     }
   }
 
-  const userRole: UserRole = Object.values(UserRole).includes(session?.role as UserRole) 
-    ? (session?.role as UserRole) 
+  const userRole: UserRole = Object.values(UserRole).includes(session?.rol_id as UserRole) 
+    ? (session?.rol_id as UserRole) 
     : UserRole.NO_AUTHENTICADO;
 
   // 1. Si es ruta pública y el usuario está autenticado, redirigir a dashboard

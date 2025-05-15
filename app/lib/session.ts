@@ -6,7 +6,15 @@ import { UserRole } from "./definitions";
 const secretKey = process.env.SESSION_SECRET;
 const encodedKey = new TextEncoder().encode(secretKey);
 
-export async function encrypt(payload: JWTPayload | undefined) {
+// Define el tipo para la sesión
+export interface SessionData extends JWTPayload {
+  id: number;
+  email: string;
+  rol_id: UserRole;
+  expiresAt?: Date | string;
+}
+
+export async function encrypt(payload: SessionData | undefined) {
   return new SignJWT(payload)
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
@@ -14,21 +22,22 @@ export async function encrypt(payload: JWTPayload | undefined) {
     .sign(encodedKey);
 }
 
-export async function decrypt(session: string | undefined = "") {
+export async function decrypt(session: string | undefined = ""): Promise<SessionData | null> {
   try {
     const { payload } = await jwtVerify(session, encodedKey, {
       algorithms: ["HS256"],
     });
-    return payload;
+    return payload as SessionData;
   } catch (error) {
     console.log("Failed to verify session", error);
+    return null;
   }
 }
 
-export async function createSession(user: {email: string, id: number, role: number}) {
+export async function createSession(user: {email: string, id: number, rol_id: UserRole}) {
   const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
-  const {id, email, role} = user;
-  const session = await encrypt({ id, email, role, expiresAt });
+  const {id, email, rol_id} = user;
+  const session = await encrypt({ id, email, rol_id, expiresAt });
   const cookieStore = await cookies();
 
   cookieStore.set("session", session, {
@@ -47,18 +56,17 @@ export async function deleteSession() {
 
 export async function getUserRole(): Promise<UserRole> {
   const cookie = (await cookies()).get("session")?.value;
-  let role: UserRole = UserRole.NO_AUTHENTICADO; // Valor por defecto
-
+  let rol_id: UserRole = UserRole.NO_AUTHENTICADO; // Valor por defecto
   if (cookie) {
     try {
       const sessionData = await decrypt(cookie);
-      if (sessionData?.role) {
-        role = sessionData.role as UserRole;
+      if (sessionData?.rol_id) {
+        rol_id = sessionData.rol_id;
       }
     } catch (error) {
       console.error("Error al desencriptar la sesión:", error);
     }
   }
 
-  return role;
+  return rol_id;
 }

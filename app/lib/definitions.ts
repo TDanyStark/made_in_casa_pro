@@ -24,7 +24,7 @@ export type UserType = {
   id: number;
   email: string;
   password?: string;
-  role: UserRole; // 1: comercial, 2: directivo, 3: colaborador, 4: admin
+  rol_id: UserRole; // 1: comercial, 2: directivo, 3: colaborador, 4: admin
 }
 
 export enum UserRole {

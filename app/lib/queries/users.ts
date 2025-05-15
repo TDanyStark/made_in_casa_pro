@@ -1,5 +1,5 @@
 import {turso} from '../db';
-import { UserType } from '../definitions';
+import { UserRole, UserType } from '../definitions';
 
 export async function getUsers() {
   try {
@@ -32,7 +32,7 @@ export async function getUserByEmail(email: string): Promise<UserType[]> {
       id: row.id,
       email: row.email,
       password: row.password,
-      role: row.role,
+      rol_id: row.rol_id as UserRole,
     })) as UserType[];
   } catch (error) {
     console.error(`Error al obtener el usuario con email ${email}:`, error);

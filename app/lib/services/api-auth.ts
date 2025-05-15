@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { UserRole } from "@/lib/definitions";
 import { cookies } from "next/headers";
-import { decrypt } from "../session";
+import { decrypt, SessionData } from "../session";
 
 /**
  * Verifica si el usuario tiene uno de los roles permitidos para acceder a un endpoint API.
@@ -24,8 +24,7 @@ export async function validateApiRole(
       response: NextResponse.json({ error: "No autorizado" }, { status: 401 }),
     };
   }
-
-  let session = null;
+  let session: SessionData | null = null;
   try {
     // Intentar desencriptar la cookie de sesión
     session = await decrypt(cookie);
@@ -41,7 +40,7 @@ export async function validateApiRole(
       response: NextResponse.json({ error: "No autorizado" }, { status: 401 }),
     };
   }
-  const userRoleHeader = session.role;
+  const userRoleHeader = session.rol_id;
   // Si no hay header de rol, el usuario no está autenticado
   if (!userRoleHeader) {
     return {
