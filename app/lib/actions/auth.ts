@@ -50,7 +50,7 @@ export async function login(state: FormState, formData: FormData) {
     };
   }
   // 3. Create a session
-  await createSession({ email: user.email, id: user.id, rol_id: user.rol_id });
+  await createSession({name: user.name, email: user.email, id: user.id, rol_id: user.rol_id });
   // 4. Redirect to the dashboard
   redirect('/dashboard');
 }

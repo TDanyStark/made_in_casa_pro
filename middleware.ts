@@ -20,7 +20,6 @@ export default async function middleware(req: NextRequest) {
   if (cookie) {
     try {
       session = await decrypt(cookie);
-      console.log("Sesión desencriptada:", session);
     } catch (error) {
       console.error("Error al desencriptar la sesión:", error);
       session = null;

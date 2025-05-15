@@ -22,6 +22,7 @@ export type FormState =
 
 export type UserType = {
   id: number;
+  name: string;
   email: string;
   password?: string;
   rol_id: UserRole; // 1: comercial, 2: directivo, 3: colaborador, 4: admin

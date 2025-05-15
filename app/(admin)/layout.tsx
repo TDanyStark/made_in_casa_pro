@@ -9,6 +9,7 @@ export default async function Layout({
   children: React.ReactNode;
 }) {
   const role = await getUserRole();
+  console.log("Role in layout:", role);
 
   return (
       <RoleProvider role={role}>

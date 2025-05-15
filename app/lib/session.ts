@@ -34,10 +34,10 @@ export async function decrypt(session: string | undefined = ""): Promise<Session
   }
 }
 
-export async function createSession(user: {email: string, id: number, rol_id: UserRole}) {
+export async function createSession(user: {name: string, email: string, id: number, rol_id: UserRole}) {
   const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
-  const {id, email, rol_id} = user;
-  const session = await encrypt({ id, email, rol_id, expiresAt });
+  const {name, email, id, rol_id} = user;
+  const session = await encrypt({ name, email, id, rol_id, expiresAt });
   const cookieStore = await cookies();
 
   cookieStore.set("session", session, {

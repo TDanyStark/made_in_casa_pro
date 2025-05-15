@@ -30,6 +30,7 @@ export async function getUserByEmail(email: string): Promise<UserType[]> {
     });
     return result.rows.map(row => ({
       id: row.id,
+      name: row.name,
       email: row.email,
       password: row.password,
       rol_id: row.rol_id as UserRole,
