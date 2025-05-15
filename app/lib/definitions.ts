@@ -28,6 +28,14 @@ export type UserType = {
   rol_id: UserRole; // 1: comercial, 2: directivo, 3: colaborador, 4: admin
 }
 
+export type ColaboradorType = UserType & {
+  rol_id: UserRole.COLABORADOR;
+  area_id: number | null;
+  is_internal: boolean;
+  hourly_rate: number | null;
+}
+
+
 export enum UserRole {
   COMERCIAL = 1,
   DIRECTIVO = 2,

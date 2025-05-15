@@ -12,7 +12,7 @@ export default function Page() {
           { href: "/brands", label: "Marcas" },
         ]}
       />
-      <h1 className="primaryH1">Todos las marcas</h1>
+      <h1 className="primaryH1">Todas las marcas</h1>
       <div className="mt-6">
         <ListBrandsClient />
       </div>
