@@ -28,6 +28,10 @@ CREATE TABLE users (
     area_id INTEGER,              -- Solo aplicable a COLABORADORES
     is_internal BOOLEAN,          -- TRUE: interno, FALSE: externo
     hourly_rate REAL,             -- Solo si is_internal = TRUE
+    must_change_password BOOLEAN DEFAULT FALSE,
+    last_login TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (rol_id) REFERENCES roles(id),
     FOREIGN KEY (area_id) REFERENCES areas(id)
 );

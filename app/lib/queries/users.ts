@@ -126,7 +126,7 @@ export async function getUsersWithPagination({
   rolId
 }: PaginationParams) {
   try {
-    let sql = "SELECT * FROM users";
+    let sql = "SELECT id, name, email, rol_id, area_id, is_internal, hourly_rate, must_change_password, last_login, is_active FROM users";
     const args = [];
     const countArgs = [];
     const conditions: string[] = [];

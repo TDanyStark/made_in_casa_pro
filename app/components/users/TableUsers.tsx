@@ -6,7 +6,7 @@ import {
   getCoreRowModel,
   useReactTable,
 } from "@tanstack/react-table";
-import { UserType } from "@/lib/definitions";
+import { UserRole, UserType } from "@/lib/definitions";
 import {
   Table,
   TableBody,
@@ -20,6 +20,7 @@ import { useQuery } from "@tanstack/react-query";
 import { get } from "@/lib/services/apiService";
 import { Eye, EyeOff } from "lucide-react";
 import { Button } from "../ui/button";
+import { Badge } from "../ui/badge";
 
 interface RoleType {
   id: number;
@@ -40,7 +41,7 @@ const TableUsers = ({ users = [], pageCount = 1 }: TableUsersProps) => {
       if (!response.ok) {
         throw new Error("Error al cargar roles");
       }
-      return response.data as RoleType[]; 
+      return response.data as RoleType[];
     },
   });
 
@@ -50,48 +51,81 @@ const TableUsers = ({ users = [], pageCount = 1 }: TableUsersProps) => {
     const role = roles.find((r: RoleType) => r.id === roleId);
     return role ? role.role : `Rol ${roleId}`;
   };
-    // Define columns for the users table
+  // Función para obtener la clase del badge según el rol
+  const getClassForBadge = (roleId: number): string => {
+    switch (roleId) {
+      case UserRole.COMERCIAL:
+        return "bg-blue-100 text-blue-800 hover:bg-blue-200 border-blue-200";
+      case UserRole.DIRECTIVO:
+        return "bg-purple-100 text-purple-800 hover:bg-purple-200 border-purple-200";
+      case UserRole.COLABORADOR:
+        return "bg-green-100 text-green-800 hover:bg-green-200 border-green-200";
+      case UserRole.ADMIN:
+        return "bg-yellow-100 text-yellow-800 hover:bg-yellow-200 border-yellow-200";
+      case UserRole.NO_AUTHENTICADO:
+      default:
+        return "bg-gray-100 text-gray-800 hover:bg-gray-200 border-gray-200";
+    }
+  };  // Define columns for the users table
   const columns: ColumnDef<UserType>[] = [
     {
       accessorKey: "id",
       header: "ID",
-      cell: ({ row }) => <div className="text-center">{row.getValue("id")}</div>,
+      cell: ({ row }) => (
+        <div className="text-center">{row.getValue("id")}</div>
+      ),
       size: 40,
-    },    {
+    },
+    {
       accessorKey: "name",
       header: "Nombre",
-      cell: ({ row }) => <div>{row.getValue("name")}</div>,
+      cell: ({ row }) => (
+        <div className="text-nowrap">{row.getValue("name")}</div>
+      ),
       size: 200,
     },
     {
       accessorKey: "email",
       header: "Correo",
-      cell: ({ row }) => <div>{row.getValue("email")}</div>,
+      cell: ({ row }) => (
+        <div className="text-nowrap">{row.getValue("email")}</div>
+      ),
       size: 200,
     },
     {
       accessorKey: "rol_id",
-      header: "Rol",
-      cell: ({ row }) => {
-        return getRoleName(row.getValue("rol_id"));
-      },
-      size: 150,
-    },
-    {      id: "actions",
-      header: "Acciones",
-      cell: () => {
+      header: "Rol",      cell: ({ row }) => {
         return (
-          <div className="flex space-x-2 justify-end pr-2">
-            <Button variant="destructive" size="icon">
-              <Eye />
-            </Button>
-            {/* <Button>
-              <EyeOff />
-            </Button> */}
+          <div className="text-nowrap">
+            <Badge className={`${getClassForBadge(row.getValue("rol_id"))} font-medium rounded-md px-2.5 py-0.5 transition-colors`}>
+              {getRoleName(row.getValue("rol_id"))}
+            </Badge>
           </div>
         );
       },
       size: 150,
+    },
+    {
+      id: "is_active",
+      accessorKey: "is_active",
+      header: "Estado",
+      cell: ({row}) => {
+        return (
+          <div className="flex space-x-2 justify-center pr-2">
+            {
+              Boolean(row.getValue("is_active")) === true ? (
+                <Button className="bg-market-pink text-white" size="icon">
+                  <Eye />
+                </Button>
+              ) : (
+                <Button className="bg-muted-foreground" size="icon">
+                  <EyeOff />
+                </Button>
+              )}
+          </div>
+        );
+      },
+      size: 80,
     },
   ];
 
@@ -105,7 +139,7 @@ const TableUsers = ({ users = [], pageCount = 1 }: TableUsersProps) => {
   });
 
   return (
-    <div className="rounded-md border h-[404px]">
+    <div className="rounded-md border h-[572.4px]">
       <Table>
         <TableHeader>
           {table.getHeaderGroups().map((headerGroup) => (
@@ -139,8 +173,8 @@ const TableUsers = ({ users = [], pageCount = 1 }: TableUsersProps) => {
               >
                 {row.getVisibleCells().map((cell) => (
                   <TableCell key={cell.id} className="p-0">
-                    {cell.column.id !== "actions" ? (
-                      <Link 
+                    {cell.column.id !== "is_active" ? (
+                      <Link
                         href={`/users/${row.getValue("id")}`}
                         className="block w-full h-full cursor-pointer p-2"
                       >

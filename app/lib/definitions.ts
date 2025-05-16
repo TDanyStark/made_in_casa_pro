@@ -26,7 +26,9 @@ export type UserType = {
   email: string;
   password?: string;
   rol_id: UserRole; // 1: comercial, 2: directivo, 3: colaborador, 4: admin
-  rol_name?: string;
+  must_change_password?: boolean;
+  last_login?: string;
+  is_active?: boolean;
 }
 
 export type ColaboradorType = UserType & {

@@ -33,19 +33,12 @@ export async function GET(request: NextRequest) {
       search: search || undefined
     });
     
-    // Filtrar la información sensible como contraseñas
-    const filteredUsers = users.map(user => ({
-      id: user.id,
-      name: user.name,
-      email: user.email,
-      rol_id: user.rol_id
-    }));
     
     // Calculate total pages
     const pageCount = Math.ceil(total / limit);
 
     return NextResponse.json({
-      data: filteredUsers,
+      data: users,
       pageCount,
       currentPage: page,
       total

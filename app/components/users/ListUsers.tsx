@@ -13,6 +13,7 @@ import { get } from "@/lib/services/apiService";
 import { ApiResponseWithPagination, UserType } from "@/lib/definitions";
 import { Button } from "../ui/button";
 
+const ENTITY = "users";
 export default function ListUsers() {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const searchParams = useSearchParams();
@@ -23,13 +24,13 @@ export default function ListUsers() {
 
   // Consulta para obtener usuarios con búsqueda y paginación
   const { data, isLoading, isError } = useQuery({
-    queryKey: ["users", { page, search }],
+    queryKey: [ENTITY, { page, search }],
     queryFn: async () => {
       const queryParams = new URLSearchParams();
       if (search) queryParams.set("search", search);
       if (page) queryParams.set("page", page);
 
-      const response = await get<ApiResponseWithPagination<UserType[]>>(`/users?${queryParams.toString()}`);
+      const response = await get<ApiResponseWithPagination<UserType[]>>(`/${ENTITY}?${queryParams.toString()}`);
       if (!response.ok) {
         throw new Error("Error al cargar usuarios");
       }
