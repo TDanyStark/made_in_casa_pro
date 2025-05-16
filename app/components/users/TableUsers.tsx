@@ -16,11 +16,13 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import Link from "next/link";
-import { useQuery } from "@tanstack/react-query";
-import { get } from "@/lib/services/apiService";
-import { Eye, EyeOff } from "lucide-react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { get, patch } from "@/lib/services/apiService";
+import { Eye, EyeOff, Loader2 } from "lucide-react";
 import { Button } from "../ui/button";
 import { Badge } from "../ui/badge";
+import { toast } from "sonner";
+import { useState } from "react";
 
 interface RoleType {
   id: number;
@@ -33,6 +35,11 @@ interface TableUsersProps {
 }
 
 const TableUsers = ({ users = [], pageCount = 1 }: TableUsersProps) => {
+  // Estado para controlar los IDs de usuarios que están siendo actualizados
+  const [loadingUsers, setLoadingUsers] = useState<number[]>([]);
+
+  const queryClient = useQueryClient();
+  
   // Consulta para obtener roles
   const { data: roles } = useQuery({
     queryKey: ["roles"],
@@ -44,6 +51,38 @@ const TableUsers = ({ users = [], pageCount = 1 }: TableUsersProps) => {
       return response.data as RoleType[];
     },
   });
+  const changeIsActive = async (userId: number, isActive: boolean) => {
+    try {
+      // Añadir el ID del usuario al array de usuarios en carga
+      setLoadingUsers((prev) => [...prev, userId]);
+      
+      const response = await patch(`users/${userId}`, {
+        is_active: !isActive,
+      });
+      
+      if (!response.ok) {
+        throw new Error("Error al cambiar el estado del usuario");
+      }
+
+      // invalidar todas las querys que empiecen con users
+      await queryClient.invalidateQueries({ queryKey: ["users"] })
+      
+      toast.success(
+        `El estado del usuario ${userId} ha sido cambiado a ${
+          !isActive ? "activo" : "inactivo"
+        }`,
+        {
+          duration: 3000,
+        }
+      );
+    } catch (error) {
+      toast.error("Error al cambiar el estado del usuario");
+      console.error(error);
+    } finally {
+      // Quitar el ID del usuario del array de usuarios en carga
+      setLoadingUsers((prev) => prev.filter((id) => id !== userId));
+    }
+  };
 
   // Función para obtener el nombre del rol según su id
   const getRoleName = (roleId: number) => {
@@ -66,7 +105,7 @@ const TableUsers = ({ users = [], pageCount = 1 }: TableUsersProps) => {
       default:
         return "bg-gray-100 text-gray-800 hover:bg-gray-200 border-gray-200";
     }
-  };  // Define columns for the users table
+  }; // Define columns for the users table
   const columns: ColumnDef<UserType>[] = [
     {
       accessorKey: "id",
@@ -94,10 +133,15 @@ const TableUsers = ({ users = [], pageCount = 1 }: TableUsersProps) => {
     },
     {
       accessorKey: "rol_id",
-      header: "Rol",      cell: ({ row }) => {
+      header: "Rol",
+      cell: ({ row }) => {
         return (
           <div className="text-nowrap">
-            <Badge className={`${getClassForBadge(row.getValue("rol_id"))} font-medium rounded-md px-2.5 py-0.5 transition-colors`}>
+            <Badge
+              className={`${getClassForBadge(
+                row.getValue("rol_id")
+              )} font-medium rounded-md px-2.5 py-0.5 transition-colors`}
+            >
               {getRoleName(row.getValue("rol_id"))}
             </Badge>
           </div>
@@ -105,23 +149,35 @@ const TableUsers = ({ users = [], pageCount = 1 }: TableUsersProps) => {
       },
       size: 150,
     },
-    {
-      id: "is_active",
+    {      id: "is_active",
       accessorKey: "is_active",
       header: "Estado",
-      cell: ({row}) => {
+      cell: ({ row }) => {
+        const userId = row.getValue("id") as number;
+        const isLoading = loadingUsers.includes(userId);
+        const isActive = Boolean(row.getValue("is_active"));
+        
         return (
           <div className="flex space-x-2 justify-center pr-2">
-            {
-              Boolean(row.getValue("is_active")) === true ? (
-                <Button className="bg-market-pink text-white hover:bg-market-pink/80" size="icon">
-                  <Eye />
-                </Button>
-              ) : (
-                <Button className="bg-muted-foreground" size="icon">
-                  <EyeOff />
-                </Button>
-              )}
+            {isActive === true ? (
+              <Button
+                className="bg-market-pink text-white hover:bg-market-pink/80"
+                size="icon"
+                onClick={() => changeIsActive(userId, true)}
+                disabled={isLoading}
+              >
+                {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Eye />}
+              </Button>
+            ) : (
+              <Button
+                className="bg-muted-foreground"
+                size="icon"
+                onClick={() => changeIsActive(userId, false)}
+                disabled={isLoading}
+              >
+                {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <EyeOff />}
+              </Button>
+            )}
           </div>
         );
       },

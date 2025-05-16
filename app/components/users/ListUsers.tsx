@@ -30,7 +30,7 @@ export default function ListUsers() {
       if (search) queryParams.set("search", search);
       if (page) queryParams.set("page", page);
 
-      const response = await get<ApiResponseWithPagination<UserType[]>>(`/${ENTITY}?${queryParams.toString()}`);
+      const response = await get<ApiResponseWithPagination<UserType[]>>(`${ENTITY}?${queryParams.toString()}`);
       if (!response.ok) {
         throw new Error("Error al cargar usuarios");
       }
