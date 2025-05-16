@@ -1,15 +1,10 @@
+import { ApiResponse } from "../definitions";
+
 // Servicio centralizado para manejar todas las llamadas a la API
 type RequestOptions = {
   method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
   body?: Record<string, unknown>;
   headers?: Record<string, string>;
-};
-
-type ApiResponse<T> ={
-  data?: T;
-  error?: string;
-  status: number;
-  ok: boolean;
 };
 
 /**

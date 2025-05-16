@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import CreatableSelect from "react-select/creatable";
 import { debounce } from "lodash";
-import { useGetEndpointQuery } from "@/hooks/useGetEndpointQuery";
+import { useGetEndpointQueryClient } from "@/hooks/useGetEndpointQueryClient";
 import { 
   FormControl, 
   FormItem, 
@@ -55,7 +55,7 @@ export function BrandSelect({
   const [isCreatingBrand, setIsCreatingBrand] = useState(false);
   const [newBrandName, setNewBrandName] = useState<string>("");
 
-  const { data, isLoading: isLoadingBrands } = useGetEndpointQuery<BrandsAndManagersType>({
+  const { data, isLoading: isLoadingBrands } = useGetEndpointQueryClient<BrandsAndManagersType>({
     search: searchTerm,
     endpoint: "brands",
   });

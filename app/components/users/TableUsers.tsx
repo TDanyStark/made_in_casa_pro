@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/table";
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
+import { get } from "@/lib/services/apiService";
 
 interface RoleType {
   id: number;
@@ -24,7 +25,7 @@ interface RoleType {
 }
 
 interface TableUsersProps {
-  users: UserType[];
+  users: UserType[] | never[];
   pageCount?: number;
 }
 
@@ -33,11 +34,11 @@ const TableUsers = ({ users = [], pageCount = 1 }: TableUsersProps) => {
   const { data: roles } = useQuery({
     queryKey: ["roles"],
     queryFn: async () => {
-      const response = await fetch("/api/roles");
+      const response = await get("/roles");
       if (!response.ok) {
         throw new Error("Error al cargar roles");
       }
-      return response.json() as Promise<RoleType[]>;
+      return response.data as RoleType[]; 
     },
   });
 

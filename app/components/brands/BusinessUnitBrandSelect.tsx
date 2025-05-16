@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import CreatableSelect from "react-select/creatable";
 import { debounce } from "lodash";
-import { useGetEndpointQuery } from "@/hooks/useGetEndpointQuery";
+import { useGetEndpointQueryClient } from "@/hooks/useGetEndpointQueryClient";
 import {
   FormControl,
   FormItem,
@@ -74,7 +74,7 @@ export function BusinessUnitBrandSelect(props: BusinessUnitBrandSelectProps) {
   const [selectedValue, setSelectedValue] = useState<number | undefined>(props.standalone && props.value ? props.value : undefined);
   const queryClient = useQueryClient();
 
-  const { data, isLoading } = useGetEndpointQuery<BusinessUnitType>({
+  const { data, isLoading } = useGetEndpointQueryClient<BusinessUnitType>({
     search: searchTerm,
     endpoint: "business_units",
   });

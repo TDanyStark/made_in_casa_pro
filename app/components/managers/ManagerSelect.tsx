@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import CreatableSelect from "react-select/creatable";
 import { debounce } from "lodash";
-import { useGetEndpointQuery } from "@/hooks/useGetEndpointQuery";
+import { useGetEndpointQueryClient } from "@/hooks/useGetEndpointQueryClient";
 import { 
   FormControl, 
   FormItem, 
@@ -48,7 +48,7 @@ export function ManagerSelect({
   const [isCreatingManager, setIsCreatingManager] = useState(false);
   const [newManagerName, setNewManagerName] = useState("");
 
-  const { data, isLoading: isLoadingManagers } = useGetEndpointQuery<ManagerType>({
+  const { data, isLoading: isLoadingManagers } = useGetEndpointQueryClient<ManagerType>({
     clientId: clientId?.toString(),
     search: searchTerm,
     endpoint: "managers",

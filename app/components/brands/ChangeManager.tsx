@@ -21,7 +21,7 @@ import { Loader2 } from "lucide-react";
 import CreatableSelect from "react-select/creatable";
 import CreateManagerModal from "@/components/managers/CreateManagerModal";
 import { ManagerType } from "@/lib/definitions";
-import { useGetEndpointQuery } from "@/hooks/useGetEndpointQuery";
+import { useGetEndpointQueryClient } from "@/hooks/useGetEndpointQueryClient";
 import { patch } from "@/lib/services/apiService";
 import { useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
@@ -60,7 +60,7 @@ export function ChangeManager({ brandId, managerId, clientId, onSuccess }: Props
 
 
   // Query para gerentes usando React Query
-  const { data, isLoading: isLoadingManagers } = useGetEndpointQuery<ManagerType>({
+  const { data, isLoading: isLoadingManagers } = useGetEndpointQueryClient<ManagerType>({
     clientId: String(clientId),
     search: searchTerm,
     endpoint: "managers",

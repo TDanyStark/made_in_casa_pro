@@ -26,6 +26,7 @@ export type UserType = {
   email: string;
   password?: string;
   rol_id: UserRole; // 1: comercial, 2: directivo, 3: colaborador, 4: admin
+  rol_name?: string;
 }
 
 export type ColaboradorType = UserType & {
@@ -99,4 +100,19 @@ export type ManagersParams ={
 export interface BusinessUnitType {
   id: number;
   name: string;
+}
+
+// response API using apiService.ts
+export type ApiResponse<T> ={
+  data?: T;
+  error?: string;
+  status: number;
+  ok: boolean;
+};
+
+export type ApiResponseWithPagination<T> = {
+  data: T;
+  pageCount: number;
+  currentPage: number;
+  total: number;
 }

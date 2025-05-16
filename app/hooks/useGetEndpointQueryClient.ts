@@ -46,7 +46,7 @@ const getEndpoint = async <T>({ clientId, page = "1", search, endpoint }: Params
   }
 };
 
-export const useGetEndpointQuery = <T>(params: ParamsUrl) => {
+export const useGetEndpointQueryClient = <T>(params: ParamsUrl) => {
   const { endpoint } = params;
   
   return useQuery({

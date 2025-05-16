@@ -9,6 +9,8 @@ import SearchBar from "@/components/search/search";
 import { useQuery } from "@tanstack/react-query";
 import CreateUserModal from "./CreateUserModal";
 import TableUsers from "./TableUsers";
+import { get } from "@/lib/services/apiService";
+import { ApiResponseWithPagination, UserType } from "@/lib/definitions";
 
 export default function ListUsers() {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -25,13 +27,12 @@ export default function ListUsers() {
       const queryParams = new URLSearchParams();
       if (search) queryParams.set("search", search);
       if (page) queryParams.set("page", page);
-      
-      const response = await fetch(`/api/users?${queryParams.toString()}`);
+
+      const response = await get<ApiResponseWithPagination<UserType[]>>(`/users?${queryParams.toString()}`);
       if (!response.ok) {
         throw new Error("Error al cargar usuarios");
       }
-      const data = await response.json();
-      return data;
+      return response.data; // Asegúrate de que el tipo sea correcto
     },
   });
 

@@ -4,7 +4,7 @@
 import { useEffect, useMemo, useState } from "react";
 import CreatableSelect from "react-select/creatable";
 import { debounce } from "lodash";
-import { useGetEndpointQuery } from "@/hooks/useGetEndpointQuery";
+import { useGetEndpointQueryClient } from "@/hooks/useGetEndpointQueryClient";
 import { API_FLAG_URL, IMG_FLAG_EXT } from "@/config/constants";
 import CreateClientModal from "./CreateClientModal";
 import { 
@@ -58,7 +58,7 @@ export function ClientSelect({
   const [isCreatingClient, setIsCreatingClient] = useState(false);
   const [newClientName, setNewClientName] = useState("");
 
-  const { data, isLoading: isLoadingClients } = useGetEndpointQuery<ClientType>({
+  const { data, isLoading: isLoadingClients } = useGetEndpointQueryClient<ClientType>({
     search: searchTerm,
     endpoint: "clients",
   });

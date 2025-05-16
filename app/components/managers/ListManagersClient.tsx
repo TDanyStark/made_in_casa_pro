@@ -1,6 +1,6 @@
 "use client";
 
-import { useGetEndpointQuery } from "@/hooks/useGetEndpointQuery";
+import { useGetEndpointQueryClient } from "@/hooks/useGetEndpointQueryClient";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import Pagination from "@/components/pagination/Pagination";
@@ -25,7 +25,7 @@ export default function ListManagersClient({
   const page = searchParams.get("page") || "1";
 
   // Utilizar React Query para obtener los managers
-  const { data, isLoading, isError } = useGetEndpointQuery<ManagerType>({
+  const { data, isLoading, isError } = useGetEndpointQueryClient<ManagerType>({
     clientId,
     page,
     search,
