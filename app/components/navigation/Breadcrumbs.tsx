@@ -11,6 +11,25 @@ interface BreadcrumbItem {
   label: string;
 }
 
+interface BreadcrumbsProps {
+  /** Elemento a mostrar como ícono de inicio (home). Por defecto es el ícono Home. */
+  homeElement?: React.ReactNode;
+  /** Elemento separador entre las migas de pan. Por defecto es el ícono ChevronRight. */
+  separator?: React.ReactNode;
+  /** Clases CSS para el contenedor principal de navegación. */
+  containerClasses?: string;
+  /** Clases CSS para la lista de migas de pan. */
+  listClasses?: string;
+  /** Clases CSS para el elemento activo (actual) en la navegación. */
+  activeItemClasses?: string;
+  /** Clases CSS para los elementos inactivos de la navegación. */
+  inactiveItemClasses?: string;
+  /** Etiquetas personalizadas para rutas específicas. Clave es la ruta (ej. "/brands"), valor es la etiqueta. */
+  customLabels?: Record<string, string>;
+  /** Migas de pan definidas manualmente. Si se proporcionan, se usan en lugar de generar automáticamente desde la URL. */
+  manualBreadcrumbs?: BreadcrumbItem[];
+}
+
 /**
  * Componente de navegación Breadcrumbs que muestra la ruta de navegación actual.
  * 
@@ -55,25 +74,6 @@ interface BreadcrumbItem {
  *   separator={<ChevronDoubleRight size={12} />}
  * />
  */
-interface BreadcrumbsProps {
-  /** Elemento a mostrar como ícono de inicio (home). Por defecto es el ícono Home. */
-  homeElement?: React.ReactNode;
-  /** Elemento separador entre las migas de pan. Por defecto es el ícono ChevronRight. */
-  separator?: React.ReactNode;
-  /** Clases CSS para el contenedor principal de navegación. */
-  containerClasses?: string;
-  /** Clases CSS para la lista de migas de pan. */
-  listClasses?: string;
-  /** Clases CSS para el elemento activo (actual) en la navegación. */
-  activeItemClasses?: string;
-  /** Clases CSS para los elementos inactivos de la navegación. */
-  inactiveItemClasses?: string;
-  /** Etiquetas personalizadas para rutas específicas. Clave es la ruta (ej. "/brands"), valor es la etiqueta. */
-  customLabels?: Record<string, string>;
-  /** Migas de pan definidas manualmente. Si se proporcionan, se usan en lugar de generar automáticamente desde la URL. */
-  manualBreadcrumbs?: BreadcrumbItem[];
-}
-
 export function Breadcrumbs({
   homeElement = <Home size={16} />,
   separator = <ChevronRight size={16} />,
