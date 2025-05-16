@@ -11,6 +11,7 @@ import CreateUserModal from "./CreateUserModal";
 import TableUsers from "./TableUsers";
 import { get } from "@/lib/services/apiService";
 import { ApiResponseWithPagination, UserType } from "@/lib/definitions";
+import { Button } from "../ui/button";
 
 export default function ListUsers() {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -84,12 +85,11 @@ export default function ListUsers() {
   return (
     <div className="space-y-4">
       <div className="flex justify-end">
-        <button
+        <Button
           onClick={() => setIsCreateModalOpen(true)}
-          className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600"
         >
           Crear usuario
-        </button>
+        </Button>
       </div>
 
       {isError ? (

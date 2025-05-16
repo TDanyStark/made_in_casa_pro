@@ -43,7 +43,7 @@ export async function GET(request: NextRequest) {
     
     // Calculate total pages
     const pageCount = Math.ceil(total / limit);
-    
+
     return NextResponse.json({
       data: filteredUsers,
       pageCount,
