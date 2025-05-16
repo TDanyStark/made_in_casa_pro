@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createUser, getUsersWithPagination } from "@/lib/queries/users";
-import { hashPassword } from "@/lib/utils";
+import bcrypt from "bcrypt";
 import { ITEMS_PER_PAGE } from "@/config/constants";
 import { validateApiRole, validateHttpMethod } from "@/lib/services/api-auth";
 import { UserRole } from "@/lib/definitions";
@@ -69,8 +69,7 @@ export async function POST(request: NextRequest) {
   
   try {
     const { name, email, password, rol_id } = await request.json();
-    
-    // Validaciones
+      // Validaciones
     if (!name || !email || !password || !rol_id) {
       return NextResponse.json(
         { message: 'Todos los campos son obligatorios' },
@@ -79,7 +78,7 @@ export async function POST(request: NextRequest) {
     }
     
     // Hash de la contraseña antes de guardar
-    const hashedPassword = await hashPassword(password);
+    const hashedPassword = await bcrypt.hash(password, 10);
     
     // Crear usuario
     const result = await createUser(name, email, hashedPassword, rol_id);

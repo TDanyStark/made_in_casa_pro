@@ -182,3 +182,82 @@ export async function getUsersWithPagination({
   }
 }
 
+export async function updateUser(userId: string, data: {
+  name?: string;
+  email?: string;
+  password?: string;
+  is_active?: boolean;
+  rol_id?: number;
+  must_change_password?: boolean;
+}) {
+  try {
+    // Construir la consulta SQL dinámicamente basada en los campos proporcionados
+    const updateFields: string[] = [];
+    const args: (string | number | boolean)[] = [];
+
+    if (data.name !== undefined) {
+      updateFields.push('name = ?');
+      args.push(data.name);
+    }
+    
+    if (data.email !== undefined) {
+      updateFields.push('email = ?');
+      args.push(data.email);
+    }
+    
+    if (data.password !== undefined) {
+      updateFields.push('password = ?');
+      args.push(data.password);
+    }
+    
+    if (data.is_active !== undefined) {
+      updateFields.push('is_active = ?');
+      args.push(data.is_active);
+    }
+    
+    if (data.rol_id !== undefined) {
+      updateFields.push('rol_id = ?');
+      args.push(data.rol_id);
+    }
+    
+    if (data.must_change_password !== undefined) {
+      updateFields.push('must_change_password = ?');
+      args.push(data.must_change_password);
+    }
+    
+    // Si no hay campos para actualizar, retornar
+    if (updateFields.length === 0) {
+      throw new Error('No se proporcionaron campos para actualizar');
+    }
+    
+    // Añadir el ID al final de los argumentos
+    args.push(userId);
+    
+    const query = `
+      UPDATE users 
+      SET ${updateFields.join(', ')} 
+      WHERE id = ?
+    `;
+    
+    await turso.execute({
+      sql: query,
+      args,
+    });
+    
+    // Obtener el usuario actualizado
+    const result = await turso.execute({
+      sql: `SELECT id, name, email, rol_id, must_change_password, last_login, is_active FROM users WHERE id = ?`,
+      args: [userId],
+    });
+    
+    if (result.rows.length === 0) {
+      throw new Error('No se encontró el usuario después de la actualización');
+    }
+    
+    return result.rows[0];
+  } catch (error) {
+    console.error(`Error al actualizar el usuario con ID ${userId}:`, error);
+    throw new Error('No se pudo actualizar el usuario');
+  }
+}
+

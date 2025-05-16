@@ -114,7 +114,7 @@ const TableUsers = ({ users = [], pageCount = 1 }: TableUsersProps) => {
           <div className="flex space-x-2 justify-center pr-2">
             {
               Boolean(row.getValue("is_active")) === true ? (
-                <Button className="bg-market-pink text-white" size="icon">
+                <Button className="bg-market-pink text-white hover:bg-market-pink/80" size="icon">
                   <Eye />
                 </Button>
               ) : (
