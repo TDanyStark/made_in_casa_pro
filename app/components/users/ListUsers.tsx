@@ -11,7 +11,7 @@ import CreateUserModal from "./CreateUserModal";
 import TableUsers from "./TableUsers";
 import { get } from "@/lib/services/apiService";
 import { ApiResponseWithPagination, UserType } from "@/lib/definitions";
-import { Button } from "../ui/button";
+import { ButtonWithShortcut } from "../ui/button-with-shortcut";
 
 const ENTITY = "users";
 export default function ListUsers() {
@@ -30,7 +30,9 @@ export default function ListUsers() {
       if (search) queryParams.set("search", search);
       if (page) queryParams.set("page", page);
 
-      const response = await get<ApiResponseWithPagination<UserType[]>>(`${ENTITY}?${queryParams.toString()}`);
+      const response = await get<ApiResponseWithPagination<UserType[]>>(
+        `${ENTITY}?${queryParams.toString()}`
+      );
       if (!response.ok) {
         throw new Error("Error al cargar usuarios");
       }
@@ -86,13 +88,18 @@ export default function ListUsers() {
   return (
     <div className="space-y-4">
       <div className="flex justify-end">
-        <Button
+        <ButtonWithShortcut
           onClick={() => setIsCreateModalOpen(true)}
+          shortcut={{
+            shortcutKey: "n",
+            altKey: true,
+            tooltipText: "Crear nuevo usuario",
+            tooltipSide: "left",
+          }}
         >
           Crear usuario
-        </Button>
+        </ButtonWithShortcut>
       </div>
-
       {isError ? (
         <div className="text-center py-4 text-red-500">
           Error al cargar los usuarios
@@ -124,7 +131,6 @@ export default function ListUsers() {
           </CardContent>
         </Card>
       )}
-
       <CreateUserModal
         isOpen={isCreateModalOpen}
         setIsOpen={setIsCreateModalOpen}

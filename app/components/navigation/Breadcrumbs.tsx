@@ -11,14 +11,66 @@ interface BreadcrumbItem {
   label: string;
 }
 
+/**
+ * Componente de navegación Breadcrumbs que muestra la ruta de navegación actual.
+ * 
+ * @component
+ * @example
+ * // Uso básico (generación automática de migas de pan desde la URL)
+ * <Breadcrumbs />
+ * 
+ * @example
+ * // Personalización de clases y estilos
+ * <Breadcrumbs 
+ *   containerClasses="flex py-5 bg-gray-100"
+ *   activeItemClasses="text-blue-600 font-bold"
+ *   inactiveItemClasses="text-gray-500 hover:text-blue-500"
+ * />
+ * 
+ * @example
+ * // Usando etiquetas personalizadas para rutas específicas
+ * <Breadcrumbs 
+ *   customLabels={{
+ *     "/brands": "Marcas", 
+ *     "/clients": "Clientes",
+ *     "/clients/[id]": "Detalles del Cliente"
+ *   }}
+ * />
+ * 
+ * @example
+ * // Usando migas de pan manuales en lugar de generación automática
+ * <Breadcrumbs 
+ *   manualBreadcrumbs={[
+ *     { href: "/dashboard", label: "Panel" },
+ *     { href: "/dashboard/reports", label: "Reportes" },
+ *     { href: "/dashboard/reports/annual", label: "Reporte Anual" }
+ *   ]}
+ * />
+ * 
+ * @example
+ * // Cambiando el ícono de inicio y el separador
+ * import { ChevronDoubleRight, House } from 'lucide-react';
+ * <Breadcrumbs 
+ *   homeElement={<House size={18} />}
+ *   separator={<ChevronDoubleRight size={12} />}
+ * />
+ */
 interface BreadcrumbsProps {
+  /** Elemento a mostrar como ícono de inicio (home). Por defecto es el ícono Home. */
   homeElement?: React.ReactNode;
+  /** Elemento separador entre las migas de pan. Por defecto es el ícono ChevronRight. */
   separator?: React.ReactNode;
+  /** Clases CSS para el contenedor principal de navegación. */
   containerClasses?: string;
+  /** Clases CSS para la lista de migas de pan. */
   listClasses?: string;
+  /** Clases CSS para el elemento activo (actual) en la navegación. */
   activeItemClasses?: string;
+  /** Clases CSS para los elementos inactivos de la navegación. */
   inactiveItemClasses?: string;
+  /** Etiquetas personalizadas para rutas específicas. Clave es la ruta (ej. "/brands"), valor es la etiqueta. */
   customLabels?: Record<string, string>;
+  /** Migas de pan definidas manualmente. Si se proporcionan, se usan en lugar de generar automáticamente desde la URL. */
   manualBreadcrumbs?: BreadcrumbItem[];
 }
 
