@@ -1,13 +1,32 @@
 "use client";
 
-import { useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useForm } from "react-hook-form";
+import { z } from "zod";
+import { useEffect } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { toast } from "sonner"
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue
+} from "@/components/ui/select";
+import { toast } from "sonner";
+import { Loader2 } from "lucide-react";
+import { get } from "@/lib/services/apiService";
+import useItemMutations from "@/hooks/useItemsMutation";
 
 interface CreateUserModalProps {
   isOpen: boolean;
@@ -19,74 +38,67 @@ interface RoleType {
   role: string;
 }
 
-export default function CreateUserModal({ isOpen, setIsOpen }: CreateUserModalProps) {
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [role, setRole] = useState<string>("");
+// Define el esquema de validación con Zod
+const formSchema = z.object({
+  name: z.string().nonempty("El nombre es obligatorio"),
+  email: z.string()
+    .email("Ingrese un email válido")
+    .nonempty("El email es obligatorio"),
+  password: z.string()
+    .min(6, "La contraseña debe tener al menos 6 caracteres")
+    .nonempty("La contraseña es obligatoria"),
+  rol_id: z.coerce
+    .number()
+    .int("Se requiere un rol válido")
+    .positive("Se requiere un rol válido"),
+});
 
-  const queryClient = useQueryClient();
+// Tipo de datos para el formulario
+type UserFormData = z.infer<typeof formSchema>;
+
+export default function CreateUserModal({ isOpen, setIsOpen }: CreateUserModalProps) {
+  // Inicializar el formulario con React Hook Form y Zod
+  const form = useForm<UserFormData>({
+    resolver: zodResolver(formSchema),
+    defaultValues: {
+      name: "",
+      email: "",
+      password: "",
+      rol_id: undefined,
+    },
+  });
+
   // Consulta para obtener roles
   const { data: roles, isLoading: rolesLoading } = useQuery({
     queryKey: ["roles"],
     queryFn: async () => {
-      const response = await fetch("/api/roles");
+      const response = await get<RoleType[]>("roles");
       if (!response.ok) {
         throw new Error("Error al cargar roles");
       }
-      return response.json() as Promise<RoleType[]>;
+      return response.data;
     },
   });
 
-  const createUserMutation = useMutation({
-    mutationFn: async (userData: { name: string; email: string; password: string; rol_id: number }) => {
-      const response = await fetch("/api/users", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(userData),
+  // Hook para mutaciones de usuario
+  const { createItem } = useItemMutations<UserFormData>("users", setIsOpen);
+  
+  // Resetear el formulario cuando se cierra el modal
+  useEffect(() => {
+    if (!isOpen) {
+      form.reset({
+        name: "",
+        email: "",
+        password: "",
+        rol_id: undefined,
       });
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || "Error al crear el usuario");
-      }
-
-      return response.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["users"] });
-      toast.success("El usuario ha sido creado exitosamente");
-      resetForm();
-      setIsOpen(false);
-    },
-    onError: (error) => {
-      toast.error(error.message);
-    },
-  });
-
-  const resetForm = () => {
-    setName("");
-    setEmail("");
-    setPassword("");
-    setRole("");
-  };
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!name || !email || !password || !role) {
-      toast.error("Por favor completa todos los campos");
-      return;
     }
-
-    createUserMutation.mutate({
-      name,
-      email,
-      password,
-      rol_id: parseInt(role),
-    });
-  };
+  }, [isOpen, form]);
+  
+  // Manejar el envío del formulario
+  const handleSubmit = form.handleSubmit((data) => {
+    createItem.mutate(data);
+  });
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
@@ -97,68 +109,90 @@ export default function CreateUserModal({ isOpen, setIsOpen }: CreateUserModalPr
             Ingresa los datos del nuevo usuario
           </DialogDescription>
         </DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-4 pt-4">
-          <div className="grid w-full items-center gap-1.5">
-            <Label htmlFor="name">Nombre</Label>
-            <Input
-              id="name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="Nombre completo"
+        <Form {...form}>
+          <form onSubmit={handleSubmit} className="space-y-4 pt-4">
+            <FormField
+              control={form.control}
+              name="name"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Nombre</FormLabel>
+                  <FormControl>
+                    <Input placeholder="Nombre completo" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
             />
-          </div>
-          
-          <div className="grid w-full items-center gap-1.5">
-            <Label htmlFor="email">Email</Label>
-            <Input
-              id="email"
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="correo@ejemplo.com"
+            
+            <FormField
+              control={form.control}
+              name="email"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Email</FormLabel>
+                  <FormControl>
+                    <Input type="email" placeholder="correo@ejemplo.com" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
             />
-          </div>
-          
-          <div className="grid w-full items-center gap-1.5">
-            <Label htmlFor="password">Contraseña</Label>
-            <Input
-              id="password"
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="********"
+            
+            <FormField
+              control={form.control}
+              name="password"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Contraseña</FormLabel>
+                  <FormControl>
+                    <Input type="password" placeholder="********" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
             />
-          </div>
-          
-          <div className="grid w-full items-center gap-1.5">
-            <Label htmlFor="role">Rol</Label>
-            <Select value={role} onValueChange={setRole}>
-              <SelectTrigger>
-                <SelectValue placeholder="Selecciona un rol" />
-              </SelectTrigger>
-              <SelectContent>
-                {rolesLoading ? (
-                  <SelectItem value="loading">Cargando roles...</SelectItem>
-                ) : (
-                  roles?.map((role) => (
-                    <SelectItem key={role.id} value={role.id.toString()}>
-                      {role.role}
-                    </SelectItem>
-                  ))
-                )}
-              </SelectContent>
-            </Select>
-          </div>
-          
-          <div className="flex justify-end gap-2 pt-4">
-            <Button type="button" variant="outline" onClick={() => setIsOpen(false)}>
-              Cancelar
-            </Button>
-            <Button type="submit" disabled={createUserMutation.isPending}>
-              {createUserMutation.isPending ? "Creando..." : "Crear usuario"}
-            </Button>
-          </div>
-        </form>
+            
+            <FormField
+              control={form.control}
+              name="rol_id"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Rol</FormLabel>
+                  <Select onValueChange={field.onChange} value={field.value?.toString()}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecciona un rol" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {rolesLoading ? (
+                        <SelectItem value="loading">Cargando roles...</SelectItem>
+                      ) : (
+                        roles?.map((role) => (
+                          <SelectItem key={role.id} value={role.id.toString()}>
+                            {role.role}
+                          </SelectItem>
+                        ))
+                      )}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            
+            <DialogFooter className="pt-4">
+              <Button type="button" variant="outline" onClick={() => setIsOpen(false)}>
+                Cancelar
+              </Button>
+              <Button type="submit" disabled={createItem.isPending} className="flex gap-2">
+                {createItem.isPending && <Loader2 className="animate-spin" />}
+                Crear usuario
+              </Button>
+            </DialogFooter>
+          </form>
+        </Form>
       </DialogContent>
     </Dialog>
   );

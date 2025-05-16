@@ -18,6 +18,8 @@ import {
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import { get } from "@/lib/services/apiService";
+import { Eye, EyeOff } from "lucide-react";
+import { Button } from "../ui/button";
 
 interface RoleType {
   id: number;
@@ -80,12 +82,12 @@ const TableUsers = ({ users = [], pageCount = 1 }: TableUsersProps) => {
       cell: () => {
         return (
           <div className="flex space-x-2 justify-end pr-2">
-            <button className="text-indigo-600 hover:text-indigo-900">
-              Editar
-            </button>
-            <button className="text-red-600 hover:text-red-900">
-              Eliminar
-            </button>
+            <Button variant="destructive" size="icon">
+              <Eye />
+            </Button>
+            {/* <Button>
+              <EyeOff />
+            </Button> */}
           </div>
         );
       },
