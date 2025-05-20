@@ -165,6 +165,7 @@ export default function CreateUserModal({
   // Manejar el envío del formulario
   const handleSubmit = form.handleSubmit((data) => {
     // Guardar las credenciales temporalmente
+    console.log(data);
     const userCredentials = {
       email: data.email,
       password: data.password

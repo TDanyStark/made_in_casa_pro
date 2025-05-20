@@ -29,15 +29,32 @@ export type UserType = {
   must_change_password?: boolean;
   last_login?: string;
   is_active?: boolean;
+  created_at?: string;
 }
 
 export type ColaboradorType = UserType & {
   rol_id: UserRole.COLABORADOR;
   area_id: number | null;
+  skills?: string[];
   is_internal: boolean;
-  hourly_rate: number | null;
 }
 
+// 👇 Interno: con salario mensual
+export type InternalColaboradorType = ColaboradorType & {
+  is_internal: true;
+  monthly_salary: number;
+  currency: string; // Ej: 'COP'
+}
+
+// 👇 Externo: con tarifa por palabra
+export type ExternalContentColaboradorType = ColaboradorType & {
+  is_internal: false;
+  rate_per_word: number;
+  currency: string; // Ej: 'COP'
+}
+
+// Útil si quieres tratar ambos con una sola variable pero diferenciarlos luego
+export type AnyColaboradorType = Partial<InternalColaboradorType> | Partial<ExternalContentColaboradorType>;
 
 export enum UserRole {
   COMERCIAL = 1,
