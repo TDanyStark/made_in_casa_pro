@@ -3,7 +3,7 @@
 import { useFormStatus } from "react-dom";
 import { Icons } from "../icons";
 
-export function SubmitButton() {
+export function SubmitButtonSignOut() {
   const { pending } = useFormStatus();
 
   return (

@@ -2,12 +2,9 @@ import Link from "next/link";
 import NavLinks from "@/components/dashboard/nav-links";
 import MICLogo from "../icons/MICLogo";
 import { logout } from "@/lib/actions/auth";
-import { useFormStatus } from "react-dom";
-import { SubmitButton } from "./SubmitButton";
+import { SubmitButtonSignOut } from "./SubmitButtonSignOut";
 
 export default function SideNav() {
-  const { pending } = useFormStatus();
-  console.log("pending", pending);
   return (
     <aside className="flex h-full flex-col px-3 py-4 md:px-2 bg-primary-foreground">
       <Link
@@ -20,7 +17,7 @@ export default function SideNav() {
         <NavLinks />
         <div className="hidden h-auto w-full grow rounded-md bg-light-bg-2 dark:bg-dark-bg-2 md:block"></div>
         <form action={logout}>
-          <SubmitButton />
+          <SubmitButtonSignOut />
         </form>
       </div>
     </aside>
