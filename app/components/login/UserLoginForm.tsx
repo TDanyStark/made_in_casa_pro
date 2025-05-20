@@ -8,7 +8,7 @@ import { Icons } from "@/components/icons";
 import { login } from "@/lib/actions/auth";
 
 export function UserLoginForm() {
-  const [state, action, pending] = useActionState(login, undefined);
+  const [state, action, pending] = useActionState(login, {errors: {}});
   return (
     <div className="grid gap-6">
       <form action={action}>
