@@ -66,10 +66,19 @@ export async function getUsers(params?: GetUsersParams) {
 
 export async function getUserById(userId: number) {
   try {
-    return await turso.execute({
+    const result = await turso.execute({
       sql: `SELECT * FROM users WHERE id = ?`,
       args: [userId],
     });
+    const row = result.rows[0];
+    return {
+      id: row.id,
+      name: row.name,
+      email: row.email,
+      password: row.password,
+      rol_id: row.rol_id as UserRole,
+      is_active: Boolean(row.is_active),
+    } as UserType;
   } catch (error) {
     console.error(`Error al obtener el usuario con ID ${userId}:`, error);
     throw new Error('No se pudo obtener el usuario');
