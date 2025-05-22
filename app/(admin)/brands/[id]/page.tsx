@@ -5,12 +5,11 @@ import { Button } from "@/components/ui/button";
 import { Breadcrumbs } from "@/components/navigation/Breadcrumbs";
 import EditableText from "@/components/input/EditableText";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import ItemManager from "@/components/brands/ItemManager";
 import ChangeManager from "@/components/brands/ChangeManager";
 import BrandManagerHistory from "@/components/brands/BrandManagerHistory";
 import { BusinessUnitBrandSelect } from "@/components/brands/BusinessUnitBrandSelect";
 import ItemInfo from "@/components/managers/ItemInfo";
-import { BriefcaseBusiness } from "lucide-react";
+import { BriefcaseBusiness, User } from "lucide-react";
 import { API_FLAG_URL, IMG_FLAG_EXT } from "@/config/constants";
 
 type Props = {
@@ -72,9 +71,15 @@ export default async function page({ params }: Props) {
               />
             </div>
             <div className="flex flex-col gap-4">
-              <ItemManager
-                name={name_manager}
-                link={`/managers/${id_manager}`}
+              <ItemInfo
+                icon={User}
+                href={`/managers/${id_manager}`}
+                label="Gerente"
+                value={
+                  <div>
+                    {name_manager}
+                  </div>
+                }
               />
               <ItemInfo
                 icon={BriefcaseBusiness}

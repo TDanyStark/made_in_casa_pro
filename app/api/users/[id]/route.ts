@@ -61,14 +61,8 @@ export async function PATCH(
 
     // Comprobar si el usuario existe
     const userResult = await getUserById(Number(id));
-    if (!userResult.rows || userResult.rows.length === 0) {
-      return NextResponse.json(
-        { error: "El usuario no existe" },
-        { status: 404 }
-      );
-    }
-
-    const existingUser = userResult.rows[0];
+    
+    const existingUser = userResult;
 
     // Si se está actualizando el email, verificar que no esté en uso por otro usuario
     if (email && email !== existingUser.email) {
@@ -143,15 +137,9 @@ export async function GET(
 
     // Obtener usuario por ID
     const userResult = await getUserById(Number(id));
-    if (!userResult.rows || userResult.rows.length === 0) {
-      return NextResponse.json(
-        { error: "El usuario no existe" },
-        { status: 404 }
-      );
-    }
 
     // Eliminar el campo de contraseña antes de devolver el usuario
-    const user = userResult.rows[0];
+    const user = userResult;
     delete user.password;
 
     return NextResponse.json(user);

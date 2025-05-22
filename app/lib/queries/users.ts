@@ -71,6 +71,9 @@ export async function getUserById(userId: number) {
       args: [userId],
     });
     const row = result.rows[0];
+    if (!row) {
+      throw new Error('Usuario no encontrado');
+    }
     return {
       id: row.id,
       name: row.name,
