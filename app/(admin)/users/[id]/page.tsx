@@ -84,6 +84,7 @@ export default async function UserPage({ params }: Props) {
           </CardContent>
         </Card>
       </div>
+
     </section>
   );
 }

@@ -36,7 +36,7 @@ export default async function middleware(req: NextRequest) {
   // 2. Si el usuario no está autenticado y la ruta no es pública
   if (!session?.id && !isPublicRoute) {    // Para rutas API, devolver 401 Unauthorized en lugar de redirigir
     if (isApiRoute) {
-      // return NextResponse.next({ headers });
+      // return NextResponse.next();
       return NextResponse.json({ error: "No autorizado" }, { status: 401 });
     }
     return NextResponse.redirect(new URL("/", req.nextUrl));
