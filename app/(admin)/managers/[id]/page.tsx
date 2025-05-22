@@ -1,6 +1,6 @@
 /* eslint-disable @next/next/no-img-element */
 import ItemBrands from "@/components/managers/ItemBrands";
-import ItemInfoEdit from "@/components/managers/ItemInfoEdit";
+import ItemInfoEdit from "@/components/items/ItemInfoEdit";
 import EditableText from "@/components/input/EditableText";
 import BiographyEditor from "@/components/managers/BiographyEditor";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";

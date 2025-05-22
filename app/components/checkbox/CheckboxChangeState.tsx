@@ -1,9 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { Checkbox } from "@/components/ui/checkbox";
 import { patch } from "@/lib/services/apiService";
 import { toast } from "sonner";
+import { Switch } from "../ui/switch";
 
 interface CheckboxChangeStateProps {
   label: string;
@@ -64,8 +64,7 @@ const CheckboxChangeState = ({
 
   return (
     <div className={`flex items-center space-x-2 mt-4 ${className}`}>
-      <Checkbox 
-        className="w-6 h-6" 
+      <Switch 
         id={id} 
         checked={isChecked}
         onCheckedChange={handleCheckedChange}
@@ -73,7 +72,7 @@ const CheckboxChangeState = ({
       />
       <label
         htmlFor={id}
-        className={`leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer select-none ${disabled || isSubmitting ? 'text-muted-foreground opacity-70' : 'text-muted-foreground'}`}
+        className={`leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer select-none ${disabled || isSubmitting ? 'text-muted-foreground opacity-50' : 'text-muted-foreground'}`}
       >
         {label}
       </label>

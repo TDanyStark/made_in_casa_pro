@@ -1,6 +1,6 @@
 /* eslint-disable @next/next/no-img-element */
 import EditableText from "@/components/input/EditableText";
-import ItemInfoEdit from "@/components/managers/ItemInfoEdit";
+import ItemInfoEdit from "@/components/items/ItemInfoEdit";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { UserType } from "@/lib/definitions";
@@ -52,6 +52,14 @@ export default async function UserPage({ params }: Props) {
           endpointIdParam="id"
         />
       </h1>
+      <CheckboxChangeState
+        label="Usuario activo"
+        id="user-active"
+        initialChecked={is_active}
+        endpoint={`users/${id}`}
+        fieldName="is_active"
+        className="mt-2"
+      />
       <div className="mt-6">
         <Card className="w-fit p-4 shadow-md rounded-lg">
           <CardHeader className="flex flex-col gap-2">
@@ -71,14 +79,6 @@ export default async function UserPage({ params }: Props) {
                 endpoint={`users/${id}`}
                 label="Correo electrónico"
                 value={email}
-              />
-              <CheckboxChangeState
-                label="Usuario activo"
-                id="user-active"
-                initialChecked={is_active}
-                endpoint={`users/${id}`}
-                fieldName="is_active"
-                className="mt-2"
               />
             </div>
           </CardContent>
