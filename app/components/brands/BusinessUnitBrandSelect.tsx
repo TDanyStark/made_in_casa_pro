@@ -27,7 +27,7 @@ interface BusinessUnitOption {
 interface FormBusinessUnitBrandSelectProps {
   form: UseFormReturn<BrandFormData>; 
   control: Control<BrandFormData>;
-  name: "business_unit_id" | "name" | "id";
+  name: "business_unit_id" | "name" | "manager_id";
   label?: string;
   placeholder?: string;
   required?: boolean;

@@ -26,7 +26,7 @@ const AutoResizeInput =({
   useEffect(() => {
     if (spanRef.current) {
       const spanWidth = spanRef.current.offsetWidth;
-      setInitialWidth(spanWidth); // establece el ancho inicial en 500px como mínimo
+      setInitialWidth(spanWidth); // establece el ancho inicial en el ancho del texto como mínimo
     }
   }, []);
 
@@ -54,7 +54,7 @@ const AutoResizeInput =({
         onKeyDown={onKeyDown}
         autoFocus={autoFocus}
         disabled={disabled}
-        className={`w-full p-0 border-0 focus:border-gray-600 focus:ring-0 outline-none text-gray-900 dark:text-white bg-transparent absolute top-0 left-0 ${className}`}
+        className={`w-full p-0 border-0 focus:border-gray-600 focus:ring-0 outline-none text-gray-900 dark:text-white bg-transparent absolute inset-0 ${className}`}
       />
 
       {/* Span oculto para medir el texto */}

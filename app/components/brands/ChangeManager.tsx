@@ -158,8 +158,8 @@ export function ChangeManager({ brandId, managerId, clientId, onSuccess }: Props
 
   return (
     <>
-      <div className="mt-4">
-        <h3 className="text-lg font-medium mb-2">Cambiar Gerente</h3>
+      <div className="mt-2">
+        <h3 className="text-sm font-medium mb-2">Cambiar Gerente</h3>
         <Form {...form}>
           <form
             id="change-manager"

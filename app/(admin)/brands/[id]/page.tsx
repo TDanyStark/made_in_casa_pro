@@ -103,7 +103,7 @@ export default async function page({ params }: Props) {
               />
 
               {accept_business_units && (
-                <div className="mt-4 w-[388px] max-w-full">
+                <div className="mt-2 w-[388px] max-w-full">
                   <BusinessUnitBrandSelect
                     standalone
                     brandId={id}

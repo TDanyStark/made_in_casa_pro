@@ -8,6 +8,7 @@ import { getUserById } from "@/lib/queries/users";
 import Link from "next/link";
 import { Breadcrumbs } from "@/components/navigation/Breadcrumbs";
 import CheckboxChangeState from "@/components/checkbox/CheckboxChangeState";
+import SiigoCustomersList from "@/components/siigo/SiigoCustomersList";
 
 type Props = {
   params: Promise<{ id: string }>;
@@ -48,7 +49,7 @@ export default async function UserPage({ params }: Props) {
           value={name}
           endpoint={`users/${id}`}
           fieldName="name"
-          as="span"
+          as="h1"
           endpointIdParam="id"
         />
       </h1>
@@ -85,6 +86,11 @@ export default async function UserPage({ params }: Props) {
         </Card>
       </div>
 
+          <div className="mt-8">
+            <div className="rounded-lg border p-6">
+              <SiigoCustomersList />
+            </div>
+          </div>
     </section>
   );
 }

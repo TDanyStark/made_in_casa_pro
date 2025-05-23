@@ -42,6 +42,8 @@ const formSchema = z.object({
   business_unit_id: z.coerce.number().int().positive().optional(),
 });
 
+export type BrandFormData = z.infer<typeof formSchema>;
+
 interface Props {
   clientId?: number;
   openModal: boolean;
