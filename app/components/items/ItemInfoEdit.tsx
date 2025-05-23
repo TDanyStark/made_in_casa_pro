@@ -115,7 +115,7 @@ const ItemInfoEdit = ({
         </div>
         <div className="w-full">
           <p className="text-sm text-gray-500 dark:text-gray-400">{label}</p>
-          <div className="font-medium ">
+          <div className="font-medium">
             {isEditing ? (
               <div className="flex gap-2">
                 <AutoResizeInput

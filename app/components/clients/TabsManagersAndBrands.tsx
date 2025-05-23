@@ -8,6 +8,7 @@ import { useState } from "react";
 import ListManagersClient from "../managers/ListManagersClient";
 import ListBrandsClient from "./ListBrandsClient";
 import { useSearchParams, usePathname, useRouter } from "next/navigation";
+import SiigoCustomersList from "../siigo/SiigoCustomersList";
 
 export function TabsManagersAndBrands({ clientId}: { clientId: number; }) {
   const [openManagerModal, setOpenManagerModal] = useState(false);
@@ -52,6 +53,12 @@ export function TabsManagersAndBrands({ clientId}: { clientId: number; }) {
         >
           Marcas
         </TabsTrigger>
+        <TabsTrigger 
+          value="SiigoClientes"
+          className="select-none data-[state=active]:bg-primary/10 dark:data-[state=active]:bg-primary/20"
+        >
+          Clientes Siigo
+        </TabsTrigger>
       </TabsList>
       <TabsContent value="managers" className="p-4">
         <Button variant="default" onClick={() => handleManagerModal(true)}>
@@ -74,6 +81,17 @@ export function TabsManagersAndBrands({ clientId}: { clientId: number; }) {
           handleModal={handleBrandModal}
         />
         <ListBrandsClient clientId={clientId.toString()} />
+      </TabsContent>
+      <TabsContent value="SiigoClientes" className="p-4">
+        <Button variant="default" onClick={() => handleBrandModal(true)}>
+          Crear marca
+        </Button>
+        <CreateBrandModal
+          clientId={clientId}
+          openModal={openBrandModal}
+          handleModal={handleBrandModal}
+        />
+        <SiigoCustomersList />
       </TabsContent>
     </Tabs>
   );

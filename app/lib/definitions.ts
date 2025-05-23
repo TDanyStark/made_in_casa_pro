@@ -34,23 +34,23 @@ export type UserType = {
 
 export type ColaboradorType = UserType & {
   rol_id: UserRole.COLABORADOR;
-  area_id: number | null;
+  area_id?: number | null;
   skills?: string[];
-  is_internal: boolean;
+  is_internal?: boolean;
 }
 
 // 👇 Interno: con salario mensual
 export type InternalColaboradorType = ColaboradorType & {
   is_internal: true;
-  monthly_salary: number;
-  currency: string; // Ej: 'COP'
+  monthly_salary?: number;
+  currency?: string; // Ej: 'COP'
 }
 
 // 👇 Externo: con tarifa por palabra
 export type ExternalContentColaboradorType = ColaboradorType & {
   is_internal: false;
-  rate_per_word: number;
-  currency: string; // Ej: 'COP'
+  rate_per_word?: number;
+  currency?: string; // Ej: 'COP'
 }
 
 // Útil si quieres tratar ambos con una sola variable pero diferenciarlos luego

@@ -81,6 +81,9 @@ export async function getUserById(userId: number) {
       password: row.password,
       rol_id: row.rol_id as UserRole,
       is_active: Boolean(row.is_active),
+      must_change_password: Boolean(row.must_change_password),
+      last_login: row.last_login,
+      created_at: row.created_at,
     } as UserType;
   } catch (error) {
     console.error(`Error al obtener el usuario con ID ${userId}:`, error);

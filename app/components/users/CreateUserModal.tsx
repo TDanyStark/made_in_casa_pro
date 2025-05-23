@@ -23,15 +23,7 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog"
+import UserCredentialsDialog from "./UserCredentialsDialog";
 
 import {
   Select,
@@ -40,10 +32,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Loader2, Copy } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { get } from "@/lib/services/apiService";
 import useItemMutations from "@/hooks/useItemsMutation";
-import { toast } from "sonner";
 
 interface CreateUserModalProps {
   isOpen: boolean;
@@ -86,31 +77,12 @@ export default function CreateUserModal({
     email: string;
     password: string;
   } | null>(null);
-
   // Función para generar contraseña
   const generatePassword = (name: string) => {
     if (!name) return "";
     const cleanName = name.split(" ")[0].toLowerCase();
     const randomNum = Math.floor(1000 + Math.random() * 9000); // número de 4 dígitos
     return `${cleanName}${randomNum}`;
-  };  // Función para copiar credenciales
-  const copyCredentials = (e: React.MouseEvent) => {
-    // Prevenir el comportamiento por defecto de AlertDialogAction (cerrar el modal)
-    e.preventDefault();
-    e.stopPropagation();
-    
-    if (createdUserData) {
-      const textToCopy = `Email: ${createdUserData.email}\nContraseña: ${createdUserData.password}`;
-      navigator.clipboard.writeText(textToCopy)
-        .then(() => {
-          // Usar la librería sonner para mostrar una notificación
-          toast.success("Credenciales copiadas al portapapeles");
-        })
-        .catch(err => {
-          console.error('Error al copiar credenciales:', err);
-          toast.error("Error al copiar credenciales");
-        });
-    }
   };
 
   // Inicializar el formulario con React Hook Form y Zod
@@ -311,44 +283,13 @@ export default function CreateUserModal({
           </Form>
         </DialogContent>
       </Dialog>{" "}      {/* Alerta con credenciales del usuario */}
-      <AlertDialog 
-        open={showAlert} 
-        onOpenChange={setShowAlert}
-      >
-        <AlertDialogContent className="max-w-md">
-          <AlertDialogHeader>
-            <AlertDialogTitle>Usuario creado con éxito</AlertDialogTitle>
-            <AlertDialogDescription>
-              Guarda estas credenciales:
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-
-          <div className="bg-slate-100 dark:bg-slate-900 p-4 rounded-md mt-2 space-y-2">
-            <div className="flex flex-col">
-              <span className="text-sm font-medium">Email:</span>
-              <span className="text-base">{createdUserData?.email}</span>
-            </div>
-            <div className="flex flex-col">
-              <span className="text-sm font-medium">Contraseña:</span>
-              <span className="text-base">{createdUserData?.password}</span>
-            </div>
-          </div>          <AlertDialogFooter className="mt-4">
-            {/* Usar div en lugar de AlertDialogAction para evitar el cierre automático */}
-            <div>
-              <Button
-                className="flex gap-2 items-center"
-                onClick={copyCredentials}
-              >
-                <Copy size={16} />
-                Copiar credenciales
-              </Button>
-            </div>
-            <AlertDialogAction asChild>
-              <Button onClick={handleAlertClose}>Cerrar</Button>
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <UserCredentialsDialog
+        isOpen={showAlert}
+        setIsOpen={setShowAlert}
+        userData={createdUserData}
+        title="Usuario creado con éxito"
+        onClose={handleAlertClose}
+      />
     </>
   );
 }

@@ -3,12 +3,14 @@ import EditableText from "@/components/input/EditableText";
 import ItemInfoEdit from "@/components/items/ItemInfoEdit";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { UserType } from "@/lib/definitions";
+import { ColaboradorType, UserRole } from "@/lib/definitions";
 import { getUserById } from "@/lib/queries/users";
 import Link from "next/link";
 import { Breadcrumbs } from "@/components/navigation/Breadcrumbs";
 import CheckboxChangeState from "@/components/checkbox/CheckboxChangeState";
-import SiigoCustomersList from "@/components/siigo/SiigoCustomersList";
+import { formatDate } from "@/lib/utils";
+import DetailsCollaborator from "@/components/users/DetailsCollaborator";
+import ChangePassword from "@/components/users/ChangePassword";
 
 type Props = {
   params: Promise<{ id: string }>;
@@ -31,8 +33,18 @@ export default async function UserPage({ params }: Props) {
     );
   }
 
-  const user = userResult as UserType;
-  const { name, email, is_active = false } = user;
+  const user = userResult as ColaboradorType;
+  const { name, email, is_active = false, rol_id, created_at, last_login} = user;
+
+  console.log("UserPage", {
+    user,
+    name,
+    email,
+    is_active,
+    rol_id,
+    created_at,
+    last_login
+  });
 
   return (
     <section>
@@ -80,17 +92,34 @@ export default async function UserPage({ params }: Props) {
                 endpoint={`users/${id}`}
                 label="Correo electrónico"
                 value={email}
-              />
+              />              {/* mostrar la fecha de creacion */}
+              <div>
+                <p className="text-sm text-gray-500 dark:text-gray-400">Fecha de creación</p>
+                <p className="font-medium">{formatDate(created_at)}</p>
+              </div>
+              {/* Mostrar fecha del último inicio de sesión */}
+              <div>
+                <p className="text-sm text-gray-500 dark:text-gray-400">Último inicio de sesión</p>
+                <p className="font-medium">{formatDate(last_login)}</p>
+              </div>
+              
+              {/* Componente para cambiar la contraseña */}
+              <div className="mt-2">
+                <ChangePassword userId={id} />
+              </div>
             </div>
+
           </CardContent>
         </Card>
       </div>
 
-      <div className="mt-8">
-        <div className="rounded-lg border p-6">
-          <SiigoCustomersList />
-        </div>
-      </div>
+      {
+        rol_id === UserRole.COLABORADOR && (
+          <div className="mt-6">
+            <DetailsCollaborator />
+          </div>
+        )
+      }
     </section>
   );
 }
