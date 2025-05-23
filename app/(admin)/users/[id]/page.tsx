@@ -86,11 +86,11 @@ export default async function UserPage({ params }: Props) {
         </Card>
       </div>
 
-          <div className="mt-8">
-            <div className="rounded-lg border p-6">
-              <SiigoCustomersList />
-            </div>
-          </div>
+      <div className="mt-8">
+        <div className="rounded-lg border p-6">
+          <SiigoCustomersList />
+        </div>
+      </div>
     </section>
   );
 }
