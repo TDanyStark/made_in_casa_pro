@@ -16,6 +16,7 @@ const userUpdateSchema = z.object({
   is_internal: z.boolean().optional(),
   area_id: z.number().int().positive().optional(),
   must_change_password: z.boolean().optional(),
+  monthly_salary: z.number().optional(),
 });
 
 export async function PATCH(
@@ -49,7 +50,7 @@ export async function PATCH(
       );
     }
 
-    const { email, name, password, is_active, rol_id, is_internal, area_id, must_change_password } =
+    const { email, name, password, is_active, rol_id, is_internal, area_id, must_change_password, monthly_salary } =
       validationResult.data;
 
     // Comprobar si el usuario existe
@@ -80,7 +81,8 @@ export async function PATCH(
       rol_id === undefined &&
       is_internal === undefined &&
       area_id === undefined &&
-      must_change_password === undefined
+      must_change_password === undefined &&
+      monthly_salary === undefined
     ) {
       return NextResponse.json(existingUser);
     }
@@ -96,6 +98,7 @@ export async function PATCH(
     if (area_id) updateData.area_id = area_id;
     if (must_change_password !== undefined)
       updateData.must_change_password = must_change_password;
+    if (monthly_salary !== undefined) updateData.monthly_salary = monthly_salary;
 
     // Actualizar usuario
     const updatedUser = await updateUser(id, updateData);

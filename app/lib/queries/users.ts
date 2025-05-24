@@ -83,6 +83,7 @@ export async function getUserById(userId: number) {
       area_id: row.area_id,
       is_internal: Boolean(row.is_internal),
       is_active: Boolean(row.is_active),
+      monthly_salary: row.monthly_salary,
       must_change_password: Boolean(row.must_change_password),
       last_login: row.last_login,
       created_at: row.created_at,
@@ -208,6 +209,7 @@ export async function updateUser(userId: string, data: {
   must_change_password?: boolean;
   is_internal?: boolean;
   area_id?: number;
+  monthly_salary?: number;
 }) {
   try {
     // Construir la consulta SQL dinámicamente basada en los campos proporcionados
@@ -253,6 +255,11 @@ export async function updateUser(userId: string, data: {
       updateFields.push('must_change_password = ?');
       args.push(data.must_change_password);
     }
+    if (data.monthly_salary !== undefined) {
+      updateFields.push('monthly_salary = ?');
+      args.push(data.monthly_salary);
+    }
+    
     
     // Si no hay campos para actualizar, retornar
     if (updateFields.length === 0) {
