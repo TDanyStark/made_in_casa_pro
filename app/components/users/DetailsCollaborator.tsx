@@ -15,23 +15,40 @@ interface DetailsCollaboratorProps {
   monthly_salary?: number;
 }
 
-const DetailsCollaborator = ({  user_id,
+const DetailsCollaborator = ({
+  user_id,
   is_internal,
   area_id,
   monthly_salary = 0,
 }: DetailsCollaboratorProps) => {
   const [isInternal, setIsInternal] = useState<boolean>(is_internal);
   const [salary, setSalary] = useState<number | undefined>(monthly_salary);
+  const [displaySalary, setDisplaySalary] = useState<string>(
+    monthly_salary ? monthly_salary.toLocaleString("es-CO") : ""
+  );
+
   const [isSaving, setIsSaving] = useState<boolean>(false);
 
-  console.log({
-    salary,
-    monthly_salary,
-  });
+  const formatNumberWithCommas = (value: string): string => {
+    // Elimina todos los caracteres no numéricos
+    const numericValue = value.replace(/[^0-9]/g, "");
 
+    if (!numericValue) return "";
+
+    // Convierte a número y formatea con separadores de miles
+    const number = Number(numericValue);
+    return isNaN(number) ? "" : number.toLocaleString("es-CO");
+  };
 
   const handleSalaryChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setSalary(e.target.value ? Number(e.target.value) : undefined);
+    const inputValue = e.target.value;
+    const cleanValue = inputValue.replace(/[^0-9]/g, "");
+
+    // Actualiza el valor numérico para guardar
+    setSalary(cleanValue ? Number(cleanValue) : undefined);
+
+    // Actualiza el valor formateado para mostrar
+    setDisplaySalary(formatNumberWithCommas(cleanValue));
   };
 
   const handleSalaryBlur = async () => {
@@ -50,9 +67,14 @@ const DetailsCollaborator = ({  user_id,
       toast.success("Salario actualizado correctamente");
     } catch (error) {
       toast.error(
-        error instanceof Error ? error.message : "Error al actualizar el salario"
+        error instanceof Error
+          ? error.message
+          : "Error al actualizar el salario"
       );
       setSalary(monthly_salary);
+      setDisplaySalary(
+        monthly_salary ? monthly_salary.toLocaleString("es-CO") : ""
+      );
     } finally {
       setIsSaving(false);
     }
@@ -67,31 +89,37 @@ const DetailsCollaborator = ({  user_id,
         endpoint={`users/${user_id}`}
         fieldName="is_internal"
         onUpdate={(newValue) => setIsInternal(newValue)}
-      />
-
+      />{" "}
       {isInternal && (
         <div className="mt-4">
           <label
             htmlFor="monthly-salary"
-            className="text-sm font-medium mb-2 block text-muted-foreground"
+            className="text-sm font-medium mb-2 block"
           >
             Sueldo Mensual
           </label>
-          <Input
-            id="monthly-salary"
-            type="number"
-            placeholder="Ingresa el sueldo mensual"
-            className="w-full"
-            value={salary || ""}
-            onChange={handleSalaryChange}
-            onBlur={handleSalaryBlur}
-            disabled={isSaving}
-          />
+          <div className="relative">
+            <span className="absolute md:text-xl left-3 top-1/2 transform -translate-y-1/2 text-gray-500">
+              $
+            </span>
+            <Input
+              id="monthly-salary"
+              type="text"
+
+              inputMode="numeric"
+              placeholder="Ingresa el sueldo mensual"
+              className="w-full pl-7 font-medium md:text-xl"
+              value={displaySalary}
+              onChange={handleSalaryChange}
+              onBlur={handleSalaryBlur}
+              disabled={isSaving}
+            />
+          </div>
         </div>
       )}
-
       <AreaSelect
         initial_value={area_id}
+        label="Área"
         placeholder="Selecciona o crea un área"
         required={false}
         disabled={false}

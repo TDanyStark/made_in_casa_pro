@@ -116,7 +116,6 @@ const AreaSelect = ({
     setSearchTerm("");
     if (onBlur) onBlur();
   };
-  console.log(areaOptions);
 
   // Function to update user's area_id in the database
   const updateUserArea = async (areaId: number) => {
