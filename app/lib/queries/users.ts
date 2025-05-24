@@ -80,6 +80,8 @@ export async function getUserById(userId: number) {
       email: row.email,
       password: row.password,
       rol_id: row.rol_id as UserRole,
+      area_id: row.area_id,
+      is_internal: Boolean(row.is_internal),
       is_active: Boolean(row.is_active),
       must_change_password: Boolean(row.must_change_password),
       last_login: row.last_login,
@@ -204,6 +206,8 @@ export async function updateUser(userId: string, data: {
   is_active?: boolean;
   rol_id?: number;
   must_change_password?: boolean;
+  is_internal?: boolean;
+  area_id?: number;
 }) {
   try {
     // Construir la consulta SQL dinámicamente basada en los campos proporcionados
@@ -233,6 +237,16 @@ export async function updateUser(userId: string, data: {
     if (data.rol_id !== undefined) {
       updateFields.push('rol_id = ?');
       args.push(data.rol_id);
+    }
+
+    if (data.is_internal !== undefined) {
+      updateFields.push('is_internal = ?');
+      args.push(data.is_internal);
+    }
+
+    if (data.area_id !== undefined) {
+      updateFields.push('area_id = ?');
+      args.push(data.area_id);
     }
     
     if (data.must_change_password !== undefined) {

@@ -9,9 +9,6 @@ import { Skeleton } from "../ui/skeleton";
 import useGetItems from "@/hooks/useGetItems";
 import useItemMutations from "@/hooks/useItemsMutation";
 import { CountryType } from "@/lib/definitions";
-
-// Importar los estilos de los selects
-import "@/styles/selects.css";
 import { toast } from "sonner";
 
 interface CreateCountrySelectProps {

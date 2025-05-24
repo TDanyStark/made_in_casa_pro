@@ -4,6 +4,7 @@ import "./styles/tiptap.css"; // Importamos los estilos globales de TipTap
 import { ThemeProvider } from "@/components/theme-provider";
 import QueryProvider from "./components/QueryProvider";
 import { Toaster } from "@/components/ui/sonner"
+import "@/styles/selects.css";
 
 export const metadata: Metadata = {
   title: {

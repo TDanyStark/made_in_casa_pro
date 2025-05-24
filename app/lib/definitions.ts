@@ -34,9 +34,9 @@ export type UserType = {
 
 export type ColaboradorType = UserType & {
   rol_id: UserRole.COLABORADOR;
-  area_id?: number | null;
+  area_id?: number;
   skills?: string[];
-  is_internal?: boolean;
+  is_internal: boolean;
 }
 
 // 👇 Interno: con salario mensual
@@ -120,6 +120,11 @@ export interface BusinessUnitType {
   id: number;
   name: string;
 }
+
+export type AreaType = {
+  id?: number;
+  name: string;
+};
 
 // response API using apiService.ts
 export type ApiResponse<T> ={

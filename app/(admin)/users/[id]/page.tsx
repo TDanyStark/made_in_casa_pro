@@ -34,17 +34,17 @@ export default async function UserPage({ params }: Props) {
   }
 
   const user = userResult as ColaboradorType;
-  const { name, email, is_active = false, rol_id, created_at, last_login} = user;
-
-  console.log("UserPage", {
-    user,
+  const {
     name,
     email,
-    is_active,
+    is_active = false,
     rol_id,
     created_at,
-    last_login
-  });
+    last_login,
+    is_internal,
+    area_id,
+    skills,
+  } = user;
 
   return (
     <section>
@@ -65,15 +65,16 @@ export default async function UserPage({ params }: Props) {
           endpointIdParam="id"
         />
       </h1>
-      <CheckboxChangeState
-        label="Usuario activo"
-        id="user-active"
-        initialChecked={is_active}
-        endpoint={`users/${id}`}
-        fieldName="is_active"
-        className="mt-2"
-      />
-      <div className="mt-6">
+      <div className="mt-4">
+        <CheckboxChangeState
+          label="Usuario activo"
+          id="user-active"
+          initialChecked={is_active}
+          endpoint={`users/${id}`}
+          fieldName="is_active"
+        />
+      </div>
+      <div className="mt-6 flex flex-wrap gap-4">
         <Card className="w-fit p-4 shadow-md rounded-lg">
           <CardHeader className="flex flex-col gap-2">
             <h2 className="text-2xl font-bold">Información</h2>
@@ -92,34 +93,41 @@ export default async function UserPage({ params }: Props) {
                 endpoint={`users/${id}`}
                 label="Correo electrónico"
                 value={email}
-              />              {/* mostrar la fecha de creacion */}
-              <div>
-                <p className="text-sm text-gray-500 dark:text-gray-400">Fecha de creación</p>
-                <p className="font-medium">{formatDate(created_at)}</p>
-              </div>
-              {/* Mostrar fecha del último inicio de sesión */}
-              <div>
-                <p className="text-sm text-gray-500 dark:text-gray-400">Último inicio de sesión</p>
-                <p className="font-medium">{formatDate(last_login)}</p>
-              </div>
-              
-              {/* Componente para cambiar la contraseña */}
+              />
               <div className="mt-2">
                 <ChangePassword userId={id} />
               </div>
+              <div>
+                <p className="text-sm text-gray-500 dark:text-gray-400">
+                  Fecha de creación
+                </p>
+                <p className="font-medium">{formatDate(created_at)}</p>
+              </div>
+              <div>
+                <p className="text-sm text-gray-500 dark:text-gray-400">
+                  Último inicio de sesión
+                </p>
+                <p className="font-medium">{formatDate(last_login)}</p>
+              </div>
             </div>
-
           </CardContent>
         </Card>
+        {rol_id === UserRole.COLABORADOR && (
+          <Card className="w-fit p-4 shadow-md rounded-lg">
+            <CardHeader className="flex flex-col gap-2">
+              <h2 className="text-2xl font-bold">Información adicional colaborador</h2>
+            </CardHeader>
+            <CardContent className="flex gap-4">
+              <DetailsCollaborator
+                user_id={Number(id)}
+                is_internal={is_internal}
+                area_id={Number(area_id)}
+                skills={skills}
+              />
+            </CardContent>
+          </Card>
+        )}
       </div>
-
-      {
-        rol_id === UserRole.COLABORADOR && (
-          <div className="mt-6">
-            <DetailsCollaborator />
-          </div>
-        )
-      }
     </section>
   );
 }

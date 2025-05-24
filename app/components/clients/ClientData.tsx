@@ -28,12 +28,14 @@ export async function ClientData({ id }: { id: string }) {
         />
         <h1 className="primaryH1">{client.name}</h1>
       </div>
-      <CheckboxChangeState 
-        label="Aceptar unidades de negocio"
-        initialChecked={client.accept_business_units || false}
-        endpoint={`clients/${id}`}
-        fieldName="accept_business_units"
-      />
+      <div className="mt-4">
+        <CheckboxChangeState
+          label="Aceptar unidades de negocio"
+          initialChecked={client.accept_business_units || false}
+          endpoint={`clients/${id}`}
+          fieldName="accept_business_units"
+        />
+      </div>
       <div className="mt-8">
         <TabsManagersAndBrands clientId={parseInt(id)} />
       </div>

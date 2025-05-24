@@ -3,17 +3,8 @@ import { z } from "zod";
 import { getUserById, getUserByEmail, updateUser } from "@/lib/queries/users";
 import { revalidatePath } from "next/cache";
 import { validateApiRole, validateHttpMethod } from "@/lib/services/api-auth";
-import { UserRole } from "@/lib/definitions";
+import { ColaboradorType, UserRole } from "@/lib/definitions";
 import bcrypt from "bcrypt";
-
-interface UserUpdate {
-  email: string;
-  name: string;
-  password: string;
-  is_active: boolean;
-  rol_id: number;
-  must_change_password: boolean;
-}
 
 // Schema para validar los datos de actualización de usuario
 const userUpdateSchema = z.object({
@@ -22,6 +13,8 @@ const userUpdateSchema = z.object({
   password: z.string().min(6).optional(),
   is_active: z.boolean().optional(),
   rol_id: z.number().int().positive().optional(),
+  is_internal: z.boolean().optional(),
+  area_id: z.number().int().positive().optional(),
   must_change_password: z.boolean().optional(),
 });
 
@@ -56,7 +49,7 @@ export async function PATCH(
       );
     }
 
-    const { email, name, password, is_active, rol_id, must_change_password } =
+    const { email, name, password, is_active, rol_id, is_internal, area_id, must_change_password } =
       validationResult.data;
 
     // Comprobar si el usuario existe
@@ -85,16 +78,22 @@ export async function PATCH(
       password === undefined &&
       is_active === undefined &&
       rol_id === undefined &&
+      is_internal === undefined &&
+      area_id === undefined &&
       must_change_password === undefined
     ) {
       return NextResponse.json(existingUser);
-    }    // Preparar los datos de actualización
-    const updateData: Partial<UserUpdate> = {};
+    }
+
+    // Preparar los datos de actualización
+    const updateData: Partial<ColaboradorType> = {};
     if (email) updateData.email = email;
     if (name) updateData.name = name;
     if (password) updateData.password = await bcrypt.hash(password, 10);
     if (is_active !== undefined) updateData.is_active = is_active;
     if (rol_id) updateData.rol_id = rol_id;
+    if (is_internal !== undefined) updateData.is_internal = is_internal;
+    if (area_id) updateData.area_id = area_id;
     if (must_change_password !== undefined)
       updateData.must_change_password = must_change_password;
 

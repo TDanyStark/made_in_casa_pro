@@ -7,8 +7,6 @@ import { useEffect, useMemo, useState } from "react";
 import { debounce } from "lodash";
 import { toast } from "sonner";
 
-import "@/styles/selects.css";
-
 import { Button } from "@/components/ui/button";
 import {
   Form,

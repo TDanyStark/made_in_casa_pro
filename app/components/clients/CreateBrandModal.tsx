@@ -5,8 +5,6 @@ import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { useEffect, useState } from "react";
 
-import "@/styles/selects.css";
-
 import { Button } from "@/components/ui/button";
 import {
   Dialog,

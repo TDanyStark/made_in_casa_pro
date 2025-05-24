@@ -63,7 +63,7 @@ const CheckboxChangeState = ({
   };
 
   return (
-    <div className={`flex items-center space-x-2 mt-4 ${className}`}>
+    <div className={`flex items-center space-x-2 ${className}`}>
       <Switch 
         id={id} 
         checked={isChecked}
