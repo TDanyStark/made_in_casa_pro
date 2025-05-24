@@ -1,5 +1,4 @@
 import { turso } from "../db";
-import { revalidatePath } from "next/cache";
 import { AreaType } from "../definitions";
 import { ITEMS_PER_PAGE } from "@/config/constants";
 
@@ -44,9 +43,6 @@ export async function createArea(areaData: Omit<AreaType, "id">) {
 
     const areaId = Number(result.lastInsertRowid);
     
-    // Revalidate paths that may display areas
-    revalidatePath('/users');
-    
     return {
       id: areaId,
       name: areaData.name,
@@ -77,9 +73,6 @@ export async function updateArea(id: string, updateData: Partial<AreaType>) {
         sql: `UPDATE areas SET ${updates.join(", ")} WHERE id = ?`,
         args,
       });
-
-      // Revalidate paths that may display areas
-      revalidatePath('/users');
 
       // Get the updated area to return
       return getAreaById(id);
