@@ -9,16 +9,24 @@ import { getUserByEmail } from "../queries/users";
 
 
 export async function login(state: FormState, formData: FormData) {
+  // Extraer los datos del formulario para usarlos incluso si hay errores
+  const submittedEmail = formData.get("email") as string;
+  const submittedPassword = formData.get("password") as string;
+  
   // Validate form fields
   const validatedFields = SignupFormSchema.safeParse({
-    email: formData.get("email"),
-    password: formData.get("password"),
+    email: submittedEmail,
+    password: submittedPassword,
   });
 
-  // If any form fields are invalid, return early
+  // If any form fields are invalid, return early with submitted data
   if (!validatedFields.success) {
     return {
       errors: validatedFields.error.flatten().fieldErrors,
+      submittedData: {
+        email: submittedEmail,
+        password: submittedPassword,
+      }
     };
   }
 
@@ -30,6 +38,10 @@ export async function login(state: FormState, formData: FormData) {
   if (res.length === 0) {
     return {
       errors: { general: "Datos incorrectos"},
+      submittedData: {
+        email: email,
+        password: password,
+      }
     };
   }
 
@@ -39,6 +51,10 @@ export async function login(state: FormState, formData: FormData) {
   if (!user.password) {
     return {
       errors: { general: "Datos incorrectos" },
+      submittedData: {
+        email: email,
+        password: password,
+      }
     };
   }
 
@@ -47,6 +63,10 @@ export async function login(state: FormState, formData: FormData) {
   if (!match) {
     return {
       errors: { general: "Datos incorrectos" },
+      submittedData: {
+        email: email,
+        password: password,
+      }
     };
   }
   // 3. Create a session

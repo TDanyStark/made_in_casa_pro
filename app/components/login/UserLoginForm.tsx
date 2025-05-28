@@ -8,7 +8,7 @@ import { Icons } from "@/components/icons";
 import { login } from "@/lib/actions/auth";
 
 export function UserLoginForm() {
-  const [state, action, pending] = useActionState(login, {errors: {}});
+  const [state, action, pending] = useActionState(login, {errors: {}, submittedData: {email: "", password: ""}});
   return (
     <div className="grid gap-6">
       <form action={action}>
@@ -27,6 +27,7 @@ export function UserLoginForm() {
                 autoComplete="email"
                 autoCorrect="off"
                 required
+                defaultValue={state?.submittedData?.email || ""}
               />
               {state?.errors && "email" in state.errors && (
                 <p className="text-xs text-red-500">{state.errors.email}</p>
@@ -43,6 +44,7 @@ export function UserLoginForm() {
                 type="password"
                 autoComplete="current-password"
                 required
+                defaultValue={state?.submittedData?.password || ""}
               />
               {state?.errors && "password" in state.errors && (
                 <p className="text-xs text-red-500">{state.errors.password}</p>
@@ -59,7 +61,9 @@ export function UserLoginForm() {
             Sign In with Email
           </Button>
           {state?.errors && "general" in state.errors && (
-                <p className="text-xs text-red-500">{state.errors.general}</p>
+                <p className="text-xs text-red-500">
+                  {state.errors.general}
+                </p>
               )}
         </div>
       </form>

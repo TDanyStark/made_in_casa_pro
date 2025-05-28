@@ -17,6 +17,10 @@ export type FormState =
         general?: string
       }
       message?: string
+      submittedData?: {
+        email?: string
+        password?: string
+      }
     }
   | undefined
 
