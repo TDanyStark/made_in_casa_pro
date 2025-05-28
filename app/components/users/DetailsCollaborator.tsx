@@ -1,11 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useState, KeyboardEvent } from "react";
 import { toast } from "sonner";
 import CheckboxChangeState from "../checkbox/CheckboxChangeState";
 import AreaSelect from "./AreaSelect";
 import { Input } from "../ui/input";
 import { patch } from "@/lib/services/apiService";
+import EnterSvg from "../icons/EnterSvg";
 
 interface DetailsCollaboratorProps {
   user_id: number;
@@ -22,12 +23,14 @@ const DetailsCollaborator = ({
   monthly_salary = 0,
 }: DetailsCollaboratorProps) => {
   const [isInternal, setIsInternal] = useState<boolean>(is_internal);
+  // Mantener un estado para el valor actual del salario después de actualizaciones
+  const [currentSalary, setCurrentSalary] = useState<number>(monthly_salary);
   const [salary, setSalary] = useState<number | undefined>(monthly_salary);
   const [displaySalary, setDisplaySalary] = useState<string>(
     monthly_salary ? monthly_salary.toLocaleString("es-CO") : ""
   );
-
   const [isSaving, setIsSaving] = useState<boolean>(false);
+  const [isEditing, setIsEditing] = useState<boolean>(false);
 
   const formatNumberWithCommas = (value: string): string => {
     // Elimina todos los caracteres no numéricos
@@ -49,34 +52,52 @@ const DetailsCollaborator = ({
 
     // Actualiza el valor formateado para mostrar
     setDisplaySalary(formatNumberWithCommas(cleanValue));
+
+    // Indica que el usuario está editando
+    setIsEditing(cleanValue ? Number(cleanValue) !== currentSalary : false);
   };
 
-  const handleSalaryBlur = async () => {
-    if (salary === monthly_salary) return;
+  const updateSalary = async () => {
+    if (salary === currentSalary || salary === undefined) return;
 
     setIsSaving(true);
+
     try {
-      const response = await patch(`users/${user_id}`, {
+      const promise = patch(`users/${user_id}`, {
         monthly_salary: salary,
       });
 
-      if (!response.ok) {
-        throw new Error(response.error || "Error al actualizar el salario");
-      }
+      toast.promise(promise, {
+        loading: "Actualizando salario...",
+        success: () => {
+          // Actualizar el valor actual del salario después de una actualización exitosa
+          if (salary !== undefined) {
+            setCurrentSalary(salary);
+          }
+          setIsEditing(false);
+          return "Salario actualizado correctamente";
+        },
+        error: (err) => {
+          setSalary(currentSalary);
+          setDisplaySalary(
+            currentSalary ? currentSalary.toLocaleString("es-CO") : ""
+          );
+          return err instanceof Error
+            ? err.message
+            : "Error al actualizar el salario";
+        },
+      });
 
-      toast.success("Salario actualizado correctamente");
-    } catch (error) {
-      toast.error(
-        error instanceof Error
-          ? error.message
-          : "Error al actualizar el salario"
-      );
-      setSalary(monthly_salary);
-      setDisplaySalary(
-        monthly_salary ? monthly_salary.toLocaleString("es-CO") : ""
-      );
+      // No es necesario esperar la promesa aquí ya que toast.promise ya la maneja
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      updateSalary();
     }
   };
 
@@ -105,15 +126,22 @@ const DetailsCollaborator = ({
             <Input
               id="monthly-salary"
               type="text"
-
               inputMode="numeric"
               placeholder="Ingresa el sueldo mensual"
               className="w-full pl-7 font-medium md:text-xl"
               value={displaySalary}
               onChange={handleSalaryChange}
-              onBlur={handleSalaryBlur}
+              onKeyDown={handleKeyDown}
               disabled={isSaving}
             />
+            {isEditing && (
+              <span
+                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 bg-gray-100 px-1 py-0.5 rounded text-xs font-medium flex items-center cursor-pointer hover:bg-gray-200 transition-colors"
+                title="Presiona Enter para guardar"
+              >
+                <EnterSvg /> Enter
+              </span>
+            )}
           </div>
         </div>
       )}
