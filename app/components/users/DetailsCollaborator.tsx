@@ -7,6 +7,7 @@ import AreaSelect from "./AreaSelect";
 import { Input } from "../ui/input";
 import { patch } from "@/lib/services/apiService";
 import EnterSvg from "../icons/EnterSvg";
+import { ColaboradorType } from "@/lib/definitions";
 
 interface DetailsCollaboratorProps {
   user_id: number;
@@ -63,16 +64,17 @@ const DetailsCollaborator = ({
     setIsSaving(true);
 
     try {
-      const promise = patch(`users/${user_id}`, {
+      const promise = patch<ColaboradorType>(`users/${user_id}`, {
         monthly_salary: salary,
       });
 
       toast.promise(promise, {
         loading: "Actualizando salario...",
-        success: () => {
+        success: (data) => {
+          const res = data.data;
           // Actualizar el valor actual del salario después de una actualización exitosa
           if (salary !== undefined) {
-            setCurrentSalary(salary);
+            setCurrentSalary(res?.monthly_salary || 0);
           }
           setIsEditing(false);
           return "Salario actualizado correctamente";

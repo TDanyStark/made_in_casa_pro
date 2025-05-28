@@ -282,7 +282,7 @@ export async function updateUser(userId: string, data: {
     
     // Obtener el usuario actualizado
     const result = await turso.execute({
-      sql: `SELECT id, name, email, rol_id, must_change_password, last_login, is_active FROM users WHERE id = ?`,
+      sql: `SELECT * FROM users WHERE id = ?`,
       args: [userId],
     });
     
