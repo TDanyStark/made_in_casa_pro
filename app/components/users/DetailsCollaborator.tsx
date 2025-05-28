@@ -87,8 +87,8 @@ const DetailsCollaborator = ({
             : "Error al actualizar el salario";
         },
       });
-
-      // No es necesario esperar la promesa aquí ya que toast.promise ya la maneja
+      // aqui esperamos a que la promesa se resuelva para que el finally se ejecute despues si no se coloca el setIsSaving(false) se ejecuta antes, y el input siempre estaria disponible
+      await promise;
     } finally {
       setIsSaving(false);
     }
