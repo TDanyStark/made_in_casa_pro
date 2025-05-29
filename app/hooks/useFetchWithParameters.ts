@@ -33,7 +33,7 @@ const fetchEndpoint = async <T>(endpoint: string, parameters: ParamsObject = {})
     }
   });
 
-  const apiUrl = `${URL_BACKEND_API || process.env.NEXT_PUBLIC_API_URL || ''}/${endpoint}?${searchParams.toString()}`;
+  const apiUrl = `${URL_BACKEND_API || ''}/${endpoint}?${searchParams.toString()}`;
   console.log(`Fetching data from: ${apiUrl}`);
   
   try {

@@ -35,8 +35,7 @@ const getEndpoint = async <T>({ clientId, page = "1", search, endpoint }: Params
     searchParams.append("search", search);
   }
 
-  const apiUrl = `${URL_BACKEND_API || process.env.NEXT_PUBLIC_API_URL || ''}/${endpoint}?${searchParams.toString()}`;
-  console.log(`Fetching data from: ${apiUrl}`);
+  const apiUrl = `${URL_BACKEND_API || ''}/${endpoint}?${searchParams.toString()}`;
   try {
     const response = await axios.get(apiUrl);
     return response.data;

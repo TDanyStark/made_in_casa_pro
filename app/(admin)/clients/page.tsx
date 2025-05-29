@@ -1,29 +1,17 @@
-import CreateClientModal from "@/components/clients/CreateClientModal";
-import ListClientsInput from "@/components/clients/ListClientsInput";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Suspense } from "react";
+import ListClientsClient from "@/components/clients/ListClientsClient";
+import { Breadcrumbs } from "@/components/navigation/Breadcrumbs";
 
-export default function Page() {
-  const cantidadSkeletons = 10;
-
+export default function ClientsPage() {
   return (
-    <section>
-      <h1 className="primaryH1">Clientes</h1>
+    <section className="container">
+      <Breadcrumbs
+        manualBreadcrumbs={[
+          { href: "/clients", label: "Clientes" },
+        ]}
+      />
+      <h1 className="primaryH1">Todos los Clientes</h1>
       <div className="mt-6">
-        <CreateClientModal />
-        <Suspense 
-          fallback={
-            <div className="mt-6">
-              <Skeleton className="w-72 h-[36px]" />
-              <div className="py-4 grid gap-8 lg:grid-cols-3">
-                {[...Array(cantidadSkeletons)].map((_, index) => (
-                  <Skeleton key={index} className="w-full h-[120px]" />
-                ))}
-              </div>
-            </div>
-          }>
-          <ListClientsInput />
-        </Suspense>
+        <ListClientsClient />
       </div>
     </section>
   );
