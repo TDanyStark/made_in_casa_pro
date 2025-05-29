@@ -114,7 +114,7 @@ export default async function UserPage({ params }: Props) {
           </CardContent>
         </Card>
         {rol_id === UserRole.COLABORADOR && (
-          <Card className="w-fit p-4 shadow-md rounded-lg max-w-md">
+          <Card className="w-fit p-4 shadow-md rounded-lg max-w-[480px]">
             <CardHeader className="flex flex-col gap-2">
               <h2 className="text-2xl font-bold">Información adicional colaborador</h2>
             </CardHeader>

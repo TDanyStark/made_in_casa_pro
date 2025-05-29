@@ -32,13 +32,13 @@ export async function GET(request: NextRequest) {
   if (!roleValidation.isAuthorized) {
     return roleValidation.response;
   }
-
   try {
     const url = new URL(request.url);
     const id = url.searchParams.get("id");
     const page = parseInt(url.searchParams.get("page") || "1");
     const limit = parseInt(url.searchParams.get("limit") || ITEMS_PER_PAGE.toString());
     const search = url.searchParams.get("search");
+    const user_id = url.searchParams.get("user_id") ? parseInt(url.searchParams.get("user_id") as string) : undefined;
     
     // If requesting a specific skill by ID
     if (id) {
@@ -51,12 +51,11 @@ export async function GET(request: NextRequest) {
       }
       return NextResponse.json(skill);
     } 
-    else if (search || page > 1) {
+    else if (search || page > 1 || user_id) {
       // If search or pagination is needed
       const { skills, total } = await getSkillsWithPagination({
-        page,
-        limit,
-        search: search || undefined
+        search: search || undefined,
+        user_id
       });
       
       // Calculate total pages

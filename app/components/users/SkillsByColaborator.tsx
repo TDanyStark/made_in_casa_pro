@@ -8,6 +8,7 @@ import { XIcon } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import SkillSelect from "./SkillSelect";
 import { Skeleton } from "../ui/skeleton";
+import { useQueryClient } from "@tanstack/react-query";
 
 interface SkillsByColaboratorProps {
   user_id: number;
@@ -20,6 +21,7 @@ const SkillsByColaborator = ({
 }: SkillsByColaboratorProps) => {  
   const [skills, setSkills] = useState<UserSkillType[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const queryClient = useQueryClient();
 
   const fetchUserSkills = useCallback(async () => {
     try {
@@ -52,6 +54,10 @@ const SkillsByColaborator = ({
         // Remove the skill from the local state
         setSkills((prevSkills) => prevSkills.filter((skill) => skill.skill_id !== skillId));
         toast.success("Habilidad eliminada correctamente");
+        // invalidar las queries de skills para que se actualicen
+        queryClient.invalidateQueries({
+          queryKey: ["skills"],
+        });
       } else {
         console.error("Error removing skill:", response.error);
         toast.error("Error al eliminar la habilidad");

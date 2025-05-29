@@ -117,6 +117,7 @@ export type AreaType = {
 export type SkillType = {
   id: number;
   name: string;
+  selected?: boolean;
 };
 
 export type UserSkillType = {

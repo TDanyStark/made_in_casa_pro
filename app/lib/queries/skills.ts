@@ -1,12 +1,23 @@
 import { turso } from "../db";
 import { SkillType } from "../definitions";
-import { ITEMS_PER_PAGE } from "@/config/constants";
 
-export async function getSkills() {
+export async function getSkills(userId?: number) {
   try {
-    const result = await turso.execute(
-      `SELECT id, name FROM skills ORDER BY name ASC`
-    );
+    const sql = `
+      SELECT 
+        s.id, 
+        s.name,
+        CASE WHEN us.skill_id IS NOT NULL THEN 1 ELSE 0 END as selected
+      FROM skills s
+      LEFT JOIN user_skills us ON s.id = us.skill_id AND us.user_id = ?
+      ORDER BY s.name ASC
+    `;
+    
+    const result = await turso.execute({
+      sql,
+      args: [userId || null]
+    });
+    
     return result.rows as unknown as SkillType[];
   } catch (error) {
     console.error("Error fetching skills:", error);
@@ -87,24 +98,29 @@ export async function updateSkill(id: string, updateData: Partial<SkillType>) {
 }
 
 export async function getSkillsWithPagination({
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  page = 1,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  limit = ITEMS_PER_PAGE,
   search,
+  user_id,
 }: {
   page?: number;
   limit?: number;
   search?: string;
+  user_id?: number;
 }) {
   try {
-    let sql = `SELECT id, name FROM skills`;
-    const args = [];
-    const countArgs = [];
+    let sql = `
+      SELECT 
+        s.id, 
+        s.name,
+        CASE WHEN us.skill_id IS NOT NULL THEN 1 ELSE 0 END as selected
+      FROM skills s
+      LEFT JOIN user_skills us ON s.id = us.skill_id AND us.user_id = ?
+    `;
+    const args: (number | null | string)[] = [user_id || null];
+    const countArgs: (number | null | string)[] = [user_id || null];
 
     // Build WHERE clause for search
     if (search) {
-      sql += ` WHERE name LIKE ?`;
+      sql += ` WHERE s.name LIKE ?`;
       const searchParam = `%${search}%`;
       args.push(searchParam);
       countArgs.push(searchParam);
