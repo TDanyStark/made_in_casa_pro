@@ -75,7 +75,7 @@ export default async function UserPage({ params }: Props) {
           fieldName="is_active"
         />
       </div>
-      <div className="mt-6 flex flex-wrap gap-4">
+      <div className="mt-6 flex flex-wrap items-start gap-4">
         <Card className="w-fit p-4 shadow-md rounded-lg">
           <CardHeader className="flex flex-col gap-2">
             <h2 className="text-2xl font-bold">Información</h2>
@@ -114,7 +114,7 @@ export default async function UserPage({ params }: Props) {
           </CardContent>
         </Card>
         {rol_id === UserRole.COLABORADOR && (
-          <Card className="w-fit p-4 shadow-md rounded-lg">
+          <Card className="w-fit p-4 shadow-md rounded-lg max-w-md">
             <CardHeader className="flex flex-col gap-2">
               <h2 className="text-2xl font-bold">Información adicional colaborador</h2>
             </CardHeader>

@@ -114,6 +114,17 @@ export type AreaType = {
   name: string;
 };
 
+export type SkillType = {
+  id: number;
+  name: string;
+};
+
+export type UserSkillType = {
+  user_id: number;
+  skill_id: number;
+  skill_name: string;
+};
+
 // response API using apiService.ts
 export type ApiResponse<T> ={
   data?: T;

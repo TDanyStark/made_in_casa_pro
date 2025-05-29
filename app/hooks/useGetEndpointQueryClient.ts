@@ -52,5 +52,6 @@ export const useGetEndpointQueryClient = <T>(params: ParamsUrl) => {
   return useQuery({
     queryKey: [endpoint, params],
     queryFn: () => getEndpoint<T>(params),
+    staleTime: 1000 * 60 * 5, // 5 minutes
   });
 };

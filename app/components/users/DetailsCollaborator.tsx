@@ -4,6 +4,7 @@ import { useState, KeyboardEvent } from "react";
 import { toast } from "sonner";
 import CheckboxChangeState from "../checkbox/CheckboxChangeState";
 import AreaSelect from "./AreaSelect";
+import SkillsByColaborator from "./SkillsByColaborator";
 import { Input } from "../ui/input";
 import { patch } from "@/lib/services/apiService";
 import EnterSvg from "../icons/EnterSvg";
@@ -158,6 +159,7 @@ const DetailsCollaborator = ({
         className="mt-4"
         user_id={user_id}
       />
+      <SkillsByColaborator user_id={user_id} className="mt-6" />
     </div>
   );
 };
