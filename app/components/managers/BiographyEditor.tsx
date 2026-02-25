@@ -2,9 +2,15 @@
 
 import { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
+import dynamic from "next/dynamic";
 import { Button } from "@/components/ui/button";
-import { RichTextEditor } from "../clients/RichTextEditor";
+import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
+
+const RichTextEditor = dynamic(
+  () => import("../clients/RichTextEditor").then((mod) => mod.RichTextEditor),
+  { loading: () => <Skeleton className="h-[300px] w-full" />, ssr: false }
+);
 import { Loader2, Check } from "lucide-react";
 import { patch } from "@/lib/services/apiService";
 

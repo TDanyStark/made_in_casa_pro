@@ -91,6 +91,19 @@ export async function patch<T>(
 }
 
 /**
+ * Realiza una petición PUT
+ * @param endpoint - Ruta del endpoint (sin /api/)
+ * @param data - Datos a enviar en el cuerpo de la petición
+ * @returns Respuesta formateada de la API
+ */
+export async function put<T>(
+  endpoint: string,
+  data: Record<string, unknown>
+): Promise<ApiResponse<T>> {
+  return fetchApi<T>(endpoint, { method: 'PUT', body: data });
+}
+
+/**
  * Realiza una petición DELETE
  * @param endpoint - Ruta del endpoint (sin /api/)
  * @param data - Datos opcionales a enviar en el cuerpo de la petición

@@ -24,10 +24,16 @@ import {
 import { Input } from "@/components/ui/input";
 import { Loader2 } from "lucide-react";
 import useItemMutations from "@/hooks/useItemsMutation";
+import dynamic from "next/dynamic";
 
 import { ClientSelect } from "@/components/clients/ClientSelect";
 import { ManagerType } from "@/lib/definitions";
-import { RichTextEditor } from "../clients/RichTextEditor";
+import { Skeleton } from "@/components/ui/skeleton";
+
+const RichTextEditor = dynamic(
+  () => import("../clients/RichTextEditor").then((mod) => mod.RichTextEditor),
+  { loading: () => <Skeleton className="h-[300px] w-full" />, ssr: false }
+);
 
 const formSchema = z.object({
   client_id: z.coerce.number().int().positive("Se requiere un cliente válido"),

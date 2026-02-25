@@ -1,12 +1,13 @@
 import { useQuery } from "@tanstack/react-query";
-import axios from "axios";
-import { URL_BACKEND_API } from "@/config/constants";
+import { get } from "@/lib/services/apiService";
 
 
 const fetchItems = async (resource: string) => {
-  const response = await axios.get(`${URL_BACKEND_API}/${resource}`);
-  const data = response.data;
-  return data;
+  const response = await get(resource);
+  if (!response.ok) {
+    throw new Error(response.error || "Error al obtener datos");
+  }
+  return response.data;
 };
 
 const useGetItems = (resource: string) => {
