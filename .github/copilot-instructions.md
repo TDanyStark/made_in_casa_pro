@@ -35,8 +35,9 @@
 
 ## Siempre que se agregue un nuevo feature o endpoint
 - asegúrate de agregar tests unitarios y de integración correspondientes.
-- Actualiza el archivo `README-RESUME.md` que es donde esta la documentación pública del proyecto, para reflejar los cambios y nuevas funcionalidades.
+- Actualiza el archivo `README-RESUME.md` que es donde esta la documentación pública del proyecto, para reflejar los cambios y nuevas funcionalidades, si es un feature pequeño como cambios a cosas que ya existen no hagas cambios en el README, pero si es algo nuevo o un cambio grande, actualízalo para que la documentación esté al día.
 
 ## Antes de hacer un nuevo feature o endpoint
-- Siempre revisa los archivos como `/lib/` `/components` etc, para no repetir codigo que ya existe, y para mantener la consistencia del proyecto. Si encuentras algo similar, intenta reutilizarlo o extenderlo en lugar de crear algo completamente nuevo.
+- Siempre revisa los archivos como `/lib/`, `/components`, `app\lib\services\apiService.ts` etc, para no repetir codigo que ya existe, y para mantener la consistencia del proyecto. Si encuentras algo similar, intenta reutilizarlo o extenderlo en lugar de crear algo completamente nuevo.
+- si ya uso librerias que estan en el package.json para lo que quieres hacer, úsalas en lugar de agregar nuevas dependencias, esto ayuda a mantener el proyecto ligero y con menos dependencias externas, y si tengo ya una libreria que hace por ejemplo selects, no hagas ese componente de 0, implementa la libreria que ya tengo para eso, y si quieres hacer algo personalizado, hazlo extendiendo el componente de la libreria, pero no hagas algo completamente nuevo sin revisar lo que ya existe.
 
