@@ -80,7 +80,6 @@ describe('useGetItems()', () => {
 
   it('uses the resource string as the queryKey', async () => {
     mockGet.mockResolvedValueOnce({ ok: true, status: 200, data: [] });
-    let capturedQueryKey: unknown[] = [];
     // Test indirectly: calling with different resources makes separate requests
     const client1Wrapper = createWrapper();
     const client2Wrapper = createWrapper();

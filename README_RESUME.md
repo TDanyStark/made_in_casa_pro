@@ -415,6 +415,109 @@ Total de endpoints implementados: **18+ rutas API**
 
 ---
 
-**Última actualización:** 2026-02-06
+## 🧪 Tests Implementados
+
+### Herramientas de Testing
+
+- **Framework:** Jest + Testing Library (React)
+- **Tipos de tests:** Unit tests para hooks, servicios, queries y utilidades
+- **Total de archivos:** 10 archivos de test
+- **Total de casos:** ~80+ test cases
+
+---
+
+### Tests por Categoría
+
+#### Hooks (`__tests__/hooks/`)
+
+**`useGetItems.test.tsx`** (6 tests)
+- Llama a `apiService.get()` con el recurso indicado
+- Retorna `response.data` en respuesta exitosa
+- Estado de carga inicial correcto
+- Lanza error con `response.error` si `response.ok` es `false`
+- Usa mensaje de fallback `"Error al obtener datos"` cuando no hay error definido
+- Usa el recurso como `queryKey` (recursos distintos hacen peticiones separadas)
+
+**`useItemsMutation.test.tsx`** (13 tests)
+- **createItem** (6): Llama a `post()`, muestra toast de éxito/error, cierra modal si `setIsOpen` fue provisto, invalida cache de React Query
+- **updateItem** (3): Llama a `put()`, muestra toast de éxito/error
+- **deleteItem** (4): Llama a `del()`, muestra toast de éxito/error, invalida cache
+
+---
+
+#### Servicios (`__tests__/lib/services/`)
+
+**`apiService.test.ts`** (18 tests)
+- **`fetchApi()`** (10): Antepone `/api/`, headers por defecto, serialización de body, manejo de errores de red y errores desconocidos
+- **`get()`** (1): Usa método GET
+- **`post()`** (1): Usa método POST con body serializado
+- **`put()`** (1): Usa método PUT con body serializado
+- **`patch()`** (1): Usa método PATCH con body serializado
+- **`del()`** (3): Usa método DELETE, con y sin body
+
+---
+
+#### Utilidades (`__tests__/lib/`)
+
+**`utils.test.ts`** (17 tests)
+- **`cn()`** (9): Merging de clases CSS, resolución de conflictos Tailwind, valores falsy, objetos y arrays
+- **`formatDate()`** (8): Manejo de valores nulos, formateo ISO UTC, ajuste de zona horaria (-5h), locale español, opciones personalizadas
+
+**`definitions.test.ts`** (18 tests)
+- **`SignupFormSchema`**: Validación de email (formato, vacío, sin @), validación de contraseña (mínimo de caracteres), casos válidos
+
+**`permissions.test.ts`** (16 tests)
+- **`routePermissions`** (3): Combinación de rutas de `links` y `linksNotVisible`, mapeo de roles
+- **`checkRoutePermission()`** (13): Rutas exactas, rutas dinámicas (`/clients/[id]`), rutas anidadas (`/projects/[id]/edit`), límites por rol (ADMIN, COLABORADOR, DIRECTIVO, NO_AUTHENTICADO)
+
+---
+
+#### Queries de Base de Datos (`__tests__/queries/`)
+
+**`users.test.ts`** (16 tests)
+- **`getUserById()`**: Retorna usuario mapeado, coerce de booleanos, error si no existe
+- **`getUserByEmail()`**: Retorna array o vacío
+- **`createUser()`**: SQL INSERT correcto, error en fallo
+- **`deleteUser()`**: SQL DELETE correcto, error en fallo
+- **`getUsers()`**: Paginación por defecto, OFFSET, pageCount, búsqueda LIKE por nombre y email
+- **`updateUser()`**: Error si data vacía, SET clause dinámica, retorna fila actualizada
+
+**`brands.test.ts`** (18 tests)
+- **`getBrands()`**: Array vacío en error, cast a `BrandType[]`
+- **`getBrandById()`**: Null en no encontrado, mapeo anidado (manager, client_info), country undefined si null
+- **`createBrand()`**: INSERT correcto, `null` para business_unit_id opcional, revalidatePath, retorna nueva marca
+- **`updateBrand()`**: Transacción en updates, historial si cambia manager_id, commit/rollback, sin transacción si no hay cambios
+- **`getBrandsWithPagination()`**: Retorno en error, filtro por clientId
+
+**`clients.test.ts`** (20 tests)
+- **`getClients()`**: SELECT correcto, error envuelto
+- **`createClient()`**: INSERT correcto, re-throw de errores
+- **`fetchFilteredClients()`**: Array vacío, mapeo con y sin country anidado
+- **`getClientById()`**: Null en no encontrado, mapeo correcto, country undefined si null
+- **`getClientsWithPagination()`**: Retorno en error, OFFSET, búsqueda LIKE, total del count query
+- **`updateClient()`**: Null si sin campos, SET clause dinámica, conversión boolean → 1/0, revalidatePath
+
+**`managers.test.ts`** (14 tests)
+- **`getManagerByEmail()`**: Retorna primera fila, null si no hay, null sin throw en error
+- **`getManagerById()`**: Null en no encontrado, mapeo con client_info anidado, campos undefined si null
+- **`getManagersByClientId()`**: WHERE correcto, array vacío en error
+- **`createManager()`**: INSERT con 5 args, `""` para biography undefined, revalidatePath, BigInt → Number
+- **`updateManager()`**: Null sin campos, SET clause dinámica
+- **`getManagersWithPagination()`**: Búsqueda LIKE en nombre/email/teléfono, filtro por clientId, retorno en error
+
+---
+
+### Cobertura General
+
+| Área | Archivos | Tests |
+|------|----------|-------|
+| Hooks | 2 | ~19 |
+| API Service | 1 | ~18 |
+| Utilidades | 2 | ~35 |
+| Queries DB | 4 | ~68 |
+
+---
+
+**Última actualización:** 2026-03-02
 **Versión de Next.js:** 15.3.2
 **Versión de React:** 19
