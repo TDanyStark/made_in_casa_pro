@@ -19,12 +19,14 @@ import { revalidatePath } from 'next/cache';
 const mockExecute = turso.execute as jest.MockedFunction<typeof turso.execute>;
 
 // Helper for a Turso-like result object
-function makeResult(rows: Record<string, unknown>[], lastInsertRowid = 0n) {
+function makeResult(rows: Record<string, unknown>[], lastInsertRowid: number | bigint = 0) {
   return {
     rows: rows as never,
-    columns: [],
+    columns: [] as string[],
+    columnTypes: [] as string[],
     lastInsertRowid: BigInt(lastInsertRowid),
     rowsAffected: rows.length,
+    toJSON: () => ({}),
   };
 }
 

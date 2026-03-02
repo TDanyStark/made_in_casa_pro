@@ -14,15 +14,18 @@ import {
   deleteUser,
   updateUser,
 } from '@/lib/queries/users';
+import { ColaboradorType } from '@/lib/definitions';
 
 const mockExecute = turso.execute as jest.MockedFunction<typeof turso.execute>;
 
-function makeResult(rows: Record<string, unknown>[], lastInsertRowid = 0n) {
+function makeResult(rows: Record<string, unknown>[], lastInsertRowid: number | bigint = 0) {
   return {
     rows: rows as never,
-    columns: [],
+    columns: [] as string[],
+    columnTypes: [] as string[],
     lastInsertRowid: BigInt(lastInsertRowid),
     rowsAffected: rows.length,
+    toJSON: () => ({}),
   };
 }
 
@@ -49,7 +52,7 @@ describe('getUserById()', () => {
       area_id: null, is_internal: 1, is_active: 0,
       monthly_salary: null, must_change_password: 1, last_login: null, created_at: null,
     }]));
-    const result = await getUserById(1);
+    const result = await getUserById(1) as ColaboradorType;
     expect(result.is_internal).toBe(true);
     expect(result.is_active).toBe(false);
     expect(result.must_change_password).toBe(true);
