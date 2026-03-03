@@ -37,7 +37,7 @@ export default function ListClientsClient({
 
   // Function to create a new URLSearchParams with updated parameters
   const createQueryString = (
-    params: Record<string, string | number | null>
+    params: Record<string, string | number | null>,
   ) => {
     const newSearchParams = new URLSearchParams(searchParams.toString());
 
@@ -59,14 +59,14 @@ export default function ListClientsClient({
       `${pathname}?${createQueryString({
         page: page,
         search: search || null,
-      })}`
+      })}`,
     );
   };
 
   // Handle search
   const handleSearch = (searchValue: string) => {
     replace(
-      `${pathname}?${createQueryString({ page: 1, search: searchValue })}`
+      `${pathname}?${createQueryString({ page: 1, search: searchValue })}`,
     );
   };
 
@@ -81,7 +81,8 @@ export default function ListClientsClient({
         <div className="text-center py-4 text-red-500">
           Error al cargar los clientes
         </div>
-      ) : (        <Card className="mt-4">
+      ) : (
+        <Card className="mt-4">
           <CardHeader>
             <div className="flex justify-between items-center">
               <CardTitle>Todos los Clientes</CardTitle>
