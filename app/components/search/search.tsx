@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, FormEvent, ChangeEvent, KeyboardEvent } from "react";
+import { useEffect, useState, FormEvent, ChangeEvent, KeyboardEvent } from "react";
 import { Search, RefreshCw } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -20,13 +20,22 @@ const SearchBar = ({
 }: SearchBarProps) => {
   const [searchInputValue, setSearchInputValue] = useState(initialSearchValue);
 
+  useEffect(() => {
+    setSearchInputValue(initialSearchValue);
+  }, [initialSearchValue]);
+
   const handleSearch = (e: FormEvent) => {
     e.preventDefault();
     onSearch(searchInputValue);
   };
 
   const handleSearchInputChange = (e: ChangeEvent<HTMLInputElement>) => {
-    setSearchInputValue(e.target.value);
+    const nextValue = e.target.value;
+    setSearchInputValue(nextValue);
+
+    if (nextValue === "") {
+      onReset();
+    }
   };
 
   const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
