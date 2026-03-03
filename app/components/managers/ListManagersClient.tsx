@@ -1,13 +1,16 @@
 "use client";
 
+import { useState } from "react";
 import { useGetEndpointQueryClient } from "@/hooks/useGetEndpointQueryClient";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import Pagination from "@/components/pagination/Pagination";
 import SearchBar from "@/components/search/search";
 import TableManagers from "./TableManagers";
 import { Skeleton } from "../ui/skeleton";
 import { ManagerType } from "@/lib/definitions";
+import CreateManagerModal from "./CreateManagerModal";
 
 interface ManagerTableClientProps {
   clientId?: string;
@@ -18,6 +21,7 @@ export default function ListManagersClient({
   clientId,
   endpoint = "managers",
 }: ManagerTableClientProps) {
+  const [openManagerModal, setOpenManagerModal] = useState(false);
   const searchParams = useSearchParams();
   const pathname = usePathname();
   const { replace } = useRouter();
@@ -86,9 +90,17 @@ export default function ListManagersClient({
       ) : (
         <Card className="mt-4">
           <CardHeader>
-            <CardTitle>
-              {clientId ? "Gerentes del Cliente" : "Todos los Gerentes"}
-            </CardTitle>
+            <div className="flex justify-between items-center">
+              <CardTitle>
+                {clientId ? "Gerentes del Cliente" : "Todos los Gerentes"}
+              </CardTitle>
+              <Button
+                variant="default"
+                onClick={() => setOpenManagerModal(true)}
+              >
+                Crear Gerente
+              </Button>
+            </div>
             <SearchBar
               initialSearchValue={search}
               placeholder="Buscar gerentes..."
@@ -114,6 +126,12 @@ export default function ListManagersClient({
           </CardContent>
         </Card>
       )}
+
+      <CreateManagerModal
+        clientId={clientId ? Number(clientId) : undefined}
+        openModal={openManagerModal}
+        handleModal={setOpenManagerModal}
+      />
     </div>
   );
 }

@@ -1,13 +1,16 @@
 "use client";
 
+import { useState } from "react";
 import { useGetEndpointQueryClient } from "@/hooks/useGetEndpointQueryClient";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import Pagination from "@/components/pagination/Pagination";
 import SearchBar from "@/components/search/search";
 import TableBrands from "./TableBrands";
 import { Skeleton } from "../ui/skeleton";
 import { BrandType } from "@/lib/definitions";
+import CreateBrandModal from "./CreateBrandModal";
 
 interface BrandTableClientProps {
   clientId?: string;
@@ -19,6 +22,7 @@ export default function ListBrandsClient({
   clientId,
   endpoint = "brands",
 }: BrandTableClientProps) {
+  const [openBrandModal, setOpenBrandModal] = useState(false);
   const searchParams = useSearchParams();
   const pathname = usePathname();
   const { replace } = useRouter();
@@ -87,9 +91,17 @@ export default function ListBrandsClient({
       ) : (
         <Card className="mt-4">
           <CardHeader>
-            <CardTitle>
-              {clientId ? "Marcas del Cliente" : "Todas las Marcas"}
-            </CardTitle>
+            <div className="flex justify-between items-center">
+              <CardTitle>
+                {clientId ? "Marcas del Cliente" : "Todas las Marcas"}
+              </CardTitle>
+              <Button
+                variant="default"
+                onClick={() => setOpenBrandModal(true)}
+              >
+                Crear Marca
+              </Button>
+            </div>
             <SearchBar
               initialSearchValue={search}
               placeholder="Buscar marcas..."
@@ -115,6 +127,12 @@ export default function ListBrandsClient({
           </CardContent>
         </Card>
       )}
+
+      <CreateBrandModal
+        clientId={clientId ? Number(clientId) : undefined}
+        openModal={openBrandModal}
+        handleModal={setOpenBrandModal}
+      />
     </div>
   );
 }
