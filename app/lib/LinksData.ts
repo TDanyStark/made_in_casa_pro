@@ -7,7 +7,7 @@ export type NavSubLink = {
 };
 
 export const navSubLinks: Record<string, NavSubLink[]> = {
-  Clientes: [
+  '/clients': [
     { name: 'Marcas', route: '/brands' },
     { name: 'Gerentes', route: '/managers' },
   ],

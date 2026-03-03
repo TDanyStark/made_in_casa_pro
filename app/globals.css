@@ -167,3 +167,8 @@ button{
   transform-origin: center 75%;
 }
 
+a{
+  text-decoration: none;
+  cursor: pointer;
+}
+
