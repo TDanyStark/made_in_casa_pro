@@ -15,7 +15,7 @@ export default function SideNav() {
       </Link>
       <div className="flex grow flex-row justify-between space-x-2 md:flex-col md:space-x-0 md:space-y-2 max-w-full overflow-auto pb-4 md:pb-0">
         <NavLinks />
-        <div className="hidden h-auto w-full grow rounded-md bg-light-bg-2 dark:bg-dark-bg-2 md:block"></div>
+        <div className="hidden h-auto w-full grow rounded-md bg-muted md:block"></div>
         <form action={logout}>
           <SubmitButtonSignOut />
         </form>

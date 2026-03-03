@@ -1,6 +1,18 @@
 import { House, Folder, LayoutList, BookUser, LibraryBig, Users } from 'lucide-react';
 import { LinksType, UserRole } from './definitions';
 
+export type NavSubLink = {
+  name: string;
+  route: string;
+};
+
+export const navSubLinks: Record<string, NavSubLink[]> = {
+  Clientes: [
+    { name: 'Marcas', route: '/brands' },
+    { name: 'Gerentes', route: '/managers' },
+  ],
+};
+
 
 export const links: LinksType[] = [
   { 
