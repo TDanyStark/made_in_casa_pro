@@ -175,7 +175,7 @@ export async function updateBrand(id: string, updateData: Partial<BrandType>) {
           currentBrand.manager_id !== manager_id
         ) {
           await transaction.execute({
-            sql: "INSERT INTO brand_manager_history (brand_id, previous_manager_id, new_manager_id, changed_at) VALUES (?, ?, ?, datetime('now', '-5 hours'))",
+            sql: "INSERT INTO brand_manager_history (brand_id, previous_manager_id, new_manager_id, changed_at) VALUES (?, ?, ?, NOW() - INTERVAL '5 hours')",
             args: [id, currentBrand.manager_id, manager_id],
           });
         }
