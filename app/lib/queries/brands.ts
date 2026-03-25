@@ -1,4 +1,4 @@
-import { turso } from "../db";
+import { db } from "../db";
 import { revalidatePath } from "next/cache";
 import { BrandType } from "../definitions";
 import { getManagerById } from "./managers";
@@ -6,7 +6,7 @@ import { ITEMS_PER_PAGE } from "@/config/constants";
 
 export async function getBrandsByManagerId(managerId: string) {
   try {
-    const result = await turso.execute({
+    const result = await db.execute({
       sql: `
         SELECT 
           b.id as id,
@@ -27,7 +27,7 @@ export async function getBrandsByManagerId(managerId: string) {
 
 export async function getBrandById(id: string) {
   try {
-    const result = await turso.execute({
+    const result = await db.execute({
       sql: `
         SELECT 
           b.id as id,
@@ -89,7 +89,7 @@ export async function getBrandById(id: string) {
 
 export async function getBrands() {
   try {
-    const result = await turso.execute(
+    const result = await db.execute(
       `SELECT * FROM brands ORDER BY name ASC`
     );
     return result.rows as unknown as BrandType[];
@@ -102,7 +102,7 @@ export async function getBrands() {
 export async function createBrand(brandData: Omit<BrandType, "id">) {
   try {
     // No need for transaction since we're only doing a single operation now
-    const brandResult = await turso.execute({
+    const brandResult = await db.execute({
       sql: `INSERT INTO brands (name, manager_id, business_unit_id)
       VALUES ($1, $2, $3)`,
       args: [brandData.name, brandData.manager_id, brandData.business_unit_id ?? null],
@@ -158,8 +158,8 @@ export async function updateBrand(id: string, updateData: Partial<BrandType>) {
       // Add the id at the end of args for WHERE clause
       args.push(id);
 
-      // Use Turso's transaction API
-      const transaction = await turso.transaction("write");
+      // Use db transaction API
+      const transaction = await db.transaction("write");
 
       try {
         // Actualizar la marca
@@ -266,7 +266,7 @@ export async function getBrandsWithPagination({
       countSql += " WHERE " + conditions.join(" AND ");
     }
 
-    const countResult = await turso.execute({
+    const countResult = await db.execute({
       sql: countSql,
       args: filterArgs,
     });
@@ -279,7 +279,7 @@ export async function getBrandsWithPagination({
     const args = [...filterArgs, limit, offset];
 
     // Execute query
-    const result = await turso.execute({
+    const result = await db.execute({
       sql,
       args,
     });
@@ -307,7 +307,7 @@ export async function getBrandManagerHistory(brandId: string) {
   try {
     
     // Query for past manager changes from history table
-    const historyResult = await turso.execute({
+    const historyResult = await db.execute({
       sql: `
         SELECT 
           bmh.id,

@@ -5,9 +5,9 @@ const mockTransaction = {
   rollback: jest.fn(),
 };
 
-// Mock Turso DB (with transaction support) before any imports
+// Mock DB (with transaction support) before any imports
 jest.mock('@/lib/db', () => ({
-  turso: {
+  db: {
     execute: jest.fn(),
     transaction: jest.fn(() => Promise.resolve(mockTransaction)),
   },
@@ -18,7 +18,7 @@ jest.mock('@/lib/queries/managers', () => ({
   getManagerById: jest.fn(),
 }));
 
-import { turso } from '@/lib/db';
+import { db } from '@/lib/db';
 import { getManagerById } from '@/lib/queries/managers';
 import {
   getBrands,
@@ -29,7 +29,7 @@ import {
 } from '@/lib/queries/brands';
 import { revalidatePath } from 'next/cache';
 
-const mockExecute = turso.execute as jest.MockedFunction<typeof turso.execute>;
+const mockExecute = db.execute as jest.MockedFunction<typeof db.execute>;
 const mockGetManagerById = getManagerById as jest.MockedFunction<typeof getManagerById>;
 
 function makeResult(rows: Record<string, unknown>[], lastInsertRowid: number | bigint = 0) {
@@ -51,7 +51,7 @@ beforeEach(() => {
 });
 
 describe('getBrands()', () => {
-  it('returns an empty array when turso throws', async () => {
+  it('returns an empty array when db throws', async () => {
     mockExecute.mockRejectedValueOnce(new Error('DB error'));
     const result = await getBrands();
     expect(result).toEqual([]);
@@ -67,7 +67,7 @@ describe('getBrands()', () => {
 });
 
 describe('getBrandById()', () => {
-  it('returns null when turso returns no rows', async () => {
+  it('returns null when db returns no rows', async () => {
     mockExecute.mockResolvedValueOnce(makeResult([]));
     const result = await getBrandById('99');
     expect(result).toBeNull();
@@ -105,7 +105,7 @@ describe('getBrandById()', () => {
 });
 
 describe('createBrand()', () => {
-  it('calls turso.execute with INSERT SQL and correct args', async () => {
+  it('calls db.execute with INSERT SQL and correct args', async () => {
     mockExecute.mockResolvedValueOnce(makeResult([], 15));
     mockGetManagerById.mockResolvedValueOnce({
       id: 10, client_id: 2, name: 'Carlos', email: 'c@test.com', phone: '555',
@@ -166,7 +166,7 @@ describe('updateBrand()', () => {
     }]));
 
     await updateBrand('5', { manager_id: 20 });
-    expect(turso.transaction).toHaveBeenCalledWith('write');
+    expect(db.transaction).toHaveBeenCalledWith('write');
   });
 
   it('inserts a history record when manager_id changes from current value', async () => {
@@ -239,12 +239,12 @@ describe('updateBrand()', () => {
   it('returns getBrandById result without transaction when no updates are provided', async () => {
     mockExecute.mockResolvedValueOnce(makeResult([]));
     await updateBrand('5', {});
-    expect(turso.transaction).not.toHaveBeenCalled();
+    expect(db.transaction).not.toHaveBeenCalled();
   });
 });
 
 describe('getBrandsWithPagination()', () => {
-  it('returns { brands: [], total: 0 } when turso throws', async () => {
+  it('returns { brands: [], total: 0 } when db throws', async () => {
     mockExecute.mockRejectedValueOnce(new Error('error'));
     const result = await getBrandsWithPagination({});
     expect(result).toEqual({ brands: [], total: 0 });

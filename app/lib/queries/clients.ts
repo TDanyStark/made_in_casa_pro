@@ -1,11 +1,11 @@
-import {turso} from '../db';
+import {db} from '../db';
 import { ClientType } from '../definitions';
 import { ITEMS_PER_PAGE } from '@/config/constants';
 import { revalidatePath } from "next/cache";
 
 export async function getClients() {
   try {
-    return await turso.execute(`SELECT * FROM clients`);
+    return await db.execute(`SELECT * FROM clients`);
   } catch (error) {
     console.error('Error al obtener clientes:', error);
     throw new Error('No se pudieron obtener los clientes');
@@ -14,7 +14,7 @@ export async function getClients() {
 
 export async function createClient(name: string, country_id: number) {
   try {
-    return await turso.execute({
+    return await db.execute({
       sql: `INSERT INTO clients (name, country_id) VALUES ($1, $2)`,
       args: [name, country_id],
     });
@@ -25,7 +25,7 @@ export async function createClient(name: string, country_id: number) {
 
 export async function fetchFilteredClients(): Promise<ClientType[]> {
   try {
-    const clients = await turso.execute(`
+    const clients = await db.execute(`
         SELECT c.id, c.name, co.id AS country_id, co.name AS country_name, co.flag AS country_flag
         FROM clients c
         LEFT JOIN countries co ON c.country_id = co.id
@@ -48,7 +48,7 @@ export async function fetchFilteredClients(): Promise<ClientType[]> {
 
 export async function getClientById(id: string): Promise<ClientType | null> {
   try {
-    const client = await turso.execute({
+    const client = await db.execute({
       sql: `
         SELECT c.id, c.name, co.id AS country_id, co.name AS country_name, c.accept_business_units, co.flag AS country_flag
         FROM clients c
@@ -119,7 +119,7 @@ export async function getClientsWithPagination({
       countSql += ' WHERE ' + conditions.join(' AND ');
     }
     
-    const countResult = await turso.execute({
+    const countResult = await db.execute({
       sql: countSql,
       args: countArgs
     });
@@ -132,7 +132,7 @@ export async function getClientsWithPagination({
     args.push(limit, offset);
 
     // Execute query
-    const result = await turso.execute({
+    const result = await db.execute({
       sql,
       args
     });
@@ -191,7 +191,7 @@ export async function updateClient(id: string, updateData: {
     args.push(id);
 
     // Ejecutar la consulta de actualización
-    await turso.execute({
+    await db.execute({
       sql: `UPDATE clients SET ${updates.join(", ")} WHERE id = $${args.length}`,
       args,
     });

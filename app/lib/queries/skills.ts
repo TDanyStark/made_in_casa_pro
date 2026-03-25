@@ -1,4 +1,4 @@
-import { turso } from "../db";
+import { db } from "../db";
 import { SkillType } from "../definitions";
 
 export async function getSkills(userId?: number) {
@@ -13,7 +13,7 @@ export async function getSkills(userId?: number) {
       ORDER BY s.name ASC
     `;
     
-    const result = await turso.execute({
+    const result = await db.execute({
       sql,
       args: [userId || null]
     });
@@ -27,7 +27,7 @@ export async function getSkills(userId?: number) {
 
 export async function getSkillById(id: string) {
   try {
-    const result = await turso.execute({
+    const result = await db.execute({
       sql: `
         SELECT id, name
         FROM skills
@@ -47,7 +47,7 @@ export async function getSkillById(id: string) {
 
 export async function createSkill(skillData: Omit<SkillType, "id">) {
   try {
-    const result = await turso.execute({
+    const result = await db.execute({
       sql: `INSERT INTO skills (name) VALUES ($1)`,
       args: [skillData.name],
     });
@@ -80,7 +80,7 @@ export async function updateSkill(id: string, updateData: Partial<SkillType>) {
       // Add the id at the end of args for WHERE clause
       args.push(id);
 
-      await turso.execute({
+      await db.execute({
         sql: `UPDATE skills SET ${updates.join(", ")} WHERE id = $2`,
         args,
       });
@@ -132,7 +132,7 @@ export async function getSkillsWithPagination({
     //   countSql += ` WHERE name LIKE ?`;
     // }
 
-    // const countResult = await turso.execute({
+    // const countResult = await db.execute({
     //   sql: countSql,
     //   args: countArgs,
     // });
@@ -147,7 +147,7 @@ export async function getSkillsWithPagination({
     // args.push(limit, offset);
 
     // Execute query
-    const result = await turso.execute({
+    const result = await db.execute({
       sql,
       args,
     });

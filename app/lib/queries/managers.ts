@@ -1,11 +1,11 @@
-import { turso } from "../db";
+import { db } from "../db";
 import { revalidatePath } from "next/cache";
 import { ManagerType } from "../definitions";
 import { ITEMS_PER_PAGE } from "@/config/constants";
 
 export async function getManagerByEmail(email: string) {
   try {
-    const result = await turso.execute({
+    const result = await db.execute({
       sql: `SELECT * FROM managers WHERE email = $1`,
       args: [email],
     });
@@ -20,7 +20,7 @@ export async function getManagerByEmail(email: string) {
 
 export async function getManagerById(id: string) {
   try {
-    const result = await turso.execute({
+    const result = await db.execute({
       sql: `
         SELECT 
           m.*,
@@ -71,7 +71,7 @@ export async function getManagerById(id: string) {
 
 export async function getManagersByClientId(clientId: string) {
   try {
-    const result = await turso.execute({
+    const result = await db.execute({
       sql: `SELECT * FROM managers WHERE client_id = $1 ORDER BY name ASC`,
       args: [clientId],
     });
@@ -84,7 +84,7 @@ export async function getManagersByClientId(clientId: string) {
 
 export async function getManagers() {
   try {
-    const result = await turso.execute(
+    const result = await db.execute(
       `SELECT * FROM managers ORDER BY name ASC`
     );
     return result.rows as unknown as ManagerType[];
@@ -129,7 +129,7 @@ export async function getManagersWithPagination({clientId, page = 1, limit = ITE
     if (conditions.length > 0) {
       countSql += " WHERE " + conditions.join(" AND ");
     }
-    const countResult = await turso.execute({
+    const countResult = await db.execute({
       sql: countSql,
       args: filterArgs,
     });
@@ -139,7 +139,7 @@ export async function getManagersWithPagination({clientId, page = 1, limit = ITE
     const args = [...filterArgs, limit, offset];
     sql += ` LIMIT $${filterArgs.length + 1} OFFSET $${filterArgs.length + 2}`;
     // Execute query
-    const result = await turso.execute({
+    const result = await db.execute({
       sql,
       args,
     });
@@ -155,7 +155,7 @@ export async function getManagersWithPagination({clientId, page = 1, limit = ITE
 
 export async function createManager(managerData: Omit<ManagerType, "id">) {
   try {
-    const result = await turso.execute({
+    const result = await db.execute({
       sql: `INSERT INTO managers (client_id, name, email, phone, biography)
       VALUES ($1, $2, $3, $4, $5)`,
       args: [
@@ -214,7 +214,7 @@ export async function updateManager(id: string, updateData: { email?: string; ph
     args.push(id);
 
     // Execute the update query
-    await turso.execute({
+    await db.execute({
       sql: `UPDATE managers SET ${updates.join(", ")} WHERE id = $${args.length}`,
       args,
     });

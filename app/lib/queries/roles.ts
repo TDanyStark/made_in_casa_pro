@@ -1,8 +1,8 @@
-import { turso } from '../db';
+import { db } from '../db';
 
 export async function getRoles() {
   try {
-    return await turso.execute(`SELECT * FROM roles`);
+    return await db.execute(`SELECT * FROM roles`);
   } catch (error) {
     console.error('Error al obtener roles:', error);
     throw new Error('No se pudieron obtener los roles');
@@ -11,7 +11,7 @@ export async function getRoles() {
 
 export async function getRoleById(roleId: number) {
   try {
-    return await turso.execute({
+    return await db.execute({
       sql: `SELECT * FROM roles WHERE id = $1`,
       args: [roleId],
     });
@@ -23,7 +23,7 @@ export async function getRoleById(roleId: number) {
 
 export async function createRole(role: string) {
   try {
-    return await turso.execute({
+    return await db.execute({
       sql: `INSERT INTO roles (role) VALUES ($1)`,
       args: [role],
     });

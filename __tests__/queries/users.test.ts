@@ -1,11 +1,11 @@
-// Mock Turso DB before any imports
+// Mock DB before any imports
 jest.mock('@/lib/db', () => ({
-  turso: {
+  db: {
     execute: jest.fn(),
   },
 }));
 
-import { turso } from '@/lib/db';
+import { db } from '@/lib/db';
 import {
   getUsers,
   getUserById,
@@ -16,7 +16,7 @@ import {
 } from '@/lib/queries/users';
 import { ColaboradorType } from '@/lib/definitions';
 
-const mockExecute = turso.execute as jest.MockedFunction<typeof turso.execute>;
+const mockExecute = db.execute as jest.MockedFunction<typeof db.execute>;
 
 function makeResult(rows: Record<string, unknown>[], lastInsertRowid: number | bigint = 0) {
   return {
@@ -82,7 +82,7 @@ describe('getUserByEmail()', () => {
 });
 
 describe('createUser()', () => {
-  it('calls turso.execute with INSERT INTO users and 4 args', async () => {
+  it('calls db.execute with INSERT INTO users and 4 args', async () => {
     mockExecute.mockResolvedValueOnce(makeResult([], 10));
     await createUser('Maria', 'maria@test.com', 'hashedpw', 3);
     expect(mockExecute).toHaveBeenCalledWith({
@@ -91,23 +91,23 @@ describe('createUser()', () => {
     });
   });
 
-  it('throws "No se pudo crear el usuario" when turso fails', async () => {
+  it('throws "No se pudo crear el usuario" when db fails', async () => {
     mockExecute.mockRejectedValueOnce(new Error('DB error'));
     await expect(createUser('X', 'x@x.com', 'pw', 1)).rejects.toThrow('No se pudo crear el usuario');
   });
 });
 
 describe('deleteUser()', () => {
-  it('calls turso.execute with DELETE WHERE id = ? and the userId', async () => {
+  it('calls db.execute with DELETE WHERE id = $1 and the userId', async () => {
     mockExecute.mockResolvedValueOnce(makeResult([]));
     await deleteUser(5);
     expect(mockExecute).toHaveBeenCalledWith({
-      sql: expect.stringContaining('DELETE FROM users WHERE id = ?'),
+      sql: expect.stringContaining('DELETE FROM users WHERE id = $1'),
       args: [5],
     });
   });
 
-  it('throws when turso fails', async () => {
+  it('throws when db fails', async () => {
     mockExecute.mockRejectedValueOnce(new Error('DB error'));
     await expect(deleteUser(1)).rejects.toThrow('No se pudo eliminar el usuario');
   });
@@ -156,7 +156,7 @@ describe('getUsers()', () => {
     }));
   });
 
-  it('throws "No se pudieron obtener los usuarios" when turso fails', async () => {
+  it('throws "No se pudieron obtener los usuarios" when db fails', async () => {
     mockExecute.mockRejectedValueOnce(new Error('DB error'));
     await expect(getUsers()).rejects.toThrow('No se pudieron obtener los usuarios');
   });
@@ -178,11 +178,11 @@ describe('updateUser()', () => {
     await updateUser('1', { name: 'Updated' });
     const updateCall = mockExecute.mock.calls[0];
     expect(updateCall[0]).toEqual(expect.objectContaining({
-      sql: expect.stringContaining('name = ?'),
+      sql: expect.stringContaining('name = $1'),
     }));
     // Should NOT include email in SET
     expect(updateCall[0]).toEqual(expect.objectContaining({
-      sql: expect.not.stringContaining('email = ?'),
+      sql: expect.not.stringContaining('email = $'),
     }));
   });
 

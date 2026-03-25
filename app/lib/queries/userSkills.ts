@@ -1,9 +1,9 @@
-import { turso } from "../db";
+import { db } from "../db";
 import { UserSkillType } from "../definitions";
 
 export async function getUserSkills(userId: number) {
   try {
-    const result = await turso.execute({
+    const result = await db.execute({
       sql: `
         SELECT us.user_id, us.skill_id, s.name as skill_name
         FROM user_skills us
@@ -24,7 +24,7 @@ export async function getUserSkills(userId: number) {
 export async function addUserSkill(userId: number, skillId: number) {
   try {
     // Check if the relationship already exists
-    const existingResult = await turso.execute({
+    const existingResult = await db.execute({
       sql: `SELECT 1 FROM user_skills WHERE user_id = $1 AND skill_id = $2`,
       args: [userId, skillId],
     });
@@ -35,7 +35,7 @@ export async function addUserSkill(userId: number, skillId: number) {
     }
 
     // If not, create it
-    await turso.execute({
+    await db.execute({
       sql: `INSERT INTO user_skills (user_id, skill_id) VALUES ($1, $2)`,
       args: [userId, skillId],
     });
@@ -49,7 +49,7 @@ export async function addUserSkill(userId: number, skillId: number) {
 
 export async function removeUserSkill(userId: number, skillId: number) {
   try {
-    await turso.execute({
+    await db.execute({
       sql: `DELETE FROM user_skills WHERE user_id = $1 AND skill_id = $2`,
       args: [userId, skillId],
     });
@@ -63,7 +63,7 @@ export async function removeUserSkill(userId: number, skillId: number) {
 
 export async function getUserSkillById(userId: number, skillId: number) {
   try {
-    const result = await turso.execute({
+    const result = await db.execute({
       sql: `
         SELECT us.user_id, us.skill_id, s.name as skill_name
         FROM user_skills us

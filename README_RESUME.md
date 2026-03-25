@@ -10,7 +10,7 @@
 
 - **Frontend**: Next.js 15.3.2, React 19, TypeScript, TailwindCSS 4
 - **Backend**: Next.js API Routes
-- **Base de Datos**: Turso (SQLite serverless)
+- **Base de Datos**: PostgreSQL (local) + Neon (produccion)
 - **Autenticación**: JWT con encriptación (jose) + bcrypt
 - **Validación**: Zod + React Hook Form
 - **UI Components**: Radix UI + Framer Motion

@@ -1,11 +1,11 @@
-// Mock Turso DB before any imports
+// Mock DB before any imports
 jest.mock('@/lib/db', () => ({
-  turso: {
+  db: {
     execute: jest.fn(),
   },
 }));
 
-import { turso } from '@/lib/db';
+import { db } from '@/lib/db';
 import {
   getManagerByEmail,
   getManagerById,
@@ -16,7 +16,7 @@ import {
 } from '@/lib/queries/managers';
 import { revalidatePath } from 'next/cache';
 
-const mockExecute = turso.execute as jest.MockedFunction<typeof turso.execute>;
+const mockExecute = db.execute as jest.MockedFunction<typeof db.execute>;
 
 function makeResult(rows: Record<string, unknown>[], lastInsertRowid: number | bigint = 0) {
   return {
@@ -48,7 +48,7 @@ describe('getManagerByEmail()', () => {
     expect(result).toBeNull();
   });
 
-  it('returns null (does not throw) when turso throws', async () => {
+  it('returns null (does not throw) when db throws', async () => {
     mockExecute.mockRejectedValueOnce(new Error('DB error'));
     const result = await getManagerByEmail('test@test.com');
     expect(result).toBeNull();
@@ -56,7 +56,7 @@ describe('getManagerByEmail()', () => {
 });
 
 describe('getManagerById()', () => {
-  it('returns null when turso returns no rows', async () => {
+  it('returns null when db returns no rows', async () => {
     mockExecute.mockResolvedValueOnce(makeResult([]));
     const result = await getManagerById('99');
     expect(result).toBeNull();
@@ -102,16 +102,16 @@ describe('getManagerById()', () => {
 });
 
 describe('getManagersByClientId()', () => {
-  it('calls execute with WHERE client_id = ? and the correct arg', async () => {
+  it('calls execute with WHERE client_id = $1 and the correct arg', async () => {
     mockExecute.mockResolvedValueOnce(makeResult([]));
     await getManagersByClientId('5');
     expect(mockExecute).toHaveBeenCalledWith(expect.objectContaining({
-      sql: expect.stringContaining('WHERE client_id = ?'),
+      sql: expect.stringContaining('WHERE client_id = $1'),
       args: ['5'],
     }));
   });
 
-  it('returns an empty array when turso throws', async () => {
+  it('returns an empty array when db throws', async () => {
     mockExecute.mockRejectedValueOnce(new Error('error'));
     const result = await getManagersByClientId('1');
     expect(result).toEqual([]);
@@ -119,7 +119,7 @@ describe('getManagersByClientId()', () => {
 });
 
 describe('createManager()', () => {
-  it('calls turso.execute with INSERT SQL and 5 args', async () => {
+  it('calls db.execute with INSERT SQL and 5 args', async () => {
     mockExecute.mockResolvedValueOnce(makeResult([], 7));
     await createManager({
       client_id: 1,
@@ -186,10 +186,10 @@ describe('updateManager()', () => {
     await updateManager('1', { email: 'new@test.com' });
     const updateCall = mockExecute.mock.calls[0];
     expect(updateCall[0]).toEqual(expect.objectContaining({
-      sql: expect.stringContaining('email = ?'),
+      sql: expect.stringContaining('email = $1'),
     }));
     expect(updateCall[0]).toEqual(expect.objectContaining({
-      sql: expect.not.stringContaining('phone = ?'),
+      sql: expect.not.stringContaining('phone = $'),
     }));
   });
 });
@@ -217,7 +217,7 @@ describe('getManagersWithPagination()', () => {
     }));
   });
 
-  it('returns { managers: [], total: 0 } when turso throws', async () => {
+  it('returns { managers: [], total: 0 } when db throws', async () => {
     mockExecute.mockRejectedValueOnce(new Error('error'));
     const result = await getManagersWithPagination({});
     expect(result).toEqual({ managers: [], total: 0 });

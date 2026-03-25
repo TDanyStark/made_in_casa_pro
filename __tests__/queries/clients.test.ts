@@ -1,11 +1,11 @@
-// Mock Turso DB before any imports
+// Mock DB before any imports
 jest.mock('@/lib/db', () => ({
-  turso: {
+  db: {
     execute: jest.fn(),
   },
 }));
 
-import { turso } from '@/lib/db';
+import { db } from '@/lib/db';
 import {
   getClients,
   createClient,
@@ -16,9 +16,9 @@ import {
 } from '@/lib/queries/clients';
 import { revalidatePath } from 'next/cache';
 
-const mockExecute = turso.execute as jest.MockedFunction<typeof turso.execute>;
+const mockExecute = db.execute as jest.MockedFunction<typeof db.execute>;
 
-// Helper for a Turso-like result object
+// Helper for a DB-like result object
 function makeResult(rows: Record<string, unknown>[], lastInsertRowid: number | bigint = 0) {
   return {
     rows: rows as never,
@@ -35,20 +35,20 @@ beforeEach(() => {
 });
 
 describe('getClients()', () => {
-  it('calls turso.execute with SELECT * FROM clients', async () => {
+  it('calls db.execute with SELECT * FROM clients', async () => {
     mockExecute.mockResolvedValueOnce(makeResult([]));
     await getClients();
     expect(mockExecute).toHaveBeenCalledWith('SELECT * FROM clients');
   });
 
-  it('throws a wrapped error when turso.execute rejects', async () => {
+  it('throws a wrapped error when db.execute rejects', async () => {
     mockExecute.mockRejectedValueOnce(new Error('DB error'));
     await expect(getClients()).rejects.toThrow('No se pudieron obtener los clientes');
   });
 });
 
 describe('createClient()', () => {
-  it('calls turso.execute with INSERT SQL and correct args', async () => {
+  it('calls db.execute with INSERT SQL and correct args', async () => {
     mockExecute.mockResolvedValueOnce(makeResult([], 5));
     await createClient('Test Client', 1);
     expect(mockExecute).toHaveBeenCalledWith({
@@ -57,14 +57,14 @@ describe('createClient()', () => {
     });
   });
 
-  it('re-throws errors from turso', async () => {
+  it('re-throws errors from db', async () => {
     mockExecute.mockRejectedValueOnce(new Error('DB fail'));
     await expect(createClient('Bad', 1)).rejects.toThrow();
   });
 });
 
 describe('fetchFilteredClients()', () => {
-  it('returns an empty array when turso returns no rows', async () => {
+  it('returns an empty array when db returns no rows', async () => {
     mockExecute.mockResolvedValueOnce(makeResult([]));
     const result = await fetchFilteredClients();
     expect(result).toEqual([]);
@@ -101,7 +101,7 @@ describe('fetchFilteredClients()', () => {
 });
 
 describe('getClientById()', () => {
-  it('returns null when turso returns no rows', async () => {
+  it('returns null when db returns no rows', async () => {
     mockExecute.mockResolvedValueOnce(makeResult([]));
     const result = await getClientById('99');
     expect(result).toBeNull();
@@ -143,7 +143,7 @@ describe('getClientById()', () => {
 });
 
 describe('getClientsWithPagination()', () => {
-  it('returns { clients: [], total: 0 } when turso throws', async () => {
+  it('returns { clients: [], total: 0 } when db throws', async () => {
     mockExecute.mockRejectedValueOnce(new Error('DB error'));
     const result = await getClientsWithPagination({});
     expect(result).toEqual({ clients: [], total: 0 });
@@ -195,7 +195,7 @@ describe('updateClient()', () => {
     await updateClient('1', { name: 'Updated' });
     const updateCall = mockExecute.mock.calls[0];
     expect(updateCall[0]).toEqual(expect.objectContaining({
-      sql: expect.stringContaining('name = ?'),
+      sql: expect.stringContaining('name = $1'),
     }));
   });
 

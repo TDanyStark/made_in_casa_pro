@@ -1,4 +1,4 @@
-import {turso} from '../db';
+import {db} from '../db';
 import { UserRole, UserType } from '../definitions';
 import { ITEMS_PER_PAGE } from "@/config/constants";
 
@@ -30,7 +30,7 @@ export async function getUsers(params?: GetUsersParams) {
     
     // Consulta para obtener el total de registros
     const countQuery = `SELECT COUNT(*) as total FROM users ${whereClause}`;
-    const countResult = await turso.execute({
+    const countResult = await db.execute({
       sql: countQuery,
       args,
     });
@@ -46,7 +46,7 @@ export async function getUsers(params?: GetUsersParams) {
       LIMIT ${search ? "$3" : "$1"} OFFSET ${search ? "$4" : "$2"}
     `;
     
-    const result = await turso.execute({
+    const result = await db.execute({
       sql: query,
       args: [...args, pageSize, offset],
     });
@@ -66,7 +66,7 @@ export async function getUsers(params?: GetUsersParams) {
 
 export async function getUserById(userId: number) {
   try {
-    const result = await turso.execute({
+    const result = await db.execute({
       sql: `SELECT * FROM users WHERE id = $1`,
       args: [userId],
     });
@@ -96,7 +96,7 @@ export async function getUserById(userId: number) {
 
 export async function getUserByEmail(email: string): Promise<UserType[]> {
   try {
-    const result = await turso.execute({
+    const result = await db.execute({
       sql: `SELECT * FROM users WHERE email = $1`,
       args: [email],
     });
@@ -115,7 +115,7 @@ export async function getUserByEmail(email: string): Promise<UserType[]> {
 
 export async function createUser(name: string, email: string, password: string, rol_id: number) {
   try {
-    return await turso.execute({
+    return await db.execute({
       sql: `INSERT INTO users (name, email, password, rol_id) VALUES ($1, $2, $3, $4)`,
       args: [name, email, password, rol_id],
     });
@@ -127,7 +127,7 @@ export async function createUser(name: string, email: string, password: string, 
 
 export async function deleteUser(userId: number) {
   try {
-    return await turso.execute({
+    return await db.execute({
       sql: `DELETE FROM users WHERE id = $1`,
       args: [userId],
     });
@@ -172,7 +172,7 @@ export async function getUsersWithPagination({
       countSql += " WHERE " + conditions.join(" AND ");
     }
 
-    const countResult = await turso.execute({
+    const countResult = await db.execute({
       sql: countSql,
       args: filterArgs,
     });
@@ -187,7 +187,7 @@ export async function getUsersWithPagination({
     sql += ` ORDER BY id DESC LIMIT ${limitPlaceholder} OFFSET ${offsetPlaceholder}`;
 
     // Execute query
-    const result = await turso.execute({
+    const result = await db.execute({
       sql,
       args,
     });
@@ -277,13 +277,13 @@ export async function updateUser(userId: string, data: {
       WHERE id = $${args.length}
     `;
     
-    await turso.execute({
+    await db.execute({
       sql: query,
       args,
     });
     
     // Obtener el usuario actualizado
-    const result = await turso.execute({
+    const result = await db.execute({
       sql: `SELECT * FROM users WHERE id = $1`,
       args: [userId],
     });

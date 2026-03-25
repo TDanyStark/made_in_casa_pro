@@ -1,4 +1,4 @@
-import { turso } from "../db";
+import { db } from "../db";
 import { ITEMS_PER_PAGE } from "@/config/constants";
 import { BusinessUnitType } from "../definitions";
 
@@ -6,7 +6,7 @@ import { BusinessUnitType } from "../definitions";
 
 export async function getBusinessUnitById(id: string) {
   try {
-    const result = await turso.execute({
+    const result = await db.execute({
       sql: `
         SELECT id, name
         FROM business_units
@@ -25,7 +25,7 @@ export async function getBusinessUnitById(id: string) {
 
 export async function getBusinessUnits() {
   try {
-    const result = await turso.execute(
+    const result = await db.execute(
       `SELECT * FROM business_units ORDER BY name ASC`
     );
     return result.rows as unknown as BusinessUnitType[];
@@ -37,7 +37,7 @@ export async function getBusinessUnits() {
 
 export async function createBusinessUnit(businessUnitData: Omit<BusinessUnitType, "id">) {
   try {
-    const result = await turso.execute({
+    const result = await db.execute({
       sql: `INSERT INTO business_units (name)
       VALUES ($1)`,
       args: [businessUnitData.name],
@@ -60,7 +60,7 @@ export async function updateBusinessUnit(id: string, updateData: Partial<Busines
     const { name } = updateData;
     
     if (name) {
-      await turso.execute({
+      await db.execute({
         sql: `UPDATE business_units SET name = $1 WHERE id = $2`,
         args: [name, id],
       });
@@ -108,7 +108,7 @@ export async function getBusinessUnitsWithPagination({
       countSql += ` WHERE name LIKE $1`;
     }
 
-    const countResult = await turso.execute({
+    const countResult = await db.execute({
       sql: countSql,
       args: countArgs,
     });
@@ -123,7 +123,7 @@ export async function getBusinessUnitsWithPagination({
     args.push(limit, offset);
 
     // Execute query
-    const result = await turso.execute({
+    const result = await db.execute({
       sql,
       args,
     });
@@ -146,7 +146,7 @@ export async function getBusinessUnitsWithPagination({
 
 export async function deleteBusinessUnit(id: string) {
   try {
-    await turso.execute({
+    await db.execute({
       sql: `DELETE FROM business_units WHERE id = $1`,
       args: [id],
     });

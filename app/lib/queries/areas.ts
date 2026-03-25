@@ -1,10 +1,10 @@
-import { turso } from "../db";
+import { db } from "../db";
 import { AreaType } from "../definitions";
 import { ITEMS_PER_PAGE } from "@/config/constants";
 
 export async function getAreas() {
   try {
-    const result = await turso.execute(
+    const result = await db.execute(
       `SELECT id, name FROM areas ORDER BY name ASC`
     );
     return result.rows as unknown as AreaType[];
@@ -16,7 +16,7 @@ export async function getAreas() {
 
 export async function getAreaById(id: string) {
   try {
-    const result = await turso.execute({
+    const result = await db.execute({
       sql: `
         SELECT id, name
         FROM areas
@@ -36,7 +36,7 @@ export async function getAreaById(id: string) {
 
 export async function createArea(areaData: Omit<AreaType, "id">) {
   try {
-    const result = await turso.execute({
+    const result = await db.execute({
       sql: `INSERT INTO areas (name) VALUES ($1)`,
       args: [areaData.name],
     });
@@ -69,7 +69,7 @@ export async function updateArea(id: string, updateData: Partial<AreaType>) {
       // Add the id at the end of args for WHERE clause
       args.push(id);
 
-      await turso.execute({
+      await db.execute({
         sql: `UPDATE areas SET ${updates.join(", ")} WHERE id = $2`,
         args,
       });
@@ -114,7 +114,7 @@ export async function getAreasWithPagination({
       countSql += ` WHERE name LIKE $1`;
     }
 
-    const countResult = await turso.execute({
+    const countResult = await db.execute({
       sql: countSql,
       args: countArgs,
     });
@@ -129,7 +129,7 @@ export async function getAreasWithPagination({
     args.push(limit, offset);
 
     // Execute query
-    const result = await turso.execute({
+    const result = await db.execute({
       sql,
       args,
     });
