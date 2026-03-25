@@ -134,7 +134,7 @@ export default function NavLinks() {
                 "flex h-[48px] grow cursor-pointer items-center justify-center gap-4 rounded-md bg-muted p-3 text-base font-normal transition-colors hover:bg-market-purple hover:text-white dark:hover:bg-market-pink/80 dark:hover:text-white md:flex-none md:justify-start md:p-2 md:px-3",
                 {
                   "bg-market-pink text-white hover:bg-market-pink dark:hover:bg-market-pink":
-                    pathname === link.route,
+                    pathname === link.route || pathname.startsWith(`${link.route}/`),
                 }
               )}
             >
