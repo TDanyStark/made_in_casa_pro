@@ -8,7 +8,7 @@ export async function getUserSkills(userId: number) {
         SELECT us.user_id, us.skill_id, s.name as skill_name
         FROM user_skills us
         JOIN skills s ON us.skill_id = s.id
-        WHERE us.user_id = ?
+        WHERE us.user_id = $1
         ORDER BY s.name ASC
       `,
       args: [userId],
@@ -25,7 +25,7 @@ export async function addUserSkill(userId: number, skillId: number) {
   try {
     // Check if the relationship already exists
     const existingResult = await turso.execute({
-      sql: `SELECT 1 FROM user_skills WHERE user_id = ? AND skill_id = ?`,
+      sql: `SELECT 1 FROM user_skills WHERE user_id = $1 AND skill_id = $2`,
       args: [userId, skillId],
     });
 
@@ -36,7 +36,7 @@ export async function addUserSkill(userId: number, skillId: number) {
 
     // If not, create it
     await turso.execute({
-      sql: `INSERT INTO user_skills (user_id, skill_id) VALUES (?, ?)`,
+      sql: `INSERT INTO user_skills (user_id, skill_id) VALUES ($1, $2)`,
       args: [userId, skillId],
     });
 
@@ -50,7 +50,7 @@ export async function addUserSkill(userId: number, skillId: number) {
 export async function removeUserSkill(userId: number, skillId: number) {
   try {
     await turso.execute({
-      sql: `DELETE FROM user_skills WHERE user_id = ? AND skill_id = ?`,
+      sql: `DELETE FROM user_skills WHERE user_id = $1 AND skill_id = $2`,
       args: [userId, skillId],
     });
     
@@ -68,7 +68,7 @@ export async function getUserSkillById(userId: number, skillId: number) {
         SELECT us.user_id, us.skill_id, s.name as skill_name
         FROM user_skills us
         JOIN skills s ON us.skill_id = s.id
-        WHERE us.user_id = ? AND us.skill_id = ?
+        WHERE us.user_id = $1 AND us.skill_id = $2
       `,
       args: [userId, skillId],
     });

@@ -20,7 +20,7 @@ export async function getAreaById(id: string) {
       sql: `
         SELECT id, name
         FROM areas
-        WHERE id = ?
+        WHERE id = $1
       `,
       args: [id],
     });
@@ -37,7 +37,7 @@ export async function getAreaById(id: string) {
 export async function createArea(areaData: Omit<AreaType, "id">) {
   try {
     const result = await turso.execute({
-      sql: `INSERT INTO areas (name) VALUES (?)`,
+      sql: `INSERT INTO areas (name) VALUES ($1)`,
       args: [areaData.name],
     });
 
@@ -61,7 +61,7 @@ export async function updateArea(id: string, updateData: Partial<AreaType>) {
 
     // Build update statement based on provided fields
     if (name) {
-      updates.push("name = ?");
+      updates.push("name = $1");
       args.push(name);
     }
 
@@ -70,7 +70,7 @@ export async function updateArea(id: string, updateData: Partial<AreaType>) {
       args.push(id);
 
       await turso.execute({
-        sql: `UPDATE areas SET ${updates.join(", ")} WHERE id = ?`,
+        sql: `UPDATE areas SET ${updates.join(", ")} WHERE id = $2`,
         args,
       });
 
@@ -102,7 +102,7 @@ export async function getAreasWithPagination({
 
     // Build WHERE clause for search
     if (search) {
-      sql += ` WHERE name LIKE ?`;
+      sql += ` WHERE name LIKE $1`;
       const searchParam = `%${search}%`;
       args.push(searchParam);
       countArgs.push(searchParam);
@@ -111,7 +111,7 @@ export async function getAreasWithPagination({
     // Get total count for pagination
     let countSql = `SELECT COUNT(*) as count FROM areas`;
     if (search) {
-      countSql += ` WHERE name LIKE ?`;
+      countSql += ` WHERE name LIKE $1`;
     }
 
     const countResult = await turso.execute({
@@ -122,7 +122,9 @@ export async function getAreasWithPagination({
     const total = Number(countResult.rows[0].count);
 
     // Add order by and pagination
-    sql += ` ORDER BY name ASC LIMIT ? OFFSET ?`;
+    const limitPlaceholder = search ? "$2" : "$1";
+    const offsetPlaceholder = search ? "$3" : "$2";
+    sql += ` ORDER BY name ASC LIMIT ${limitPlaceholder} OFFSET ${offsetPlaceholder}`;
     const offset = (page - 1) * limit;
     args.push(limit, offset);
 

@@ -3,7 +3,7 @@
 ## Descripción general del proyecto
 - Aplicación Next.js 15 con App Router. Las páginas de UI viven en `app/(admin)/*` y la página de login es `app/page.tsx`.
 - Las rutas de la API están en `app/api/**` y usan `NextRequest/NextResponse`.
-- La capa de datos usa Turso (libsql) en `app/lib/db.ts` con helpers de consultas en `app/lib/queries/**`; las mutaciones suelen llamar a `revalidatePath`.
+- La capa de datos usa postgress en `app/lib/db.ts` con helpers de consultas en `app/lib/queries/**`; las mutaciones suelen llamar a `revalidatePath`.
 - El alias de rutas `@/*` mapea a `app/*` (ver `tsconfig.json`), por lo que imports como `"@/lib/queries/clients"` apuntan a `app/`.
 
 ## Autenticación y permisos
@@ -27,11 +27,7 @@
 
 ## Desarrollo local y entorno
 - Scripts: `npm run dev` (turbopack), `npm run build`, `npm run start`, `npm run lint`.
-- Variables de entorno requeridas: `SESSION_SECRET`, `TURSO_DATABASE_URL`, `TURSO_AUTH_TOKEN` (usadas en `app/lib/session.ts` y `app/lib/db.ts`).
-
-
-## Test
-- Para los tests, se usan Jest y React Testing Library. Las funciones de Turso se mockean para simular resultados de la base de datos. revisar el estilo de los test que ya existen en `__tests__/queries` y `__tests__/hooks` para mantener consistencia.
+- Variables de entorno requeridas: `SESSION_SECRET`, (usadas en `app/lib/session.ts` y `app/lib/db.ts`).
 
 ## Siempre que se agregue un nuevo feature o endpoint
 - asegúrate de agregar tests unitarios y de integración correspondientes.

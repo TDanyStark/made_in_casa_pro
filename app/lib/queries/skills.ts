@@ -9,7 +9,7 @@ export async function getSkills(userId?: number) {
         s.name,
         CASE WHEN us.skill_id IS NOT NULL THEN 1 ELSE 0 END as selected
       FROM skills s
-      LEFT JOIN user_skills us ON s.id = us.skill_id AND us.user_id = ?
+      LEFT JOIN user_skills us ON s.id = us.skill_id AND us.user_id = $1
       ORDER BY s.name ASC
     `;
     
@@ -31,7 +31,7 @@ export async function getSkillById(id: string) {
       sql: `
         SELECT id, name
         FROM skills
-        WHERE id = ?
+        WHERE id = $1
       `,
       args: [id],
     });
@@ -48,7 +48,7 @@ export async function getSkillById(id: string) {
 export async function createSkill(skillData: Omit<SkillType, "id">) {
   try {
     const result = await turso.execute({
-      sql: `INSERT INTO skills (name) VALUES (?)`,
+      sql: `INSERT INTO skills (name) VALUES ($1)`,
       args: [skillData.name],
     });
 
@@ -72,7 +72,7 @@ export async function updateSkill(id: string, updateData: Partial<SkillType>) {
 
     // Build update statement based on provided fields
     if (name) {
-      updates.push("name = ?");
+      updates.push("name = $1");
       args.push(name);
     }
 
@@ -81,7 +81,7 @@ export async function updateSkill(id: string, updateData: Partial<SkillType>) {
       args.push(id);
 
       await turso.execute({
-        sql: `UPDATE skills SET ${updates.join(", ")} WHERE id = ?`,
+        sql: `UPDATE skills SET ${updates.join(", ")} WHERE id = $2`,
         args,
       });
 
@@ -120,7 +120,7 @@ export async function getSkillsWithPagination({
 
     // Build WHERE clause for search
     if (search) {
-      sql += ` WHERE s.name LIKE ?`;
+      sql += ` WHERE s.name LIKE $2`;
       const searchParam = `%${search}%`;
       args.push(searchParam);
       countArgs.push(searchParam);

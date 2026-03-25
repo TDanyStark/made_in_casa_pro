@@ -6,7 +6,7 @@ import { ITEMS_PER_PAGE } from "@/config/constants";
 export async function getManagerByEmail(email: string) {
   try {
     const result = await turso.execute({
-      sql: `SELECT * FROM managers WHERE email = ?`,
+      sql: `SELECT * FROM managers WHERE email = $1`,
       args: [email],
     });
     return result.rows.length > 0
@@ -33,7 +33,7 @@ export async function getManagerById(id: string) {
         FROM managers m
         LEFT JOIN clients c ON m.client_id = c.id
         LEFT JOIN countries co ON c.country_id = co.id
-        WHERE m.id = ?
+        WHERE m.id = $1
       `,
       args: [id],
     });
@@ -72,7 +72,7 @@ export async function getManagerById(id: string) {
 export async function getManagersByClientId(clientId: string) {
   try {
     const result = await turso.execute({
-      sql: `SELECT * FROM managers WHERE client_id = ? ORDER BY name ASC`,
+      sql: `SELECT * FROM managers WHERE client_id = $1 ORDER BY name ASC`,
       args: [clientId],
     });
     return result.rows as unknown as ManagerType[];
@@ -105,19 +105,21 @@ export async function getManagersWithPagination({clientId, page = 1, limit = ITE
   
   try {
     let sql = "SELECT * FROM managers";
-    const args = [];
-    const countArgs = [];
+    const filterArgs: Array<string | number> = [];
     const conditions: string[] = [];
     if (clientId) {
-      conditions.push("client_id = ?");
-      args.push(clientId);
-      countArgs.push(clientId);
+      filterArgs.push(clientId);
+      conditions.push(`client_id = $${filterArgs.length}`);
     }
     if (search) {
-      conditions.push("(name LIKE ? OR email LIKE ? OR phone LIKE ?)");
       const searchParam = `%${search}%`;
-      args.push(searchParam, searchParam, searchParam);
-      countArgs.push(searchParam, searchParam, searchParam);
+      filterArgs.push(searchParam);
+      const p1 = filterArgs.length;
+      filterArgs.push(searchParam);
+      const p2 = filterArgs.length;
+      filterArgs.push(searchParam);
+      const p3 = filterArgs.length;
+      conditions.push(`(name LIKE $${p1} OR email LIKE $${p2} OR phone LIKE $${p3})`);
     }
     if (conditions.length > 0) {
       sql += " WHERE " + conditions.join(" AND ");
@@ -129,13 +131,13 @@ export async function getManagersWithPagination({clientId, page = 1, limit = ITE
     }
     const countResult = await turso.execute({
       sql: countSql,
-      args: countArgs,
+      args: filterArgs,
     });
     const total = Number(countResult.rows[0].count);
     // Add pagination
     const offset = (page - 1) * limit;
-    sql += " LIMIT ? OFFSET ?";
-    args.push(limit, offset);
+    const args = [...filterArgs, limit, offset];
+    sql += ` LIMIT $${filterArgs.length + 1} OFFSET $${filterArgs.length + 2}`;
     // Execute query
     const result = await turso.execute({
       sql,
@@ -155,7 +157,7 @@ export async function createManager(managerData: Omit<ManagerType, "id">) {
   try {
     const result = await turso.execute({
       sql: `INSERT INTO managers (client_id, name, email, phone, biography)
-      VALUES (?, ?, ?, ?, ?)`,
+      VALUES ($1, $2, $3, $4, $5)`,
       args: [
         managerData.client_id,
         managerData.name,
@@ -184,22 +186,22 @@ export async function updateManager(id: string, updateData: { email?: string; ph
     const args: string[] = [];
 
     if (updateData.email !== undefined) {
-      updates.push("email = ?");
+      updates.push(`email = $${args.length + 1}`);
       args.push(updateData.email);
     }
 
     if (updateData.phone !== undefined) {
-      updates.push("phone = ?");
+      updates.push(`phone = $${args.length + 1}`);
       args.push(updateData.phone);
     }
 
     if (updateData.name !== undefined) {
-      updates.push("name = ?");
+      updates.push(`name = $${args.length + 1}`);
       args.push(updateData.name);
     }
 
     if (updateData.biography !== undefined) {
-      updates.push("biography = ?");
+      updates.push(`biography = $${args.length + 1}`);
       args.push(updateData.biography);
     }
 
@@ -213,7 +215,7 @@ export async function updateManager(id: string, updateData: { email?: string; ph
 
     // Execute the update query
     await turso.execute({
-      sql: `UPDATE managers SET ${updates.join(", ")} WHERE id = ?`,
+      sql: `UPDATE managers SET ${updates.join(", ")} WHERE id = $${args.length}`,
       args,
     });
 

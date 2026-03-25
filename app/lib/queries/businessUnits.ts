@@ -10,7 +10,7 @@ export async function getBusinessUnitById(id: string) {
       sql: `
         SELECT id, name
         FROM business_units
-        WHERE id = ?
+        WHERE id = $1
       `,
       args: [id],
     });
@@ -39,7 +39,7 @@ export async function createBusinessUnit(businessUnitData: Omit<BusinessUnitType
   try {
     const result = await turso.execute({
       sql: `INSERT INTO business_units (name)
-      VALUES (?)`,
+      VALUES ($1)`,
       args: [businessUnitData.name],
     });
 
@@ -61,7 +61,7 @@ export async function updateBusinessUnit(id: string, updateData: Partial<Busines
     
     if (name) {
       await turso.execute({
-        sql: `UPDATE business_units SET name = ? WHERE id = ?`,
+        sql: `UPDATE business_units SET name = $1 WHERE id = $2`,
         args: [name, id],
       });
       
@@ -96,7 +96,7 @@ export async function getBusinessUnitsWithPagination({
 
     // Build WHERE clause for search
     if (search) {
-      sql += ` WHERE name LIKE ?`;
+      sql += ` WHERE name LIKE $1`;
       const searchParam = `%${search}%`;
       args.push(searchParam);
       countArgs.push(searchParam);
@@ -105,7 +105,7 @@ export async function getBusinessUnitsWithPagination({
     // Get total count for pagination
     let countSql = `SELECT COUNT(*) as count FROM business_units`;
     if (search) {
-      countSql += ` WHERE name LIKE ?`;
+      countSql += ` WHERE name LIKE $1`;
     }
 
     const countResult = await turso.execute({
@@ -116,7 +116,9 @@ export async function getBusinessUnitsWithPagination({
     const total = Number(countResult.rows[0].count);
 
     // Add order by and pagination
-    sql += " ORDER BY name ASC LIMIT ? OFFSET ?";
+    const limitPlaceholder = search ? "$2" : "$1";
+    const offsetPlaceholder = search ? "$3" : "$2";
+    sql += ` ORDER BY name ASC LIMIT ${limitPlaceholder} OFFSET ${offsetPlaceholder}`;
     const offset = (page - 1) * limit;
     args.push(limit, offset);
 
@@ -145,7 +147,7 @@ export async function getBusinessUnitsWithPagination({
 export async function deleteBusinessUnit(id: string) {
   try {
     await turso.execute({
-      sql: `DELETE FROM business_units WHERE id = ?`,
+      sql: `DELETE FROM business_units WHERE id = $1`,
       args: [id],
     });
     

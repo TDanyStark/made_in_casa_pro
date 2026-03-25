@@ -15,7 +15,7 @@ export async function getClients() {
 export async function createClient(name: string, country_id: number) {
   try {
     return await turso.execute({
-      sql: `INSERT INTO clients (name, country_id) VALUES (?, ?)`,
+      sql: `INSERT INTO clients (name, country_id) VALUES ($1, $2)`,
       args: [name, country_id],
     });
   } catch (error) {
@@ -53,7 +53,7 @@ export async function getClientById(id: string): Promise<ClientType | null> {
         SELECT c.id, c.name, co.id AS country_id, co.name AS country_name, c.accept_business_units, co.flag AS country_flag
         FROM clients c
         LEFT JOIN countries co ON c.country_id = co.id
-        WHERE c.id = ?
+        WHERE c.id = $1
       `,
       args: [id],
     });
@@ -102,7 +102,7 @@ export async function getClientsWithPagination({
     const conditions: string[] = [];
     
     if (search) {
-      conditions.push('(c.name LIKE ? OR co.name LIKE ?)');
+      conditions.push(`(c.name LIKE $1 OR co.name LIKE $2)`);
       const searchParam = `%${search}%`;
       args.push(searchParam, searchParam);
       countArgs.push(searchParam, searchParam);
@@ -128,7 +128,7 @@ export async function getClientsWithPagination({
     
     // Add pagination
     const offset = (page - 1) * limit;
-    sql += ' ORDER BY c.name ASC LIMIT ? OFFSET ?';
+    sql += ` ORDER BY c.name ASC LIMIT ${search ? "$3" : "$1"} OFFSET ${search ? "$4" : "$2"}`;
     args.push(limit, offset);
 
     // Execute query
@@ -168,17 +168,17 @@ export async function updateClient(id: string, updateData: {
     const args = [];
 
     if (updateData.name !== undefined) {
-      updates.push("name = ?");
+      updates.push(`name = $${args.length + 1}`);
       args.push(updateData.name);
     }
 
     if (updateData.country_id !== undefined) {
-      updates.push("country_id = ?");
+      updates.push(`country_id = $${args.length + 1}`);
       args.push(updateData.country_id);
     }
 
     if (updateData.accept_business_units !== undefined) {
-      updates.push("accept_business_units = ?");
+      updates.push(`accept_business_units = $${args.length + 1}`);
       args.push(updateData.accept_business_units ? 1 : 0); // Convertir boolean a 1/0 para SQLite
     }
 
@@ -192,7 +192,7 @@ export async function updateClient(id: string, updateData: {
 
     // Ejecutar la consulta de actualización
     await turso.execute({
-      sql: `UPDATE clients SET ${updates.join(", ")} WHERE id = ?`,
+      sql: `UPDATE clients SET ${updates.join(", ")} WHERE id = $${args.length}`,
       args,
     });
 

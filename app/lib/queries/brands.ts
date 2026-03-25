@@ -13,7 +13,7 @@ export async function getBrandsByManagerId(managerId: string) {
           b.name as name,
           b.manager_id as manager_id
         FROM brands b
-        WHERE b.manager_id = ? 
+        WHERE b.manager_id = $1 
         ORDER BY b.name ASC
       `,
       args: [managerId],
@@ -47,7 +47,7 @@ export async function getBrandById(id: string) {
         JOIN managers m ON b.manager_id = m.id
         JOIN clients c ON m.client_id = c.id
         LEFT JOIN countries co ON c.country_id = co.id
-        WHERE b.id = ?
+        WHERE b.id = $1
       `,
       args: [id],
     });
@@ -104,7 +104,7 @@ export async function createBrand(brandData: Omit<BrandType, "id">) {
     // No need for transaction since we're only doing a single operation now
     const brandResult = await turso.execute({
       sql: `INSERT INTO brands (name, manager_id, business_unit_id)
-      VALUES (?, ?, ?)`,
+      VALUES ($1, $2, $3)`,
       args: [brandData.name, brandData.manager_id, brandData.business_unit_id ?? null],
     });
 
@@ -140,17 +140,17 @@ export async function updateBrand(id: string, updateData: Partial<BrandType>) {
 
     // Build update statement based on provided fields
     if (name) {
-      updates.push("name = ?");
+      updates.push(`name = $${args.length + 1}`);
       args.push(name);
     }
 
     if (manager_id) {
-      updates.push("manager_id = ?");
+      updates.push(`manager_id = $${args.length + 1}`);
       args.push(manager_id);
     }
 
     if (business_unit_id) {
-      updates.push("business_unit_id = ?");
+      updates.push(`business_unit_id = $${args.length + 1}`);
       args.push(business_unit_id);
     }
 
@@ -164,7 +164,7 @@ export async function updateBrand(id: string, updateData: Partial<BrandType>) {
       try {
         // Actualizar la marca
         await transaction.execute({
-          sql: `UPDATE brands SET ${updates.join(", ")} WHERE id = ?`,
+          sql: `UPDATE brands SET ${updates.join(", ")} WHERE id = $${args.length}`,
           args,
         });
 
@@ -175,7 +175,7 @@ export async function updateBrand(id: string, updateData: Partial<BrandType>) {
           currentBrand.manager_id !== manager_id
         ) {
           await transaction.execute({
-            sql: "INSERT INTO brand_manager_history (brand_id, previous_manager_id, new_manager_id, changed_at) VALUES (?, ?, ?, NOW() - INTERVAL '5 hours')",
+            sql: "INSERT INTO brand_manager_history (brand_id, previous_manager_id, new_manager_id, changed_at) VALUES ($1, $2, $3, NOW() - INTERVAL '5 hours')",
             args: [id, currentBrand.manager_id, manager_id],
           });
         }
@@ -228,29 +228,28 @@ export async function getBrandsWithPagination({
       FROM brands b
       JOIN managers m ON b.manager_id = m.id
     `;
-    const args = [];
-    const countArgs = [];
+    const filterArgs: Array<string | number> = [];
 
     // Build WHERE clause
     const conditions: string[] = [];
 
     if (managerId) {
-      conditions.push("b.manager_id = ?");
-      args.push(managerId);
-      countArgs.push(managerId);
+      filterArgs.push(managerId);
+      conditions.push(`b.manager_id = $${filterArgs.length}`);
     }
 
     if (clientId) {
-      conditions.push("m.client_id = ?");
-      args.push(clientId);
-      countArgs.push(clientId);
+      filterArgs.push(clientId);
+      conditions.push(`m.client_id = $${filterArgs.length}`);
     }
 
     if (search) {
-      conditions.push("(b.name LIKE ? OR m.name LIKE ?)");
       const searchParam = `%${search}%`;
-      args.push(searchParam, searchParam);
-      countArgs.push(searchParam, searchParam);
+      filterArgs.push(searchParam);
+      const p1 = filterArgs.length;
+      filterArgs.push(searchParam);
+      const p2 = filterArgs.length;
+      conditions.push(`(b.name LIKE $${p1} OR m.name LIKE $${p2})`);
     }
 
     if (conditions.length > 0) {
@@ -269,15 +268,15 @@ export async function getBrandsWithPagination({
 
     const countResult = await turso.execute({
       sql: countSql,
-      args: countArgs,
+      args: filterArgs,
     });
 
     const total = Number(countResult.rows[0].count);
 
     // Add order by and pagination
-    sql += " ORDER BY b.name ASC LIMIT ? OFFSET ?";
+    sql += ` ORDER BY b.name ASC LIMIT $${filterArgs.length + 1} OFFSET $${filterArgs.length + 2}`;
     const offset = (page - 1) * limit;
-    args.push(limit, offset);
+    const args = [...filterArgs, limit, offset];
 
     // Execute query
     const result = await turso.execute({
@@ -321,7 +320,7 @@ export async function getBrandManagerHistory(brandId: string) {
         FROM brand_manager_history bmh
         JOIN managers prev_m ON bmh.previous_manager_id = prev_m.id
         JOIN managers new_m ON bmh.new_manager_id = new_m.id
-        WHERE bmh.brand_id = ?
+        WHERE bmh.brand_id = $1
         ORDER BY bmh.changed_at DESC
       `,
       args: [brandId],

@@ -405,7 +405,7 @@ Total de endpoints implementados: **18+ rutas API**
 
 ## 📌 Notas Técnicas
 
-- Base de datos: **Turso** (SQLite serverless)
+- Base de datos: **Postgress**
 - Autenticación: **JWT encriptado** en cookies HTTP-only
 - Validación: **Zod** en todas las entradas
 - Paginación: LIMIT/OFFSET con búsqueda LIKE

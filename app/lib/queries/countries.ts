@@ -12,7 +12,7 @@ export async function getCountries() {
 export async function createCountry(name: string, flag: string) {
   try {
     return await turso.execute({
-      sql: `INSERT INTO countries (name, flag) VALUES (?, ?)`,
+      sql: `INSERT INTO countries (name, flag) VALUES ($1, $2)`,
       args: [name, flag],
     });
   } catch (error) {

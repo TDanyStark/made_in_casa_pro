@@ -12,7 +12,7 @@ export async function getRoles() {
 export async function getRoleById(roleId: number) {
   try {
     return await turso.execute({
-      sql: `SELECT * FROM roles WHERE id = ?`,
+      sql: `SELECT * FROM roles WHERE id = $1`,
       args: [roleId],
     });
   } catch (error) {
@@ -24,7 +24,7 @@ export async function getRoleById(roleId: number) {
 export async function createRole(role: string) {
   try {
     return await turso.execute({
-      sql: `INSERT INTO roles (role) VALUES (?)`,
+      sql: `INSERT INTO roles (role) VALUES ($1)`,
       args: [role],
     });
   } catch (error) {

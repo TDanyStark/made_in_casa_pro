@@ -24,7 +24,7 @@ export async function getUsers(params?: GetUsersParams) {
     const args: (string | number)[] = [];
     
     if (search) {
-      whereClause = `WHERE name LIKE ? OR email LIKE ?`;
+      whereClause = `WHERE name LIKE $1 OR email LIKE $2`;
       args.push(`%${search}%`, `%${search}%`);
     }
     
@@ -43,7 +43,7 @@ export async function getUsers(params?: GetUsersParams) {
       SELECT * FROM users 
       ${whereClause}
       ORDER BY name ASC
-      LIMIT ? OFFSET ?
+      LIMIT ${search ? "$3" : "$1"} OFFSET ${search ? "$4" : "$2"}
     `;
     
     const result = await turso.execute({
@@ -67,7 +67,7 @@ export async function getUsers(params?: GetUsersParams) {
 export async function getUserById(userId: number) {
   try {
     const result = await turso.execute({
-      sql: `SELECT * FROM users WHERE id = ?`,
+      sql: `SELECT * FROM users WHERE id = $1`,
       args: [userId],
     });
     const row = result.rows[0];
@@ -97,7 +97,7 @@ export async function getUserById(userId: number) {
 export async function getUserByEmail(email: string): Promise<UserType[]> {
   try {
     const result = await turso.execute({
-      sql: `SELECT * FROM users WHERE email = ?`,
+      sql: `SELECT * FROM users WHERE email = $1`,
       args: [email],
     });
     return result.rows.map(row => ({
@@ -116,7 +116,7 @@ export async function getUserByEmail(email: string): Promise<UserType[]> {
 export async function createUser(name: string, email: string, password: string, rol_id: number) {
   try {
     return await turso.execute({
-      sql: `INSERT INTO users (name, email, password, rol_id) VALUES (?, ?, ?, ?)`,
+      sql: `INSERT INTO users (name, email, password, rol_id) VALUES ($1, $2, $3, $4)`,
       args: [name, email, password, rol_id],
     });
   } catch (error) {
@@ -128,7 +128,7 @@ export async function createUser(name: string, email: string, password: string, 
 export async function deleteUser(userId: number) {
   try {
     return await turso.execute({
-      sql: `DELETE FROM users WHERE id = ?`,
+      sql: `DELETE FROM users WHERE id = $1`,
       args: [userId],
     });
   } catch (error) {
@@ -145,21 +145,21 @@ export async function getUsersWithPagination({
 }: PaginationParams) {
   try {
     let sql = "SELECT id, name, email, rol_id, area_id, is_internal, must_change_password, last_login, is_active FROM users";
-    const args = [];
-    const countArgs = [];
+    const filterArgs: Array<string | number> = [];
     const conditions: string[] = [];
 
     if (rolId) {
-      conditions.push("rol_id = ?");
-      args.push(rolId);
-      countArgs.push(rolId);
+      filterArgs.push(rolId);
+      conditions.push(`rol_id = $${filterArgs.length}`);
     }
 
     if (search) {
-      conditions.push("(name LIKE ? OR email LIKE ?)");
       const searchParam = `%${search}%`;
-      args.push(searchParam, searchParam);
-      countArgs.push(searchParam, searchParam);
+      filterArgs.push(searchParam);
+      const firstSearch = filterArgs.length;
+      filterArgs.push(searchParam);
+      const secondSearch = filterArgs.length;
+      conditions.push(`(name LIKE $${firstSearch} OR email LIKE $${secondSearch})`);
     }
 
     if (conditions.length > 0) {
@@ -174,15 +174,17 @@ export async function getUsersWithPagination({
 
     const countResult = await turso.execute({
       sql: countSql,
-      args: countArgs,
+      args: filterArgs,
     });
 
     const total = Number(countResult.rows[0].count);
 
     // Add pagination
     const offset = (page - 1) * limit;
-    sql += " ORDER BY id DESC LIMIT ? OFFSET ?";
-    args.push(limit, offset);
+    const args = [...filterArgs, limit, offset];
+    const limitPlaceholder = `$${filterArgs.length + 1}`;
+    const offsetPlaceholder = `$${filterArgs.length + 2}`;
+    sql += ` ORDER BY id DESC LIMIT ${limitPlaceholder} OFFSET ${offsetPlaceholder}`;
 
     // Execute query
     const result = await turso.execute({
@@ -217,47 +219,47 @@ export async function updateUser(userId: string, data: {
     const args: (string | number | boolean)[] = [];
 
     if (data.name !== undefined) {
-      updateFields.push('name = ?');
       args.push(data.name);
+      updateFields.push(`name = $${args.length}`);
     }
     
     if (data.email !== undefined) {
-      updateFields.push('email = ?');
       args.push(data.email);
+      updateFields.push(`email = $${args.length}`);
     }
     
     if (data.password !== undefined) {
-      updateFields.push('password = ?');
       args.push(data.password);
+      updateFields.push(`password = $${args.length}`);
     }
     
     if (data.is_active !== undefined) {
-      updateFields.push('is_active = ?');
       args.push(data.is_active);
+      updateFields.push(`is_active = $${args.length}`);
     }
     
     if (data.rol_id !== undefined) {
-      updateFields.push('rol_id = ?');
       args.push(data.rol_id);
+      updateFields.push(`rol_id = $${args.length}`);
     }
 
     if (data.is_internal !== undefined) {
-      updateFields.push('is_internal = ?');
       args.push(data.is_internal);
+      updateFields.push(`is_internal = $${args.length}`);
     }
 
     if (data.area_id !== undefined) {
-      updateFields.push('area_id = ?');
       args.push(data.area_id);
+      updateFields.push(`area_id = $${args.length}`);
     }
     
     if (data.must_change_password !== undefined) {
-      updateFields.push('must_change_password = ?');
       args.push(data.must_change_password);
+      updateFields.push(`must_change_password = $${args.length}`);
     }
     if (data.monthly_salary !== undefined) {
-      updateFields.push('monthly_salary = ?');
       args.push(data.monthly_salary);
+      updateFields.push(`monthly_salary = $${args.length}`);
     }
     
     
@@ -272,7 +274,7 @@ export async function updateUser(userId: string, data: {
     const query = `
       UPDATE users 
       SET ${updateFields.join(', ')} 
-      WHERE id = ?
+      WHERE id = $${args.length}
     `;
     
     await turso.execute({
@@ -282,7 +284,7 @@ export async function updateUser(userId: string, data: {
     
     // Obtener el usuario actualizado
     const result = await turso.execute({
-      sql: `SELECT * FROM users WHERE id = ?`,
+      sql: `SELECT * FROM users WHERE id = $1`,
       args: [userId],
     });
     
