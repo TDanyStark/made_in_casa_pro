@@ -199,25 +199,25 @@ describe('updateClient()', () => {
     }));
   });
 
-  it('converts accept_business_units: true to 1 in SQL args', async () => {
+  it('uses accept_business_units: true in SQL args', async () => {
     mockExecute
       .mockResolvedValueOnce(makeResult([]))
       .mockResolvedValueOnce(makeResult([{ id: 1, name: 'T', country_id: null, accept_business_units: 1 }]));
     await updateClient('1', { accept_business_units: true });
     const updateCall = mockExecute.mock.calls[0];
     expect(updateCall[0]).toEqual(expect.objectContaining({
-      args: expect.arrayContaining([1]),
+      args: expect.arrayContaining([true]),
     }));
   });
 
-  it('converts accept_business_units: false to 0 in SQL args', async () => {
+  it('uses accept_business_units: false in SQL args', async () => {
     mockExecute
       .mockResolvedValueOnce(makeResult([]))
       .mockResolvedValueOnce(makeResult([{ id: 1, name: 'T', country_id: null, accept_business_units: 0 }]));
     await updateClient('1', { accept_business_units: false });
     const updateCall = mockExecute.mock.calls[0];
     expect(updateCall[0]).toEqual(expect.objectContaining({
-      args: expect.arrayContaining([0]),
+      args: expect.arrayContaining([false]),
     }));
   });
 

@@ -37,7 +37,7 @@ export async function getAreaById(id: string) {
 export async function createArea(areaData: Omit<AreaType, "id">) {
   try {
     const result = await db.execute({
-      sql: `INSERT INTO areas (name) VALUES ($1)`,
+      sql: `INSERT INTO areas (name) VALUES ($1) RETURNING id`,
       args: [areaData.name],
     });
 

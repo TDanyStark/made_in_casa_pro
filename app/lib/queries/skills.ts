@@ -48,7 +48,7 @@ export async function getSkillById(id: string) {
 export async function createSkill(skillData: Omit<SkillType, "id">) {
   try {
     const result = await db.execute({
-      sql: `INSERT INTO skills (name) VALUES ($1)`,
+      sql: `INSERT INTO skills (name) VALUES ($1) RETURNING id`,
       args: [skillData.name],
     });
 
@@ -113,38 +113,18 @@ export async function getSkillsWithPagination({
         s.name,
         CASE WHEN us.skill_id IS NOT NULL THEN 1 ELSE 0 END as selected
       FROM skills s
-      LEFT JOIN user_skills us ON s.id = us.skill_id AND us.user_id = ?
+      LEFT JOIN user_skills us ON s.id = us.skill_id AND us.user_id = $1
     `;
     const args: (number | null | string)[] = [user_id || null];
-    const countArgs: (number | null | string)[] = [user_id || null];
 
     // Build WHERE clause for search
     if (search) {
       sql += ` WHERE s.name LIKE $2`;
       const searchParam = `%${search}%`;
       args.push(searchParam);
-      countArgs.push(searchParam);
     }
 
-    // // Get total count for pagination
-    // let countSql = `SELECT COUNT(*) as count FROM skills`;
-    // if (search) {
-    //   countSql += ` WHERE name LIKE ?`;
-    // }
-
-    // const countResult = await db.execute({
-    //   sql: countSql,
-    //   args: countArgs,
-    // });
-
-    // const total = Number(countResult.rows[0].count);
     const total = 1;
-
-
-    // Add order by and pagination
-    // sql += ` ORDER BY name ASC LIMIT ? OFFSET ?`;
-    // const offset = (page - 1) * limit;
-    // args.push(limit, offset);
 
     // Execute query
     const result = await db.execute({

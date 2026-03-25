@@ -13,32 +13,6 @@ if (typeof globalThis.WebSocket === "undefined") {
   }
 }
 
-/**
- * Converts a libSQL-style query ({ sql, args } with ? placeholders) into a
- * pg-compatible query ({ text, values } with $1, $2, … placeholders).
- *
- * Also auto-appends `RETURNING id` to INSERT statements so that
- * `result.lastInsertRowid` works like it did with libSQL/SQLite.
- */
-function convertQuery(
-  query: string | { sql: string; args?: unknown[] }
-): { text: string; values: unknown[] } {
-  const rawSql = typeof query === "string" ? query : query.sql;
-  const args = typeof query === "string" ? [] : (query.args ?? []);
-
-  // Replace ? positional params with $1, $2, …
-  let idx = 0;
-  let text = rawSql.replace(/\?/g, () => `$${++idx}`);
-
-  // Auto-add RETURNING id to INSERT statements so lastInsertRowid is populated
-  const trimmed = text.trimEnd();
-  if (/^\s*INSERT\s/i.test(trimmed) && !/RETURNING/i.test(trimmed)) {
-    text = trimmed + " RETURNING id";
-  }
-
-  return { text, values: args };
-}
-
 export class NeonAdapter implements DbAdapter {
   private pool: Pool;
 
@@ -49,8 +23,9 @@ export class NeonAdapter implements DbAdapter {
   async execute(
     query: string | { sql: string; args?: unknown[] }
   ): Promise<DbResult> {
-    const { text, values } = convertQuery(query);
-    const result = await this.pool.query(text, values as unknown[]);
+    const sql = typeof query === "string" ? query : query.sql;
+    const args = typeof query === "string" ? [] : (query.args ?? []);
+    const result = await this.pool.query(sql, args as unknown[]);
     return {
       rows: result.rows,
       lastInsertRowid: (result.rows[0]?.id as number | bigint) ?? undefined,
@@ -66,8 +41,9 @@ export class NeonAdapter implements DbAdapter {
       async execute(
         query: string | { sql: string; args?: unknown[] }
       ): Promise<DbResult> {
-        const { text, values } = convertQuery(query);
-        const result = await client.query(text, values as unknown[]);
+        const sql = typeof query === "string" ? query : query.sql;
+        const args = typeof query === "string" ? [] : (query.args ?? []);
+        const result = await client.query(sql, args as unknown[]);
         return {
           rows: result.rows,
           lastInsertRowid:

@@ -104,7 +104,7 @@ export async function createBrand(brandData: Omit<BrandType, "id">) {
     // No need for transaction since we're only doing a single operation now
     const brandResult = await db.execute({
       sql: `INSERT INTO brands (name, manager_id, business_unit_id)
-      VALUES ($1, $2, $3)`,
+      VALUES ($1, $2, $3) RETURNING id`,
       args: [brandData.name, brandData.manager_id, brandData.business_unit_id ?? null],
     });
 

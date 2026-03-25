@@ -179,7 +179,7 @@ export async function updateClient(id: string, updateData: {
 
     if (updateData.accept_business_units !== undefined) {
       updates.push(`accept_business_units = $${args.length + 1}`);
-      args.push(updateData.accept_business_units ? 1 : 0); // Convertir boolean a 1/0 para SQLite
+      args.push(updateData.accept_business_units);
     }
 
     // Si no hay campos para actualizar, devolver null

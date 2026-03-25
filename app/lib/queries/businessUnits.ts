@@ -39,7 +39,7 @@ export async function createBusinessUnit(businessUnitData: Omit<BusinessUnitType
   try {
     const result = await db.execute({
       sql: `INSERT INTO business_units (name)
-      VALUES ($1)`,
+      VALUES ($1) RETURNING id`,
       args: [businessUnitData.name],
     });
 

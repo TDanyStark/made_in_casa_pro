@@ -157,7 +157,7 @@ export async function createManager(managerData: Omit<ManagerType, "id">) {
   try {
     const result = await db.execute({
       sql: `INSERT INTO managers (client_id, name, email, phone, biography)
-      VALUES ($1, $2, $3, $4, $5)`,
+      VALUES ($1, $2, $3, $4, $5) RETURNING id`,
       args: [
         managerData.client_id,
         managerData.name,
@@ -170,7 +170,7 @@ export async function createManager(managerData: Omit<ManagerType, "id">) {
     revalidatePath(`/clients/${managerData.client_id}`);
 
     return {
-      id: Number(result.lastInsertRowid), // Convertir BigInt a Number
+      id: Number(result.lastInsertRowid),
       ...managerData,
     };
   } catch (error) {
