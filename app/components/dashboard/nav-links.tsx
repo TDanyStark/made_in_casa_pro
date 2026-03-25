@@ -58,7 +58,7 @@ export default function NavLinks() {
                 <Link
                   href={link.route}
                   className={cn(
-                    "flex h-full min-w-0 flex-1 items-center justify-center gap-4 rounded-l-md bg-muted p-3 text-base font-normal hover:bg-market-purple hover:text-white dark:hover:bg-secondary dark:hover:text-dark-subtitle md:justify-start md:p-2 md:px-3",
+                    "flex h-full min-w-0 flex-1 cursor-pointer items-center justify-center gap-4 rounded-l-md bg-muted p-3 text-base font-normal transition-colors hover:bg-market-purple hover:text-white dark:hover:bg-market-pink/80 dark:hover:text-white md:justify-start md:p-2 md:px-3",
                     {
                       "bg-market-pink text-white hover:bg-market-pink dark:hover:bg-market-pink":
                         isGroupActive,
@@ -88,7 +88,7 @@ export default function NavLinks() {
                         setOpenDropdownRoute(link.route);
                       }}
                       className={cn(
-                        "flex h-full items-center justify-center rounded-r-md bg-muted px-2 hover:bg-market-purple hover:text-white dark:hover:bg-secondary dark:hover:text-dark-subtitle",
+                        "flex h-full cursor-pointer items-center justify-center rounded-r-md bg-muted px-2 transition-colors hover:bg-market-purple hover:text-white dark:hover:bg-market-pink/80 dark:hover:text-white",
                         {
                           "bg-market-pink/70 text-white hover:bg-market-pink/80 dark:hover:bg-market-pink/80":
                             isGroupActive,
@@ -131,7 +131,7 @@ export default function NavLinks() {
               key={link.name}
               href={link.route}
               className={cn(
-                "flex h-[48px] grow items-center justify-center gap-4 rounded-md bg-muted p-3 text-base font-normal hover:bg-market-purple hover:text-white dark:hover:bg-secondary dark:hover:text-dark-subtitle md:flex-none md:justify-start md:p-2 md:px-3",
+                "flex h-[48px] grow cursor-pointer items-center justify-center gap-4 rounded-md bg-muted p-3 text-base font-normal transition-colors hover:bg-market-purple hover:text-white dark:hover:bg-market-pink/80 dark:hover:text-white md:flex-none md:justify-start md:p-2 md:px-3",
                 {
                   "bg-market-pink text-white hover:bg-market-pink dark:hover:bg-market-pink":
                     pathname === link.route,
