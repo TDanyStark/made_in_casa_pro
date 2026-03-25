@@ -57,6 +57,7 @@ export class NeonAdapter implements DbAdapter {
     };
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   async transaction(_mode?: "read" | "write"): Promise<DbTransaction> {
     const client = await this.pool.connect();
     await client.query("BEGIN");

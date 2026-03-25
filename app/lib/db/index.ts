@@ -1,17 +1,30 @@
 import type { DbAdapter } from "./types";
 import { NeonAdapter } from "./neon-adapter";
+import { PostgresAdapter } from "./postgres-adapter";
 
 // ---------------------------------------------------------------------------
-// To swap the database provider, replace NeonAdapter with any class that
-// implements the DbAdapter interface (see types.ts).
+// Database provider selection based on environment:
+// - Development (NODE_ENV !== 'production'): Uses PostgreSQL locally
+// - Production: Uses Neon
 //
-// Example for a future migration to another provider:
-//   import { PlanetScaleAdapter } from "./planetscale-adapter";
-//   export const db: DbAdapter = new PlanetScaleAdapter(process.env.DATABASE_URL!);
+// For local development, requires DATABASE_LOCAL_URL pointing to PostgreSQL
+// For production, requires DATABASE_URL pointing to Neon
 // ---------------------------------------------------------------------------
 
-if (!process.env.DATABASE_URL) {
-  throw new Error("DATABASE_URL environment variable is not set.");
+let db: DbAdapter;
+
+if (process.env.NODE_ENV === "production") {
+  if (!process.env.DATABASE_URL) {
+    throw new Error(
+      "DATABASE_URL environment variable is required in production."
+    );
+  }
+  db = new NeonAdapter(process.env.DATABASE_URL);
+} else {
+  // Development: use local PostgreSQL
+  const localUrl =
+    process.env.DATABASE_LOCAL_URL || "postgresql://localhost/made_in_casa";
+  db = new PostgresAdapter(localUrl);
 }
 
-export const db: DbAdapter = new NeonAdapter(process.env.DATABASE_URL);
+export { db };
