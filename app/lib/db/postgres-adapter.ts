@@ -3,8 +3,6 @@ import type { DbAdapter, DbResult, DbTransaction } from "./types";
 
 /**
  * PostgreSQL adapter for local development.
- * In production, use NeonAdapter instead.
- *
  * Requires: npm install pg
  */
 export class PostgresAdapter implements DbAdapter {
@@ -24,7 +22,6 @@ export class PostgresAdapter implements DbAdapter {
 
     return {
       rows: result.rows as DbResult["rows"],
-      lastInsertRowid: (result.rows[0]?.id as number | bigint) ?? undefined,
     };
   }
 
@@ -49,8 +46,6 @@ export class PostgresAdapter implements DbAdapter {
 
           return {
             rows: result.rows as DbResult["rows"],
-            lastInsertRowid:
-              (result.rows[0]?.id as number | bigint) ?? undefined,
           };
         },
         async commit() {

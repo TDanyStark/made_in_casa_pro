@@ -15,7 +15,7 @@ export async function getClients() {
 export async function createClient(name: string, country_id: number) {
   try {
     return await db.execute({
-      sql: `INSERT INTO clients (name, country_id) VALUES ($1, $2)`,
+      sql: `INSERT INTO clients (name, country_id) VALUES ($1, $2) RETURNING id`,
       args: [name, country_id],
     });
   } catch (error) {

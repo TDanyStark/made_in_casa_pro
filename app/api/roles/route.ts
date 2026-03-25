@@ -29,7 +29,7 @@ export async function POST(request: Request) {
     
     return NextResponse.json({
       message: 'Rol creado exitosamente',
-      id: result.lastInsertRowid
+      id: Number(result.rows[0]?.id)
     }, { status: 201 });
     
   } catch (error) {

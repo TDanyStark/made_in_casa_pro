@@ -4,7 +4,6 @@ export interface DbRow {
 
 export interface DbResult {
   rows: DbRow[];
-  lastInsertRowid?: number | bigint;
 }
 
 export interface DbTransaction {

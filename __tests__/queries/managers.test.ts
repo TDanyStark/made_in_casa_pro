@@ -18,12 +18,11 @@ import { revalidatePath } from 'next/cache';
 
 const mockExecute = db.execute as jest.MockedFunction<typeof db.execute>;
 
-function makeResult(rows: Record<string, unknown>[], lastInsertRowid: number | bigint = 0) {
+function makeResult(rows: Record<string, unknown>[]) {
   return {
     rows: rows as never,
     columns: [] as string[],
     columnTypes: [] as string[],
-    lastInsertRowid: BigInt(lastInsertRowid),
     rowsAffected: rows.length,
     toJSON: () => ({}),
   };
@@ -135,7 +134,7 @@ describe('createManager()', () => {
   });
 
   it('uses empty string for biography when it is undefined (prevents null constraint)', async () => {
-    mockExecute.mockResolvedValueOnce(makeResult([], 8));
+    mockExecute.mockResolvedValueOnce(makeResult([{ id: 8 }]));
     await createManager({
       client_id: 1,
       name: 'Manager',
@@ -149,7 +148,7 @@ describe('createManager()', () => {
   });
 
   it('calls revalidatePath with the client route', async () => {
-    mockExecute.mockResolvedValueOnce(makeResult([], 9));
+    mockExecute.mockResolvedValueOnce(makeResult([{ id: 9 }]));
     await createManager({
       client_id: 3,
       name: 'Manager',
@@ -159,8 +158,8 @@ describe('createManager()', () => {
     expect(revalidatePath).toHaveBeenCalledWith('/clients/3');
   });
 
-  it('converts lastInsertRowid BigInt to Number for returned id', async () => {
-    mockExecute.mockResolvedValueOnce(makeResult([], 42));
+  it('returns id from RETURNING clause as number', async () => {
+    mockExecute.mockResolvedValueOnce(makeResult([{ id: 42 }]));
     const result = await createManager({
       client_id: 1,
       name: 'M',

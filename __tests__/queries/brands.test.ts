@@ -32,12 +32,11 @@ import { revalidatePath } from 'next/cache';
 const mockExecute = db.execute as jest.MockedFunction<typeof db.execute>;
 const mockGetManagerById = getManagerById as jest.MockedFunction<typeof getManagerById>;
 
-function makeResult(rows: Record<string, unknown>[], lastInsertRowid: number | bigint = 0) {
+function makeResult(rows: Record<string, unknown>[]) {
   return {
     rows: rows as never,
     columns: [] as string[],
     columnTypes: [] as string[],
-    lastInsertRowid: BigInt(lastInsertRowid),
     rowsAffected: rows.length,
     toJSON: () => ({}),
   };
@@ -106,7 +105,7 @@ describe('getBrandById()', () => {
 
 describe('createBrand()', () => {
   it('calls db.execute with INSERT SQL and correct args', async () => {
-    mockExecute.mockResolvedValueOnce(makeResult([], 15));
+    mockExecute.mockResolvedValueOnce(makeResult([{ id: 15 }]));
     mockGetManagerById.mockResolvedValueOnce({
       id: 10, client_id: 2, name: 'Carlos', email: 'c@test.com', phone: '555',
     });
@@ -118,7 +117,7 @@ describe('createBrand()', () => {
   });
 
   it('uses null for business_unit_id when it is undefined', async () => {
-    mockExecute.mockResolvedValueOnce(makeResult([], 15));
+    mockExecute.mockResolvedValueOnce(makeResult([{ id: 15 }]));
     mockGetManagerById.mockResolvedValueOnce({
       id: 10, client_id: 2, name: 'M', email: 'm@m.com', phone: '0',
     });
@@ -136,8 +135,8 @@ describe('createBrand()', () => {
     expect(revalidatePath).toHaveBeenCalledWith('/clients/3');
   });
 
-  it('returns the new brand with id from lastInsertRowid', async () => {
-    mockExecute.mockResolvedValueOnce(makeResult([], 20));
+  it('returns the new brand with id from RETURNING clause', async () => {
+    mockExecute.mockResolvedValueOnce(makeResult([{ id: 20 }]));
     mockGetManagerById.mockResolvedValueOnce({
       id: 10, client_id: 2, name: 'M', email: 'm@m.com', phone: '0',
     });

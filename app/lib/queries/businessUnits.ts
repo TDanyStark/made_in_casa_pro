@@ -43,7 +43,7 @@ export async function createBusinessUnit(businessUnitData: Omit<BusinessUnitType
       args: [businessUnitData.name],
     });
 
-    const businessUnitId = Number(result.lastInsertRowid);
+    const businessUnitId = Number(result.rows[0]?.id);
 
     return {
       id: businessUnitId,

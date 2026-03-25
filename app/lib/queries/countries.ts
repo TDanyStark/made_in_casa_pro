@@ -12,7 +12,7 @@ export async function getCountries() {
 export async function createCountry(name: string, flag: string) {
   try {
     return await db.execute({
-      sql: `INSERT INTO countries (name, flag) VALUES ($1, $2)`,
+      sql: `INSERT INTO countries (name, flag) VALUES ($1, $2) RETURNING id`,
       args: [name, flag],
     });
   } catch (error) {

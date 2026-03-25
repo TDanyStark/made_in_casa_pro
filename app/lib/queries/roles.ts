@@ -24,7 +24,7 @@ export async function getRoleById(roleId: number) {
 export async function createRole(role: string) {
   try {
     return await db.execute({
-      sql: `INSERT INTO roles (role) VALUES ($1)`,
+      sql: `INSERT INTO roles (role) VALUES ($1) RETURNING id`,
       args: [role],
     });
   } catch (error) {

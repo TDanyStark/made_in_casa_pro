@@ -52,7 +52,7 @@ export async function createSkill(skillData: Omit<SkillType, "id">) {
       args: [skillData.name],
     });
 
-    const skillId = Number(result.lastInsertRowid);
+    const skillId = Number(result.rows[0]?.id);
     
     return {
       id: skillId,

@@ -18,12 +18,11 @@ import { ColaboradorType } from '@/lib/definitions';
 
 const mockExecute = db.execute as jest.MockedFunction<typeof db.execute>;
 
-function makeResult(rows: Record<string, unknown>[], lastInsertRowid: number | bigint = 0) {
+function makeResult(rows: Record<string, unknown>[]) {
   return {
     rows: rows as never,
     columns: [] as string[],
     columnTypes: [] as string[],
-    lastInsertRowid: BigInt(lastInsertRowid),
     rowsAffected: rows.length,
     toJSON: () => ({}),
   };

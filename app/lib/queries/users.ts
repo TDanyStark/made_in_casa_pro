@@ -116,7 +116,7 @@ export async function getUserByEmail(email: string): Promise<UserType[]> {
 export async function createUser(name: string, email: string, password: string, rol_id: number) {
   try {
     return await db.execute({
-      sql: `INSERT INTO users (name, email, password, rol_id) VALUES ($1, $2, $3, $4)`,
+      sql: `INSERT INTO users (name, email, password, rol_id) VALUES ($1, $2, $3, $4) RETURNING id`,
       args: [name, email, password, rol_id],
     });
   } catch (error) {

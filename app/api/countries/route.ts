@@ -73,7 +73,7 @@ export async function POST(request: NextRequest) {
     const { name, flag } = validationResult.data;
     
     const res = await createCountry(name, flag);
-    const id = Number(res.lastInsertRowid); // Convertir BigInt a Number
+    const id = Number(res.rows[0]?.id);
 
     return NextResponse.json({ id, message: "País creado exitosamente" }, { status: 201 });
   } catch (error) {

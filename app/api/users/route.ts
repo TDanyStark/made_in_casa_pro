@@ -85,7 +85,7 @@ export async function POST(request: NextRequest) {
     
     return NextResponse.json({ 
       message: 'Usuario creado exitosamente',
-      id: Number(result.lastInsertRowid),
+      id: Number(result.rows[0]?.id),
     }, { status: 201 });
 
   } catch (error: Error | unknown) {

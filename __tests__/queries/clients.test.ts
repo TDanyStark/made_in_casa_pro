@@ -19,12 +19,11 @@ import { revalidatePath } from 'next/cache';
 const mockExecute = db.execute as jest.MockedFunction<typeof db.execute>;
 
 // Helper for a DB-like result object
-function makeResult(rows: Record<string, unknown>[], lastInsertRowid: number | bigint = 0) {
+function makeResult(rows: Record<string, unknown>[]) {
   return {
     rows: rows as never,
     columns: [] as string[],
     columnTypes: [] as string[],
-    lastInsertRowid: BigInt(lastInsertRowid),
     rowsAffected: rows.length,
     toJSON: () => ({}),
   };

@@ -41,7 +41,7 @@ export async function createArea(areaData: Omit<AreaType, "id">) {
       args: [areaData.name],
     });
 
-    const areaId = Number(result.lastInsertRowid);
+    const areaId = Number(result.rows[0]?.id);
     
     return {
       id: areaId,

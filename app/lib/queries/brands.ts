@@ -108,7 +108,7 @@ export async function createBrand(brandData: Omit<BrandType, "id">) {
       args: [brandData.name, brandData.manager_id, brandData.business_unit_id ?? null],
     });
 
-    const brandId = Number(brandResult.lastInsertRowid);
+    const brandId = Number(brandResult.rows[0]?.id);
 
     const manager = await getManagerById(brandData.manager_id.toString());
     // Revalidamos la ruta del cliente al que pertenece el manager

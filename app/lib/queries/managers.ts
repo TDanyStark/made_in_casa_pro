@@ -170,7 +170,7 @@ export async function createManager(managerData: Omit<ManagerType, "id">) {
     revalidatePath(`/clients/${managerData.client_id}`);
 
     return {
-      id: Number(result.lastInsertRowid),
+      id: Number(result.rows[0]?.id),
       ...managerData,
     };
   } catch (error) {
