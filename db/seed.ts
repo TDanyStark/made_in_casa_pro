@@ -11,7 +11,7 @@
 import { readdir, readFile } from "fs/promises";
 import { join, dirname } from "path";
 import { fileURLToPath } from "url";
-import { Pool, neonConfig } from "@neondatabase/serverless";
+import { Pool } from "pg";
 
 // Load .env.local / .env for local development
 for (const envFile of [".env.local", ".env"]) {
@@ -23,21 +23,18 @@ for (const envFile of [".env.local", ".env"]) {
   }
 }
 
-// WebSocket support for Node.js
-if (typeof globalThis.WebSocket === "undefined") {
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    neonConfig.webSocketConstructor = require("ws");
-  } catch {
-    // ws not installed — fine in environments with native WebSocket
-  }
-}
-
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
 async function seed() {
-  const url = process.env.DATABASE_URL;
-  if (!url) throw new Error("DATABASE_URL is not set.");
+  const url =
+    process.env.NODE_ENV === "production"
+      ? process.env.DATABASE_URL
+      : process.env.DATABASE_LOCAL_URL || "postgresql://localhost/made_in_casa";
+  if (!url) {
+    throw new Error(
+      "Missing database URL. Use DATABASE_LOCAL_URL in local or DATABASE_URL in production."
+    );
+  }
 
   const pool = new Pool({ connectionString: url });
 

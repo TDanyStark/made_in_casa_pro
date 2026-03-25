@@ -13,7 +13,7 @@
 import { readdir, readFile } from "fs/promises";
 import { join, dirname } from "path";
 import { fileURLToPath } from "url";
-import { Pool, neonConfig } from "@neondatabase/serverless";
+import { Pool } from "pg";
 
 // ── Cargar variables de entorno ──────────────────────────────────────────────
 for (const envFile of [".env.local", ".env"]) {
@@ -22,16 +22,6 @@ for (const envFile of [".env.local", ".env"]) {
     break;
   } catch {
     // Archivo no encontrado — continúa con el siguiente
-  }
-}
-
-// ── WebSocket para entornos Node.js (no necesario en Vercel / edge) ──────────
-if (typeof globalThis.WebSocket === "undefined") {
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    neonConfig.webSocketConstructor = require("ws");
-  } catch {
-    // ws no instalado — funciona en entornos con WebSocket nativo
   }
 }
 
@@ -44,9 +34,17 @@ const red    = (s: string) => `\x1b[31m${s}\x1b[0m`;
 const dim    = (s: string) => `\x1b[2m${s}\x1b[0m`;
 
 async function migrate() {
-  const url = process.env.DATABASE_URL;
+  const url =
+    process.env.NODE_ENV === "production"
+      ? process.env.DATABASE_URL
+      : process.env.DATABASE_LOCAL_URL || "postgresql://localhost/made_in_casa";
+
   if (!url) {
-    console.error(red("✖  DATABASE_URL no está definida."));
+    console.error(
+      red(
+        "✖  Falta URL de base de datos. Usa DATABASE_LOCAL_URL en local o DATABASE_URL en producción."
+      )
+    );
     process.exit(1);
   }
 
