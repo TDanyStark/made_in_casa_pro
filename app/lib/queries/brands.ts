@@ -249,7 +249,7 @@ export async function getBrandsWithPagination({
       const p1 = filterArgs.length;
       filterArgs.push(searchParam);
       const p2 = filterArgs.length;
-      conditions.push(`(b.name LIKE $${p1} OR m.name LIKE $${p2})`);
+      conditions.push(`(unaccent(b.name) ILIKE unaccent($${p1}) OR unaccent(m.name) ILIKE unaccent($${p2}))`);
     }
 
     if (conditions.length > 0) {

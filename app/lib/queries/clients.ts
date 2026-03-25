@@ -102,7 +102,7 @@ export async function getClientsWithPagination({
     const conditions: string[] = [];
     
     if (search) {
-      conditions.push(`(c.name LIKE $1 OR co.name LIKE $2)`);
+      conditions.push(`(unaccent(c.name) ILIKE unaccent($1) OR unaccent(co.name) ILIKE unaccent($2))`);
       const searchParam = `%${search}%`;
       args.push(searchParam, searchParam);
       countArgs.push(searchParam, searchParam);

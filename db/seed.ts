@@ -1,7 +1,9 @@
 /**
  * Database seeder
  *
- * Usage: npx tsx db/seed.ts
+ * Usage:
+ *   npx tsx db/seed.ts           — apply new seeds (skips already applied)
+ *   npx tsx db/seed.ts --reset   — truncate all seed tables, clear tracker, then re-seed
  *
  * Reads all .sql files from db/seeds/ sorted by filename, tracks applied
  * seeds in a _seeds table, and skips already-applied ones.
@@ -24,6 +26,25 @@ for (const envFile of [".env.local", ".env"]) {
 }
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
+const RESET = process.argv.includes("--reset");
+
+// Tables populated by seeds, in dependency order (leaf → root).
+// RESTART IDENTITY resets auto-increment sequences.
+const SEED_TABLES = [
+  "product_task_templates",
+  "user_skills",
+  "products",
+  "product_categories",
+  "brands",
+  "managers",
+  "clients",
+  "users",
+  "business_units",
+  "skills",
+  "areas",
+  "countries",
+  "roles",
+].join(", ");
 
 async function seed() {
   const url =
@@ -46,6 +67,15 @@ async function seed() {
       applied_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     )
   `);
+
+  if (RESET) {
+    console.log("⚠️  --reset: truncating all seed tables…");
+    await pool.query(
+      `TRUNCATE ${SEED_TABLES} RESTART IDENTITY CASCADE`
+    );
+    await pool.query("DELETE FROM _seeds");
+    console.log("✓  Tables cleared. Re-seeding…\n");
+  }
 
   const seedsDir = join(__dirname, "seeds");
   const files = (await readdir(seedsDir))

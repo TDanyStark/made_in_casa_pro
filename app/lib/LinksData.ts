@@ -79,6 +79,10 @@ export const linksNotVisible: LinksType[] = [
     roles: [UserRole.ADMIN, UserRole.COMERCIAL, UserRole.DIRECTIVO]
   },
   {
+    route: '/products/[id]',
+    roles: [UserRole.ADMIN, UserRole.COMERCIAL, UserRole.DIRECTIVO]
+  },
+  {
     route: '/products/create',
     roles: [UserRole.ADMIN, UserRole.COMERCIAL, UserRole.DIRECTIVO]
   },

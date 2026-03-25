@@ -140,3 +140,31 @@ export type ApiResponseWithPagination<T> = {
   currentPage: number;
   total: number;
 }
+
+export type ProductCategoryType = {
+  id: number;
+  name: string;
+};
+
+export type ProductType = {
+  id: number;
+  name: string;
+  description: string | null;
+  category_id: number | null;
+  category_name: string | null;
+  is_active: number;
+  created_at: string;
+};
+
+export type ProductTaskTemplateType = {
+  id: number;
+  product_id: number;
+  title: string;
+  description: string | null;
+  area_id: number | null;
+  area_name: string | null;
+  assigned_user_id: number | null;
+  assigned_user_name: string | null;
+  order_index: number;
+  created_at: string;
+};

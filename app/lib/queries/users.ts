@@ -24,7 +24,7 @@ export async function getUsers(params?: GetUsersParams) {
     const args: (string | number)[] = [];
     
     if (search) {
-      whereClause = `WHERE name LIKE $1 OR email LIKE $2`;
+      whereClause = `WHERE unaccent(name) ILIKE unaccent($1) OR unaccent(email) ILIKE unaccent($2)`;
       args.push(`%${search}%`, `%${search}%`);
     }
     
@@ -159,7 +159,7 @@ export async function getUsersWithPagination({
       const firstSearch = filterArgs.length;
       filterArgs.push(searchParam);
       const secondSearch = filterArgs.length;
-      conditions.push(`(name LIKE $${firstSearch} OR email LIKE $${secondSearch})`);
+      conditions.push(`(unaccent(name) ILIKE unaccent($${firstSearch}) OR unaccent(email) ILIKE unaccent($${secondSearch}))`);
     }
 
     if (conditions.length > 0) {

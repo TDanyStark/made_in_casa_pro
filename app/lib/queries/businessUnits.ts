@@ -96,7 +96,7 @@ export async function getBusinessUnitsWithPagination({
 
     // Build WHERE clause for search
     if (search) {
-      sql += ` WHERE name LIKE $1`;
+      sql += ` WHERE unaccent(name) ILIKE unaccent($1)`;
       const searchParam = `%${search}%`;
       args.push(searchParam);
       countArgs.push(searchParam);
@@ -105,7 +105,7 @@ export async function getBusinessUnitsWithPagination({
     // Get total count for pagination
     let countSql = `SELECT COUNT(*) as count FROM business_units`;
     if (search) {
-      countSql += ` WHERE name LIKE $1`;
+      countSql += ` WHERE unaccent(name) ILIKE unaccent($1)`;
     }
 
     const countResult = await db.execute({

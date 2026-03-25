@@ -11,7 +11,8 @@
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
     "db:migrate": "tsx db/migrate.ts",
-    "db:seed": "tsx db/seed.ts"
+    "db:seed": "tsx db/seed.ts",
+    "db:seed:reset": "tsx db/seed.ts --reset"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

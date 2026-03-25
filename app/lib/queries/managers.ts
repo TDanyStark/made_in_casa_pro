@@ -119,7 +119,7 @@ export async function getManagersWithPagination({clientId, page = 1, limit = ITE
       const p2 = filterArgs.length;
       filterArgs.push(searchParam);
       const p3 = filterArgs.length;
-      conditions.push(`(name LIKE $${p1} OR email LIKE $${p2} OR phone LIKE $${p3})`);
+      conditions.push(`(unaccent(name) ILIKE unaccent($${p1}) OR unaccent(email) ILIKE unaccent($${p2}) OR unaccent(phone) ILIKE unaccent($${p3}))`);
     }
     if (conditions.length > 0) {
       sql += " WHERE " + conditions.join(" AND ");

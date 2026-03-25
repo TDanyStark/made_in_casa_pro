@@ -119,12 +119,22 @@ export async function getSkillsWithPagination({
 
     // Build WHERE clause for search
     if (search) {
-      sql += ` WHERE s.name LIKE $2`;
+      sql += ` WHERE unaccent(s.name) ILIKE unaccent($2)`;
       const searchParam = `%${search}%`;
       args.push(searchParam);
     }
 
-    const total = 1;
+    // Get total count for pagination
+    let countSql = `
+      SELECT COUNT(*) as count
+      FROM skills s
+      LEFT JOIN user_skills us ON s.id = us.skill_id AND us.user_id = $1
+    `;
+    if (search) {
+      countSql += ` WHERE unaccent(s.name) ILIKE unaccent($2)`;
+    }
+    const countResult = await db.execute({ sql: countSql, args });
+    const total = Number(countResult.rows[0]?.count ?? 0);
 
     // Execute query
     const result = await db.execute({

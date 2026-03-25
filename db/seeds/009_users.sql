@@ -6,6 +6,7 @@
 --
 -- is_internal: 1 = empleado interno, 0 = colaborador externo
 -- must_change_password: 1 = debe cambiar al primer login
+-- area_id: solo aplica a colaboradores; NULL para admin, directivos y comerciales
 
 -- ─────────────────────────────────────────────
 -- ADMIN (1)
@@ -16,7 +17,7 @@ VALUES (
   'admin@madencasa.com',
   '$2b$10$aEyIpIyBNuZxmLTk0ditj.Lq/ZJW6Zz4vgVcaXcUhwlmE2GtnV2j6',
   (SELECT id FROM roles WHERE role = 'admin'),
-  (SELECT id FROM areas WHERE name = 'Tecnología'),
+  NULL,
   1, 1, 0
 );
 
@@ -29,7 +30,7 @@ VALUES (
   'jp.vargas@madencasa.com',
   '$2b$10$aEyIpIyBNuZxmLTk0ditj.Lq/ZJW6Zz4vgVcaXcUhwlmE2GtnV2j6',
   (SELECT id FROM roles WHERE role = 'directivo'),
-  (SELECT id FROM areas WHERE name = 'Operaciones'),
+  NULL,
   1, 1, 0, 12000000
 );
 
@@ -39,7 +40,7 @@ VALUES (
   'mf.ospina@madencasa.com',
   '$2b$10$aEyIpIyBNuZxmLTk0ditj.Lq/ZJW6Zz4vgVcaXcUhwlmE2GtnV2j6',
   (SELECT id FROM roles WHERE role = 'directivo'),
-  (SELECT id FROM areas WHERE name = 'Marketing'),
+  NULL,
   1, 1, 0, 11500000
 );
 
@@ -52,7 +53,7 @@ VALUES (
   'pa.rios@madencasa.com',
   '$2b$10$aEyIpIyBNuZxmLTk0ditj.Lq/ZJW6Zz4vgVcaXcUhwlmE2GtnV2j6',
   (SELECT id FROM roles WHERE role = 'comercial'),
-  (SELECT id FROM areas WHERE name = 'Ventas'),
+  NULL,
   1, 1, 0, 5500000
 );
 
@@ -62,7 +63,7 @@ VALUES (
   'as.herrera@madencasa.com',
   '$2b$10$aEyIpIyBNuZxmLTk0ditj.Lq/ZJW6Zz4vgVcaXcUhwlmE2GtnV2j6',
   (SELECT id FROM roles WHERE role = 'comercial'),
-  (SELECT id FROM areas WHERE name = 'Ventas'),
+  NULL,
   1, 1, 0, 5200000
 );
 
@@ -72,12 +73,12 @@ VALUES (
   'lm.pardo@madencasa.com',
   '$2b$10$aEyIpIyBNuZxmLTk0ditj.Lq/ZJW6Zz4vgVcaXcUhwlmE2GtnV2j6',
   (SELECT id FROM roles WHERE role = 'comercial'),
-  (SELECT id FROM areas WHERE name = 'Marketing'),
+  NULL,
   1, 1, 0, 5800000
 );
 
 -- ─────────────────────────────────────────────
--- COLABORADORES (4)
+-- COLABORADORES (4) — los únicos con area_id
 -- ─────────────────────────────────────────────
 INSERT INTO users (name, email, password, rol_id, area_id, is_internal, is_active, must_change_password, monthly_salary)
 VALUES (
@@ -85,7 +86,7 @@ VALUES (
   'sv.cruz@madencasa.com',
   '$2b$10$aEyIpIyBNuZxmLTk0ditj.Lq/ZJW6Zz4vgVcaXcUhwlmE2GtnV2j6',
   (SELECT id FROM roles WHERE role = 'colaborador'),
-  (SELECT id FROM areas WHERE name = 'Tecnología'),
+  (SELECT id FROM areas WHERE name = 'Programación/IT'),
   1, 1, 1, 3500000
 );
 
@@ -105,7 +106,7 @@ VALUES (
   'i.moreno@madencasa.com',
   '$2b$10$aEyIpIyBNuZxmLTk0ditj.Lq/ZJW6Zz4vgVcaXcUhwlmE2GtnV2j6',
   (SELECT id FROM roles WHERE role = 'colaborador'),
-  (SELECT id FROM areas WHERE name = 'Finanzas'),
+  (SELECT id FROM areas WHERE name = 'Escritura'),
   1, 1, 0, 3800000
 );
 
@@ -115,6 +116,6 @@ VALUES (
   'ms.duarte@madencasa.com',
   '$2b$10$aEyIpIyBNuZxmLTk0ditj.Lq/ZJW6Zz4vgVcaXcUhwlmE2GtnV2j6',
   (SELECT id FROM roles WHERE role = 'colaborador'),
-  (SELECT id FROM areas WHERE name = 'Recursos Humanos'),
+  (SELECT id FROM areas WHERE name = 'Diseño'),
   0, 1, 1, 0
 );

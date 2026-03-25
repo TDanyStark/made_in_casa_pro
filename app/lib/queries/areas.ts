@@ -102,7 +102,7 @@ export async function getAreasWithPagination({
 
     // Build WHERE clause for search
     if (search) {
-      sql += ` WHERE name LIKE $1`;
+      sql += ` WHERE unaccent(name) ILIKE unaccent($1)`;
       const searchParam = `%${search}%`;
       args.push(searchParam);
       countArgs.push(searchParam);
@@ -111,7 +111,7 @@ export async function getAreasWithPagination({
     // Get total count for pagination
     let countSql = `SELECT COUNT(*) as count FROM areas`;
     if (search) {
-      countSql += ` WHERE name LIKE $1`;
+      countSql += ` WHERE unaccent(name) ILIKE unaccent($1)`;
     }
 
     const countResult = await db.execute({
