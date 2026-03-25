@@ -234,7 +234,7 @@ export async function updateUser(userId: string, data: {
     }
     
     if (data.is_active !== undefined) {
-      args.push(data.is_active);
+      args.push(data.is_active ? 1 : 0);
       updateFields.push(`is_active = $${args.length}`);
     }
     
@@ -244,7 +244,7 @@ export async function updateUser(userId: string, data: {
     }
 
     if (data.is_internal !== undefined) {
-      args.push(data.is_internal);
+      args.push(data.is_internal ? 1 : 0);
       updateFields.push(`is_internal = $${args.length}`);
     }
 
@@ -254,7 +254,7 @@ export async function updateUser(userId: string, data: {
     }
     
     if (data.must_change_password !== undefined) {
-      args.push(data.must_change_password);
+      args.push(data.must_change_password ? 1 : 0);
       updateFields.push(`must_change_password = $${args.length}`);
     }
     if (data.monthly_salary !== undefined) {
