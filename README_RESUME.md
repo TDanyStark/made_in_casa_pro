@@ -406,6 +406,7 @@ Total de endpoints implementados: **18+ rutas API**
 ## 📌 Notas Técnicas
 
 - Base de datos: **Postgress**
+- Política de base de datos: Siempre que se implemente algo nuevo que afecte datos, se deben crear y versionar su migración en `db/migrations/` y su seeder correspondiente en `db/seeds/`.
 - Autenticación: **JWT encriptado** en cookies HTTP-only
 - Validación: **Zod** en todas las entradas
 - Paginación: LIMIT/OFFSET con búsqueda LIKE
