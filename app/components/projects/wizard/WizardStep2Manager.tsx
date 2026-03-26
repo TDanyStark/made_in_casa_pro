@@ -99,6 +99,7 @@ export function WizardStep2Manager({ state, onNext, onBack }: Props) {
           <span className="font-normal">(opcional)</span>
         </label>
         <Select<ManagerOption>
+          instanceId="wizard-comanager-select"
           options={availableOptions}
           value={null}
           onChange={(opt) => addCoManager(opt as ManagerOption | null)}

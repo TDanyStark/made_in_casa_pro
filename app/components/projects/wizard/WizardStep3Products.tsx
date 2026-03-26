@@ -78,6 +78,7 @@ export function WizardStep3Products({ state, onNext, onBack }: Props) {
       <div className="space-y-2">
         <label className="text-sm font-medium">Agregar productos *</label>
         <Select<ProductOption>
+          instanceId="wizard-products-select"
           options={availableOptions}
           value={null}
           onChange={(opt) => addProduct(opt as ProductOption | null)}

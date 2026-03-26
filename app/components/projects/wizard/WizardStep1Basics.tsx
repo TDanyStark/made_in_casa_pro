@@ -160,6 +160,7 @@ export function WizardStep1Basics({ state, onNext }: Props) {
               <FormLabel>Marca</FormLabel>
               <FormControl>
                 <Select<BrandOption>
+                  instanceId="wizard-brand-select"
                   options={brandsData ?? []}
                   value={selectedBrand}
                   onChange={(opt) => handleBrandChange(opt as BrandOption | null)}

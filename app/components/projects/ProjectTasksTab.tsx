@@ -408,6 +408,7 @@ export function ProjectTasksTab({ projectId, products: initialProducts, canEdit 
           {canEdit && (
             <div className="w-64">
               <ReactSelect<ProductOption>
+                instanceId="project-tasks-product-select"
                 options={catalogOptions}
                 value={null}
                 onChange={(opt) => handleAddProduct(opt as ProductOption | null)}

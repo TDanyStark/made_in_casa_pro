@@ -12,6 +12,45 @@ const brandUpdateSchema = z.object({
   business_unit_id: z.coerce.number().int().positive().optional(),
 });
 
+export async function GET(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const methodValidation = validateHttpMethod(request, ["GET"]);
+  if (!methodValidation.isValidMethod) {
+    return methodValidation.response;
+  }
+
+  const roleValidation = await validateApiRole(request, [
+    UserRole.ADMIN,
+    UserRole.COMERCIAL,
+    UserRole.DIRECTIVO,
+  ]);
+  if (!roleValidation.isAuthorized) {
+    return roleValidation.response;
+  }
+
+  try {
+    const { id } = await params;
+    const brand = await getBrandById(id);
+
+    if (!brand) {
+      return NextResponse.json(
+        { error: "La marca no existe" },
+        { status: 404 }
+      );
+    }
+
+    return NextResponse.json(brand);
+  } catch (error) {
+    console.error("Error fetching brand:", error);
+    return NextResponse.json(
+      { error: "Error al obtener la marca: " + error },
+      { status: 500 }
+    );
+  }
+}
+
 export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }

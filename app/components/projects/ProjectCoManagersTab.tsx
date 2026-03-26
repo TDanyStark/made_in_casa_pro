@@ -92,6 +92,7 @@ export function ProjectCoManagersTab({ projectId, mainManagerId, coManagers, can
         <div className="flex gap-2">
           <div className="flex-1">
             <Select<ManagerOption>
+              instanceId="project-comanagers-select"
               options={allManagers}
               value={selectedOption}
               onChange={(opt) => setSelectedOption(opt as ManagerOption | null)}

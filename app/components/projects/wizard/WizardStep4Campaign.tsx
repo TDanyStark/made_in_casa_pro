@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { CampaignSelect } from "@/components/projects/CampaignSelect";
 import { Button } from "@/components/ui/button";
 import { WizardState } from "@/hooks/useProjectWizard";
@@ -12,8 +13,12 @@ interface Props {
 }
 
 export function WizardStep4Campaign({ state, onNext, onBack }: Props) {
+  const [campaignId, setCampaignId] = useState<number | null>(state.campaign_id ?? null);
+  const [campaignName, setCampaignName] = useState<string>(state.campaign_name ?? "");
+
   const handleChange = (id: number | null, name?: string) => {
-    onNext({ campaign_id: id, campaign_name: name ?? "" });
+    setCampaignId(id);
+    setCampaignName(name ?? "");
   };
 
   return (
@@ -28,18 +33,18 @@ export function WizardStep4Campaign({ state, onNext, onBack }: Props) {
           Asocia este proyecto a una campaña para agrupar múltiples proyectos en tus informes.
         </p>
         <CampaignSelect
-          value={state.campaign_id}
-          initialLabel={state.campaign_name || null}
+          value={campaignId}
+          initialLabel={campaignName || null}
           clientId={state.client_id}
           onChange={handleChange}
           placeholder="Buscar campaña existente o crear nueva..."
         />
       </div>
 
-      {state.campaign_name && (
+      {campaignName && (
         <div className="rounded-md border bg-muted/30 px-4 py-3 text-sm">
           Campaña seleccionada:{" "}
-          <span className="font-semibold">{state.campaign_name}</span>
+          <span className="font-semibold">{campaignName}</span>
         </div>
       )}
 
@@ -47,7 +52,10 @@ export function WizardStep4Campaign({ state, onNext, onBack }: Props) {
         <Button type="button" variant="outline" onClick={onBack}>
           Atrás
         </Button>
-        <Button type="button" onClick={() => onNext({})}>
+        <Button
+          type="button"
+          onClick={() => onNext({ campaign_id: campaignId, campaign_name: campaignName })}
+        >
           Siguiente
         </Button>
       </div>
