@@ -25,12 +25,6 @@ interface TableManagersProps {
 // Define columns for the managers table
 export const columns: ColumnDef<ManagerType>[] = [
   {
-    accessorKey: "id",
-    header: "ID",
-    cell: ({ row }) => <div className="text-center">{row.getValue("id")}</div>,
-    size: 40,
-  },
-  {
     accessorKey: "name",
     header: "Nombre",
     size: 250,
@@ -93,7 +87,7 @@ const TableManagers = ({ managers, pageCount }: TableManagersProps) => {
                 {row.getVisibleCells().map((cell) => (
                   <TableCell key={cell.id} className="p-0">
                     <Link 
-                      href={`/managers/${row.getValue("id")}`}
+                      href={`/managers/${row.original.id}`}
                       className="block w-full h-full cursor-pointer p-2"
                       >
                       {flexRender(

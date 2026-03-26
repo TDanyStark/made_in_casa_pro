@@ -27,12 +27,6 @@ interface TableClientsProps {
 // Define columns for the clients table
 export const columns: ColumnDef<ClientType>[] = [
   {
-    accessorKey: "id",
-    header: "ID",
-    cell: ({ row }) => <div className="text-center">{row.getValue("id")}</div>,
-    size: 40,
-  },
-  {
     accessorKey: "name",
     header: "Nombre",
     size: 300,
@@ -107,7 +101,7 @@ const TableClients = ({ clients, pageCount }: TableClientsProps) => {
                 {row.getVisibleCells().map((cell) => (
                   <TableCell key={cell.id} className="p-0">
                     <Link 
-                      href={`/clients/${row.getValue("id")}`}
+                      href={`/clients/${row.original.id}`}
                       className="block w-full h-full cursor-pointer p-2"
                       >
                       {flexRender(

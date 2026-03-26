@@ -25,12 +25,6 @@ interface TableProductsProps {
 
 const columns: ColumnDef<ProductType>[] = [
   {
-    accessorKey: "id",
-    header: "ID",
-    cell: ({ row }) => <div className="text-center">{row.getValue("id")}</div>,
-    size: 50,
-  },
-  {
     accessorKey: "name",
     header: "Nombre",
     size: 220,
@@ -102,7 +96,7 @@ const TableProducts = ({ products, pageCount }: TableProductsProps) => {
                 {row.getVisibleCells().map((cell) => (
                   <TableCell key={cell.id} className="p-0">
                     <Link
-                      href={`/products/${row.getValue("id")}`}
+                      href={`/products/${row.original.id}`}
                       className="block w-full h-full cursor-pointer p-2"
                     >
                       {flexRender(cell.column.columnDef.cell, cell.getContext())}

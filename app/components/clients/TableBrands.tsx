@@ -25,12 +25,6 @@ interface TableBrandsProps {
 // Define columns for the brands table
 export const columns: ColumnDef<BrandType>[] = [
   {
-    accessorKey: "id",
-    header: "ID",
-    cell: ({ row }) => <div className="text-center">{row.getValue("id")}</div>,
-    size: 40,
-  },
-  {
     accessorKey: "brand_name",
     header: "Nombre",
     size: 200,
@@ -88,7 +82,7 @@ const TableBrands = ({ brands, pageCount }: TableBrandsProps) => {
                 {row.getVisibleCells().map((cell) => (
                   <TableCell key={cell.id} className="p-0">
                     <Link 
-                      href={`/brands/${row.getValue("id")}`}
+                      href={`/brands/${row.original.id}`}
                       className="block w-full h-full cursor-pointer p-2"
                       >
                       {flexRender(

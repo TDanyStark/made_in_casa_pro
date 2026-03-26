@@ -108,14 +108,6 @@ const TableUsers = ({ users = [], pageCount = 1 }: TableUsersProps) => {
   }; // Define columns for the users table
   const columns: ColumnDef<UserType>[] = [
     {
-      accessorKey: "id",
-      header: "ID",
-      cell: ({ row }) => (
-        <div className="text-center">{row.getValue("id")}</div>
-      ),
-      size: 40,
-    },
-    {
       accessorKey: "name",
       header: "Nombre",
       cell: ({ row }) => (
@@ -153,7 +145,7 @@ const TableUsers = ({ users = [], pageCount = 1 }: TableUsersProps) => {
       accessorKey: "is_active",
       header: "Estado",
       cell: ({ row }) => {
-        const userId = row.getValue("id") as number;
+        const userId = row.original.id as number;
         const isLoading = loadingUsers.includes(userId);
         const isActive = Boolean(row.getValue("is_active"));
         
@@ -231,7 +223,7 @@ const TableUsers = ({ users = [], pageCount = 1 }: TableUsersProps) => {
                   <TableCell key={cell.id} className="p-0">
                     {cell.column.id !== "is_active" ? (
                       <Link
-                        href={`/users/${row.getValue("id")}`}
+                        href={`/users/${row.original.id}`}
                         className="block w-full h-full cursor-pointer p-2"
                       >
                         {flexRender(
