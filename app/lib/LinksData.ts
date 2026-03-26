@@ -25,7 +25,7 @@ export const links: LinksType[] = [
     name: 'Proyectos',
     route: '/projects',
     icon: Folder,
-    roles: [UserRole.ADMIN, UserRole.COMERCIAL, UserRole.DIRECTIVO]
+    roles: [UserRole.ADMIN, UserRole.COMERCIAL, UserRole.DIRECTIVO, UserRole.COLABORADOR]
   },
   { 
     name: 'Tareas', 
@@ -89,6 +89,10 @@ export const linksNotVisible: LinksType[] = [
   {
     route: '/products/[id]/edit',
     roles: [UserRole.ADMIN, UserRole.COMERCIAL, UserRole.DIRECTIVO]
+  },
+  {
+    route: '/projects/[id]',
+    roles: [UserRole.ADMIN, UserRole.COMERCIAL, UserRole.DIRECTIVO, UserRole.COLABORADOR]
   },
   {
     route: '/projects/create',

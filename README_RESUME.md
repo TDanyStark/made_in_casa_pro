@@ -519,6 +519,81 @@ Total de endpoints implementados: **18+ rutas API**
 
 ---
 
-**Última actualización:** 2026-03-02
+---
+
+### 9️⃣ Módulo de PROYECTOS (Projects)
+
+El núcleo central de la aplicación. Organiza la ejecución de productos (servicios) para una marca.
+
+**¿Qué se puede hacer?**
+- ✅ Crear proyectos mediante un wizard multi-paso con vista previa en tiempo real
+- ✅ Asociar proyecto a una marca → gerente principal → co-responsables opcionales
+- ✅ Agregar productos al proyecto (instancia automáticamente las tareas desde `product_task_templates`)
+- ✅ Asignación automática de tareas al colaborador interno con menor carga
+- ✅ Asociar proyecto a una campaña (creatable inline con React Select async)
+- ✅ Crear carpetas en Google Drive con estructura: `Made In Casa/{cliente}/{marca}/{proyecto}/{producto}/`
+- ✅ Notas del proyecto con editor TipTap (Markdown enriquecido)
+- ✅ Estados de proyecto: Activo, Pausado, Completado, Archivado
+- ✅ Progreso automático calculado como `tareas completadas / total`
+- ✅ Vista de tareas por producto (tabs), con cambio de estado inline y drag & drop para reordenar
+- ✅ Gestión de co-responsables desde la página de detalle
+- ✅ Filtros en lista: búsqueda, estado
+
+**Permisos:**
+- Crear/Editar proyecto: ADMIN, DIRECTIVO, COMERCIAL
+- Ver lista y detalle: Todos los roles
+- Cambiar estado de tareas: Todos los roles
+- Eliminar proyecto: ADMIN, DIRECTIVO
+
+**Endpoints API:**
+- `GET /api/projects` — lista paginada con filtros
+- `POST /api/projects` — crear proyecto
+- `GET /api/projects/[id]` — detalle completo (co-managers, productos, metadata)
+- `PATCH /api/projects/[id]` — editar (título, estado, notas, campaña, drive)
+- `DELETE /api/projects/[id]` — eliminar
+- `POST /api/projects/[id]/managers` — agregar co-responsable
+- `DELETE /api/projects/[id]/managers` — quitar co-responsable
+- `GET /api/projects/[id]/products` — productos del proyecto
+- `POST /api/projects/[id]/products` — agregar producto + instanciar tareas
+- `DELETE /api/projects/[id]/products/[pid]` — quitar producto
+- `GET /api/projects/[id]/tasks` — todas las tareas del proyecto
+- `POST /api/projects/[id]/tasks` — crear tarea manual
+- `PATCH /api/projects/[id]/tasks/[tid]` — actualizar estado/asignación
+- `DELETE /api/projects/[id]/tasks/[tid]` — eliminar tarea
+- `POST /api/projects/[id]/tasks/reorder` — reordenar tareas
+- `POST /api/projects/[id]/recalculate` — recalcular % de progreso
+- `POST /api/drive/create-folder` — crear carpetas en Google Drive
+
+**Tablas de base de datos:**
+- `campaigns` — campañas (nombre, fecha)
+- `projects` — proyectos con FK a brand, manager, campaign; campos drive, notes, status, progress
+- `project_managers` — join table de co-responsables
+- `project_products` — productos asignados al proyecto
+- `project_tasks` — instancias de tareas (heredadas de templates o manuales)
+
+**Variable de entorno requerida:**
+- `GOOGLE_SERVICE_ACCOUNT_JSON` — JSON de Service Account de Google Cloud (para Drive API)
+
+---
+
+### 🔟 Módulo de CAMPAÑAS (Campaigns)
+
+Entidad simple para agrupar proyectos en informes.
+
+**¿Qué se puede hacer?**
+- ✅ Crear campañas (inline desde el wizard de proyectos o en `/api/campaigns`)
+- ✅ Buscar campañas con AJAX (React Select async/creatable)
+- ✅ Asociar/desasociar campaña desde el detalle de proyecto
+
+**Endpoints API:**
+- `GET /api/campaigns` — lista paginada con búsqueda
+- `POST /api/campaigns` — crear
+- `GET /api/campaigns/[id]` — detalle
+- `PATCH /api/campaigns/[id]` — editar
+- `DELETE /api/campaigns/[id]` — eliminar
+
+---
+
+**Última actualización:** 2026-03-26
 **Versión de Next.js:** 15.3.2
 **Versión de React:** 19

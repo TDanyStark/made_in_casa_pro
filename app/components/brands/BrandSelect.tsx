@@ -14,7 +14,12 @@ import { Control, UseFormReturn } from "react-hook-form";
 import { FormField } from "@/components/ui/form";
 import CreateBrandModal from "../clients/CreateBrandModal";
 import { BrandsAndManagersType, BrandType } from "@/lib/definitions";
-import { FormDataTest } from "../projects/ClientComponent";
+
+// Generic form shape that must contain at least brand_id
+interface AnyFormWithBrand {
+  brand_id: number;
+  [key: string]: unknown;
+}
 
 interface BrandOption {
   value: number;
@@ -30,7 +35,8 @@ interface FormData {
 }
 
 interface BrandSelectProps {
-  form: UseFormReturn<FormDataTest>; 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  form: UseFormReturn<any>;
   control: Control<FormData>;
   name: "name" | "brand_id" | "id";
   label?: string;

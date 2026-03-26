@@ -14,7 +14,7 @@
 INSERT INTO users (name, email, password, rol_id, area_id, is_internal, is_active, must_change_password)
 VALUES (
   'Admin Sistema',
-  'admin@madencasa.com',
+  'admin@market-support.com',
   '$2b$10$aEyIpIyBNuZxmLTk0ditj.Lq/ZJW6Zz4vgVcaXcUhwlmE2GtnV2j6',
   (SELECT id FROM roles WHERE role = 'admin'),
   NULL,
@@ -26,8 +26,8 @@ VALUES (
 -- ─────────────────────────────────────────────
 INSERT INTO users (name, email, password, rol_id, area_id, is_internal, is_active, must_change_password, monthly_salary)
 VALUES (
-  'Juan Pablo Vargas',
-  'jp.vargas@madencasa.com',
+  'Sandy Baron',
+  'sandy.baron@market-support.com',
   '$2b$10$aEyIpIyBNuZxmLTk0ditj.Lq/ZJW6Zz4vgVcaXcUhwlmE2GtnV2j6',
   (SELECT id FROM roles WHERE role = 'directivo'),
   NULL,
@@ -36,8 +36,8 @@ VALUES (
 
 INSERT INTO users (name, email, password, rol_id, area_id, is_internal, is_active, must_change_password, monthly_salary)
 VALUES (
-  'María Fernanda Ospina',
-  'mf.ospina@madencasa.com',
+  'Josue Amado',
+  'josue.amado@market-support.com',
   '$2b$10$aEyIpIyBNuZxmLTk0ditj.Lq/ZJW6Zz4vgVcaXcUhwlmE2GtnV2j6',
   (SELECT id FROM roles WHERE role = 'directivo'),
   NULL,
@@ -49,32 +49,12 @@ VALUES (
 -- ─────────────────────────────────────────────
 INSERT INTO users (name, email, password, rol_id, area_id, is_internal, is_active, must_change_password, monthly_salary)
 VALUES (
-  'Pedro Alejandro Ríos',
-  'pa.rios@madencasa.com',
+  'Leidy Poveda',
+  'leidy.poveda@market-support.com',
   '$2b$10$aEyIpIyBNuZxmLTk0ditj.Lq/ZJW6Zz4vgVcaXcUhwlmE2GtnV2j6',
   (SELECT id FROM roles WHERE role = 'comercial'),
   NULL,
   1, 1, 0, 5500000
-);
-
-INSERT INTO users (name, email, password, rol_id, area_id, is_internal, is_active, must_change_password, monthly_salary)
-VALUES (
-  'Ana Sofía Herrera',
-  'as.herrera@madencasa.com',
-  '$2b$10$aEyIpIyBNuZxmLTk0ditj.Lq/ZJW6Zz4vgVcaXcUhwlmE2GtnV2j6',
-  (SELECT id FROM roles WHERE role = 'comercial'),
-  NULL,
-  1, 1, 0, 5200000
-);
-
-INSERT INTO users (name, email, password, rol_id, area_id, is_internal, is_active, must_change_password, monthly_salary)
-VALUES (
-  'Luis Miguel Pardo',
-  'lm.pardo@madencasa.com',
-  '$2b$10$aEyIpIyBNuZxmLTk0ditj.Lq/ZJW6Zz4vgVcaXcUhwlmE2GtnV2j6',
-  (SELECT id FROM roles WHERE role = 'comercial'),
-  NULL,
-  1, 1, 0, 5800000
 );
 
 -- ─────────────────────────────────────────────
@@ -82,8 +62,8 @@ VALUES (
 -- ─────────────────────────────────────────────
 INSERT INTO users (name, email, password, rol_id, area_id, is_internal, is_active, must_change_password, monthly_salary)
 VALUES (
-  'Sofía Valentina Cruz',
-  'sv.cruz@madencasa.com',
+  'Daniel Amado',
+  'daniel.amado@market-support.com',
   '$2b$10$aEyIpIyBNuZxmLTk0ditj.Lq/ZJW6Zz4vgVcaXcUhwlmE2GtnV2j6',
   (SELECT id FROM roles WHERE role = 'colaborador'),
   (SELECT id FROM areas WHERE name = 'Programación/IT'),
@@ -92,8 +72,8 @@ VALUES (
 
 INSERT INTO users (name, email, password, rol_id, area_id, is_internal, is_active, must_change_password, monthly_salary)
 VALUES (
-  'Carlos Andrés Mejía',
-  'ca.mejia@madencasa.com',
+  'Nataly Ruiz',
+  'nathaliaruiz.ms@gmail.com',
   '$2b$10$aEyIpIyBNuZxmLTk0ditj.Lq/ZJW6Zz4vgVcaXcUhwlmE2GtnV2j6',
   (SELECT id FROM roles WHERE role = 'colaborador'),
   (SELECT id FROM areas WHERE name = 'Diseño'),
@@ -102,8 +82,8 @@ VALUES (
 
 INSERT INTO users (name, email, password, rol_id, area_id, is_internal, is_active, must_change_password, monthly_salary)
 VALUES (
-  'Isabella Moreno',
-  'i.moreno@madencasa.com',
+  'Lina Gonzalez',
+  'lina.gonzalez.market@gmail.com',
   '$2b$10$aEyIpIyBNuZxmLTk0ditj.Lq/ZJW6Zz4vgVcaXcUhwlmE2GtnV2j6',
   (SELECT id FROM roles WHERE role = 'colaborador'),
   (SELECT id FROM areas WHERE name = 'Escritura'),
@@ -112,8 +92,8 @@ VALUES (
 
 INSERT INTO users (name, email, password, rol_id, area_id, is_internal, is_active, must_change_password, monthly_salary)
 VALUES (
-  'Mateo Santiago Duarte',
-  'ms.duarte@madencasa.com',
+  'Laura Obregoso',
+  'laura.obregoso.market@gmail.com',
   '$2b$10$aEyIpIyBNuZxmLTk0ditj.Lq/ZJW6Zz4vgVcaXcUhwlmE2GtnV2j6',
   (SELECT id FROM roles WHERE role = 'colaborador'),
   (SELECT id FROM areas WHERE name = 'Diseño'),

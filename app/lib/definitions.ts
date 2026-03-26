@@ -168,3 +168,78 @@ export type ProductTaskTemplateType = {
   order_index: number;
   created_at: string;
 };
+
+// ─── Projects module ────────────────────────────────────────────────────────
+
+export type CampaignType = {
+  id: number;
+  name: string;
+  created_at: string;
+};
+
+export type ProjectStatus = 'active' | 'paused' | 'completed' | 'archived';
+
+export type ProjectType = {
+  id: number;
+  title: string;
+  brand_id: number;
+  brand_name: string;
+  manager_id: number;
+  manager_name: string;
+  client_id: number;
+  client_name: string;
+  campaign_id: number | null;
+  campaign_name: string | null;
+  drive_folder_id: string | null;
+  drive_folder_url: string | null;
+  notes: string | null;
+  status: ProjectStatus;
+  progress: number;
+  created_by: number | null;
+  created_by_name: string | null;
+  created_at: string;
+  updated_at: string;
+  // aggregates (populated in list queries)
+  product_count?: number;
+  co_manager_count?: number;
+};
+
+export type ProjectDetailType = ProjectType & {
+  co_managers: Array<{ id: number; name: string; email: string }>;
+  products: ProjectProductType[];
+};
+
+export type ProjectProductStatus = 'pending' | 'in_progress' | 'completed';
+
+export type ProjectProductType = {
+  id: number;
+  project_id: number;
+  product_id: number;
+  product_name: string;
+  product_category_id: number | null;
+  product_category_name: string | null;
+  status: ProjectProductStatus;
+  created_at: string;
+  tasks?: ProjectTaskType[];
+  task_total?: number;
+  task_completed?: number;
+};
+
+export type ProjectTaskStatus = 'not_started' | 'in_progress' | 'completed' | 'blocked';
+
+export type ProjectTaskType = {
+  id: number;
+  project_id: number;
+  project_product_id: number;
+  template_id: number | null;
+  title: string;
+  description: string | null;
+  area_id: number | null;
+  area_name: string | null;
+  assigned_user_id: number | null;
+  assigned_user_name: string | null;
+  status: ProjectTaskStatus;
+  order_index: number;
+  created_at: string;
+  updated_at: string;
+};
