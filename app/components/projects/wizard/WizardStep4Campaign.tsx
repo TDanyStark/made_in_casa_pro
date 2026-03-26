@@ -29,6 +29,8 @@ export function WizardStep4Campaign({ state, onNext, onBack }: Props) {
         </p>
         <CampaignSelect
           value={state.campaign_id}
+          initialLabel={state.campaign_name || null}
+          clientId={state.client_id}
           onChange={handleChange}
           placeholder="Buscar campaña existente o crear nueva..."
         />

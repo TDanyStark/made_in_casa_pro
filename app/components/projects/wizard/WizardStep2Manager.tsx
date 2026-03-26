@@ -7,7 +7,8 @@ import { get } from "@/lib/services/apiService";
 import { ManagerType, ApiResponseWithPagination } from "@/lib/definitions";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { X } from "lucide-react";
+import { Card } from "@/components/ui/card";
+import { X, User, Mail } from "lucide-react";
 import { WizardState } from "@/hooks/useProjectWizard";
 
 interface ManagerOption {
@@ -23,9 +24,6 @@ interface Props {
 }
 
 export function WizardStep2Manager({ state, onNext, onBack }: Props) {
-  const [selectedManager, setSelectedManager] = useState<ManagerOption | null>(
-    state.manager_id ? { value: state.manager_id, label: state.manager_name, email: "" } : null
-  );
   const [coManagers, setCoManagers] = useState<ManagerOption[]>(
     state.co_manager_ids.map((id, i) => ({
       value: id,
@@ -33,45 +31,31 @@ export function WizardStep2Manager({ state, onNext, onBack }: Props) {
       email: "",
     }))
   );
-  const [error, setError] = useState("");
 
-  // Fetch managers for the selected brand
-  const { data: managers = [], isLoading } = useQuery({
-    queryKey: ["managers-for-brand", state.brand_id],
+  // All managers except the main one and already-added co-managers
+  const { data: allManagers = [], isLoading } = useQuery({
+    queryKey: ["managers-all-for-comanager", state.manager_id],
     queryFn: async () => {
-      if (!state.brand_id) return [];
-      const res = await get<ApiResponseWithPagination<ManagerType[]>>(
-        `managers?limit=100&brand_id=${state.brand_id}`
-      );
+      const res = await get<ApiResponseWithPagination<ManagerType[]>>("managers?limit=200");
       if (!res.ok || !res.data) return [];
       const data = (res.data as unknown as { data: ManagerType[] }).data ?? [];
-      return data.map((m): ManagerOption => ({
-        value: m.id!,
-        label: m.name,
-        email: m.email,
-      }));
+      return data
+        .filter((m) => m.id !== state.manager_id)
+        .map((m): ManagerOption => ({
+          value: m.id!,
+          label: m.name,
+          email: m.email,
+        }));
     },
     staleTime: 1000 * 60,
   });
 
-  const handleNext = () => {
-    if (!selectedManager) {
-      setError("El gerente principal es requerido");
-      return;
-    }
-    setError("");
-    onNext({
-      manager_id: selectedManager.value,
-      manager_name: selectedManager.label,
-      co_manager_ids: coManagers.map((m) => m.value),
-      co_manager_names: coManagers.map((m) => m.label),
-    });
-  };
+  const availableOptions = allManagers.filter(
+    (m) => !coManagers.find((cm) => cm.value === m.value)
+  );
 
   const addCoManager = (opt: ManagerOption | null) => {
     if (!opt) return;
-    if (opt.value === selectedManager?.value) return;
-    if (coManagers.find((m) => m.value === opt.value)) return;
     setCoManagers((prev) => [...prev, opt]);
   };
 
@@ -79,29 +63,48 @@ export function WizardStep2Manager({ state, onNext, onBack }: Props) {
     setCoManagers((prev) => prev.filter((m) => m.value !== id));
   };
 
-  // Available managers filtered out already-selected co-managers and main manager
-  const availableForCoManager = managers.filter(
-    (m) =>
-      m.value !== selectedManager?.value &&
-      !coManagers.find((cm) => cm.value === m.value)
-  );
+  const handleNext = () => {
+    onNext({
+      co_manager_ids: coManagers.map((m) => m.value),
+      co_manager_names: coManagers.map((m) => m.label),
+    });
+  };
 
   return (
     <div className="space-y-6">
+      {/* Main manager — read-only, auto-assigned from brand */}
       <div className="space-y-2">
-        <label className="text-sm font-medium">Gerente principal *</label>
+        <label className="text-sm font-medium">Gerente principal</label>
+        <Card className="p-4 bg-muted/30 space-y-1.5">
+          <div className="flex items-center gap-2 text-sm">
+            <User className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+            <span className="font-medium">{state.manager_name}</span>
+            <Badge variant="secondary" className="text-xs ml-auto">
+              Asignado por la marca
+            </Badge>
+          </div>
+          {state.manager_email && (
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <Mail className="h-3 w-3 shrink-0" />
+              {state.manager_email}
+            </div>
+          )}
+        </Card>
+      </div>
+
+      {/* Co-managers */}
+      <div className="space-y-2">
+        <label className="text-sm font-medium text-muted-foreground">
+          Co-responsables{" "}
+          <span className="font-normal">(opcional)</span>
+        </label>
         <Select<ManagerOption>
-          options={managers}
-          value={selectedManager}
-          onChange={(opt) => {
-            setSelectedManager(opt as ManagerOption | null);
-            setError("");
-          }}
+          options={availableOptions}
+          value={null}
+          onChange={(opt) => addCoManager(opt as ManagerOption | null)}
           isLoading={isLoading}
-          placeholder="Seleccionar gerente..."
-          noOptionsMessage={() =>
-            isLoading ? "Cargando..." : "No hay gerentes disponibles para esta marca"
-          }
+          placeholder="Buscar gerente para agregar como co-responsable..."
+          noOptionsMessage={() => "No hay gerentes disponibles"}
           formatOptionLabel={(opt: ManagerOption) => (
             <div>
               <p className="text-sm font-medium">{opt.label}</p>
@@ -109,31 +112,17 @@ export function WizardStep2Manager({ state, onNext, onBack }: Props) {
             </div>
           )}
           classNamePrefix="react-select"
-        />
-        {error && <p className="text-sm text-destructive">{error}</p>}
-      </div>
-
-      <div className="space-y-2">
-        <label className="text-sm font-medium text-muted-foreground">
-          Co-responsables (opcional)
-        </label>
-        <Select<ManagerOption>
-          options={availableForCoManager}
-          value={null}
-          onChange={(opt) => addCoManager(opt as ManagerOption | null)}
-          isDisabled={!selectedManager}
-          placeholder={
-            selectedManager
-              ? "Agregar co-responsable..."
-              : "Primero selecciona el gerente principal"
-          }
-          classNamePrefix="react-select"
           controlShouldRenderValue={false}
         />
+
         {coManagers.length > 0 && (
           <div className="flex flex-wrap gap-2 mt-2">
             {coManagers.map((m) => (
-              <Badge key={m.value} variant="secondary" className="flex items-center gap-1.5 pr-1">
+              <Badge
+                key={m.value}
+                variant="secondary"
+                className="flex items-center gap-1.5 pr-1"
+              >
                 {m.label}
                 <button
                   type="button"

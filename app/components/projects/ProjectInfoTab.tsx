@@ -48,6 +48,8 @@ export function ProjectInfoTab({ project, canEdit }: Props) {
         {canEdit ? (
           <CampaignSelect
             value={project.campaign_id}
+            initialLabel={project.campaign_name}
+            clientId={project.client_id}
             onChange={handleCampaignChange}
             placeholder="Sin campaña — buscar o crear..."
           />

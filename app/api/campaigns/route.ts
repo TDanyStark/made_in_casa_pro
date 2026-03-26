@@ -7,6 +7,7 @@ import { ITEMS_PER_PAGE } from "@/config/constants";
 
 const campaignSchema = z.object({
   name: z.string().min(1, "El nombre es requerido").max(200),
+  client_id: z.coerce.number().int().positive("El cliente es requerido"),
 });
 
 export async function GET(request: NextRequest) {
@@ -22,8 +23,12 @@ export async function GET(request: NextRequest) {
   const page = parseInt(url.searchParams.get("page") || "1");
   const limit = parseInt(url.searchParams.get("limit") || ITEMS_PER_PAGE.toString());
   const search = url.searchParams.get("search") || undefined;
+  const clientIdParam = url.searchParams.get("client_id");
+  const clientId = clientIdParam ? parseInt(clientIdParam) : undefined;
 
-  const { campaigns, total } = await getCampaignsWithPagination({ page, limit, search });
+  const { campaigns, total } = await getCampaignsWithPagination({
+    page, limit, search, clientId,
+  });
   const pageCount = Math.ceil(total / limit);
   return NextResponse.json({ data: campaigns, pageCount, currentPage: page, total });
 }
@@ -46,7 +51,7 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
-    const campaign = await createCampaign(validation.data.name);
+    const campaign = await createCampaign(validation.data.name, validation.data.client_id);
     return NextResponse.json(campaign, { status: 201 });
   } catch (error) {
     console.error("Error creating campaign:", error);

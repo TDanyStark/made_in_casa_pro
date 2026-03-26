@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -19,6 +19,8 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { User, Building2, Loader2 } from "lucide-react";
 import { WizardState } from "@/hooks/useProjectWizard";
 
 const schema = z.object({
@@ -31,7 +33,24 @@ type FormValues = z.infer<typeof schema>;
 interface BrandOption {
   value: number;
   label: string;
-  clientName?: string;
+  managerName?: string;
+}
+
+// Full brand detail returned by GET /api/brands/[id]
+interface BrandDetail {
+  id: number;
+  name: string;
+  manager_id: number;
+  manager: {
+    id: number;
+    name: string;
+    email: string;
+    client_id: number;
+    client_info: {
+      id: number;
+      name: string;
+    };
+  };
 }
 
 interface Props {
@@ -53,7 +72,8 @@ export function WizardStep1Basics({ state, onNext }: Props) {
     },
   });
 
-  const { data: brandsData, isLoading } = useQuery({
+  // Brands search
+  const { data: brandsData, isLoading: isLoadingBrands } = useQuery({
     queryKey: ["brands-search", search],
     queryFn: async () => {
       const params = new URLSearchParams({ page: "1", limit: "30" });
@@ -64,45 +84,55 @@ export function WizardStep1Basics({ state, onNext }: Props) {
         (b): BrandOption => ({
           value: b.id,
           label: b.brand_name,
-          clientName: b.manager_name,
+          managerName: b.manager_name,
         })
       );
     },
     staleTime: 1000 * 30,
   });
 
-  // Also fetch client info when brand selected
-  const { data: brandDetail } = useQuery({
+  // Full brand detail — auto-resolves manager + client when a brand is selected
+  const { data: brandDetail, isLoading: isLoadingDetail } = useQuery<BrandDetail | null>({
     queryKey: ["brand-detail", selectedBrand?.value],
     queryFn: async () => {
       if (!selectedBrand?.value) return null;
-      const res = await get<{ client_name: string }>(`brands/${selectedBrand.value}`);
-      return res.ok ? res.data : null;
+      const res = await get<BrandDetail>(`brands/${selectedBrand.value}`);
+      return res.ok ? (res.data as unknown as BrandDetail) : null;
     },
     enabled: !!selectedBrand?.value,
+    staleTime: 1000 * 60,
   });
 
   const debouncedSearch = debounce((v: string) => setSearch(v), 400);
 
+  const handleBrandChange = (opt: BrandOption | null) => {
+    setSelectedBrand(opt);
+    form.setValue("brand_id", opt?.value ?? (undefined as unknown as number));
+    form.clearErrors("brand_id");
+  };
+
   const onSubmit = (values: FormValues) => {
-    const brand = brandsData?.find((b) => b.value === values.brand_id);
-    const clientName =
-      (brandDetail as unknown as { client_name?: string } | null)?.client_name ?? "";
+    if (!brandDetail) return; // shouldn't happen — button is disabled while loading
+
     onNext({
       title: values.title,
       brand_id: values.brand_id,
-      brand_name: brand?.label ?? state.brand_name,
-      client_name: clientName,
+      brand_name: brandDetail.name,
+      client_id: brandDetail.manager?.client_info?.id ?? null,
+      client_name: brandDetail.manager?.client_info?.name ?? "",
+      manager_id: brandDetail.manager_id,
+      manager_name: brandDetail.manager?.name ?? "",
+      manager_email: brandDetail.manager?.email ?? "",
     });
   };
 
-  useEffect(() => {
-    if (selectedBrand) form.setValue("brand_id", selectedBrand.value);
-  }, [selectedBrand, form]);
+  const isLoadingBrandInfo = !!selectedBrand?.value && isLoadingDetail;
+  const canProceed = !!brandDetail && !isLoadingDetail;
 
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+        {/* Title */}
         <FormField
           control={form.control}
           name="title"
@@ -121,6 +151,7 @@ export function WizardStep1Basics({ state, onNext }: Props) {
           )}
         />
 
+        {/* Brand select */}
         <FormField
           control={form.control}
           name="brand_id"
@@ -131,13 +162,9 @@ export function WizardStep1Basics({ state, onNext }: Props) {
                 <Select<BrandOption>
                   options={brandsData ?? []}
                   value={selectedBrand}
-                  onChange={(opt) => {
-                    setSelectedBrand(opt as BrandOption | null);
-                    form.setValue("brand_id", (opt as BrandOption | null)?.value ?? (undefined as unknown as number));
-                    form.clearErrors("brand_id");
-                  }}
+                  onChange={(opt) => handleBrandChange(opt as BrandOption | null)}
                   onInputChange={(v) => debouncedSearch(v)}
-                  isLoading={isLoading}
+                  isLoading={isLoadingBrands}
                   placeholder="Buscar marca..."
                   noOptionsMessage={({ inputValue }) =>
                     inputValue ? "Sin resultados" : "Escribe para buscar"
@@ -146,8 +173,8 @@ export function WizardStep1Basics({ state, onNext }: Props) {
                   formatOptionLabel={(opt: BrandOption) => (
                     <div className="flex items-center justify-between">
                       <span>{opt.label}</span>
-                      {opt.clientName && (
-                        <span className="text-xs text-muted-foreground">{opt.clientName}</span>
+                      {opt.managerName && (
+                        <span className="text-xs text-muted-foreground">{opt.managerName}</span>
                       )}
                     </div>
                   )}
@@ -160,8 +187,50 @@ export function WizardStep1Basics({ state, onNext }: Props) {
           )}
         />
 
+        {/* Auto-resolved info card — shows manager + client once brand is selected */}
+        {selectedBrand && (
+          <div className="min-h-[88px]">
+            {isLoadingBrandInfo ? (
+              <Card className="p-4 flex items-center gap-2 text-sm text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin shrink-0" />
+                Cargando información de la marca...
+              </Card>
+            ) : brandDetail ? (
+              <Card className="p-4 space-y-2 bg-muted/30">
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">
+                  Asignado automáticamente
+                </p>
+                <div className="flex items-center gap-2 text-sm">
+                  <User className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                  <span className="font-medium">{brandDetail.manager?.name}</span>
+                  {brandDetail.manager?.email && (
+                    <span className="text-muted-foreground text-xs">
+                      — {brandDetail.manager.email}
+                    </span>
+                  )}
+                </div>
+                <div className="flex items-center gap-2 text-sm">
+                  <Building2 className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                  <span className="text-muted-foreground">
+                    {brandDetail.manager?.client_info?.name ?? "Sin cliente"}
+                  </span>
+                </div>
+              </Card>
+            ) : null}
+          </div>
+        )}
+
         <div className="flex justify-end">
-          <Button type="submit">Siguiente</Button>
+          <Button type="submit" disabled={!!selectedBrand && !canProceed}>
+            {isLoadingBrandInfo ? (
+              <>
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                Cargando...
+              </>
+            ) : (
+              "Siguiente"
+            )}
+          </Button>
         </div>
       </form>
     </Form>

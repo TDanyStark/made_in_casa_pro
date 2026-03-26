@@ -174,6 +174,8 @@ export type ProductTaskTemplateType = {
 export type CampaignType = {
   id: number;
   name: string;
+  client_id: number | null;
+  client_name?: string;
   created_at: string;
 };
 

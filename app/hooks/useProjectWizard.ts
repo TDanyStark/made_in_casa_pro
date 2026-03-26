@@ -10,15 +10,19 @@ export interface WizardManager {
 }
 
 export interface WizardState {
-  // Step 1 — basics
+  // Step 1 — basics (brand auto-resolves manager + client)
   title: string;
   brand_id: number | null;
   brand_name: string;
+  client_id: number | null;
   client_name: string;
 
-  // Step 2 — manager
+  // Manager auto-assigned from brand (not manually selected)
   manager_id: number | null;
   manager_name: string;
+  manager_email: string;
+
+  // Step 2 — co-managers (optional)
   co_manager_ids: number[];
   co_manager_names: string[];
 
@@ -39,9 +43,11 @@ const INITIAL_STATE: WizardState = {
   title: "",
   brand_id: null,
   brand_name: "",
+  client_id: null,
   client_name: "",
   manager_id: null,
   manager_name: "",
+  manager_email: "",
   co_manager_ids: [],
   co_manager_names: [],
   products: [],

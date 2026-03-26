@@ -1,72 +1,62 @@
 -- Seed 010: User skills (habilidades por usuario)
 -- user_id y skill_id referenciados por email y nombre respectivamente
 
--- Admin Sistema → SQL, JavaScript, TypeScript
+-- Admin Sistema → Desarrollo web, Creación de apps
 INSERT INTO user_skills (user_id, skill_id)
-VALUES ((SELECT id FROM users WHERE email = 'admin@madencasa.com'), (SELECT id FROM skills WHERE name = 'SQL'));
+VALUES ((SELECT id FROM users WHERE email = 'admin@market-support.com'), (SELECT id FROM skills WHERE name = 'Desarrollo web'));
 INSERT INTO user_skills (user_id, skill_id)
-VALUES ((SELECT id FROM users WHERE email = 'admin@madencasa.com'), (SELECT id FROM skills WHERE name = 'JavaScript'));
-INSERT INTO user_skills (user_id, skill_id)
-VALUES ((SELECT id FROM users WHERE email = 'admin@madencasa.com'), (SELECT id FROM skills WHERE name = 'TypeScript'));
+VALUES ((SELECT id FROM users WHERE email = 'admin@market-support.com'), (SELECT id FROM skills WHERE name = 'Creación de apps'));
 
--- Juan Pablo Vargas (directivo) → Leadership, Project Management, Communication
+-- Sandy Baron (directiva) → Liderazgo, Gestión de proyectos, Comunicación
 INSERT INTO user_skills (user_id, skill_id)
-VALUES ((SELECT id FROM users WHERE email = 'jp.vargas@madencasa.com'), (SELECT id FROM skills WHERE name = 'Leadership'));
+VALUES ((SELECT id FROM users WHERE email = 'sandy.baron@market-support.com'), (SELECT id FROM skills WHERE name = 'Liderazgo'));
 INSERT INTO user_skills (user_id, skill_id)
-VALUES ((SELECT id FROM users WHERE email = 'jp.vargas@madencasa.com'), (SELECT id FROM skills WHERE name = 'Project Management'));
+VALUES ((SELECT id FROM users WHERE email = 'sandy.baron@market-support.com'), (SELECT id FROM skills WHERE name = 'Gestión de proyectos'));
 INSERT INTO user_skills (user_id, skill_id)
-VALUES ((SELECT id FROM users WHERE email = 'jp.vargas@madencasa.com'), (SELECT id FROM skills WHERE name = 'Communication'));
+VALUES ((SELECT id FROM users WHERE email = 'sandy.baron@market-support.com'), (SELECT id FROM skills WHERE name = 'Comunicación'));
 
--- María Fernanda Ospina (directiva) → Leadership, Communication, Design
+-- Josue Amado (directivo) → Liderazgo, Comunicación, Gestión de proyectos
 INSERT INTO user_skills (user_id, skill_id)
-VALUES ((SELECT id FROM users WHERE email = 'mf.ospina@madencasa.com'), (SELECT id FROM skills WHERE name = 'Leadership'));
+VALUES ((SELECT id FROM users WHERE email = 'josue.amado@market-support.com'), (SELECT id FROM skills WHERE name = 'Liderazgo'));
 INSERT INTO user_skills (user_id, skill_id)
-VALUES ((SELECT id FROM users WHERE email = 'mf.ospina@madencasa.com'), (SELECT id FROM skills WHERE name = 'Communication'));
+VALUES ((SELECT id FROM users WHERE email = 'josue.amado@market-support.com'), (SELECT id FROM skills WHERE name = 'Comunicación'));
 INSERT INTO user_skills (user_id, skill_id)
-VALUES ((SELECT id FROM users WHERE email = 'mf.ospina@madencasa.com'), (SELECT id FROM skills WHERE name = 'Design'));
+VALUES ((SELECT id FROM users WHERE email = 'josue.amado@market-support.com'), (SELECT id FROM skills WHERE name = 'Gestión de proyectos'));
 
--- Pedro Alejandro Ríos (comercial) → Communication, Project Management
+-- Leidy Poveda (comercial) → Comunicación, Gestión de proyectos
 INSERT INTO user_skills (user_id, skill_id)
-VALUES ((SELECT id FROM users WHERE email = 'pa.rios@madencasa.com'), (SELECT id FROM skills WHERE name = 'Communication'));
+VALUES ((SELECT id FROM users WHERE email = 'leidy.poveda@market-support.com'), (SELECT id FROM skills WHERE name = 'Comunicación'));
 INSERT INTO user_skills (user_id, skill_id)
-VALUES ((SELECT id FROM users WHERE email = 'pa.rios@madencasa.com'), (SELECT id FROM skills WHERE name = 'Project Management'));
+VALUES ((SELECT id FROM users WHERE email = 'leidy.poveda@market-support.com'), (SELECT id FROM skills WHERE name = 'Gestión de proyectos'));
 
--- Ana Sofía Herrera (comercial) → Communication, Design
+-- Daniel Amado (Programación/IT) → Creación de apps, Creación de flipbooks digitales, Desarrollo web
 INSERT INTO user_skills (user_id, skill_id)
-VALUES ((SELECT id FROM users WHERE email = 'as.herrera@madencasa.com'), (SELECT id FROM skills WHERE name = 'Communication'));
+VALUES ((SELECT id FROM users WHERE email = 'daniel.amado@market-support.com'), (SELECT id FROM skills WHERE name = 'Creación de apps'));
 INSERT INTO user_skills (user_id, skill_id)
-VALUES ((SELECT id FROM users WHERE email = 'as.herrera@madencasa.com'), (SELECT id FROM skills WHERE name = 'Design'));
+VALUES ((SELECT id FROM users WHERE email = 'daniel.amado@market-support.com'), (SELECT id FROM skills WHERE name = 'Creación de flipbooks digitales'));
+INSERT INTO user_skills (user_id, skill_id)
+VALUES ((SELECT id FROM users WHERE email = 'daniel.amado@market-support.com'), (SELECT id FROM skills WHERE name = 'Desarrollo web'));
 
--- Luis Miguel Pardo (comercial) → Communication, Leadership, SQL
+-- Nataly Ruiz (Diseño) → Ilustraciones, Revistas, Diseño gráfico
 INSERT INTO user_skills (user_id, skill_id)
-VALUES ((SELECT id FROM users WHERE email = 'lm.pardo@madencasa.com'), (SELECT id FROM skills WHERE name = 'Communication'));
+VALUES ((SELECT id FROM users WHERE email = 'nathaliaruiz.ms@gmail.com'), (SELECT id FROM skills WHERE name = 'Ilustraciones'));
 INSERT INTO user_skills (user_id, skill_id)
-VALUES ((SELECT id FROM users WHERE email = 'lm.pardo@madencasa.com'), (SELECT id FROM skills WHERE name = 'Leadership'));
+VALUES ((SELECT id FROM users WHERE email = 'nathaliaruiz.ms@gmail.com'), (SELECT id FROM skills WHERE name = 'Revistas'));
 INSERT INTO user_skills (user_id, skill_id)
-VALUES ((SELECT id FROM users WHERE email = 'lm.pardo@madencasa.com'), (SELECT id FROM skills WHERE name = 'SQL'));
+VALUES ((SELECT id FROM users WHERE email = 'nathaliaruiz.ms@gmail.com'), (SELECT id FROM skills WHERE name = 'Diseño gráfico'));
 
--- Sofía Valentina Cruz (colaboradora) → JavaScript, TypeScript, React
+-- Lina Gonzalez (Escritura) → Escritura creativa, Redacción y copywriting, Corrección de estilo
 INSERT INTO user_skills (user_id, skill_id)
-VALUES ((SELECT id FROM users WHERE email = 'sv.cruz@madencasa.com'), (SELECT id FROM skills WHERE name = 'JavaScript'));
+VALUES ((SELECT id FROM users WHERE email = 'lina.gonzalez.market@gmail.com'), (SELECT id FROM skills WHERE name = 'Escritura creativa'));
 INSERT INTO user_skills (user_id, skill_id)
-VALUES ((SELECT id FROM users WHERE email = 'sv.cruz@madencasa.com'), (SELECT id FROM skills WHERE name = 'TypeScript'));
+VALUES ((SELECT id FROM users WHERE email = 'lina.gonzalez.market@gmail.com'), (SELECT id FROM skills WHERE name = 'Redacción y copywriting'));
 INSERT INTO user_skills (user_id, skill_id)
-VALUES ((SELECT id FROM users WHERE email = 'sv.cruz@madencasa.com'), (SELECT id FROM skills WHERE name = 'React'));
+VALUES ((SELECT id FROM users WHERE email = 'lina.gonzalez.market@gmail.com'), (SELECT id FROM skills WHERE name = 'Corrección de estilo'));
 
--- Carlos Andrés Mejía (colaborador) → Design, Communication
+-- Laura Obregoso (Diseño, externa) → Ilustraciones, Video, Diseño gráfico
 INSERT INTO user_skills (user_id, skill_id)
-VALUES ((SELECT id FROM users WHERE email = 'ca.mejia@madencasa.com'), (SELECT id FROM skills WHERE name = 'Design'));
+VALUES ((SELECT id FROM users WHERE email = 'laura.obregoso.market@gmail.com'), (SELECT id FROM skills WHERE name = 'Ilustraciones'));
 INSERT INTO user_skills (user_id, skill_id)
-VALUES ((SELECT id FROM users WHERE email = 'ca.mejia@madencasa.com'), (SELECT id FROM skills WHERE name = 'Communication'));
-
--- Isabella Moreno (colaboradora) → SQL, Python
+VALUES ((SELECT id FROM users WHERE email = 'laura.obregoso.market@gmail.com'), (SELECT id FROM skills WHERE name = 'Video'));
 INSERT INTO user_skills (user_id, skill_id)
-VALUES ((SELECT id FROM users WHERE email = 'i.moreno@madencasa.com'), (SELECT id FROM skills WHERE name = 'SQL'));
-INSERT INTO user_skills (user_id, skill_id)
-VALUES ((SELECT id FROM users WHERE email = 'i.moreno@madencasa.com'), (SELECT id FROM skills WHERE name = 'Python'));
-
--- Mateo Santiago Duarte (colaborador externo) → Communication, Project Management
-INSERT INTO user_skills (user_id, skill_id)
-VALUES ((SELECT id FROM users WHERE email = 'ms.duarte@madencasa.com'), (SELECT id FROM skills WHERE name = 'Communication'));
-INSERT INTO user_skills (user_id, skill_id)
-VALUES ((SELECT id FROM users WHERE email = 'ms.duarte@madencasa.com'), (SELECT id FROM skills WHERE name = 'Project Management'));
+VALUES ((SELECT id FROM users WHERE email = 'laura.obregoso.market@gmail.com'), (SELECT id FROM skills WHERE name = 'Diseño gráfico'));

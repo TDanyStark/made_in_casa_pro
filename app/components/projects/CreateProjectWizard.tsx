@@ -14,7 +14,7 @@ import { WizardState } from "@/hooks/useProjectWizard";
 
 const STEPS = [
   { label: "Básicos" },
-  { label: "Gerente" },
+  { label: "Co-responsables" },
   { label: "Productos" },
   { label: "Campaña" },
   { label: "Drive" },
