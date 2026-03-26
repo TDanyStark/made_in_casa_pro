@@ -6,8 +6,7 @@ import { WizardStep1Basics } from "./wizard/WizardStep1Basics";
 import { WizardStep2Manager } from "./wizard/WizardStep2Manager";
 import { WizardStep3Products } from "./wizard/WizardStep3Products";
 import { WizardStep4Campaign } from "./wizard/WizardStep4Campaign";
-import { WizardStep5Drive } from "./wizard/WizardStep5Drive";
-import { WizardStep6Confirm } from "./wizard/WizardStep6Confirm";
+import { WizardStep5Confirm } from "./wizard/WizardStep5Confirm";
 import { cn } from "@/lib/utils";
 import { Check } from "lucide-react";
 import { WizardState } from "@/hooks/useProjectWizard";
@@ -17,7 +16,6 @@ const STEPS = [
   { label: "Co-responsables" },
   { label: "Productos" },
   { label: "Campaña" },
-  { label: "Drive" },
   { label: "Confirmar" },
 ];
 
@@ -40,9 +38,7 @@ export function CreateProjectWizard() {
       case 3:
         return <WizardStep4Campaign state={state} onNext={handleNext} onBack={prev} />;
       case 4:
-        return <WizardStep5Drive state={state} onNext={handleNext} onBack={prev} />;
-      case 5:
-        return <WizardStep6Confirm state={state} onBack={prev} />;
+        return <WizardStep5Confirm state={state} onBack={prev} />;
       default:
         return null;
     }

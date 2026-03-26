@@ -66,7 +66,7 @@ export function useProjectWizard() {
     setState((prev) => ({ ...prev, ...partial }));
   };
 
-  const next = () => setCurrentStep((s) => Math.min(s + 1, 5));
+  const next = () => setCurrentStep((s) => Math.min(s + 1, 4));
   const prev = () => setCurrentStep((s) => Math.max(s - 1, 0));
   const goTo = (step: number) => setCurrentStep(step);
   const reset = () => {
