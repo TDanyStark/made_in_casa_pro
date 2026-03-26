@@ -53,11 +53,19 @@ export function WizardStep5Confirm({ state, onBack }: Props) {
     try {
       // 1. Create Drive folder (mandatory)
       setCurrentAction("Creando carpeta en Drive...");
+
+      // Collect emails: manager principal + co-managers
+      const shareEmails = [
+        state.manager_email,
+        ...state.co_manager_emails,
+      ].filter(Boolean);
+
       const driveRes = await post<DriveResult>("drive/create-folder", {
         clientName: state.client_name,
         brandName: state.brand_name,
         projectTitle: state.title,
         productNames: state.products.map((p) => p.name),
+        shareEmails,
       });
 
       if (!driveRes.ok || !driveRes.data) {

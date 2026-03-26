@@ -299,3 +299,20 @@ export async function updateUser(userId: string, data: {
   }
 }
 
+/**
+ * Returns the emails of all active users with role ADMIN or DIRECTIVO.
+ * Used to auto-share Drive folders when a project is created.
+ */
+export async function getAdminAndDirectivoEmails(): Promise<string[]> {
+  try {
+    const result = await db.execute({
+      sql: `SELECT email FROM users WHERE rol_id IN (1, 2) AND is_active = 1 AND email IS NOT NULL ORDER BY name ASC`,
+      args: [],
+    });
+    return result.rows.map((r) => r.email as string).filter(Boolean);
+  } catch (error) {
+    console.error("Error fetching admin/directivo emails:", error);
+    return [];
+  }
+}
+

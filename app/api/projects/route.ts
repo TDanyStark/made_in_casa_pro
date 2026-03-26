@@ -12,6 +12,8 @@ const projectSchema = z.object({
   brand_id: z.coerce.number().int().positive("La marca es requerida"),
   manager_id: z.coerce.number().int().positive("El gerente es requerido"),
   campaign_id: z.coerce.number().int().positive().optional().nullable(),
+  drive_folder_id: z.string().optional().nullable(),
+  drive_folder_url: z.string().url().optional().nullable(),
   notes: z.string().optional().nullable(),
   status: z.enum(["active", "paused", "completed", "archived"]).optional(),
 });

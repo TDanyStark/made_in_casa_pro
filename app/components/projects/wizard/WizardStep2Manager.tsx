@@ -28,7 +28,7 @@ export function WizardStep2Manager({ state, onNext, onBack }: Props) {
     state.co_manager_ids.map((id, i) => ({
       value: id,
       label: state.co_manager_names[i] ?? "",
-      email: "",
+      email: state.co_manager_emails[i] ?? "",
     }))
   );
 
@@ -67,6 +67,7 @@ export function WizardStep2Manager({ state, onNext, onBack }: Props) {
     onNext({
       co_manager_ids: coManagers.map((m) => m.value),
       co_manager_names: coManagers.map((m) => m.label),
+      co_manager_emails: coManagers.map((m) => m.email),
     });
   };
 

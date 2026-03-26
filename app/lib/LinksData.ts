@@ -1,4 +1,4 @@
-import { House, Folder, LayoutList, BookUser, LibraryBig, Users } from 'lucide-react';
+import { House, Folder, LayoutList, BookUser, LibraryBig, Users, Settings } from 'lucide-react';
 import { LinksType, UserRole } from './definitions';
 
 export type NavSubLink = {
@@ -49,6 +49,12 @@ export const links: LinksType[] = [
     name: 'Usuarios', 
     route: '/users', 
     icon: Users,
+    roles: [UserRole.ADMIN]
+  },
+  {
+    name: 'Configuración',
+    route: '/settings',
+    icon: Settings,
     roles: [UserRole.ADMIN]
   },
 ];
