@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { get } from "@/lib/services/apiService";
-import { ProjectType, ApiResponseWithPagination, ProjectStatus } from "@/lib/definitions";
+import { ProjectType, ApiResponseWithPagination } from "@/lib/definitions";
 import { ITEMS_PER_PAGE } from "@/config/constants";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";

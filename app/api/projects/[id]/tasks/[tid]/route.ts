@@ -14,7 +14,10 @@ const patchSchema = z.object({
   description: z.string().nullable().optional(),
   area_id: z.coerce.number().int().positive().nullable().optional(),
   assigned_user_id: z.coerce.number().int().positive().nullable().optional(),
-  status: z.enum(["not_started", "in_progress", "completed", "blocked"]).optional(),
+  status: z.enum(["not_started", "waiting", "in_progress", "completed", "blocked"]).optional(),
+  task_type: z.enum(["execution", "validation"]).optional(),
+  task_flag: z.enum(["new", "correction", "adjustment"]).optional(),
+  requires_quote: z.coerce.number().int().min(0).max(1).optional(),
 });
 
 type Params = { params: Promise<{ id: string; tid: string }> };

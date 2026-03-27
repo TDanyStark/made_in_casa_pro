@@ -7,7 +7,6 @@ import Select from "react-select";
 import { get } from "@/lib/services/apiService";
 import { ProductType, ApiResponseWithPagination } from "@/lib/definitions";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { X, Package } from "lucide-react";
 import { WizardState } from "@/hooks/useProjectWizard";
 

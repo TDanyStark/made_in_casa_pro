@@ -13,6 +13,8 @@ const updateSchema = z.object({
   description: z.string().optional().nullable(),
   area_id: z.coerce.number().int().positive().optional().nullable(),
   assigned_user_id: z.coerce.number().int().positive().optional().nullable(),
+  task_type: z.enum(["execution", "validation"]).optional(),
+  requires_quote: z.coerce.number().int().min(0).max(1).optional(),
 });
 
 export async function PATCH(

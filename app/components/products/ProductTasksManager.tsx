@@ -44,16 +44,19 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { get, post, patch, del } from "@/lib/services/apiService";
-import { AreaType, ProductTaskTemplateType } from "@/lib/definitions";
+import { AreaType, ProductTaskTemplateType, TaskType } from "@/lib/definitions";
 
 const taskSchema = z.object({
   title: z.string().min(1, "El título es requerido"),
   description: z.string().optional().nullable(),
   area_id: z.coerce.number().positive().optional().nullable(),
   assigned_user_id: z.coerce.number().positive().optional().nullable(),
+  task_type: z.enum(["execution", "validation"]).default("execution"),
+  requires_quote: z.boolean().default(false),
 });
 
 type TaskFormValues = z.infer<typeof taskSchema>;
@@ -61,12 +64,19 @@ type TaskFormValues = z.infer<typeof taskSchema>;
 interface CollaboratorOption {
   id: number;
   name: string;
+  is_internal: number;
+  active_task_count: number;
 }
 
 interface Props {
   productId: number;
   initialTasks?: ProductTaskTemplateType[];
 }
+
+const TASK_TYPE_CONFIG: Record<TaskType, { label: string; className: string }> = {
+  execution: { label: "Ejecución", className: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400" },
+  validation: { label: "Validación", className: "bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400" },
+};
 
 export default function ProductTasksManager({ productId, initialTasks = [] }: Props) {
   const queryClient = useQueryClient();
@@ -95,16 +105,27 @@ export default function ProductTasksManager({ productId, initialTasks = [] }: Pr
 
   const form = useForm<TaskFormValues>({
     resolver: zodResolver(taskSchema),
-    defaultValues: { title: "", description: "", area_id: null, assigned_user_id: null },
+    defaultValues: {
+      title: "",
+      description: "",
+      area_id: null,
+      assigned_user_id: null,
+      task_type: "execution",
+      requires_quote: false,
+    },
   });
 
   const selectedAreaId = form.watch("area_id");
+  const selectedTaskType = form.watch("task_type");
+  const requiresQuote = form.watch("requires_quote");
 
   const { data: collaborators = [] } = useQuery<CollaboratorOption[]>({
-    queryKey: ["collaborators-by-area", selectedAreaId],
+    queryKey: ["collaborators-by-area", selectedAreaId, "include_external"],
     queryFn: async () => {
-      const params = selectedAreaId ? `?area_id=${selectedAreaId}` : "";
-      const res = await get<CollaboratorOption[]>(`collaborators${params}`);
+      const params = new URLSearchParams();
+      if (selectedAreaId) params.set("area_id", selectedAreaId.toString());
+      params.set("include_external", "1");
+      const res = await get<CollaboratorOption[]>(`collaborators?${params}`);
       return res.ok ? (res.data ?? []) : [];
     },
     enabled: dialogOpen,
@@ -112,7 +133,14 @@ export default function ProductTasksManager({ productId, initialTasks = [] }: Pr
 
   function openCreate() {
     setEditingTask(null);
-    form.reset({ title: "", description: "", area_id: null, assigned_user_id: null });
+    form.reset({
+      title: "",
+      description: "",
+      area_id: null,
+      assigned_user_id: null,
+      task_type: "execution",
+      requires_quote: false,
+    });
     setDialogOpen(true);
   }
 
@@ -123,6 +151,8 @@ export default function ProductTasksManager({ productId, initialTasks = [] }: Pr
       description: task.description ?? "",
       area_id: task.area_id ?? null,
       assigned_user_id: task.assigned_user_id ?? null,
+      task_type: task.task_type ?? "execution",
+      requires_quote: task.requires_quote === 1,
     });
     setDialogOpen(true);
   }
@@ -130,20 +160,19 @@ export default function ProductTasksManager({ productId, initialTasks = [] }: Pr
   const onSubmit = async (values: TaskFormValues) => {
     setSubmitting(true);
     try {
+      const payload = {
+        ...values,
+        area_id: values.area_id ?? null,
+        assigned_user_id: values.assigned_user_id ?? null,
+        requires_quote: values.requires_quote ? 1 : 0,
+      };
+
       if (editingTask) {
-        const res = await patch(`products/${productId}/tasks/${editingTask.id}`, {
-          ...values,
-          area_id: values.area_id ?? null,
-          assigned_user_id: values.assigned_user_id ?? null,
-        });
+        const res = await patch(`products/${productId}/tasks/${editingTask.id}`, payload);
         if (!res.ok) throw new Error(res.error);
         toast.success("Tarea actualizada");
       } else {
-        const res = await post(`products/${productId}/tasks`, {
-          ...values,
-          area_id: values.area_id ?? null,
-          assigned_user_id: values.assigned_user_id ?? null,
-        });
+        const res = await post(`products/${productId}/tasks`, payload);
         if (!res.ok) throw new Error(res.error);
         toast.success("Tarea creada");
       }
@@ -170,7 +199,6 @@ export default function ProductTasksManager({ productId, initialTasks = [] }: Pr
 
   const handleReorder = async (reordered: ProductTaskTemplateType[]) => {
     setReordering(true);
-    // Optimistic update: update query cache immediately
     queryClient.setQueryData(["product-tasks", productId], reordered);
     try {
       const res = await post(`products/${productId}/tasks/reorder`, {
@@ -179,7 +207,7 @@ export default function ProductTasksManager({ productId, initialTasks = [] }: Pr
       if (!res.ok) throw new Error(res.error);
     } catch {
       toast.error("Error al reordenar las tareas");
-      refetch(); // rollback
+      refetch();
     } finally {
       setReordering(false);
     }
@@ -210,7 +238,20 @@ export default function ProductTasksManager({ productId, initialTasks = [] }: Pr
             <div className="flex items-start gap-3 rounded-md border bg-card p-3">
               <div className="flex-shrink-0 pt-0.5">{dragHandle}</div>
               <div className="flex-1 min-w-0">
-                <p className="font-medium text-sm leading-snug">{task.title}</p>
+                <div className="flex items-center gap-1.5 flex-wrap mb-0.5">
+                  <p className="font-medium text-sm leading-snug">{task.title}</p>
+                  <Badge
+                    variant="secondary"
+                    className={`text-xs ${TASK_TYPE_CONFIG[task.task_type ?? "execution"]?.className ?? ""}`}
+                  >
+                    {TASK_TYPE_CONFIG[task.task_type ?? "execution"]?.label ?? task.task_type}
+                  </Badge>
+                  {task.requires_quote === 1 && (
+                    <Badge variant="outline" className="text-xs text-amber-700 border-amber-400 bg-amber-50 dark:bg-amber-900/20">
+                      Cotización requerida
+                    </Badge>
+                  )}
+                </div>
                 {task.description && (
                   <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">
                     {task.description}
@@ -228,7 +269,7 @@ export default function ProductTasksManager({ productId, initialTasks = [] }: Pr
                     </Badge>
                   ) : task.area_name ? (
                     <Badge variant="outline" className="text-xs text-muted-foreground">
-                      Por asignar
+                      Auto-asignación
                     </Badge>
                   ) : null}
                 </div>
@@ -280,7 +321,7 @@ export default function ProductTasksManager({ productId, initialTasks = [] }: Pr
 
       {/* Task Create/Edit Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="sm:max-w-[480px]" tabIndex={undefined} aria-describedby={undefined}>
+        <DialogContent className="sm:max-w-[520px]" tabIndex={undefined} aria-describedby={undefined}>
           <DialogHeader>
             <DialogTitle>
               {editingTask ? "Editar tarea" : "Nueva tarea predefinida"}
@@ -295,7 +336,7 @@ export default function ProductTasksManager({ productId, initialTasks = [] }: Pr
                   <FormItem>
                     <FormLabel>Título</FormLabel>
                     <FormControl>
-                      <Input placeholder="Ej: Enviar al equipo creativo" {...field} />
+                      <Input placeholder="Ej: Diseñar contenido del email" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -320,6 +361,71 @@ export default function ProductTasksManager({ productId, initialTasks = [] }: Pr
                   </FormItem>
                 )}
               />
+
+              {/* Task type selector */}
+              <FormField
+                control={form.control}
+                name="task_type"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Tipo de tarea</FormLabel>
+                    <FormControl>
+                      <Select value={field.value} onValueChange={field.onChange}>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="execution">
+                            <div className="flex flex-col">
+                              <span>Ejecución</span>
+                              <span className="text-xs text-muted-foreground">El colaborador ejecuta y pasa al siguiente</span>
+                            </div>
+                          </SelectItem>
+                          <SelectItem value="validation">
+                            <div className="flex flex-col">
+                              <span>Validación</span>
+                              <span className="text-xs text-muted-foreground">El colaborador puede aprobar o rechazar y enviar a cualquier paso</span>
+                            </div>
+                          </SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              {/* Requires quote checkbox — only for execution tasks */}
+              {selectedTaskType === "execution" && (
+                <FormField
+                  control={form.control}
+                  name="requires_quote"
+                  render={({ field }) => (
+                    <FormItem className="flex items-start gap-3 rounded-md border p-3">
+                      <FormControl>
+                        <Checkbox
+                          checked={field.value}
+                          onCheckedChange={(checked) => {
+                            field.onChange(checked);
+                            if (checked) {
+                              // If requires quote, clear specific user (externals quote first)
+                              form.setValue("assigned_user_id", null);
+                            }
+                          }}
+                        />
+                      </FormControl>
+                      <div className="space-y-0.5">
+                        <FormLabel className="text-sm font-medium cursor-pointer">
+                          Requiere cotización de externo
+                        </FormLabel>
+                        <p className="text-xs text-muted-foreground">
+                          El flujo se bloqueará en esta tarea hasta que un colaborador externo presente su propuesta y sea aceptada.
+                        </p>
+                      </div>
+                    </FormItem>
+                  )}
+                />
+              )}
 
               <FormField
                 control={form.control}
@@ -353,41 +459,48 @@ export default function ProductTasksManager({ productId, initialTasks = [] }: Pr
                 )}
               />
 
-              <FormField
-                control={form.control}
-                name="assigned_user_id"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Persona asignada (opcional)</FormLabel>
-                    <FormControl>
-                      <Select
-                        value={field.value?.toString() ?? "none"}
-                        onValueChange={(v) => field.onChange(v === "none" ? null : Number(v))}
-                        disabled={!selectedAreaId}
-                      >
-                        <SelectTrigger>
-                          <SelectValue
-                            placeholder={
-                              selectedAreaId
-                                ? "Asignar a persona específica"
-                                : "Selecciona un área primero"
-                            }
-                          />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="none">Por asignar (solo área)</SelectItem>
-                          {collaborators.map((u) => (
-                            <SelectItem key={u.id} value={u.id.toString()}>
-                              {u.name}
+              {!requiresQuote && (
+                <FormField
+                  control={form.control}
+                  name="assigned_user_id"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Persona asignada (opcional)</FormLabel>
+                      <FormControl>
+                        <Select
+                          value={field.value?.toString() ?? "none"}
+                          onValueChange={(v) => field.onChange(v === "none" ? null : Number(v))}
+                          disabled={!selectedAreaId}
+                        >
+                          <SelectTrigger>
+                            <SelectValue
+                              placeholder={
+                                selectedAreaId
+                                  ? "Asignar a persona específica"
+                                  : "Selecciona un área primero"
+                              }
+                            />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="none">
+                              {selectedAreaId ? "Auto-asignación (interno con menos carga)" : "Sin asignar"}
                             </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+                            {collaborators.map((u) => (
+                              <SelectItem key={u.id} value={u.id.toString()}>
+                                <span>{u.name}</span>
+                                <span className="ml-2 text-xs text-muted-foreground">
+                                  {u.is_internal ? `• ${u.active_task_count} tarea(s)` : "• Externo"}
+                                </span>
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              )}
 
               <DialogFooter>
                 <Button

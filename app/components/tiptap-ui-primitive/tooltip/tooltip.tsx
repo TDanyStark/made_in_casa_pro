@@ -155,10 +155,11 @@ export const TooltipTrigger = React.forwardRef<
   TooltipTriggerProps
 >(function TooltipTrigger({ children, asChild = false, ...props }, propRef) {
   const context = useTooltipContext()
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const childrenRef = React.isValidElement(children)
     ? parseInt(React.version, 10) >= 19
-      ? (children.props as any).ref
-      : (children as any).ref
+      ? (children.props as any).ref // eslint-disable-line @typescript-eslint/no-explicit-any
+      : (children as any).ref // eslint-disable-line @typescript-eslint/no-explicit-any
     : undefined
   const ref = useMergeRefs([context.refs.setReference, propRef, childrenRef])
 
@@ -168,7 +169,7 @@ export const TooltipTrigger = React.forwardRef<
       context.getReferenceProps({
         ref,
         ...props,
-        ...(children.props as any),
+        ...(children.props as any), // eslint-disable-line @typescript-eslint/no-explicit-any
         "data-tooltip-state": context.open ? "open" : "closed",
       })
     )

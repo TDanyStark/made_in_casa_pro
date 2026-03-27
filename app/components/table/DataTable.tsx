@@ -1,3 +1,4 @@
+import React from "react";
 import {
   Table,
   TableBody,
@@ -11,7 +12,7 @@ import {
 interface Column<T> {
   key: keyof T;
   label: string;
-  render?: (value: unknown, row: T) => JSX.Element | string;
+  render?: (value: unknown, row: T) => React.ReactElement | string;
 }
 
 interface ActionComponentProps<T> {

@@ -32,7 +32,7 @@ export function CreateCountrySelect({ field }: CreateCountrySelectProps) {
   
   // Obtener los países usando el hook de consulta
   const { data, isLoading, isError } = useGetItems("/countries");
-  const countries: CountryType[] = useMemo(() => data?.countries ?? [], [data]);
+  const countries: CountryType[] = useMemo(() => (data as unknown as { countries?: CountryType[] })?.countries ?? [], [data]);
   
   // Preparar opciones para react-select
   useEffect(() => {

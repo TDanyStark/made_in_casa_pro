@@ -1,6 +1,14 @@
 import { db } from "../db";
 import { revalidatePath } from "next/cache";
-import { ProjectTaskType, ProjectTaskStatus } from "../definitions";
+import {
+  ProjectTaskType,
+  ProjectTaskStatus,
+  TaskType,
+  TaskFlag,
+  TaskTransitionType,
+} from "../definitions";
+
+// ─── Shared SELECT fragments ──────────────────────────────────────────────────
 
 const TASK_SELECT = `
   pt.id,
@@ -10,13 +18,18 @@ const TASK_SELECT = `
   pt.title,
   pt.description,
   pt.area_id,
-  a.name  AS area_name,
+  a.name            AS area_name,
   pt.assigned_user_id,
-  u.name  AS assigned_user_name,
+  u.name            AS assigned_user_name,
   pt.status,
+  pt.task_type,
+  pt.task_flag,
+  pt.requires_quote,
   pt.order_index,
   pt.created_at,
-  pt.updated_at
+  pt.updated_at,
+  (SELECT COUNT(*) FROM task_quotes tq WHERE tq.task_id = pt.id) AS quote_count,
+  (SELECT COUNT(*) FROM task_quotes tq WHERE tq.task_id = pt.id AND tq.status = 'pending') AS pending_quote_count
 `;
 
 const TASK_JOINS = `
@@ -24,6 +37,8 @@ const TASK_JOINS = `
   LEFT JOIN areas a ON pt.area_id = a.id
   LEFT JOIN users u ON pt.assigned_user_id = u.id
 `;
+
+// ─── Read ─────────────────────────────────────────────────────────────────────
 
 export async function getProjectTaskById(id: number): Promise<ProjectTaskType | null> {
   try {
@@ -75,6 +90,38 @@ export async function getTasksByProject(projectId: number): Promise<ProjectTaskT
   }
 }
 
+export async function getTaskTransitions(taskId: number): Promise<TaskTransitionType[]> {
+  try {
+    const result = await db.execute({
+      sql: `
+        SELECT
+          tt.id,
+          tt.task_id,
+          tt.project_id,
+          tt.from_status,
+          tt.to_status,
+          tt.from_flag,
+          tt.to_flag,
+          tt.moved_by,
+          u.name AS moved_by_name,
+          tt.notes,
+          tt.transitioned_at
+        FROM task_transitions tt
+        LEFT JOIN users u ON tt.moved_by = u.id
+        WHERE tt.task_id = $1
+        ORDER BY tt.transitioned_at ASC
+      `,
+      args: [taskId],
+    });
+    return result.rows as unknown as TaskTransitionType[];
+  } catch (error) {
+    console.error("Error fetching task transitions:", error);
+    return [];
+  }
+}
+
+// ─── Create ───────────────────────────────────────────────────────────────────
+
 export async function createProjectTask(data: {
   project_id: number;
   project_product_id: number;
@@ -84,14 +131,18 @@ export async function createProjectTask(data: {
   area_id?: number | null;
   assigned_user_id?: number | null;
   status?: ProjectTaskStatus;
+  task_type?: TaskType;
+  task_flag?: TaskFlag;
+  requires_quote?: number;
   order_index: number;
 }): Promise<ProjectTaskType> {
   try {
     const result = await db.execute({
       sql: `
         INSERT INTO project_tasks
-          (project_id, project_product_id, template_id, title, description, area_id, assigned_user_id, status, order_index)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+          (project_id, project_product_id, template_id, title, description,
+           area_id, assigned_user_id, status, task_type, task_flag, requires_quote, order_index)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
         RETURNING id
       `,
       args: [
@@ -103,6 +154,9 @@ export async function createProjectTask(data: {
         data.area_id ?? null,
         data.assigned_user_id ?? null,
         data.status ?? "not_started",
+        data.task_type ?? "execution",
+        data.task_flag ?? "new",
+        data.requires_quote ?? 0,
         data.order_index,
       ],
     });
@@ -116,6 +170,8 @@ export async function createProjectTask(data: {
   }
 }
 
+// ─── Update ───────────────────────────────────────────────────────────────────
+
 export async function updateProjectTask(
   id: number,
   data: Partial<{
@@ -124,6 +180,9 @@ export async function updateProjectTask(
     area_id: number | null;
     assigned_user_id: number | null;
     status: ProjectTaskStatus;
+    task_type: TaskType;
+    task_flag: TaskFlag;
+    requires_quote: number;
   }>
 ): Promise<ProjectTaskType | null> {
   try {
@@ -136,6 +195,9 @@ export async function updateProjectTask(
       ["area_id", data.area_id],
       ["assigned_user_id", data.assigned_user_id],
       ["status", data.status],
+      ["task_type", data.task_type],
+      ["task_flag", data.task_flag],
+      ["requires_quote", data.requires_quote],
     ];
 
     for (const [col, val] of fields) {
@@ -164,6 +226,8 @@ export async function updateProjectTask(
   }
 }
 
+// ─── Delete ───────────────────────────────────────────────────────────────────
+
 export async function deleteProjectTask(id: number): Promise<void> {
   try {
     const task = await getProjectTaskById(id);
@@ -174,6 +238,8 @@ export async function deleteProjectTask(id: number): Promise<void> {
     throw error;
   }
 }
+
+// ─── Reorder ──────────────────────────────────────────────────────────────────
 
 export async function reorderProjectTasks(
   projectProductId: number,
@@ -197,26 +263,276 @@ export async function reorderProjectTasks(
   }
 }
 
+// ─── Transition logger ────────────────────────────────────────────────────────
+
+async function logTransition(
+  taskId: number,
+  projectId: number,
+  fromStatus: string | null,
+  toStatus: string,
+  fromFlag: string | null,
+  toFlag: string | null,
+  movedBy: number,
+  notes?: string | null
+): Promise<void> {
+  await db.execute({
+    sql: `
+      INSERT INTO task_transitions
+        (task_id, project_id, from_status, to_status, from_flag, to_flag, moved_by, notes)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+    `,
+    args: [taskId, projectId, fromStatus ?? null, toStatus, fromFlag ?? null, toFlag ?? null, movedBy, notes ?? null],
+  });
+}
+
+// ─── Complete task (execution flow) ──────────────────────────────────────────
+
+/**
+ * Marks an execution task as completed and auto-activates the next task in order.
+ * Only the assigned user can complete (enforced at API layer).
+ */
+export async function completeTask(
+  taskId: number,
+  userId: number,
+  notes?: string | null
+): Promise<{ task: ProjectTaskType; nextTask: ProjectTaskType | null; blockedReason?: string }> {
+  const task = await getProjectTaskById(taskId);
+  if (!task) throw new Error("Tarea no encontrada");
+  if (task.task_type !== "execution") throw new Error("Solo se pueden completar tareas de ejecución con este endpoint");
+  if (task.status !== "in_progress" && task.status !== "not_started") {
+    throw new Error("La tarea no está en un estado que permita completarla");
+  }
+
+  const transaction = await db.transaction("write");
+  try {
+    // 1. Mark current task as completed
+    await transaction.execute({
+      sql: `UPDATE project_tasks SET status = 'completed', updated_at = CURRENT_TIMESTAMP WHERE id = $1`,
+      args: [taskId],
+    });
+
+    // 2. Log transition
+    await transaction.execute({
+      sql: `
+        INSERT INTO task_transitions (task_id, project_id, from_status, to_status, from_flag, to_flag, moved_by, notes)
+        VALUES ($1, $2, $3, 'completed', $4, $4, $5, $6)
+      `,
+      args: [taskId, task.project_id, task.status, task.task_flag, userId, notes ?? null],
+    });
+
+    // 3. Find next task in this product (lowest order_index with status='waiting' or 'not_started')
+    const nextResult = await transaction.execute({
+      sql: `
+        SELECT id, assigned_user_id, requires_quote, task_flag, status
+        FROM project_tasks
+        WHERE project_product_id = $1
+          AND order_index > (SELECT order_index FROM project_tasks WHERE id = $2)
+          AND status IN ('waiting', 'not_started')
+        ORDER BY order_index ASC
+        LIMIT 1
+      `,
+      args: [task.project_product_id, taskId],
+    });
+
+    let nextTask: ProjectTaskType | null = null;
+    let blockedReason: string | undefined;
+
+    if (nextResult.rows.length > 0) {
+      const next = nextResult.rows[0] as unknown as {
+        id: number;
+        assigned_user_id: number | null;
+        requires_quote: number;
+        task_flag: string;
+        status: string;
+      };
+
+      if (Number(next.requires_quote) === 1 && !next.assigned_user_id) {
+        // Block: requires external quote, no one assigned yet
+        await transaction.execute({
+          sql: `UPDATE project_tasks SET status = 'blocked', updated_at = CURRENT_TIMESTAMP WHERE id = $1`,
+          args: [next.id],
+        });
+        await transaction.execute({
+          sql: `
+            INSERT INTO task_transitions (task_id, project_id, from_status, to_status, from_flag, to_flag, moved_by, notes)
+            VALUES ($1, $2, $3, 'blocked', $4, $4, $5, $6)
+          `,
+          args: [next.id, task.project_id, next.status, next.task_flag, userId, "Requiere cotización de colaborador externo"],
+        });
+        blockedReason = "La siguiente tarea requiere cotización de un colaborador externo. El encargado del proyecto debe invitar a un externo para cotizar.";
+      } else if (!next.assigned_user_id) {
+        // Block: no one assigned
+        await transaction.execute({
+          sql: `UPDATE project_tasks SET status = 'blocked', updated_at = CURRENT_TIMESTAMP WHERE id = $1`,
+          args: [next.id],
+        });
+        await transaction.execute({
+          sql: `
+            INSERT INTO task_transitions (task_id, project_id, from_status, to_status, from_flag, to_flag, moved_by, notes)
+            VALUES ($1, $2, $3, 'blocked', $4, $4, $5, $6)
+          `,
+          args: [next.id, task.project_id, next.status, next.task_flag, userId, "Sin colaborador asignado"],
+        });
+        blockedReason = "La siguiente tarea no tiene colaborador asignado. El encargado del proyecto debe asignar a alguien.";
+      } else {
+        // Activate next task
+        await transaction.execute({
+          sql: `UPDATE project_tasks SET status = 'in_progress', updated_at = CURRENT_TIMESTAMP WHERE id = $1`,
+          args: [next.id],
+        });
+        await transaction.execute({
+          sql: `
+            INSERT INTO task_transitions (task_id, project_id, from_status, to_status, from_flag, to_flag, moved_by, notes)
+            VALUES ($1, $2, $3, 'in_progress', $4, $4, $5, $6)
+          `,
+          args: [next.id, task.project_id, next.status, next.task_flag, userId, "Activada automáticamente al completar tarea anterior"],
+        });
+      }
+    }
+
+    await transaction.commit();
+
+    const updatedTask = await getProjectTaskById(taskId);
+    if (nextResult.rows.length > 0) {
+      const nextId = Number((nextResult.rows[0] as unknown as { id: number }).id);
+      nextTask = await getProjectTaskById(nextId);
+    }
+
+    revalidatePath(`/projects/${task.project_id}`);
+    return { task: updatedTask!, nextTask, blockedReason };
+  } catch (error) {
+    await transaction.rollback();
+    console.error("Error completing task:", error);
+    throw error;
+  }
+}
+
+// ─── Validate task (validation flow) ─────────────────────────────────────────
+
+/**
+ * Handles validation task actions:
+ * - approve: same as complete, moves to next task in order
+ * - reject: marks current validation as completed (historical), sets target task to in_progress
+ *           with flag='correction', leaves intermediate tasks as completed (historical)
+ */
+export async function validateTask(
+  taskId: number,
+  userId: number,
+  action: "approve" | "reject",
+  targetOrderIndex?: number,
+  notes?: string | null
+): Promise<{ task: ProjectTaskType; targetTask: ProjectTaskType | null; blockedReason?: string }> {
+  const task = await getProjectTaskById(taskId);
+  if (!task) throw new Error("Tarea no encontrada");
+  if (task.task_type !== "validation") throw new Error("Solo se pueden validar tareas de tipo validación");
+  if (task.status !== "in_progress") throw new Error("La tarea de validación no está en progreso");
+
+  if (action === "approve") {
+    const result = await completeTask(taskId, userId, notes);
+    return { task: result.task, targetTask: result.nextTask, blockedReason: result.blockedReason };
+  }
+
+  // Reject: find the target task to send back to
+  if (targetOrderIndex === undefined) throw new Error("Se requiere indicar a qué tarea volver");
+
+  const targetResult = await db.execute({
+    sql: `
+      SELECT id, status, task_flag, order_index
+      FROM project_tasks
+      WHERE project_product_id = $1 AND order_index = $2
+      LIMIT 1
+    `,
+    args: [task.project_product_id, targetOrderIndex],
+  });
+  if (targetResult.rows.length === 0) throw new Error("Tarea destino no encontrada");
+
+  const target = targetResult.rows[0] as unknown as {
+    id: number;
+    status: string;
+    task_flag: string;
+    order_index: number;
+  };
+
+  const transaction = await db.transaction("write");
+  try {
+    // 1. Mark validation task as completed (historical record)
+    await transaction.execute({
+      sql: `UPDATE project_tasks SET status = 'completed', updated_at = CURRENT_TIMESTAMP WHERE id = $1`,
+      args: [taskId],
+    });
+    await transaction.execute({
+      sql: `
+        INSERT INTO task_transitions (task_id, project_id, from_status, to_status, from_flag, to_flag, moved_by, notes)
+        VALUES ($1, $2, 'in_progress', 'completed', $3, $3, $4, $5)
+      `,
+      args: [taskId, task.project_id, task.task_flag, userId, notes ?? "Validación rechazada, enviada a corrección"],
+    });
+
+    // 2. Set target task to in_progress with flag=correction
+    await transaction.execute({
+      sql: `
+        UPDATE project_tasks
+        SET status = 'in_progress', task_flag = 'correction', updated_at = CURRENT_TIMESTAMP
+        WHERE id = $1
+      `,
+      args: [target.id],
+    });
+    await transaction.execute({
+      sql: `
+        INSERT INTO task_transitions (task_id, project_id, from_status, to_status, from_flag, to_flag, moved_by, notes)
+        VALUES ($1, $2, $3, 'in_progress', $4, 'correction', $5, $6)
+      `,
+      args: [target.id, task.project_id, target.status, target.task_flag, userId, notes ?? "Regresada para corrección"],
+    });
+
+    // 3. Tasks between target and validation task: leave as completed (historical)
+    // They will get new instances if the flow passes through them again
+
+    await transaction.commit();
+
+    const updatedTask = await getProjectTaskById(taskId);
+    const targetTask = await getProjectTaskById(target.id);
+
+    revalidatePath(`/projects/${task.project_id}`);
+    return { task: updatedTask!, targetTask };
+  } catch (error) {
+    await transaction.rollback();
+    console.error("Error validating task:", error);
+    throw error;
+  }
+}
+
+// ─── Auto-assignment helpers ──────────────────────────────────────────────────
+
 /**
  * Finds the internal collaborator (is_internal=1, rol_id=4) with the fewest
- * active (not completed) project tasks, to use for auto-assignment.
+ * active (not completed/waiting) project tasks in the given area.
+ * If areaId is provided, restrict to that area. Otherwise search globally.
  */
-export async function findLeastLoadedInternalCollaborator(): Promise<number | null> {
+export async function findLeastLoadedInternalCollaborator(areaId?: number | null): Promise<number | null> {
   try {
+    const args: unknown[] = [];
+    let areaFilter = "";
+    if (areaId) {
+      args.push(areaId);
+      areaFilter = `AND u.area_id = $${args.length}`;
+    }
+
     const result = await db.execute({
       sql: `
         SELECT u.id
         FROM users u
         LEFT JOIN project_tasks pt ON pt.assigned_user_id = u.id
-          AND pt.status != 'completed'
+          AND pt.status NOT IN ('completed', 'waiting')
         WHERE u.rol_id = 4
           AND u.is_internal = 1
           AND u.is_active = 1
+          ${areaFilter}
         GROUP BY u.id
         ORDER BY COUNT(pt.id) ASC
         LIMIT 1
       `,
-      args: [],
+      args,
     });
     if (result.rows.length === 0) return null;
     return Number((result.rows[0] as unknown as { id: number }).id);
@@ -227,8 +543,35 @@ export async function findLeastLoadedInternalCollaborator(): Promise<number | nu
 }
 
 /**
+ * Checks if there are any internal collaborators in the given area.
+ */
+export async function hasInternalCollaboratorsInArea(areaId: number): Promise<boolean> {
+  try {
+    const result = await db.execute({
+      sql: `SELECT COUNT(*) AS cnt FROM users WHERE rol_id = 4 AND is_internal = 1 AND is_active = 1 AND area_id = $1`,
+      args: [areaId],
+    });
+    return Number((result.rows[0] as unknown as { cnt: number }).cnt) > 0;
+  } catch {
+    return false;
+  }
+}
+
+// ─── Instantiate tasks from templates ────────────────────────────────────────
+
+/**
  * Instantiates product_task_templates as project_tasks for a given project_product.
- * Auto-assigns internal collaborator if template has no assigned_user_id.
+ * 
+ * Assignment logic per template:
+ *   1. If template.assigned_user_id → use directly (fixed assignment)
+ *   2. If template.area_id:
+ *      a. If area has internals → assign least loaded internal of that area
+ *      b. If no internals in area → leave assigned_user_id = NULL (requires_quote handled later)
+ *   3. If neither → assigned_user_id = NULL
+ * 
+ * Status logic:
+ *   - First task (order_index 0) → 'not_started' (ready to begin)
+ *   - All others → 'waiting' (assigned but blocked until previous completes)
  */
 export async function instantiateTasksFromTemplates(
   projectId: number,
@@ -238,7 +581,7 @@ export async function instantiateTasksFromTemplates(
   try {
     const templates = await db.execute({
       sql: `
-        SELECT id, title, description, area_id, assigned_user_id, order_index
+        SELECT id, title, description, area_id, assigned_user_id, order_index, task_type, requires_quote
         FROM product_task_templates
         WHERE product_id = $1
         ORDER BY order_index ASC, id ASC
@@ -246,24 +589,41 @@ export async function instantiateTasksFromTemplates(
       args: [productId],
     });
 
-    const fallbackUserId = await findLeastLoadedInternalCollaborator();
-
     const transaction = await db.transaction("write");
     try {
-      for (const tpl of templates.rows as unknown as Array<{
-        id: number;
-        title: string;
-        description: string | null;
-        area_id: number | null;
-        assigned_user_id: number | null;
-        order_index: number;
-      }>) {
-        const assignedTo = tpl.assigned_user_id ?? fallbackUserId;
+      for (let i = 0; i < templates.rows.length; i++) {
+        const tpl = templates.rows[i] as unknown as {
+          id: number;
+          title: string;
+          description: string | null;
+          area_id: number | null;
+          assigned_user_id: number | null;
+          order_index: number;
+          task_type: string;
+          requires_quote: number;
+        };
+
+        let assignedTo: number | null = null;
+
+        if (tpl.assigned_user_id) {
+          // Fixed assignment in template
+          assignedTo = tpl.assigned_user_id;
+        } else if (tpl.area_id) {
+          // Try to find least loaded internal in this area
+          const internalId = await findLeastLoadedInternalCollaborator(tpl.area_id);
+          assignedTo = internalId; // null if no internals in area
+        }
+        // else: no area, no user → null
+
+        // First task is ready, rest are waiting
+        const status: ProjectTaskStatus = i === 0 ? "not_started" : "waiting";
+
         await transaction.execute({
           sql: `
             INSERT INTO project_tasks
-              (project_id, project_product_id, template_id, title, description, area_id, assigned_user_id, status, order_index)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, 'not_started', $8)
+              (project_id, project_product_id, template_id, title, description,
+               area_id, assigned_user_id, status, task_type, task_flag, requires_quote, order_index)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'new', $10, $11)
           `,
           args: [
             projectId,
@@ -272,7 +632,10 @@ export async function instantiateTasksFromTemplates(
             tpl.title,
             tpl.description ?? null,
             tpl.area_id ?? null,
-            assignedTo ?? null,
+            assignedTo,
+            status,
+            tpl.task_type ?? "execution",
+            tpl.requires_quote ?? 0,
             tpl.order_index,
           ],
         });
@@ -288,4 +651,67 @@ export async function instantiateTasksFromTemplates(
     console.error("Error instantiating tasks from templates:", error);
     throw error;
   }
+}
+
+// ─── My tasks (for collaborator dashboard) ────────────────────────────────────
+
+export async function getMyTasks(userId: number): Promise<ProjectTaskType[]> {
+  try {
+    const result = await db.execute({
+      sql: `
+        SELECT
+          pt.id,
+          pt.project_id,
+          pt.project_product_id,
+          pt.template_id,
+          pt.title,
+          pt.description,
+          pt.area_id,
+          a.name            AS area_name,
+          pt.assigned_user_id,
+          u.name            AS assigned_user_name,
+          pt.status,
+          pt.task_type,
+          pt.task_flag,
+          pt.requires_quote,
+          pt.order_index,
+          pt.created_at,
+          pt.updated_at,
+          p.title           AS project_title,
+          pr.product_name,
+          0                 AS quote_count,
+          0                 AS pending_quote_count
+        FROM project_tasks pt
+        LEFT JOIN areas a            ON pt.area_id           = a.id
+        LEFT JOIN users u            ON pt.assigned_user_id  = u.id
+        LEFT JOIN projects p         ON pt.project_id        = p.id
+        LEFT JOIN (
+          SELECT pp.id, pr2.name AS product_name
+          FROM project_products pp
+          JOIN products pr2 ON pp.product_id = pr2.id
+        ) pr ON pt.project_product_id = pr.id
+        WHERE pt.assigned_user_id = $1
+          AND pt.status IN ('in_progress', 'not_started', 'blocked')
+        ORDER BY pt.status = 'in_progress' DESC, pt.updated_at DESC
+      `,
+      args: [userId],
+    });
+    return result.rows as unknown as ProjectTaskType[];
+  } catch (error) {
+    console.error("Error fetching my tasks:", error);
+    return [];
+  }
+}
+
+export async function logTaskTransition(
+  taskId: number,
+  projectId: number,
+  fromStatus: string | null,
+  toStatus: string,
+  fromFlag: string | null,
+  toFlag: string | null,
+  movedBy: number,
+  notes?: string | null
+): Promise<void> {
+  return logTransition(taskId, projectId, fromStatus, toStatus, fromFlag, toFlag, movedBy, notes);
 }

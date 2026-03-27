@@ -4,7 +4,6 @@ import {
   ProjectType,
   ProjectDetailType,
   ProjectProductType,
-  ProjectTaskType,
   ProjectStatus,
 } from "../definitions";
 import { buildWhereClause, buildPaginationArgs, parseTotal } from "../db/query-helpers";

@@ -15,11 +15,7 @@ import { FormField } from "@/components/ui/form";
 import CreateBrandModal from "../clients/CreateBrandModal";
 import { BrandsAndManagersType, BrandType } from "@/lib/definitions";
 
-// Generic form shape that must contain at least brand_id
-interface AnyFormWithBrand {
-  brand_id: number;
-  [key: string]: unknown;
-}
+
 
 interface BrandOption {
   value: number;

@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { ProjectType } from "@/lib/definitions";
 import { ProjectStatusBadge } from "./ProjectStatusBadge";
 import { ProjectProgressBar } from "./ProjectProgressBar";

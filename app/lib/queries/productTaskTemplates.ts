@@ -18,6 +18,8 @@ export async function getTaskTemplatesByProductId(
           ptt.assigned_user_id,
           u.name  AS assigned_user_name,
           ptt.order_index,
+          ptt.task_type,
+          ptt.requires_quote,
           ptt.created_at
         FROM product_task_templates ptt
         LEFT JOIN areas a ON ptt.area_id = a.id
@@ -48,6 +50,8 @@ export async function getTaskTemplateById(id: number): Promise<ProductTaskTempla
           ptt.assigned_user_id,
           u.name  AS assigned_user_name,
           ptt.order_index,
+          ptt.task_type,
+          ptt.requires_quote,
           ptt.created_at
         FROM product_task_templates ptt
         LEFT JOIN areas a ON ptt.area_id = a.id
@@ -71,13 +75,15 @@ export async function createTaskTemplate(data: {
   area_id?: number | null;
   assigned_user_id?: number | null;
   order_index: number;
+  task_type?: string;
+  requires_quote?: number;
 }): Promise<ProductTaskTemplateType> {
   try {
     const result = await db.execute({
       sql: `
         INSERT INTO product_task_templates
-          (product_id, title, description, area_id, assigned_user_id, order_index)
-        VALUES ($1, $2, $3, $4, $5, $6)
+          (product_id, title, description, area_id, assigned_user_id, order_index, task_type, requires_quote)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
         RETURNING id
       `,
       args: [
@@ -87,6 +93,8 @@ export async function createTaskTemplate(data: {
         data.area_id ?? null,
         data.assigned_user_id ?? null,
         data.order_index,
+        data.task_type ?? "execution",
+        data.requires_quote ?? 0,
       ],
     });
     const id = Number(result.rows[0]?.id);
@@ -106,6 +114,8 @@ export async function updateTaskTemplate(
     description: string | null;
     area_id: number | null;
     assigned_user_id: number | null;
+    task_type: string;
+    requires_quote: number;
   }>
 ): Promise<ProductTaskTemplateType | null> {
   try {
@@ -127,6 +137,14 @@ export async function updateTaskTemplate(
     if (data.assigned_user_id !== undefined) {
       args.push(data.assigned_user_id);
       updates.push(`assigned_user_id = $${args.length}`);
+    }
+    if (data.task_type !== undefined) {
+      args.push(data.task_type);
+      updates.push(`task_type = $${args.length}`);
+    }
+    if (data.requires_quote !== undefined) {
+      args.push(data.requires_quote);
+      updates.push(`requires_quote = $${args.length}`);
     }
 
     if (updates.length === 0) return getTaskTemplateById(id);

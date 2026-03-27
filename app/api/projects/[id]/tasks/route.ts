@@ -12,7 +12,10 @@ const taskSchema = z.object({
   description: z.string().optional().nullable(),
   area_id: z.coerce.number().int().positive().optional().nullable(),
   assigned_user_id: z.coerce.number().int().positive().optional().nullable(),
-  status: z.enum(["not_started", "in_progress", "completed", "blocked"]).optional(),
+  status: z.enum(["not_started", "waiting", "in_progress", "completed", "blocked"]).optional(),
+  task_type: z.enum(["execution", "validation"]).optional().default("execution"),
+  task_flag: z.enum(["new", "correction", "adjustment"]).optional().default("new"),
+  requires_quote: z.coerce.number().int().min(0).max(1).optional().default(0),
 });
 
 type Params = { params: Promise<{ id: string }> };
@@ -67,6 +70,9 @@ export async function POST(request: NextRequest, { params }: Params) {
       area_id: validation.data.area_id ?? null,
       assigned_user_id: validation.data.assigned_user_id ?? null,
       status: validation.data.status ?? "not_started",
+      task_type: validation.data.task_type ?? "execution",
+      task_flag: validation.data.task_flag ?? "new",
+      requires_quote: validation.data.requires_quote ?? 0,
       order_index: nextOrder,
     });
 

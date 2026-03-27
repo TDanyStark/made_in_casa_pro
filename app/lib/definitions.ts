@@ -156,6 +156,9 @@ export type ProductType = {
   created_at: string;
 };
 
+export type TaskType = 'execution' | 'validation';
+export type TaskFlag = 'new' | 'correction' | 'adjustment';
+
 export type ProductTaskTemplateType = {
   id: number;
   product_id: number;
@@ -165,7 +168,11 @@ export type ProductTaskTemplateType = {
   area_name: string | null;
   assigned_user_id: number | null;
   assigned_user_name: string | null;
+  assigned_user_rol_id: number | null;
   order_index: number;
+  task_type: TaskType;
+  requires_quote: number; // 0 | 1
+  assign_to_commercial: number; // 0 | 1
   created_at: string;
 };
 
@@ -227,7 +234,7 @@ export type ProjectProductType = {
   task_completed?: number;
 };
 
-export type ProjectTaskStatus = 'not_started' | 'in_progress' | 'completed' | 'blocked';
+export type ProjectTaskStatus = 'not_started' | 'waiting' | 'in_progress' | 'completed' | 'blocked';
 
 export type ProjectTaskType = {
   id: number;
@@ -240,8 +247,60 @@ export type ProjectTaskType = {
   area_name: string | null;
   assigned_user_id: number | null;
   assigned_user_name: string | null;
+  assigned_user_rol_id: number | null;
   status: ProjectTaskStatus;
+  task_type: TaskType;
+  task_flag: TaskFlag;
+  requires_quote: number; // 0 | 1
+  assign_to_commercial: number; // 0 | 1
   order_index: number;
   created_at: string;
   updated_at: string;
+  // aggregates
+  quote_count?: number;
+  pending_quote_count?: number;
+};
+
+export type TaskTransitionType = {
+  id: number;
+  task_id: number;
+  project_id: number;
+  from_status: string | null;
+  to_status: string;
+  from_flag: string | null;
+  to_flag: string | null;
+  moved_by: number | null;
+  moved_by_name: string | null;
+  notes: string | null;
+  transitioned_at: string;
+};
+
+export type QuoteStatus = 'pending' | 'accepted' | 'rejected';
+
+export type TaskQuoteType = {
+  id: number;
+  task_id: number;
+  task_title?: string;
+  project_id?: number;
+  user_id: number;
+  user_name: string;
+  price: number | null;
+  delivery_days: number | null;
+  delivery_hours: number | null;
+  notes: string | null;
+  status: QuoteStatus;
+  created_at: string;
+  updated_at: string;
+};
+
+export type TaskQuoteInvitationType = {
+  id: number;
+  task_id: number;
+  user_id: number;
+  user_name: string;
+  invited_by: number | null;
+  invited_by_name: string | null;
+  invited_at: string;
+  // joined from task_quotes
+  quote_status?: QuoteStatus | null;
 };

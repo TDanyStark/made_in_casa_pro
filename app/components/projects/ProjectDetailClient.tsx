@@ -5,6 +5,7 @@ import { get } from "@/lib/services/apiService";
 import { ProjectDetailType, UserRole } from "@/lib/definitions";
 import { ProjectHeader } from "./ProjectHeader";
 import { ProjectTasksTab } from "./ProjectTasksTab";
+import { ProjectQuotesTab } from "./ProjectQuotesTab";
 import { ProjectNotesEditor } from "./ProjectNotesEditor";
 import { ProjectCoManagersTab } from "./ProjectCoManagersTab";
 import { ProjectInfoTab } from "./ProjectInfoTab";
@@ -16,9 +17,10 @@ import Link from "next/link";
 interface Props {
   projectId: number;
   userRole: UserRole;
+  currentUserId?: number;
 }
 
-export function ProjectDetailClient({ projectId, userRole }: Props) {
+export function ProjectDetailClient({ projectId, userRole, currentUserId }: Props) {
   const canEdit =
     userRole === UserRole.ADMIN ||
     userRole === UserRole.DIRECTIVO ||
@@ -69,6 +71,9 @@ export function ProjectDetailClient({ projectId, userRole }: Props) {
               </span>
             )}
           </TabsTrigger>
+          {canEdit && (
+            <TabsTrigger value="quotes">Cotizaciones</TabsTrigger>
+          )}
           <TabsTrigger value="notes">Notas</TabsTrigger>
           <TabsTrigger value="co-managers">
             Co-responsables
@@ -84,8 +89,16 @@ export function ProjectDetailClient({ projectId, userRole }: Props) {
             projectId={projectId}
             products={project.products}
             canEdit={canEdit}
+            currentUserId={currentUserId}
+            currentUserRole={userRole}
           />
         </TabsContent>
+
+        {canEdit && (
+          <TabsContent value="quotes" className="mt-6">
+            <ProjectQuotesTab projectId={projectId} canEdit={canEdit} />
+          </TabsContent>
+        )}
 
         <TabsContent value="notes" className="mt-6">
           <ProjectNotesEditor

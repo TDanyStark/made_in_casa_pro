@@ -1,4 +1,4 @@
-import { House, Folder, LayoutList, BookUser, LibraryBig, Users, Settings } from 'lucide-react';
+import { House, Folder, LayoutList, BookUser, LibraryBig, Users, Settings, CheckSquare } from 'lucide-react';
 import { LinksType, UserRole } from './definitions';
 
 export type NavSubLink = {
@@ -25,6 +25,12 @@ export const links: LinksType[] = [
     name: 'Proyectos',
     route: '/projects',
     icon: Folder,
+    roles: [UserRole.ADMIN, UserRole.COMERCIAL, UserRole.DIRECTIVO, UserRole.COLABORADOR]
+  },
+  {
+    name: 'Mis Tareas',
+    route: '/my-tasks',
+    icon: CheckSquare,
     roles: [UserRole.ADMIN, UserRole.COMERCIAL, UserRole.DIRECTIVO, UserRole.COLABORADOR]
   },
   { 
@@ -60,6 +66,14 @@ export const links: LinksType[] = [
 ];
 
 export const linksNotVisible: LinksType[] = [
+  {
+    route: '/my-tasks',
+    roles: [UserRole.ADMIN, UserRole.COMERCIAL, UserRole.DIRECTIVO, UserRole.COLABORADOR]
+  },
+  {
+    route: '/my-quotes',
+    roles: [UserRole.ADMIN, UserRole.COMERCIAL, UserRole.DIRECTIVO, UserRole.COLABORADOR]
+  },
   {
     route: '/clients',
     roles: [UserRole.ADMIN, UserRole.COMERCIAL, UserRole.DIRECTIVO]

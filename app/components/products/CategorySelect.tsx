@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import CreatableSelect from "react-select/creatable";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { get, post } from "@/lib/services/apiService";

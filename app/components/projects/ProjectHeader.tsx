@@ -13,7 +13,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { ProjectDetailType, ProjectStatus } from "@/lib/definitions";
-import { ProjectStatusBadge } from "./ProjectStatusBadge";
 import { ProjectProgressBar } from "./ProjectProgressBar";
 import { patch } from "@/lib/services/apiService";
 import EditableText from "@/components/input/EditableText";
