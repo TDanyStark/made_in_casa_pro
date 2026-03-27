@@ -909,7 +909,7 @@ export function ProjectTasksTab({
                       <FormLabel>Tipo de tarea</FormLabel>
                       <FormControl>
                         <Select value={field.value} onValueChange={field.onChange}>
-                          <SelectTrigger>
+                          <SelectTrigger className="h-auto min-h-9 py-2 *:data-[slot=select-value]:items-start *:data-[slot=select-value]:justify-start *:data-[slot=select-value]:text-left [&>span]:line-clamp-none">
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>

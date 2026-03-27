@@ -16,6 +16,7 @@ const taskSchema = z.object({
   task_type: z.enum(["execution", "validation"]).optional().default("execution"),
   task_flag: z.enum(["new", "correction", "adjustment"]).optional().default("new"),
   requires_quote: z.coerce.number().int().min(0).max(1).optional().default(0),
+  assign_to_commercial: z.coerce.number().int().min(0).max(1).optional().default(0),
 });
 
 type Params = { params: Promise<{ id: string }> };
@@ -73,6 +74,7 @@ export async function POST(request: NextRequest, { params }: Params) {
       task_type: validation.data.task_type ?? "execution",
       task_flag: validation.data.task_flag ?? "new",
       requires_quote: validation.data.requires_quote ?? 0,
+      assign_to_commercial: validation.data.assign_to_commercial ?? 0,
       order_index: nextOrder,
     });
 

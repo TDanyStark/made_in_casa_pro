@@ -15,6 +15,7 @@ const taskSchema = z.object({
   assigned_user_id: z.coerce.number().int().positive().optional().nullable(),
   task_type: z.enum(["execution", "validation"]).optional().default("execution"),
   requires_quote: z.coerce.number().int().min(0).max(1).optional().default(0),
+  assign_to_commercial: z.coerce.number().int().min(0).max(1).optional().default(0),
 });
 
 export async function GET(
@@ -82,6 +83,7 @@ export async function POST(
       ...validation.data,
       task_type: validation.data.task_type ?? "execution",
       requires_quote: validation.data.requires_quote ?? 0,
+      assign_to_commercial: validation.data.assign_to_commercial ?? 0,
     });
 
     return NextResponse.json(task, { status: 201 });

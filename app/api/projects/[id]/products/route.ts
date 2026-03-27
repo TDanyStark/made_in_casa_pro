@@ -5,6 +5,7 @@ import { UserRole } from "@/lib/definitions";
 import {
   getProjectProducts,
   addProductToProject,
+  getProjectById,
 } from "@/lib/queries/projects";
 import { instantiateTasksFromTemplates } from "@/lib/queries/projectTasks";
 import { recalculateProjectProgress } from "@/lib/queries/projects";
@@ -54,11 +55,16 @@ export async function POST(request: NextRequest, { params }: Params) {
 
     const { product_id } = validation.data;
 
+    // Get project to resolve created_by for assign_to_commercial
+    const project = await getProjectById(projectId);
+    const commercialUserId = project?.created_by ?? null;
+
     // Add product → get project_product id
     const projectProductId = await addProductToProject(projectId, product_id);
 
     // Instantiate task templates as project tasks
-    await instantiateTasksFromTemplates(projectId, projectProductId, product_id);
+    // Pass commercialUserId so assign_to_commercial=1 tasks get the project creator assigned
+    await instantiateTasksFromTemplates(projectId, projectProductId, product_id, commercialUserId);
 
     // Recalculate progress
     await recalculateProjectProgress(projectId);

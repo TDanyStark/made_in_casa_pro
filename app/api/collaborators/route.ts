@@ -7,16 +7,16 @@ import { UserRole } from "@/lib/definitions";
  * GET /api/collaborators
  * Query params:
  *   - area_id: filter by area (optional)
- *   - include_external: '1' | 'true' to include external collaborators (default: only internals when area given)
- *   - only_external: '1' | 'true' to return only external collaborators (for quote invitations)
- * 
- * Returns active users with task_count (active tasks) for load display.
- * 
+ *   - include_external: '1' to include external collaborators alongside internals
+ *   - only_external: '1' to return only external collaborators (for quote invitations)
+ *   - all_users: '1' to return ALL active users regardless of role (for free assignment)
+ *
  * Behavior:
- *   - No area_id → return all users (internals + externals if include_external=1)
- *   - area_id + default → return only internals of that area (is_internal=1)
- *   - area_id + include_external=1 → return everyone from that area
- *   - only_external=1 → return only externals (is_internal=0, rol_id=4)
+ *   - all_users=1 → all active users of any role, optionally filtered by area_id
+ *   - only_external=1 → only externals (is_internal=0, rol_id=4), optionally by area_id
+ *   - area_id + default → only internals of that area (is_internal=1, rol_id=4)
+ *   - area_id + include_external=1 → everyone (rol_id=4) from that area
+ *   - no area_id + no flags → all active collaborators (rol_id=4)
  */
 export async function GET(request: NextRequest) {
   const methodValidation = validateHttpMethod(request, ["GET"]);
@@ -32,17 +32,27 @@ export async function GET(request: NextRequest) {
   try {
     const url = new URL(request.url);
     const areaId = url.searchParams.get("area_id");
-    const includeExternal = url.searchParams.get("include_external") === "1" || url.searchParams.get("include_external") === "true";
-    const onlyExternal = url.searchParams.get("only_external") === "1" || url.searchParams.get("only_external") === "true";
+    const includeExternal =
+      url.searchParams.get("include_external") === "1" ||
+      url.searchParams.get("include_external") === "true";
+    const onlyExternal =
+      url.searchParams.get("only_external") === "1" ||
+      url.searchParams.get("only_external") === "true";
+    const allUsers =
+      url.searchParams.get("all_users") === "1" ||
+      url.searchParams.get("all_users") === "true";
 
     const args: unknown[] = [];
-    const conditions: string[] = ["u.is_active = 1", "u.rol_id = 4"];
+    const conditions: string[] = ["u.is_active = 1"];
 
-    if (onlyExternal) {
-      conditions.push("u.is_internal = 0");
+    if (allUsers) {
+      // No rol_id filter — return every active user
+    } else if (onlyExternal) {
+      conditions.push("u.rol_id = 4", "u.is_internal = 0");
     } else if (areaId && !includeExternal) {
-      // Default behavior with area: internals only
-      conditions.push("u.is_internal = 1");
+      conditions.push("u.rol_id = 4", "u.is_internal = 1");
+    } else {
+      conditions.push("u.rol_id = 4");
     }
 
     if (areaId) {
@@ -50,12 +60,13 @@ export async function GET(request: NextRequest) {
       conditions.push(`u.area_id = $${args.length}`);
     }
 
-    const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
+    const whereClause = `WHERE ${conditions.join(" AND ")}`;
 
     const sql = `
       SELECT
         u.id,
         u.name,
+        u.rol_id,
         u.is_internal,
         u.area_id,
         a.name AS area_name,
@@ -68,7 +79,16 @@ export async function GET(request: NextRequest) {
       FROM users u
       LEFT JOIN areas a ON u.area_id = a.id
       ${whereClause}
-      ORDER BY u.is_internal DESC, active_task_count ASC, u.name ASC
+      ORDER BY
+        CASE u.rol_id
+          WHEN 1 THEN 1
+          WHEN 2 THEN 2
+          WHEN 3 THEN 3
+          WHEN 4 THEN CASE WHEN u.is_internal = 1 THEN 4 ELSE 5 END
+          ELSE 6
+        END ASC,
+        active_task_count ASC,
+        u.name ASC
     `;
 
     const result = await db.execute({ sql, args });

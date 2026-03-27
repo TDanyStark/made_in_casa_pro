@@ -21,10 +21,12 @@ const TASK_SELECT = `
   a.name            AS area_name,
   pt.assigned_user_id,
   u.name            AS assigned_user_name,
+  u.rol_id          AS assigned_user_rol_id,
   pt.status,
   pt.task_type,
   pt.task_flag,
   pt.requires_quote,
+  pt.assign_to_commercial,
   pt.order_index,
   pt.created_at,
   pt.updated_at,
@@ -134,6 +136,7 @@ export async function createProjectTask(data: {
   task_type?: TaskType;
   task_flag?: TaskFlag;
   requires_quote?: number;
+  assign_to_commercial?: number;
   order_index: number;
 }): Promise<ProjectTaskType> {
   try {
@@ -141,8 +144,9 @@ export async function createProjectTask(data: {
       sql: `
         INSERT INTO project_tasks
           (project_id, project_product_id, template_id, title, description,
-           area_id, assigned_user_id, status, task_type, task_flag, requires_quote, order_index)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+           area_id, assigned_user_id, status, task_type, task_flag,
+           requires_quote, assign_to_commercial, order_index)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
         RETURNING id
       `,
       args: [
@@ -157,6 +161,7 @@ export async function createProjectTask(data: {
         data.task_type ?? "execution",
         data.task_flag ?? "new",
         data.requires_quote ?? 0,
+        data.assign_to_commercial ?? 0,
         data.order_index,
       ],
     });
@@ -183,6 +188,7 @@ export async function updateProjectTask(
     task_type: TaskType;
     task_flag: TaskFlag;
     requires_quote: number;
+    assign_to_commercial: number;
   }>
 ): Promise<ProjectTaskType | null> {
   try {
@@ -198,6 +204,7 @@ export async function updateProjectTask(
       ["task_type", data.task_type],
       ["task_flag", data.task_flag],
       ["requires_quote", data.requires_quote],
+      ["assign_to_commercial", data.assign_to_commercial],
     ];
 
     for (const [col, val] of fields) {
@@ -561,27 +568,30 @@ export async function hasInternalCollaboratorsInArea(areaId: number): Promise<bo
 
 /**
  * Instantiates product_task_templates as project_tasks for a given project_product.
- * 
- * Assignment logic per template:
- *   1. If template.assigned_user_id → use directly (fixed assignment)
- *   2. If template.area_id:
- *      a. If area has internals → assign least loaded internal of that area
- *      b. If no internals in area → leave assigned_user_id = NULL (requires_quote handled later)
- *   3. If neither → assigned_user_id = NULL
- * 
+ *
+ * Assignment logic per template (in priority order):
+ *   1. assign_to_commercial = 1 → assign commercialUserId (the project creator)
+ *   2. assigned_user_id set → use directly (fixed assignment)
+ *   3. area_id set:
+ *      a. Area has internals → assign least loaded internal of that area
+ *      b. No internals in area → leave NULL (blocked until manual assignment or quote)
+ *   4. Neither → assigned_user_id = NULL
+ *
  * Status logic:
- *   - First task (order_index 0) → 'not_started' (ready to begin)
+ *   - First task (order_index = lowest) → 'not_started' (ready to begin)
  *   - All others → 'waiting' (assigned but blocked until previous completes)
  */
 export async function instantiateTasksFromTemplates(
   projectId: number,
   projectProductId: number,
-  productId: number
+  productId: number,
+  commercialUserId?: number | null
 ): Promise<void> {
   try {
     const templates = await db.execute({
       sql: `
-        SELECT id, title, description, area_id, assigned_user_id, order_index, task_type, requires_quote
+        SELECT id, title, description, area_id, assigned_user_id,
+               order_index, task_type, requires_quote, assign_to_commercial
         FROM product_task_templates
         WHERE product_id = $1
         ORDER BY order_index ASC, id ASC
@@ -601,29 +611,33 @@ export async function instantiateTasksFromTemplates(
           order_index: number;
           task_type: string;
           requires_quote: number;
+          assign_to_commercial: number;
         };
 
         let assignedTo: number | null = null;
 
-        if (tpl.assigned_user_id) {
-          // Fixed assignment in template
+        if (Number(tpl.assign_to_commercial) === 1 && commercialUserId) {
+          // Assign the project creator / commercial responsible
+          assignedTo = commercialUserId;
+        } else if (tpl.assigned_user_id) {
+          // Fixed assignment defined in the template
           assignedTo = tpl.assigned_user_id;
         } else if (tpl.area_id) {
-          // Try to find least loaded internal in this area
+          // Auto-assign least loaded internal of the area
           const internalId = await findLeastLoadedInternalCollaborator(tpl.area_id);
           assignedTo = internalId; // null if no internals in area
         }
-        // else: no area, no user → null
 
-        // First task is ready, rest are waiting
+        // First task ready to start, all others wait their turn
         const status: ProjectTaskStatus = i === 0 ? "not_started" : "waiting";
 
         await transaction.execute({
           sql: `
             INSERT INTO project_tasks
               (project_id, project_product_id, template_id, title, description,
-               area_id, assigned_user_id, status, task_type, task_flag, requires_quote, order_index)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'new', $10, $11)
+               area_id, assigned_user_id, status, task_type, task_flag,
+               requires_quote, assign_to_commercial, order_index)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'new', $10, $11, $12)
           `,
           args: [
             projectId,
@@ -636,6 +650,7 @@ export async function instantiateTasksFromTemplates(
             status,
             tpl.task_type ?? "execution",
             tpl.requires_quote ?? 0,
+            tpl.assign_to_commercial ?? 0,
             tpl.order_index,
           ],
         });
@@ -670,10 +685,12 @@ export async function getMyTasks(userId: number): Promise<ProjectTaskType[]> {
           a.name            AS area_name,
           pt.assigned_user_id,
           u.name            AS assigned_user_name,
+          u.rol_id          AS assigned_user_rol_id,
           pt.status,
           pt.task_type,
           pt.task_flag,
           pt.requires_quote,
+          pt.assign_to_commercial,
           pt.order_index,
           pt.created_at,
           pt.updated_at,

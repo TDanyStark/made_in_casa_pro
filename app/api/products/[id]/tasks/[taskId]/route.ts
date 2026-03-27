@@ -15,6 +15,7 @@ const updateSchema = z.object({
   assigned_user_id: z.coerce.number().int().positive().optional().nullable(),
   task_type: z.enum(["execution", "validation"]).optional(),
   requires_quote: z.coerce.number().int().min(0).max(1).optional(),
+  assign_to_commercial: z.coerce.number().int().min(0).max(1).optional(),
 });
 
 export async function PATCH(

@@ -18,6 +18,7 @@ const patchSchema = z.object({
   task_type: z.enum(["execution", "validation"]).optional(),
   task_flag: z.enum(["new", "correction", "adjustment"]).optional(),
   requires_quote: z.coerce.number().int().min(0).max(1).optional(),
+  assign_to_commercial: z.coerce.number().int().min(0).max(1).optional(),
 });
 
 type Params = { params: Promise<{ id: string; tid: string }> };

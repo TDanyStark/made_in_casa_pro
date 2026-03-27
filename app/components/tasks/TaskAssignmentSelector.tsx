@@ -1,0 +1,355 @@
+"use client";
+
+/**
+ * TaskAssignmentSelector
+ *
+ * A unified assignment widget for task forms (templates and project tasks).
+ * Supports three modes:
+ *   - "auto"       → area is selected, system picks the least-loaded internal
+ *   - "commercial" → assigned at runtime to the project creator (created_by)
+ *   - "specific"   → pick any active user from the organisation (optionally filtered by area)
+ *
+ * Props mirror the three form fields it controls:
+ *   - assignMode       / onAssignModeChange
+ *   - areaId           / onAreaIdChange
+ *   - assignedUserId   / onAssignedUserIdChange
+ *   - requiresQuote    (read-only, passed from parent to conditionally hide user selector)
+ *
+ * The component fetches users/areas internally; parent only gets values back via callbacks.
+ */
+
+import { useEffect } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { get } from "@/lib/services/apiService";
+import { AreaType, UserRole } from "@/lib/definitions";
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectLabel,
+  SelectSeparator,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
+import { Users, Zap, UserCheck } from "lucide-react";
+
+export type AssignMode = "auto" | "commercial" | "specific";
+
+const ROL_LABELS: Record<number, string> = {
+  [UserRole.ADMIN]: "Admin",
+  [UserRole.DIRECTIVO]: "Directivo",
+  [UserRole.COMERCIAL]: "Comercial",
+  [UserRole.COLABORADOR]: "Colaborador",
+};
+
+const ROL_BADGE_CLASS: Record<number, string> = {
+  [UserRole.ADMIN]: "bg-red-100 text-red-700 border-red-200 dark:bg-red-900/20 dark:text-red-400",
+  [UserRole.DIRECTIVO]: "bg-purple-100 text-purple-700 border-purple-200 dark:bg-purple-900/20 dark:text-purple-400",
+  [UserRole.COMERCIAL]: "bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-900/20 dark:text-blue-400",
+  [UserRole.COLABORADOR]: "bg-green-100 text-green-700 border-green-200 dark:bg-green-900/20 dark:text-green-400",
+};
+
+interface UserOption {
+  id: number;
+  name: string;
+  rol_id: number;
+  is_internal: number;
+  area_name: string | null;
+  active_task_count: number;
+}
+
+interface Props {
+  assignMode: AssignMode;
+  onAssignModeChange: (mode: AssignMode) => void;
+
+  areaId: number | null;
+  onAreaIdChange: (id: number | null) => void;
+
+  assignedUserId: number | null;
+  onAssignedUserIdChange: (id: number | null) => void;
+
+  requiresQuote?: boolean;
+  disabled?: boolean;
+}
+
+export function TaskAssignmentSelector({
+  assignMode,
+  onAssignModeChange,
+  areaId,
+  onAreaIdChange,
+  assignedUserId,
+  onAssignedUserIdChange,
+  requiresQuote = false,
+  disabled = false,
+}: Props) {
+  const { data: areas = [] } = useQuery<AreaType[]>({
+    queryKey: ["areas-all"],
+    queryFn: async () => {
+      const res = await get<{ data: AreaType[] }>("areas");
+      return res.ok ? ((res.data as unknown as { data: AreaType[] })?.data ?? []) : [];
+    },
+    staleTime: 1000 * 60 * 5,
+  });
+
+  // All active users (for "specific" mode), optionally filtered by area
+  const { data: allUsers = [] } = useQuery<UserOption[]>({
+    queryKey: ["all-users-for-assignment", areaId],
+    queryFn: async () => {
+      const params = new URLSearchParams({ all_users: "1" });
+      if (areaId) params.set("area_id", areaId.toString());
+      const res = await get<UserOption[]>(`collaborators?${params}`);
+      return res.ok ? (res.data ?? []) : [];
+    },
+    enabled: assignMode === "specific",
+    staleTime: 1000 * 60 * 2,
+  });
+
+  // When mode changes, clear user or area as needed
+  useEffect(() => {
+    if (assignMode === "commercial") {
+      onAssignedUserIdChange(null);
+    } else if (assignMode === "auto") {
+      onAssignedUserIdChange(null);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [assignMode]);
+
+  // Group users by role for the dropdown
+  const admins = allUsers.filter((u) => u.rol_id === UserRole.ADMIN);
+  const directivos = allUsers.filter((u) => u.rol_id === UserRole.DIRECTIVO);
+  const comerciales = allUsers.filter((u) => u.rol_id === UserRole.COMERCIAL);
+  const internals = allUsers.filter((u) => u.rol_id === UserRole.COLABORADOR && u.is_internal === 1);
+  const externals = allUsers.filter((u) => u.rol_id === UserRole.COLABORADOR && u.is_internal === 0);
+
+  const renderUserItem = (u: UserOption) => (
+    <SelectItem key={u.id} value={u.id.toString()}>
+      <div className="flex items-center justify-between gap-2 w-full">
+        <span>{u.name}</span>
+        <div className="flex items-center gap-1 ml-1">
+          {u.rol_id === UserRole.COLABORADOR && (
+            <span className="text-xs text-muted-foreground">
+              {u.active_task_count} tarea(s)
+            </span>
+          )}
+          {u.area_name && (
+            <span className="text-xs text-muted-foreground">· {u.area_name}</span>
+          )}
+          {u.is_internal === 0 && u.rol_id === UserRole.COLABORADOR && (
+            <span className="text-xs text-muted-foreground italic">(externo)</span>
+          )}
+        </div>
+      </div>
+    </SelectItem>
+  );
+
+  return (
+    <div className="space-y-3">
+      {/* Mode selector */}
+      <div>
+        <label className="text-sm font-medium block mb-1.5">Asignación</label>
+        <div className="grid grid-cols-1 gap-2">
+          {/* Auto */}
+          <button
+            type="button"
+            disabled={disabled}
+            onClick={() => onAssignModeChange("auto")}
+            className={`flex items-start gap-3 rounded-md border p-3 text-left transition-colors ${
+              assignMode === "auto"
+                ? "border-primary bg-primary/5"
+                : "border-input hover:bg-muted/50"
+            } ${disabled ? "opacity-50 cursor-not-allowed" : ""}`}
+          >
+            <Zap className={`h-4 w-4 mt-0.5 flex-shrink-0 ${assignMode === "auto" ? "text-primary" : "text-muted-foreground"}`} />
+            <div>
+              <p className="text-sm font-medium leading-none">Auto-asignación por área</p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                El sistema escoge el colaborador interno con menos carga del área seleccionada
+              </p>
+            </div>
+          </button>
+
+          {/* Commercial */}
+          <button
+            type="button"
+            disabled={disabled || !!requiresQuote}
+            onClick={() => onAssignModeChange("commercial")}
+            className={`flex items-start gap-3 rounded-md border p-3 text-left transition-colors ${
+              assignMode === "commercial"
+                ? "border-primary bg-primary/5"
+                : "border-input hover:bg-muted/50"
+            } ${(disabled || requiresQuote) ? "opacity-50 cursor-not-allowed" : ""}`}
+          >
+            <UserCheck className={`h-4 w-4 mt-0.5 flex-shrink-0 ${assignMode === "commercial" ? "text-primary" : "text-muted-foreground"}`} />
+            <div>
+              <p className="text-sm font-medium leading-none">Comercial encargado</p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Se asigna automáticamente al comercial que crea el proyecto
+              </p>
+            </div>
+          </button>
+
+          {/* Specific */}
+          <button
+            type="button"
+            disabled={disabled || !!requiresQuote}
+            onClick={() => onAssignModeChange("specific")}
+            className={`flex items-start gap-3 rounded-md border p-3 text-left transition-colors ${
+              assignMode === "specific"
+                ? "border-primary bg-primary/5"
+                : "border-input hover:bg-muted/50"
+            } ${(disabled || requiresQuote) ? "opacity-50 cursor-not-allowed" : ""}`}
+          >
+            <Users className={`h-4 w-4 mt-0.5 flex-shrink-0 ${assignMode === "specific" ? "text-primary" : "text-muted-foreground"}`} />
+            <div>
+              <p className="text-sm font-medium leading-none">Persona específica</p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Selecciona cualquier usuario de la organización
+              </p>
+            </div>
+          </button>
+        </div>
+      </div>
+
+      {/* Area selector — shown for auto and specific modes */}
+      {(assignMode === "auto" || assignMode === "specific") && (
+        <div>
+          <label className="text-sm font-medium block mb-1.5">
+            Área
+            {assignMode === "auto" && <span className="text-destructive ml-1">*</span>}
+            {assignMode === "specific" && <span className="text-muted-foreground text-xs ml-1">(opcional — filtra la lista)</span>}
+          </label>
+          <Select
+            value={areaId?.toString() ?? "none"}
+            onValueChange={(v) => {
+              onAreaIdChange(v === "none" ? null : Number(v));
+              onAssignedUserIdChange(null);
+            }}
+            disabled={disabled}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Seleccionar área" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="none">
+                {assignMode === "specific" ? "Todas las áreas" : "Sin área específica"}
+              </SelectItem>
+              {areas.map((area) => (
+                <SelectItem key={area.id!} value={area.id!.toString()}>
+                  {area.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {assignMode === "auto" && !areaId && (
+            <p className="text-xs text-muted-foreground mt-1">
+              Si no seleccionas área, la auto-asignación no podrá ejecutarse.
+            </p>
+          )}
+        </div>
+      )}
+
+      {/* User selector — only for "specific" mode */}
+      {assignMode === "specific" && !requiresQuote && (
+        <div>
+          <label className="text-sm font-medium block mb-1.5">Persona asignada</label>
+          <Select
+            value={assignedUserId?.toString() ?? "none"}
+            onValueChange={(v) => onAssignedUserIdChange(v === "none" ? null : Number(v))}
+            disabled={disabled}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Seleccionar persona..." />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="none">Sin asignar (dejar vacío)</SelectItem>
+
+              {admins.length > 0 && (
+                <SelectGroup>
+                  <SelectLabel>
+                    <Badge variant="outline" className={`text-xs ${ROL_BADGE_CLASS[UserRole.ADMIN]}`}>
+                      {ROL_LABELS[UserRole.ADMIN]}
+                    </Badge>
+                  </SelectLabel>
+                  {admins.map(renderUserItem)}
+                </SelectGroup>
+              )}
+
+              {directivos.length > 0 && (
+                <>
+                  {admins.length > 0 && <SelectSeparator />}
+                  <SelectGroup>
+                    <SelectLabel>
+                      <Badge variant="outline" className={`text-xs ${ROL_BADGE_CLASS[UserRole.DIRECTIVO]}`}>
+                        {ROL_LABELS[UserRole.DIRECTIVO]}
+                      </Badge>
+                    </SelectLabel>
+                    {directivos.map(renderUserItem)}
+                  </SelectGroup>
+                </>
+              )}
+
+              {comerciales.length > 0 && (
+                <>
+                  {(admins.length > 0 || directivos.length > 0) && <SelectSeparator />}
+                  <SelectGroup>
+                    <SelectLabel>
+                      <Badge variant="outline" className={`text-xs ${ROL_BADGE_CLASS[UserRole.COMERCIAL]}`}>
+                        {ROL_LABELS[UserRole.COMERCIAL]}
+                      </Badge>
+                    </SelectLabel>
+                    {comerciales.map(renderUserItem)}
+                  </SelectGroup>
+                </>
+              )}
+
+              {internals.length > 0 && (
+                <>
+                  <SelectSeparator />
+                  <SelectGroup>
+                    <SelectLabel>
+                      <Badge variant="outline" className={`text-xs ${ROL_BADGE_CLASS[UserRole.COLABORADOR]}`}>
+                        Colaborador Interno
+                      </Badge>
+                    </SelectLabel>
+                    {internals.map(renderUserItem)}
+                  </SelectGroup>
+                </>
+              )}
+
+              {externals.length > 0 && (
+                <>
+                  <SelectSeparator />
+                  <SelectGroup>
+                    <SelectLabel>
+                      <Badge variant="outline" className="text-xs text-amber-700 border-amber-300 bg-amber-50">
+                        Colaborador Externo
+                      </Badge>
+                    </SelectLabel>
+                    {externals.map(renderUserItem)}
+                  </SelectGroup>
+                </>
+              )}
+            </SelectContent>
+          </Select>
+        </div>
+      )}
+
+      {/* Info for commercial mode */}
+      {assignMode === "commercial" && (
+        <p className="text-xs text-muted-foreground bg-muted/50 rounded-md px-3 py-2">
+          Esta tarea se asignará al comercial que cree el proyecto al momento de instanciarse.
+        </p>
+      )}
+
+      {/* Info for requires_quote blocking */}
+      {requiresQuote && assignMode !== "auto" && (
+        <p className="text-xs text-amber-600 bg-amber-50 dark:bg-amber-900/20 rounded-md px-3 py-2">
+          Con &quot;Requiere cotización&quot; activo, la asignación la define el externo que gane la cotización.
+          Solo la auto-asignación por área queda disponible como referencia.
+        </p>
+      )}
+    </div>
+  );
+}
