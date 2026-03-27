@@ -37,7 +37,10 @@ export async function GET(request: NextRequest) {
     const authUrl = oauth2Client.generateAuthUrl({
       access_type: "offline",   // required to get a refresh_token
       prompt: "consent",        // force consent screen so refresh_token is always returned
-      scope: ["https://www.googleapis.com/auth/drive"],
+      scope: [
+        "https://www.googleapis.com/auth/drive",
+        "https://www.googleapis.com/auth/userinfo.email",
+      ],
     });
 
     return NextResponse.redirect(authUrl);

@@ -48,14 +48,22 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Get the email of the authorized account
-    oauth2Client.setCredentials(tokens);
-    const oauth2 = google.oauth2({ version: "v2", auth: oauth2Client });
-    const { data: userInfo } = await oauth2.userinfo.get();
+    // Extract email from the id_token payload (no extra API call needed)
+    let connectedEmail: string | null = null;
+    if (tokens.id_token) {
+      try {
+        const payload = JSON.parse(
+          Buffer.from(tokens.id_token.split(".")[1], "base64url").toString("utf8")
+        );
+        connectedEmail = payload.email ?? null;
+      } catch {
+        // Non-critical — email display is cosmetic
+      }
+    }
 
     await upsertSettings({
       google_oauth_refresh_token: tokens.refresh_token,
-      google_oauth_connected_email: userInfo.email ?? null,
+      google_oauth_connected_email: connectedEmail,
     });
 
     return NextResponse.redirect(`${appUrl}/settings?google_success=1`);
