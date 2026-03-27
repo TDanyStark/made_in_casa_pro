@@ -15,9 +15,9 @@ import {
   ProjectTaskStatus,
   TaskType,
   TaskFlag,
-  AreaType,
   ApiResponseWithPagination,
 } from "@/lib/definitions";
+import { TaskAssignmentSelector, AssignMode } from "@/components/tasks/TaskAssignmentSelector";
 import { SortableList } from "@/components/ui/sortable-list";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -124,20 +124,28 @@ const TASK_FLAG_CONFIG: Record<TaskFlag, { label: string; className: string }> =
 const taskSchema = z.object({
   title: z.string().min(1, "El título es requerido"),
   description: z.string().optional().nullable(),
-  area_id: z.coerce.number().positive().optional().nullable(),
-  assigned_user_id: z.coerce.number().positive().optional().nullable(),
   status: z.enum(["not_started", "waiting", "in_progress", "completed", "blocked"]).optional(),
   task_type: z.enum(["execution", "validation"]).default("execution"),
   requires_quote: z.boolean().default(false),
+  // assignment
+  assign_mode: z.enum(["auto", "commercial", "specific"]).default("auto"),
+  area_id: z.coerce.number().positive().optional().nullable(),
+  assigned_user_id: z.coerce.number().positive().optional().nullable(),
 });
 
 type TaskFormValues = z.infer<typeof taskSchema>;
 
-interface CollaboratorOption {
-  id: number;
-  name: string;
-  is_internal: number;
-  active_task_count: number;
+function deriveAssignMode(task: ProjectTaskType): AssignMode {
+  if (task.assign_to_commercial === 1) return "commercial";
+  if (task.assigned_user_id !== null) return "specific";
+  return "auto";
+}
+
+function rolLabel(rolId: number | null): string | null {
+  if (rolId === 1) return "Admin";
+  if (rolId === 2) return "Directivo";
+  if (rolId === 3) return "Comercial";
+  return null;
 }
 
 interface ProductOption {
@@ -227,29 +235,10 @@ export function ProjectTasksTab({
     staleTime: 1000 * 60,
   });
 
-  const { data: areas = [] } = useQuery({
-    queryKey: ["areas-all"],
-    queryFn: async () => {
-      const res = await get<{ data: AreaType[] }>("areas");
-      return res.ok ? ((res.data as unknown as { data: AreaType[] })?.data ?? []) : [];
-    },
-  });
-
-  const selectedAreaId = form.watch("area_id");
   const selectedTaskType = form.watch("task_type");
   const requiresQuote = form.watch("requires_quote");
-
-  const { data: collaborators = [] } = useQuery<CollaboratorOption[]>({
-    queryKey: ["collaborators-by-area", selectedAreaId, "include_external"],
-    queryFn: async () => {
-      const params = new URLSearchParams();
-      if (selectedAreaId) params.set("area_id", selectedAreaId.toString());
-      params.set("include_external", "1");
-      const res = await get<CollaboratorOption[]>(`collaborators?${params}`);
-      return res.ok ? (res.data ?? []) : [];
-    },
-    enabled: dialogOpen,
-  });
+  const assignMode = form.watch("assign_mode");
+  const areaId = form.watch("area_id");
 
   const currentProductIds = new Set(products.map((p) => p.product_id));
 
@@ -327,12 +316,8 @@ export function ProjectTasksTab({
     setActiveProductId(projectProductId);
     setEditingTask(null);
     form.reset({
-      title: "",
-      description: "",
-      area_id: null,
-      assigned_user_id: null,
-      task_type: "execution",
-      requires_quote: false,
+      title: "", description: "", task_type: "execution", requires_quote: false,
+      assign_mode: "auto", area_id: null, assigned_user_id: null,
     });
     setDialogOpen(true);
   };
@@ -341,13 +326,11 @@ export function ProjectTasksTab({
     setEditingTask(task);
     setActiveProductId(task.project_product_id);
     form.reset({
-      title: task.title,
-      description: task.description ?? "",
-      area_id: task.area_id ?? null,
-      assigned_user_id: task.assigned_user_id ?? null,
-      status: task.status,
-      task_type: task.task_type ?? "execution",
+      title: task.title, description: task.description ?? "",
+      status: task.status, task_type: task.task_type ?? "execution",
       requires_quote: task.requires_quote === 1,
+      assign_mode: deriveAssignMode(task),
+      area_id: task.area_id ?? null, assigned_user_id: task.assigned_user_id ?? null,
     });
     setDialogOpen(true);
   };
@@ -355,11 +338,15 @@ export function ProjectTasksTab({
   const onSubmit = async (values: TaskFormValues) => {
     setSubmitting(true);
     try {
+      const assign_to_commercial = values.assign_mode === "commercial" ? 1 : 0;
+      const area_id = values.assign_mode !== "commercial" ? (values.area_id ?? null) : null;
+      const assigned_user_id = values.assign_mode === "specific" ? (values.assigned_user_id ?? null) : null;
+
       const payload = {
-        ...values,
-        area_id: values.area_id ?? null,
-        assigned_user_id: values.assigned_user_id ?? null,
+        title: values.title, description: values.description ?? null,
+        status: values.status, task_type: values.task_type,
         requires_quote: values.requires_quote ? 1 : 0,
+        assign_to_commercial, area_id, assigned_user_id,
       };
 
       if (editingTask) {
@@ -743,15 +730,25 @@ export function ProjectTasksTab({
                                     {task.area_name}
                                   </Badge>
                                 )}
+                                {task.assign_to_commercial === 1 && !task.assigned_user_name && (
+                                  <Badge variant="outline" className="text-xs text-blue-700 border-blue-300 bg-blue-50 dark:bg-blue-900/20">
+                                    Comercial del proyecto
+                                  </Badge>
+                                )}
                                 {task.assigned_user_name && (
                                   <Badge variant="outline" className="text-xs">
                                     {task.assigned_user_name}
+                                    {rolLabel(task.assigned_user_rol_id ?? null) && (
+                                      <span className="ml-1 text-muted-foreground">
+                                        ({rolLabel(task.assigned_user_rol_id ?? null)})
+                                      </span>
+                                    )}
                                     {isMyTask(task) && (
                                       <span className="ml-1 text-primary">(tú)</span>
                                     )}
                                   </Badge>
                                 )}
-                                {!task.assigned_user_name && (
+                                {!task.assigned_user_name && task.assign_to_commercial !== 1 && (
                                   <Badge variant="outline" className="text-xs text-muted-foreground">
                                     Sin asignar
                                   </Badge>
@@ -952,78 +949,16 @@ export function ProjectTasksTab({
                   />
                 )}
 
-                <FormField
-                  control={form.control}
-                  name="area_id"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Área</FormLabel>
-                      <FormControl>
-                        <Select
-                          value={field.value?.toString() ?? "none"}
-                          onValueChange={(v) => {
-                            field.onChange(v === "none" ? null : Number(v));
-                            form.setValue("assigned_user_id", null);
-                          }}
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Sin área" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="none">Sin área</SelectItem>
-                            {areas.map((area) => (
-                              <SelectItem key={area.id!} value={area.id!.toString()}>
-                                {area.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
+                {/* Unified assignment widget */}
+                <TaskAssignmentSelector
+                  assignMode={assignMode}
+                  onAssignModeChange={(mode) => form.setValue("assign_mode", mode)}
+                  areaId={areaId ?? null}
+                  onAreaIdChange={(id) => form.setValue("area_id", id)}
+                  assignedUserId={form.watch("assigned_user_id") ?? null}
+                  onAssignedUserIdChange={(id) => form.setValue("assigned_user_id", id)}
+                  requiresQuote={requiresQuote}
                 />
-
-                {!requiresQuote && (
-                  <FormField
-                    control={form.control}
-                    name="assigned_user_id"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Asignado a</FormLabel>
-                        <FormControl>
-                          <Select
-                            value={field.value?.toString() ?? "none"}
-                            onValueChange={(v) => field.onChange(v === "none" ? null : Number(v))}
-                            disabled={!selectedAreaId}
-                          >
-                            <SelectTrigger>
-                              <SelectValue
-                                placeholder={
-                                  selectedAreaId ? "Seleccionar persona" : "Selecciona área primero"
-                                }
-                              />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="none">
-                                {selectedAreaId ? "Auto-asignación (interno con menos carga)" : "Por asignar"}
-                              </SelectItem>
-                              {collaborators.map((u) => (
-                                <SelectItem key={u.id} value={u.id.toString()}>
-                                  {u.name}
-                                  <span className="ml-2 text-xs text-muted-foreground">
-                                    {u.is_internal ? `• ${u.active_task_count} tarea(s)` : "• Externo"}
-                                  </span>
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                )}
 
                 {editingTask && (
                   <FormField
