@@ -87,7 +87,7 @@ VALUES (
   '$2b$10$aEyIpIyBNuZxmLTk0ditj.Lq/ZJW6Zz4vgVcaXcUhwlmE2GtnV2j6',
   (SELECT id FROM roles WHERE role = 'colaborador'),
   (SELECT id FROM areas WHERE name = 'Escritura'),
-  1, 1, 0, 3800000
+  0, 1, 0, 3800000
 );
 
 INSERT INTO users (name, email, password, rol_id, area_id, is_internal, is_active, must_change_password, monthly_salary)
