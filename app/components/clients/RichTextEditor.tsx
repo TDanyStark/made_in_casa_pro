@@ -121,14 +121,18 @@ export const RichTextEditor = ({
             {/* Mantener el editor en el DOM pero oculto si se prefiere para preservar estado, 
                 pero con Tiptap es mejor un renderizado condicional si preservamos el objeto 'editor' */}
             <Dialog open={isExpanded} onOpenChange={setIsExpanded}>
-              <DialogContent className="max-w-[95vw] w-[95vw] h-[95vh] flex flex-col p-6 overflow-hidden">
-                <DialogHeader>
-                  <DialogTitle>{title}</DialogTitle>
-                </DialogHeader>
-                <div className="flex flex-col flex-1 overflow-hidden mt-2">
-                  {toolbar}
-                  <div className="flex-1 overflow-y-auto mt-2 min-h-0">
-                    {editorContent}
+              <DialogContent className="sm:max-w-[1200px] w-[95vw] h-[95vh] flex flex-col p-0 overflow-hidden bg-background">
+                <div className="flex flex-col h-full overflow-hidden">
+                  <div className="flex items-center justify-between p-4 border-b bg-muted/30">
+                    <DialogTitle className="text-xl font-bold">{title}</DialogTitle>
+                  </div>
+                  <div className="p-2 border-b bg-background sticky top-0 z-10 flex justify-center">
+                    {toolbar}
+                  </div>
+                  <div className="flex-1 overflow-y-auto p-6 md:p-10 min-h-0 bg-background">
+                    <div className="mx-auto w-full prose dark:prose-invert max-w-none">
+                      {editorContent}
+                    </div>
                   </div>
                 </div>
               </DialogContent>
