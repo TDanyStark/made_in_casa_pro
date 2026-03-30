@@ -37,3 +37,5 @@
 - Siempre revisa los archivos como `/lib/`, `/components`, `app\lib\services\apiService.ts` etc, para no repetir codigo que ya existe, y para mantener la consistencia del proyecto. Si encuentras algo similar, intenta reutilizarlo o extenderlo en lugar de crear algo completamente nuevo.
 - si ya uso librerias que estan en el package.json para lo que quieres hacer, úsalas en lugar de agregar nuevas dependencias, esto ayuda a mantener el proyecto ligero y con menos dependencias externas, y si tengo ya una libreria que hace por ejemplo selects, no hagas ese componente de 0, implementa la libreria que ya tengo para eso, y si quieres hacer algo personalizado, hazlo extendiendo el componente de la libreria, pero no hagas algo completamente nuevo sin revisar lo que ya existe.
 
+## Ajustes si el resultado no es esperado:
+- Debes de borrar todo el codigo que ya no usarás para evitar codigo basura que no hace nada.

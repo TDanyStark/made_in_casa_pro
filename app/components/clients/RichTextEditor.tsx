@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useEditor, EditorContent, EditorContext } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import { MarkButton } from "../tiptap-ui/mark-button";
@@ -12,6 +13,16 @@ import { Underline } from '@tiptap/extension-underline'
 import { Superscript } from '@tiptap/extension-superscript'
 import { Subscript } from '@tiptap/extension-subscript'
 
+import { Maximize2, Minimize2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { cn } from "@/lib/utils";
+
 // estilos sass
 import '@/components/tiptap-node/code-block-node/code-block-node.scss'
 import '@/components/tiptap-node/list-node/list-node.scss'
@@ -22,12 +33,18 @@ export const RichTextEditor = ({
   onChange,
   placeholder,
   noBorder = false,
+  expandable = false,
+  title = "Editor de texto",
 }: {
   value: string;
   onChange: (value: string) => void;
   placeholder?: string;
   noBorder?: boolean;
+  expandable?: boolean;
+  title?: string;
 }) => {
+  const [isExpanded, setIsExpanded] = useState(false);
+
   const editor = useEditor({
     immediatelyRender: false,
     extensions: [
@@ -49,33 +66,75 @@ export const RichTextEditor = ({
     },
     editorProps: {
       attributes: {
-        class: noBorder 
-          ? "min-h-[250px] px-3 py-2 focus:outline-none border-none max-w-[950px]" 
-          : "min-h-[250px] border border-input rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 focus-visible:ring-ring max-w-[950px]",
+        class: cn(
+          "min-h-[250px] focus:outline-none px-3 py-2",
+          noBorder ? "border-none" : "border border-input rounded-md focus:ring-2 focus:ring-ring focus:ring-offset-2 focus-visible:ring-ring",
+          isExpanded ? "flex-1 min-h-[500px] h-full" : "max-w-[950px]"
+        ),
       },
     },
   });
 
+  const toolbar = (
+    <div className="toolbar flex items-center flex-wrap gap-2 mb-2 p-2 border border-input rounded-md max-w-fit bg-background">
+      <div className="tiptap-button-group flex flex-wrap gap-1" data-orientation="horizontal">
+        <MarkButton type="bold" />
+        <MarkButton type="italic" />
+        <MarkButton type="strike" />
+        <MarkButton type="code" />
+        <MarkButton type="underline" />
+        <MarkButton type="superscript" />
+        <MarkButton type="subscript" />
+        <HeadingButton level={1}></HeadingButton>
+        <HeadingButton level={2}></HeadingButton>
+        <HeadingButton level={3}></HeadingButton>
+        <ListButton type="bulletList" />
+        <LinkButton />
+      </div>
+      {expandable && !isExpanded && (
+        <Button 
+          type="button"
+          variant="ghost" 
+          size="icon" 
+          className="h-8 w-8 ml-2 border-l pl-2" 
+          onClick={() => setIsExpanded(true)}
+          title="Ampliar editor"
+        >
+          <Maximize2 className="h-4 w-4" />
+        </Button>
+      )}
+    </div>
+  );
+
+  const editorContent = <EditorContent editor={editor} placeholder={placeholder} />;
+
   return (
-    <div className="rich-text-editor">
+    <div className="rich-text-editor h-full flex flex-col">
       <EditorContext.Provider value={{ editor }}>
-        <div className="toolbar flex items-center flex-wrap gap-2 mb-2 p-2 border border-input rounded-md max-w-fit">
-          <div className="tiptap-button-group " data-orientation="horizontal">
-            <MarkButton type="bold" />
-            <MarkButton type="italic" />
-            <MarkButton type="strike" />
-            <MarkButton type="code" />
-            <MarkButton type="underline" />
-            <MarkButton type="superscript" />
-            <MarkButton type="subscript" />
-            <HeadingButton level={1}></HeadingButton>
-            <HeadingButton level={2}></HeadingButton>
-            <HeadingButton level={3}></HeadingButton>
-            <ListButton type="bulletList" />
-            <LinkButton />
-          </div>
-        </div>
-        <EditorContent editor={editor} placeholder={placeholder} />
+        {!isExpanded ? (
+          <>
+            {toolbar}
+            {editorContent}
+          </>
+        ) : (
+          <>
+            {/* Mantener el editor en el DOM pero oculto si se prefiere para preservar estado, 
+                pero con Tiptap es mejor un renderizado condicional si preservamos el objeto 'editor' */}
+            <Dialog open={isExpanded} onOpenChange={setIsExpanded}>
+              <DialogContent className="max-w-[95vw] w-[95vw] h-[95vh] flex flex-col p-6 overflow-hidden">
+                <DialogHeader>
+                  <DialogTitle>{title}</DialogTitle>
+                </DialogHeader>
+                <div className="flex flex-col flex-1 overflow-hidden mt-2">
+                  {toolbar}
+                  <div className="flex-1 overflow-y-auto mt-2 min-h-0">
+                    {editorContent}
+                  </div>
+                </div>
+              </DialogContent>
+            </Dialog>
+          </>
+        )}
       </EditorContext.Provider>
     </div>
   );

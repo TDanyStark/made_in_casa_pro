@@ -5,16 +5,9 @@ import dynamic from "next/dynamic";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
-import { Loader2, Check, Maximize2 } from "lucide-react";
+import { Loader2, Check } from "lucide-react";
 import { patch } from "@/lib/services/apiService";
 import { useQueryClient } from "@tanstack/react-query";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
 
 const RichTextEditor = dynamic(
   () => import("@/components/clients/RichTextEditor").then((mod) => mod.RichTextEditor),
@@ -60,39 +53,7 @@ export function ProjectNotesEditor({ projectId, initialContent }: Props) {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <h3 className="text-lg font-semibold">Notas del proyecto</h3>
-          <Dialog>
-            <DialogTrigger asChild>
-              <Button variant="ghost" size="icon" className="h-8 w-8" title="Ampliar editor">
-                <Maximize2 className="h-4 w-4" />
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="sm:max-w-[90vw] h-[90vh] flex flex-col">
-              <DialogHeader>
-                <DialogTitle>Notas del proyecto</DialogTitle>
-              </DialogHeader>
-              <div className="flex-1 overflow-y-auto">
-                <RichTextEditor
-                  value={content}
-                  onChange={setContent}
-                  placeholder="Agrega notas, objetivos o contexto del proyecto..."
-                  noBorder={true}
-                />
-              </div>
-              <div className="flex justify-end pt-4 border-t">
-                <Button onClick={handleSave} disabled={isSubmitting || !isChanged} className="gap-2">
-                  {isSubmitting ? (
-                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                  ) : showSuccess ? (
-                    <Check className="h-3.5 w-3.5" />
-                  ) : null}
-                  {isSubmitting ? "Guardando..." : showSuccess ? "¡Guardado!" : "Guardar cambios"}
-                </Button>
-              </div>
-            </DialogContent>
-          </Dialog>
-        </div>
+        <h3 className="text-lg font-semibold">Notas del proyecto</h3>
         {isChanged && (
           <Button onClick={handleSave} disabled={isSubmitting} size="sm" className="gap-2">
             {isSubmitting ? (
@@ -109,6 +70,8 @@ export function ProjectNotesEditor({ projectId, initialContent }: Props) {
         onChange={setContent}
         placeholder="Agrega notas, objetivos o contexto del proyecto..."
         noBorder={true}
+        expandable={true}
+        title="Notas del proyecto"
       />
     </div>
   );

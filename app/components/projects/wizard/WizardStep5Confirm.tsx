@@ -203,6 +203,8 @@ export function WizardStep5Confirm({ state, onBack }: Props) {
             value={notes}
             onChange={setNotes}
             placeholder="Describe los objetivos, alcance y notas relevantes..."
+            expandable={true}
+            title="Notas del proyecto"
           />
         </div>
       </div>
