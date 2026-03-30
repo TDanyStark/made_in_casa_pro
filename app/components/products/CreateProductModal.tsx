@@ -85,7 +85,7 @@ export default function CreateProductModal({ openModal, handleModal }: Props) {
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogContent
-        className="sm:max-w-[480px]"
+        className="sm:max-w-[480px] max-h-[90vh] overflow-y-auto"
         tabIndex={undefined}
         aria-describedby={undefined}
       >

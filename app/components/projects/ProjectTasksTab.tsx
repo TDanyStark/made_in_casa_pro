@@ -881,7 +881,7 @@ export function ProjectTasksTab({
 
         {/* ── Create / Edit Task Dialog ── */}
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-          <DialogContent className="sm:max-w-[520px]" aria-describedby={undefined}>
+          <DialogContent className="sm:max-w-[520px] max-h-[90vh] overflow-y-auto" aria-describedby={undefined}>
             <DialogHeader>
               <DialogTitle>
                 {editingTask ? "Editar tarea" : "Nueva tarea"}
@@ -1053,7 +1053,7 @@ export function ProjectTasksTab({
             if (!open) setValidateDialog({ open: false, task: null, productTasks: [] });
           }}
         >
-          <DialogContent className="sm:max-w-[480px]" aria-describedby={undefined}>
+          <DialogContent className="sm:max-w-[480px] max-h-[90vh] overflow-y-auto" aria-describedby={undefined}>
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
                 <ShieldCheck className="h-5 w-5 text-purple-600" />

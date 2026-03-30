@@ -338,7 +338,7 @@ export function MyTasksClient() {
           if (!open) setValidateDialog({ open: false, task: null, siblings: [] });
         }}
       >
-        <DialogContent className="sm:max-w-[480px]" aria-describedby={undefined}>
+        <DialogContent className="sm:max-w-[480px] max-h-[90vh] overflow-y-auto" aria-describedby={undefined}>
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <ShieldCheck className="h-5 w-5 text-purple-600" />

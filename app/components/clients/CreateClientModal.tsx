@@ -102,7 +102,7 @@ export function CreateClientModal({ modalControl, onSuccess, initialName = "" }:
         </DialogTrigger>
       )}
       <DialogContent 
-        className="sm:max-w-[425px]"
+        className="sm:max-w-[425px] max-h-[90vh] overflow-y-auto"
         tabIndex={undefined}
         aria-describedby={undefined}
         >

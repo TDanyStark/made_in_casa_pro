@@ -213,7 +213,7 @@ export function ProjectQuotesTab({ projectId, canEdit }: Props) {
 
       {/* Invite Dialog */}
       <Dialog open={!!inviteDialogTask} onOpenChange={(open) => !open && setInviteDialogTask(null)}>
-        <DialogContent className="sm:max-w-[420px]" aria-describedby={undefined}>
+        <DialogContent className="sm:max-w-[420px] max-h-[90vh] overflow-y-auto" aria-describedby={undefined}>
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <UserPlus className="h-5 w-5" />

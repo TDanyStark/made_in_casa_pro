@@ -138,7 +138,7 @@ export function CreateBrandModal({
     <>
       <Dialog open={openModal} onOpenChange={handleModal}>
         <DialogContent
-          className="sm:max-w-[525px]"
+          className="sm:max-w-[525px] max-h-[90vh] overflow-y-auto"
           tabIndex={undefined}
           aria-describedby={undefined}
         >
