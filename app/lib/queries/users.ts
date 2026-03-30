@@ -12,7 +12,7 @@ interface PaginationParams {
   page?: number;
   limit?: number;
   search?: string;
-  rolId?: number;
+  rolId?: number | number[];
 }
 
 export async function getUsers(params?: GetUsersParams) {
@@ -149,8 +149,14 @@ export async function getUsersWithPagination({
     const conditions: string[] = [];
 
     if (rolId) {
-      filterArgs.push(rolId);
-      conditions.push(`rol_id = $${filterArgs.length}`);
+      if (Array.isArray(rolId)) {
+        const placeholders = rolId.map((_, i) => `$${filterArgs.length + i + 1}`);
+        conditions.push(`rol_id IN (${placeholders.join(", ")})`);
+        filterArgs.push(...rolId);
+      } else {
+        filterArgs.push(rolId);
+        conditions.push(`rol_id = $${filterArgs.length}`);
+      }
     }
 
     if (search) {

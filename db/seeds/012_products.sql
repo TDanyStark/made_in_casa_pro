@@ -25,7 +25,7 @@ INSERT INTO products (name, category_id, description) VALUES
 
 -- MAILING
 ('Audio-mailing',                         (SELECT id FROM product_categories WHERE name = 'Mailing'),                       'Envío masivo con contenido de audio'),
-('Approved Mailing',                      (SELECT id FROM product_categories WHERE name = 'Mailing'),                       'Campañas de correo bajo estándares corporativos'),
+('Approved Email (VAE)',                  (SELECT id FROM product_categories WHERE name = 'Mailing'),                       'Campañas de correo bajo estándares corporativos'),
 ('Mailing texto/imagen',                  (SELECT id FROM product_categories WHERE name = 'Mailing'),                       'Diseño estándar de correo electrónico'),
 ('Video-mailing',                         (SELECT id FROM product_categories WHERE name = 'Mailing'),                       'Integración de video en campañas de correo'),
 
