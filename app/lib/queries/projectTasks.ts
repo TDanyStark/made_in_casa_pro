@@ -13,7 +13,6 @@ import {
 const TASK_SELECT = `
   pt.id,
   pt.project_id,
-  pt.project_product_id,
   pt.template_id,
   pt.title,
   pt.description,
@@ -56,32 +55,13 @@ export async function getProjectTaskById(id: number): Promise<ProjectTaskType | 
   }
 }
 
-export async function getTasksByProjectProduct(
-  projectProductId: number
-): Promise<ProjectTaskType[]> {
-  try {
-    const result = await db.execute({
-      sql: `
-        SELECT ${TASK_SELECT} ${TASK_JOINS}
-        WHERE pt.project_product_id = $1
-        ORDER BY pt.order_index ASC, pt.id ASC
-      `,
-      args: [projectProductId],
-    });
-    return result.rows as unknown as ProjectTaskType[];
-  } catch (error) {
-    console.error("Error fetching tasks by project_product_id:", error);
-    return [];
-  }
-}
-
 export async function getTasksByProject(projectId: number): Promise<ProjectTaskType[]> {
   try {
     const result = await db.execute({
       sql: `
         SELECT ${TASK_SELECT} ${TASK_JOINS}
         WHERE pt.project_id = $1
-        ORDER BY pt.project_product_id ASC, pt.order_index ASC, pt.id ASC
+        ORDER BY pt.order_index ASC, pt.id ASC
       `,
       args: [projectId],
     });
@@ -126,7 +106,6 @@ export async function getTaskTransitions(taskId: number): Promise<TaskTransition
 
 export async function createProjectTask(data: {
   project_id: number;
-  project_product_id: number;
   template_id?: number | null;
   title: string;
   description?: string | null;
@@ -143,15 +122,14 @@ export async function createProjectTask(data: {
     const result = await db.execute({
       sql: `
         INSERT INTO project_tasks
-          (project_id, project_product_id, template_id, title, description,
+          (project_id, template_id, title, description,
            area_id, assigned_user_id, status, task_type, task_flag,
            requires_quote, assign_to_commercial, order_index)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
         RETURNING id
       `,
       args: [
         data.project_id,
-        data.project_product_id,
         data.template_id ?? null,
         data.title,
         data.description ?? null,
@@ -249,7 +227,6 @@ export async function deleteProjectTask(id: number): Promise<void> {
 // ─── Reorder ──────────────────────────────────────────────────────────────────
 
 export async function reorderProjectTasks(
-  projectProductId: number,
   projectId: number,
   orderedIds: number[]
 ): Promise<void> {
@@ -257,8 +234,8 @@ export async function reorderProjectTasks(
   try {
     for (let i = 0; i < orderedIds.length; i++) {
       await transaction.execute({
-        sql: `UPDATE project_tasks SET order_index = $1 WHERE id = $2 AND project_product_id = $3`,
-        args: [i, orderedIds[i], projectProductId],
+        sql: `UPDATE project_tasks SET order_index = $1 WHERE id = $2 AND project_id = $3`,
+        args: [i, orderedIds[i], projectId],
       });
     }
     await transaction.commit();
@@ -327,18 +304,18 @@ export async function completeTask(
       args: [taskId, task.project_id, task.status, task.task_flag, userId, notes ?? null],
     });
 
-    // 3. Find next task in this product (lowest order_index with status='waiting' or 'not_started')
+    // 3. Find next task in this project (lowest order_index with status='waiting' or 'not_started')
     const nextResult = await transaction.execute({
       sql: `
         SELECT id, assigned_user_id, requires_quote, task_flag, status
         FROM project_tasks
-        WHERE project_product_id = $1
+        WHERE project_id = $1
           AND order_index > (SELECT order_index FROM project_tasks WHERE id = $2)
           AND status IN ('waiting', 'not_started')
         ORDER BY order_index ASC
         LIMIT 1
       `,
-      args: [task.project_product_id, taskId],
+      args: [task.project_id, taskId],
     });
 
     let nextTask: ProjectTaskType | null = null;
@@ -446,10 +423,10 @@ export async function validateTask(
     sql: `
       SELECT id, status, task_flag, order_index
       FROM project_tasks
-      WHERE project_product_id = $1 AND order_index = $2
+      WHERE project_id = $1 AND order_index = $2
       LIMIT 1
     `,
-    args: [task.project_product_id, targetOrderIndex],
+    args: [task.project_id, targetOrderIndex],
   });
   if (targetResult.rows.length === 0) throw new Error("Tarea destino no encontrada");
 
@@ -583,7 +560,6 @@ export async function hasInternalCollaboratorsInArea(areaId: number): Promise<bo
  */
 export async function instantiateTasksFromTemplates(
   projectId: number,
-  projectProductId: number,
   productId: number,
   commercialUserId?: number | null
 ): Promise<void> {
@@ -634,15 +610,14 @@ export async function instantiateTasksFromTemplates(
         const insertResult = await transaction.execute({
           sql: `
             INSERT INTO project_tasks
-              (project_id, project_product_id, template_id, title, description,
+              (project_id, template_id, title, description,
                area_id, assigned_user_id, status, task_type, task_flag,
                requires_quote, assign_to_commercial, order_index)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'new', $10, $11, $12)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'new', $9, $10, $11)
             RETURNING id
           `,
           args: [
             projectId,
-            projectProductId,
             tpl.id,
             tpl.title,
             tpl.description ?? null,

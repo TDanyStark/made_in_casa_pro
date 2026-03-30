@@ -5,17 +5,13 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { debounce } from "lodash";
 import { toast } from "sonner";
 import { get, post, patch, del } from "@/lib/services/apiService";
 import {
-  ProductType,
-  ProjectProductType,
   ProjectTaskType,
   ProjectTaskStatus,
   TaskType,
   TaskFlag,
-  ApiResponseWithPagination,
 } from "@/lib/definitions";
 import { TaskAssignmentSelector, AssignMode } from "@/components/tasks/TaskAssignmentSelector";
 import { SortableList } from "@/components/ui/sortable-list";
@@ -55,7 +51,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -65,16 +60,13 @@ import {
   Pencil,
   Trash2,
   Package,
-  X,
   Lock,
   CheckCircle,
   ChevronDown,
   AlertTriangle,
   Clock,
   ShieldCheck,
-  HardDrive,
 } from "lucide-react";
-import ReactSelect from "react-select";
 import {
   Tooltip,
   TooltipContent,
@@ -129,13 +121,11 @@ const taskSchema = z
     status: z.enum(["not_started", "waiting", "in_progress", "completed", "blocked"]).optional(),
     task_type: z.enum(["execution", "validation"]).default("execution"),
     requires_quote: z.boolean().default(false),
-    // assignment
     assign_mode: z.enum(["auto", "commercial", "specific"]).default("auto"),
     area_id: z.coerce.number().positive().optional().nullable(),
     assigned_user_id: z.coerce.number().positive().optional().nullable(),
   })
   .superRefine((data, ctx) => {
-    // In project tasks (real tasks), "specific" mode requires selecting a person
     if (data.assign_mode === "specific" && !data.assigned_user_id) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
@@ -143,7 +133,6 @@ const taskSchema = z
         path: ["assigned_user_id"],
       });
     }
-    // "auto" mode requires an area to be able to auto-assign
     if (data.assign_mode === "auto" && !data.area_id && !data.requires_quote) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
@@ -168,17 +157,11 @@ function rolLabel(rolId: number | null): string | null {
   return null;
 }
 
-interface ProductOption {
-  value: number;
-  label: string;
-  categoryName: string | null;
-}
-
 // ─── Props ────────────────────────────────────────────────────────────────────
 
 interface Props {
   projectId: number;
-  products: ProjectProductType[];
+  productName: string | null;
   canEdit: boolean;
   currentUserId?: number;
   currentUserRole?: number;
@@ -189,14 +172,13 @@ interface Props {
 interface ValidateDialogState {
   open: boolean;
   task: ProjectTaskType | null;
-  productTasks: ProjectTaskType[];
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export function ProjectTasksTab({
   projectId,
-  products: initialProducts,
+  productName,
   canEdit,
   currentUserId,
   currentUserRole,
@@ -205,22 +187,17 @@ export function ProjectTasksTab({
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<ProjectTaskType | null>(null);
-  const [activeProductId, setActiveProductId] = useState<number | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [reordering, setReordering] = useState(false);
   const [completingTaskId, setCompletingTaskId] = useState<number | null>(null);
   const [validateDialog, setValidateDialog] = useState<ValidateDialogState>({
     open: false,
     task: null,
-    productTasks: [],
   });
   const [validateAction, setValidateAction] = useState<"approve" | "reject">("approve");
   const [validateTarget, setValidateTarget] = useState<string>("");
   const [validateNotes, setValidateNotes] = useState("");
   const [validating, setValidating] = useState(false);
-
-  const [productSearch, setProductSearch] = useState("");
-  const [addingProduct, setAddingProduct] = useState(false);
 
   const form = useForm<TaskFormValues>({
     resolver: zodResolver(taskSchema),
@@ -236,16 +213,6 @@ export function ProjectTasksTab({
 
   // ── Queries ──────────────────────────────────────────────────────────────────
 
-  const { data: products = initialProducts, isLoading: isLoadingProducts } = useQuery({
-    queryKey: ["project-products", projectId],
-    queryFn: async () => {
-      const res = await get<ProjectProductType[]>(`projects/${projectId}/products`);
-      return res.ok ? (res.data ?? []) : [];
-    },
-    initialData: initialProducts,
-    staleTime: 1000 * 60,
-  });
-
   const { data: tasks = [], isLoading: isLoadingTasks } = useQuery({
     queryKey: ["project-tasks", projectId],
     queryFn: async () => {
@@ -260,42 +227,16 @@ export function ProjectTasksTab({
   const assignMode = form.watch("assign_mode");
   const areaId = form.watch("area_id");
 
-  const currentProductIds = new Set(products.map((p) => p.product_id));
-
-  const { data: catalogOptions = [], isLoading: isLoadingCatalog } = useQuery({
-    queryKey: ["products-catalog-search", productSearch],
-    queryFn: async () => {
-      const params = new URLSearchParams({ page: "1", limit: "30", is_active: "1" });
-      if (productSearch) params.set("search", productSearch);
-      const res = await get<ApiResponseWithPagination<ProductType[]>>(`products?${params}`);
-      if (!res.ok || !res.data) return [];
-      return ((res.data as unknown as { data: ProductType[] }).data ?? [])
-        .filter((p) => !currentProductIds.has(p.id))
-        .map((p): ProductOption => ({
-          value: p.id,
-          label: p.name,
-          categoryName: p.category_name,
-        }));
-    },
-    staleTime: 1000 * 30,
-  });
-
-  const debouncedProductSearch = debounce((v: string) => setProductSearch(v), 400);
-
   // ─────────────────────────────────────────────────────────────────────────────
   // Helpers
   // ─────────────────────────────────────────────────────────────────────────────
 
   const invalidateAll = () => {
     queryClient.invalidateQueries({ queryKey: ["project-tasks", projectId] });
-    queryClient.invalidateQueries({ queryKey: ["project-products", projectId] });
     queryClient.invalidateQueries({ queryKey: ["project", projectId] });
   };
 
-  const getProductTasks = (projectProductId: number) =>
-    tasks
-      .filter((t) => t.project_product_id === projectProductId)
-      .sort((a, b) => a.order_index - b.order_index || a.id - b.id);
+  const sortedTasks = [...tasks].sort((a, b) => a.order_index - b.order_index || a.id - b.id);
 
   const isMyTask = (task: ProjectTaskType) =>
     currentUserId !== undefined && task.assigned_user_id === currentUserId;
@@ -306,34 +247,7 @@ export function ProjectTasksTab({
   // Handlers
   // ─────────────────────────────────────────────────────────────────────────────
 
-  const handleAddProduct = async (opt: ProductOption | null) => {
-    if (!opt) return;
-    setAddingProduct(true);
-    try {
-      const res = await post(`projects/${projectId}/products`, { product_id: opt.value });
-      if (!res.ok) throw new Error(res.error);
-      toast.success(`"${opt.label}" agregado al proyecto`);
-      invalidateAll();
-    } catch {
-      toast.error("Error al agregar el producto");
-    } finally {
-      setAddingProduct(false);
-    }
-  };
-
-  const handleRemoveProduct = async (projectProductId: number, productName: string) => {
-    try {
-      const res = await del(`projects/${projectId}/products/${projectProductId}`);
-      if (!res.ok) throw new Error(res.error);
-      toast.success(`"${productName}" quitado del proyecto`);
-      invalidateAll();
-    } catch {
-      toast.error("Error al quitar el producto");
-    }
-  };
-
-  const openCreate = (projectProductId: number) => {
-    setActiveProductId(projectProductId);
+  const openCreate = () => {
     setEditingTask(null);
     form.reset({
       title: "", description: "", task_type: "execution", requires_quote: false,
@@ -344,7 +258,6 @@ export function ProjectTasksTab({
 
   const openEdit = (task: ProjectTaskType) => {
     setEditingTask(task);
-    setActiveProductId(task.project_product_id);
     form.reset({
       title: task.title, description: task.description ?? "",
       status: task.status, task_type: task.task_type ?? "execution",
@@ -374,10 +287,7 @@ export function ProjectTasksTab({
         if (!res.ok) throw new Error(res.error);
         toast.success("Tarea actualizada");
       } else {
-        const res = await post(`projects/${projectId}/tasks`, {
-          ...payload,
-          project_product_id: activeProductId!,
-        });
+        const res = await post(`projects/${projectId}/tasks`, payload);
         if (!res.ok) throw new Error(res.error);
         toast.success("Tarea creada");
       }
@@ -391,7 +301,6 @@ export function ProjectTasksTab({
     }
   };
 
-  // Complete execution task
   const handleCompleteTask = async (task: ProjectTaskType) => {
     setCompletingTaskId(task.id);
     try {
@@ -413,16 +322,13 @@ export function ProjectTasksTab({
     }
   };
 
-  // Open validate dialog
   const openValidateDialog = (task: ProjectTaskType) => {
-    const productTasks = getProductTasks(task.project_product_id);
-    setValidateDialog({ open: true, task, productTasks });
+    setValidateDialog({ open: true, task });
     setValidateAction("approve");
     setValidateTarget("");
     setValidateNotes("");
   };
 
-  // Submit validation
   const handleValidate = async () => {
     if (!validateDialog.task) return;
     setValidating(true);
@@ -456,7 +362,7 @@ export function ProjectTasksTab({
         toast.success("Tarea enviada a corrección.");
       }
 
-      setValidateDialog({ open: false, task: null, productTasks: [] });
+      setValidateDialog({ open: false, task: null });
       invalidateAll();
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Error al validar";
@@ -478,13 +384,11 @@ export function ProjectTasksTab({
     }
   };
 
-  const handleReorder = async (projectProductId: number, reordered: ProjectTaskType[]) => {
+  const handleReorder = async (reordered: ProjectTaskType[]) => {
     setReordering(true);
-    const allOtherTasks = tasks.filter((t) => t.project_product_id !== projectProductId);
-    queryClient.setQueryData(["project-tasks", projectId], [...allOtherTasks, ...reordered]);
+    queryClient.setQueryData(["project-tasks", projectId], reordered);
     try {
       const res = await post(`projects/${projectId}/tasks/reorder`, {
-        project_product_id: projectProductId,
         orderedIds: reordered.map((t) => t.id),
       });
       if (!res.ok) throw new Error(res.error);
@@ -500,407 +404,254 @@ export function ProjectTasksTab({
   // Render
   // ─────────────────────────────────────────────────────────────────────────────
 
-  if (isLoadingTasks && isLoadingProducts) {
+  if (isLoadingTasks) {
     return <Skeleton className="h-64 w-full" />;
   }
+
+  const completed = sortedTasks.filter((t) => t.status === "completed").length;
 
   return (
     <TooltipProvider>
       <>
-        {/* ── Products manager section ── */}
-        <div className="mb-6 space-y-3">
+        {/* ── Header ── */}
+        <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
-            <Package className="h-4 w-4 text-muted-foreground" />
-            <span className="text-sm font-medium">Productos del proyecto</span>
-          </div>
-
-          <div className="flex flex-wrap gap-2 min-h-[32px]">
-            {isLoadingProducts ? (
-              <Skeleton className="h-7 w-48" />
-            ) : products.length === 0 ? (
-              <p className="text-sm text-muted-foreground italic">Sin productos aún</p>
-            ) : (
-              products.map((p) => {
-                const taskCount = getProductTasks(p.id).length;
-                return (
-                  <AlertDialog key={p.id}>
-                    <div className="flex items-center gap-1.5 rounded-full border bg-muted/50 pl-3 pr-1 py-1 text-sm">
-                      <span className="font-medium">{p.product_name}</span>
-                      {p.drive_folder_url && (
-                        <a
-                          href={p.drive_folder_url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-blue-500 hover:text-blue-700 transition-colors"
-                          title="Ver carpeta en Drive"
-                        >
-                          <HardDrive className="h-3 w-3" />
-                        </a>
-                      )}
-                      {taskCount > 0 && (
-                        <span className="text-xs text-muted-foreground mr-1.5">
-                          ({taskCount} tarea{taskCount !== 1 ? "s" : ""})
-                        </span>
-                      )}
-                      {canEdit && (
-                        <AlertDialogTrigger asChild>
-                          <button
-                            className="rounded-full p-0.5 hover:bg-destructive/15 hover:text-destructive transition-colors"
-                            title={`Quitar ${p.product_name}`}
-                          >
-                            <X className="h-3.5 w-3.5" />
-                          </button>
-                        </AlertDialogTrigger>
-                      )}
-                    </div>
-                    <AlertDialogContent>
-                      <AlertDialogHeader>
-                        <AlertDialogTitle>¿Quitar &quot;{p.product_name}&quot;?</AlertDialogTitle>
-                        <AlertDialogDescription>
-                          Se quitará este producto del proyecto
-                          {taskCount > 0
-                            ? ` y se eliminarán sus ${taskCount} tarea${taskCount !== 1 ? "s" : ""} asociada${taskCount !== 1 ? "s" : ""}.`
-                            : "."}
-                          {" "}Esta acción no se puede deshacer.
-                        </AlertDialogDescription>
-                      </AlertDialogHeader>
-                      <AlertDialogFooter>
-                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                        <AlertDialogAction
-                          className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                          onClick={() => handleRemoveProduct(p.id, p.product_name)}
-                        >
-                          Quitar producto
-                        </AlertDialogAction>
-                      </AlertDialogFooter>
-                    </AlertDialogContent>
-                  </AlertDialog>
-                );
-              })
-            )}
-
-            {canEdit && (
-              <div className="w-64">
-                <ReactSelect<ProductOption>
-                  instanceId="project-tasks-product-select"
-                  options={catalogOptions}
-                  value={null}
-                  onChange={(opt) => handleAddProduct(opt as ProductOption | null)}
-                  onInputChange={(v) => debouncedProductSearch(v)}
-                  isLoading={isLoadingCatalog || addingProduct}
-                  placeholder="+ Agregar producto..."
-                  noOptionsMessage={({ inputValue }) =>
-                    inputValue ? "Sin resultados" : "Escribe para buscar"
-                  }
-                  loadingMessage={() => "Cargando..."}
-                  controlShouldRenderValue={false}
-                  formatOptionLabel={(opt: ProductOption) => (
-                    <div>
-                      <p className="text-sm font-medium">{opt.label}</p>
-                      {opt.categoryName && (
-                        <p className="text-xs text-muted-foreground">{opt.categoryName}</p>
-                      )}
-                    </div>
-                  )}
-                  classNamePrefix="react-select"
-                  filterOption={() => true}
-                  styles={{
-                    control: (base) => ({
-                      ...base,
-                      minHeight: "32px",
-                      height: "32px",
-                      fontSize: "0.875rem",
-                    }),
-                    valueContainer: (base) => ({ ...base, padding: "0 8px" }),
-                    indicatorsContainer: (base) => ({ ...base, height: "32px" }),
-                  }}
-                />
+            {productName && (
+              <div className="flex items-center gap-1.5">
+                <Package className="h-4 w-4 text-muted-foreground" />
+                <span className="text-sm font-medium">{productName}</span>
               </div>
             )}
+            {sortedTasks.length > 0 && (
+              <span className="text-sm text-muted-foreground">
+                — {completed} de {sortedTasks.length} tareas completadas
+                {reordering && <Loader2 className="inline ml-2 h-3.5 w-3.5 animate-spin" />}
+              </span>
+            )}
           </div>
+          {canEdit && (
+            <Button size="sm" onClick={openCreate}>
+              <Plus className="h-3.5 w-3.5 mr-1" />
+              Agregar tarea
+            </Button>
+          )}
         </div>
 
-        {/* ── Tasks tabs ── */}
-        {products.length === 0 ? (
+        {/* ── Task list ── */}
+        {sortedTasks.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-12 text-center border rounded-lg border-dashed">
             <Package className="h-10 w-10 text-muted-foreground/40 mb-3" />
             <p className="text-muted-foreground text-sm">
-              Agrega un producto para ver sus tareas.
+              No hay tareas aún.
             </p>
           </div>
         ) : (
-          <Tabs defaultValue={products[0]?.id.toString()}>
-            <TabsList className="flex-wrap h-auto gap-1 mb-4">
-              {products.map((p) => {
-                const productTasks = getProductTasks(p.id);
-                const completed = productTasks.filter((t) => t.status === "completed").length;
-                const total = productTasks.length;
-                const hasBlocked = productTasks.some((t) => t.status === "blocked");
-                return (
-                  <TabsTrigger key={p.id} value={p.id.toString()} className="gap-1.5">
-                    {p.product_name}
-                    {p.drive_folder_url && (
-                      <a
-                        href={p.drive_folder_url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-blue-500 hover:text-blue-700 transition-colors"
-                        onClick={(e) => e.stopPropagation()}
-                        title="Ver carpeta en Drive"
-                      >
-                        <HardDrive className="h-3 w-3" />
-                      </a>
-                    )}
-                    {hasBlocked && (
-                      <AlertTriangle className="h-3 w-3 text-destructive" />
-                    )}
-                    <span className="text-xs opacity-60">{completed}/{total}</span>
-                  </TabsTrigger>
-                );
-              })}
-            </TabsList>
+          <SortableList
+            items={sortedTasks}
+            onReorder={handleReorder}
+            renderItem={(task, dragHandle) => {
+              const taskType = task.task_type ?? "execution";
+              const taskFlag = task.task_flag ?? "new";
+              const isWaiting = task.status === "waiting";
+              const isBlocked = task.status === "blocked";
+              const isInProgress = task.status === "in_progress";
+              const isValidation = taskType === "validation";
+              const canComplete = isInProgress && !isValidation && (isMyTask(task) || isAdmin);
+              const canValidate = isInProgress && isValidation && (isMyTask(task) || isAdmin);
+              const needsQuote = task.requires_quote === 1 && isBlocked;
 
-            {products.map((product) => {
-              const productTasks = getProductTasks(product.id);
               return (
-                <TabsContent key={product.id} value={product.id.toString()} className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <p className="text-sm text-muted-foreground">
-                      {productTasks.filter((t) => t.status === "completed").length} de{" "}
-                      {productTasks.length} tareas completadas
-                      {reordering && (
-                        <Loader2 className="inline ml-2 h-3.5 w-3.5 animate-spin" />
+                <div
+                  className={`flex items-start gap-3 rounded-md border bg-card p-3 transition-opacity ${
+                    isWaiting ? "opacity-60" : ""
+                  } ${isBlocked ? "border-destructive/50 bg-destructive/5" : ""}`}
+                >
+                  {canEdit && !isWaiting && !isBlocked && (
+                    <div className="flex-shrink-0 pt-0.5">{dragHandle}</div>
+                  )}
+                  {(isWaiting || isBlocked) && (
+                    <div className="flex-shrink-0 pt-1 pl-1">
+                      {isBlocked ? (
+                        <AlertTriangle className="h-4 w-4 text-destructive" />
+                      ) : (
+                        <Lock className="h-4 w-4 text-muted-foreground" />
                       )}
-                    </p>
-                    {canEdit && (
-                      <Button size="sm" onClick={() => openCreate(product.id)}>
-                        <Plus className="h-3.5 w-3.5 mr-1" />
-                        Agregar tarea
-                      </Button>
+                    </div>
+                  )}
+
+                  <div className="flex-1 min-w-0">
+                    {/* Title + type/flag badges */}
+                    <div className="flex items-center flex-wrap gap-1.5 mb-0.5">
+                      <p className="font-medium text-sm leading-snug">{task.title}</p>
+                      <Badge
+                        variant="outline"
+                        className={`text-xs ${TASK_TYPE_CONFIG[taskType]?.className}`}
+                      >
+                        {isValidation ? (
+                          <ShieldCheck className="h-3 w-3 mr-1" />
+                        ) : null}
+                        {TASK_TYPE_CONFIG[taskType]?.label}
+                      </Badge>
+                      {taskFlag !== "new" && (
+                        <Badge
+                          variant="outline"
+                          className={`text-xs ${TASK_FLAG_CONFIG[taskFlag]?.className}`}
+                        >
+                          {TASK_FLAG_CONFIG[taskFlag]?.label}
+                        </Badge>
+                      )}
+                      {task.requires_quote === 1 && (
+                        <Badge variant="outline" className="text-xs text-amber-700 border-amber-400 bg-amber-50 dark:bg-amber-900/20">
+                          Cotización
+                        </Badge>
+                      )}
+                    </div>
+
+                    {task.description && (
+                      <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">
+                        {task.description}
+                      </p>
                     )}
+
+                    {/* Blocked reason */}
+                    {isBlocked && needsQuote && (
+                      <p className="text-xs text-destructive mt-1 font-medium">
+                        Esperando cotización de externo
+                      </p>
+                    )}
+                    {isBlocked && !needsQuote && (
+                      <p className="text-xs text-destructive mt-1 font-medium">
+                        Sin colaborador asignado
+                      </p>
+                    )}
+
+                    {/* Area / user badges */}
+                    <div className="flex flex-wrap gap-1.5 mt-1.5">
+                      {task.area_name && (
+                        <Badge variant="secondary" className="text-xs">
+                          {task.area_name}
+                        </Badge>
+                      )}
+                      {task.assign_to_commercial === 1 && !task.assigned_user_name && (
+                        <Badge variant="outline" className="text-xs text-blue-700 border-blue-300 bg-blue-50 dark:bg-blue-900/20">
+                          Comercial del proyecto
+                        </Badge>
+                      )}
+                      {task.assigned_user_name && (
+                        <Badge variant="outline" className="text-xs">
+                          {task.assigned_user_name}
+                          {rolLabel(task.assigned_user_rol_id ?? null) && (
+                            <span className="ml-1 text-muted-foreground">
+                              ({rolLabel(task.assigned_user_rol_id ?? null)})
+                            </span>
+                          )}
+                          {isMyTask(task) && (
+                            <span className="ml-1 text-primary">(tú)</span>
+                          )}
+                        </Badge>
+                      )}
+                      {!task.assigned_user_name && task.assign_to_commercial !== 1 && (
+                        <Badge variant="outline" className="text-xs text-muted-foreground">
+                          Sin asignar
+                        </Badge>
+                      )}
+                    </div>
                   </div>
 
-                  {productTasks.length === 0 ? (
-                    <div className="rounded-md border border-dashed py-8 text-center">
-                      <p className="text-sm text-muted-foreground">
-                        No hay tareas para este producto.
-                      </p>
-                    </div>
-                  ) : (
-                    <SortableList
-                      items={productTasks}
-                      onReorder={(reordered) => handleReorder(product.id, reordered)}
-                      renderItem={(task, dragHandle) => {
-                        const taskType = task.task_type ?? "execution";
-                        const taskFlag = task.task_flag ?? "new";
-                        const isWaiting = task.status === "waiting";
-                        const isBlocked = task.status === "blocked";
-                        const isInProgress = task.status === "in_progress";
-                        const isValidation = taskType === "validation";
-                        const canComplete = isInProgress && !isValidation && (isMyTask(task) || isAdmin);
-                        const canValidate = isInProgress && isValidation && (isMyTask(task) || isAdmin);
-                        const needsQuote = task.requires_quote === 1 && isBlocked;
+                  {/* Right: status + actions */}
+                  <div className="flex items-center gap-1.5 flex-shrink-0 flex-wrap justify-end">
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span
+                          className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium ${
+                            TASK_STATUS_CONFIG[task.status]?.className ?? ""
+                          }`}
+                        >
+                          {TASK_STATUS_CONFIG[task.status]?.icon}
+                          {TASK_STATUS_CONFIG[task.status]?.label ?? task.status}
+                        </span>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        {isWaiting
+                          ? "Esta tarea está asignada pero esperando que termine la anterior"
+                          : TASK_STATUS_CONFIG[task.status]?.label}
+                      </TooltipContent>
+                    </Tooltip>
 
-                        return (
-                          <div
-                            className={`flex items-start gap-3 rounded-md border bg-card p-3 transition-opacity ${
-                              isWaiting ? "opacity-60" : ""
-                            } ${isBlocked ? "border-destructive/50 bg-destructive/5" : ""}`}
-                          >
-                            {canEdit && !isWaiting && !isBlocked && (
-                              <div className="flex-shrink-0 pt-0.5">{dragHandle}</div>
-                            )}
-                            {(isWaiting || isBlocked) && (
-                              <div className="flex-shrink-0 pt-1 pl-1">
-                                {isBlocked ? (
-                                  <AlertTriangle className="h-4 w-4 text-destructive" />
-                                ) : (
-                                  <Lock className="h-4 w-4 text-muted-foreground" />
-                                )}
-                              </div>
-                            )}
+                    {canComplete && (
+                      <Button
+                        size="sm"
+                        variant="default"
+                        className="h-7 text-xs gap-1"
+                        onClick={() => handleCompleteTask(task)}
+                        disabled={completingTaskId === task.id}
+                      >
+                        {completingTaskId === task.id ? (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                          <CheckCircle className="h-3.5 w-3.5" />
+                        )}
+                        Completar
+                      </Button>
+                    )}
 
-                            <div className="flex-1 min-w-0">
-                              {/* Title + type/flag badges */}
-                              <div className="flex items-center flex-wrap gap-1.5 mb-0.5">
-                                <p className="font-medium text-sm leading-snug">{task.title}</p>
-                                <Badge
-                                  variant="outline"
-                                  className={`text-xs ${TASK_TYPE_CONFIG[taskType]?.className}`}
-                                >
-                                  {isValidation ? (
-                                    <ShieldCheck className="h-3 w-3 mr-1" />
-                                  ) : null}
-                                  {TASK_TYPE_CONFIG[taskType]?.label}
-                                </Badge>
-                                {taskFlag !== "new" && (
-                                  <Badge
-                                    variant="outline"
-                                    className={`text-xs ${TASK_FLAG_CONFIG[taskFlag]?.className}`}
-                                  >
-                                    {TASK_FLAG_CONFIG[taskFlag]?.label}
-                                  </Badge>
-                                )}
-                                {task.requires_quote === 1 && (
-                                  <Badge variant="outline" className="text-xs text-amber-700 border-amber-400 bg-amber-50 dark:bg-amber-900/20">
-                                    Cotización
-                                  </Badge>
-                                )}
-                              </div>
+                    {canValidate && (
+                      <Button
+                        size="sm"
+                        variant="default"
+                        className="h-7 text-xs gap-1 bg-purple-600 hover:bg-purple-700"
+                        onClick={() => openValidateDialog(task)}
+                      >
+                        <ShieldCheck className="h-3.5 w-3.5" />
+                        Validar
+                      </Button>
+                    )}
 
-                              {task.description && (
-                                <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">
-                                  {task.description}
-                                </p>
-                              )}
-
-                              {/* Blocked reason */}
-                              {isBlocked && needsQuote && (
-                                <p className="text-xs text-destructive mt-1 font-medium">
-                                  Esperando cotización de externo
-                                </p>
-                              )}
-                              {isBlocked && !needsQuote && (
-                                <p className="text-xs text-destructive mt-1 font-medium">
-                                  Sin colaborador asignado
-                                </p>
-                              )}
-
-                              {/* Area / user badges */}
-                              <div className="flex flex-wrap gap-1.5 mt-1.5">
-                                {task.area_name && (
-                                  <Badge variant="secondary" className="text-xs">
-                                    {task.area_name}
-                                  </Badge>
-                                )}
-                                {task.assign_to_commercial === 1 && !task.assigned_user_name && (
-                                  <Badge variant="outline" className="text-xs text-blue-700 border-blue-300 bg-blue-50 dark:bg-blue-900/20">
-                                    Comercial del proyecto
-                                  </Badge>
-                                )}
-                                {task.assigned_user_name && (
-                                  <Badge variant="outline" className="text-xs">
-                                    {task.assigned_user_name}
-                                    {rolLabel(task.assigned_user_rol_id ?? null) && (
-                                      <span className="ml-1 text-muted-foreground">
-                                        ({rolLabel(task.assigned_user_rol_id ?? null)})
-                                      </span>
-                                    )}
-                                    {isMyTask(task) && (
-                                      <span className="ml-1 text-primary">(tú)</span>
-                                    )}
-                                  </Badge>
-                                )}
-                                {!task.assigned_user_name && task.assign_to_commercial !== 1 && (
-                                  <Badge variant="outline" className="text-xs text-muted-foreground">
-                                    Sin asignar
-                                  </Badge>
-                                )}
-                              </div>
-                            </div>
-
-                            {/* Right: status + actions */}
-                            <div className="flex items-center gap-1.5 flex-shrink-0 flex-wrap justify-end">
-                              {/* Status badge */}
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <span
-                                    className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium ${
-                                      TASK_STATUS_CONFIG[task.status]?.className ?? ""
-                                    }`}
-                                  >
-                                    {TASK_STATUS_CONFIG[task.status]?.icon}
-                                    {TASK_STATUS_CONFIG[task.status]?.label ?? task.status}
-                                  </span>
-                                </TooltipTrigger>
-                                <TooltipContent>
-                                  {isWaiting
-                                    ? "Esta tarea está asignada pero esperando que termine la anterior"
-                                    : TASK_STATUS_CONFIG[task.status]?.label}
-                                </TooltipContent>
-                              </Tooltip>
-
-                              {/* Complete button for execution tasks */}
-                              {canComplete && (
-                                <Button
-                                  size="sm"
-                                  variant="default"
-                                  className="h-7 text-xs gap-1"
-                                  onClick={() => handleCompleteTask(task)}
-                                  disabled={completingTaskId === task.id}
-                                >
-                                  {completingTaskId === task.id ? (
-                                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                                  ) : (
-                                    <CheckCircle className="h-3.5 w-3.5" />
-                                  )}
-                                  Completar
-                                </Button>
-                              )}
-
-                              {/* Validate button for validation tasks */}
-                              {canValidate && (
-                                <Button
-                                  size="sm"
-                                  variant="default"
-                                  className="h-7 text-xs gap-1 bg-purple-600 hover:bg-purple-700"
-                                  onClick={() => openValidateDialog(task)}
-                                >
-                                  <ShieldCheck className="h-3.5 w-3.5" />
-                                  Validar
-                                </Button>
-                              )}
-
-                              {canEdit && (
-                                <>
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-7 w-7"
-                                    onClick={() => openEdit(task)}
-                                  >
-                                    <Pencil className="h-3.5 w-3.5" />
-                                  </Button>
-                                  <AlertDialog>
-                                    <AlertDialogTrigger asChild>
-                                      <Button
-                                        variant="ghost"
-                                        size="icon"
-                                        className="h-7 w-7 text-destructive hover:text-destructive"
-                                      >
-                                        <Trash2 className="h-3.5 w-3.5" />
-                                      </Button>
-                                    </AlertDialogTrigger>
-                                    <AlertDialogContent>
-                                      <AlertDialogHeader>
-                                        <AlertDialogTitle>¿Eliminar tarea?</AlertDialogTitle>
-                                        <AlertDialogDescription>
-                                          Se eliminará &quot;{task.title}&quot;. Esta acción no se puede deshacer.
-                                        </AlertDialogDescription>
-                                      </AlertDialogHeader>
-                                      <AlertDialogFooter>
-                                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                                        <AlertDialogAction
-                                          className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                                          onClick={() => handleDeleteTask(task.id)}
-                                        >
-                                          Eliminar
-                                        </AlertDialogAction>
-                                      </AlertDialogFooter>
-                                    </AlertDialogContent>
-                                  </AlertDialog>
-                                </>
-                              )}
-                            </div>
-                          </div>
-                        );
-                      }}
-                    />
-                  )}
-                </TabsContent>
+                    {canEdit && (
+                      <>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7"
+                          onClick={() => openEdit(task)}
+                        >
+                          <Pencil className="h-3.5 w-3.5" />
+                        </Button>
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7 text-destructive hover:text-destructive"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>¿Eliminar tarea?</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                Se eliminará &quot;{task.title}&quot;. Esta acción no se puede deshacer.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                              <AlertDialogAction
+                                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                onClick={() => handleDeleteTask(task.id)}
+                              >
+                                Eliminar
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      </>
+                    )}
+                  </div>
+                </div>
               );
-            })}
-          </Tabs>
+            }}
+          />
         )}
 
         {/* ── Create / Edit Task Dialog ── */}
@@ -940,7 +691,6 @@ export function ProjectTasksTab({
                   )}
                 />
 
-                {/* Task type */}
                 <FormField
                   control={form.control}
                   name="task_type"
@@ -963,7 +713,6 @@ export function ProjectTasksTab({
                   )}
                 />
 
-                {/* Requires quote — only for execution */}
                 {selectedTaskType === "execution" && (
                   <FormField
                     control={form.control}
@@ -992,13 +741,11 @@ export function ProjectTasksTab({
                   />
                 )}
 
-                {/* Unified assignment widget */}
                 <div className="space-y-1">
                   <TaskAssignmentSelector
                     assignMode={assignMode}
                     onAssignModeChange={(mode) => {
                       form.setValue("assign_mode", mode);
-                      // Clear validation errors when mode changes
                       form.clearErrors(["assigned_user_id", "area_id"]);
                     }}
                     areaId={areaId ?? null}
@@ -1013,7 +760,6 @@ export function ProjectTasksTab({
                     }}
                     requiresQuote={requiresQuote}
                   />
-                  {/* Show validation errors for assignment fields */}
                   {form.formState.errors.assigned_user_id && (
                     <p className="text-xs text-destructive font-medium px-1">
                       {form.formState.errors.assigned_user_id.message}
@@ -1074,7 +820,7 @@ export function ProjectTasksTab({
         <Dialog
           open={validateDialog.open}
           onOpenChange={(open) => {
-            if (!open) setValidateDialog({ open: false, task: null, productTasks: [] });
+            if (!open) setValidateDialog({ open: false, task: null });
           }}
         >
           <DialogContent className="sm:max-w-[480px] max-h-[90vh] overflow-y-auto" aria-describedby={undefined}>
@@ -1090,7 +836,6 @@ export function ProjectTasksTab({
                   Tarea: <span className="font-medium text-foreground">{validateDialog.task.title}</span>
                 </p>
 
-                {/* Action selector */}
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Acción</label>
                   <div className="grid grid-cols-2 gap-2">
@@ -1121,7 +866,6 @@ export function ProjectTasksTab({
                   </div>
                 </div>
 
-                {/* Target selector for reject */}
                 {validateAction === "reject" && (
                   <div className="space-y-2">
                     <label className="text-sm font-medium">Regresar al paso</label>
@@ -1130,7 +874,7 @@ export function ProjectTasksTab({
                         <SelectValue placeholder="Seleccionar tarea destino" />
                       </SelectTrigger>
                       <SelectContent>
-                        {validateDialog.productTasks
+                        {sortedTasks
                           .filter(
                             (t) =>
                               t.id !== validateDialog.task!.id &&
@@ -1151,7 +895,6 @@ export function ProjectTasksTab({
                   </div>
                 )}
 
-                {/* Notes */}
                 <div className="space-y-2">
                   <label className="text-sm font-medium">
                     Notas {validateAction === "reject" ? "(requeridas)" : "(opcional)"}
@@ -1172,7 +915,7 @@ export function ProjectTasksTab({
             <DialogFooter>
               <Button
                 variant="outline"
-                onClick={() => setValidateDialog({ open: false, task: null, productTasks: [] })}
+                onClick={() => setValidateDialog({ open: false, task: null })}
               >
                 Cancelar
               </Button>

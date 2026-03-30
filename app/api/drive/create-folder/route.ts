@@ -11,7 +11,6 @@ const schema = z.object({
   clientName: z.string().min(1),
   brandName: z.string().min(1),
   projectTitle: z.string().min(1),
-  productNames: z.array(z.string().min(1)).default([]),
   /** Emails adicionales a compartir (manager, co-managers). */
   shareEmails: z.array(z.string().email()).default([]),
 });

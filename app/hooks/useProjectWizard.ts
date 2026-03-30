@@ -27,8 +27,8 @@ export interface WizardState {
   co_manager_names: string[];
   co_manager_emails: string[];
 
-  // Step 3 — products
-  products: ProductType[];
+  // Step 3 — product (single)
+  product: ProductType | null;
 
   // Step 4 — campaign
   campaign_id: number | null;
@@ -52,7 +52,7 @@ const INITIAL_STATE: WizardState = {
   co_manager_ids: [],
   co_manager_names: [],
   co_manager_emails: [],
-  products: [],
+  product: null,
   campaign_id: null,
   campaign_name: "",
   notes: "",

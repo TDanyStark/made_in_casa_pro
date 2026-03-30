@@ -183,7 +183,7 @@ export function TrafficClient() {
               </TableRow>
             ) : (
               trafficRows.map((row) => (
-                <TableRow key={row.project_product_id}>
+                <TableRow key={row.project_id}>
                   <TableCell>
                     <div className="flex flex-col">
                       <Link 

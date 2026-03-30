@@ -5,7 +5,6 @@ import { UserRole } from "@/lib/definitions";
 import { reorderProjectTasks } from "@/lib/queries/projectTasks";
 
 const schema = z.object({
-  project_product_id: z.coerce.number().int().positive(),
   orderedIds: z.array(z.number().int().positive()).min(1),
 });
 
@@ -27,11 +26,7 @@ export async function POST(request: NextRequest, { params }: Params) {
     if (!validation.success) {
       return NextResponse.json({ error: "Datos inválidos" }, { status: 400 });
     }
-    await reorderProjectTasks(
-      validation.data.project_product_id,
-      parseInt(id),
-      validation.data.orderedIds
-    );
+    await reorderProjectTasks(parseInt(id), validation.data.orderedIds);
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("Error reordering tasks:", error);

@@ -2,7 +2,6 @@
 CREATE TABLE IF NOT EXISTS project_tasks (
   id                 SERIAL      PRIMARY KEY,
   project_id         INTEGER     NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
-  project_product_id INTEGER     NOT NULL REFERENCES project_products(id) ON DELETE CASCADE,
   template_id        INTEGER     REFERENCES product_task_templates(id) ON DELETE SET NULL,
   title              TEXT        NOT NULL,
   description        TEXT,

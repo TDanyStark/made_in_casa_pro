@@ -11,6 +11,7 @@ const projectSchema = z.object({
   title: z.string().min(1, "El título es requerido").max(300),
   brand_id: z.coerce.number().int().positive("La marca es requerida"),
   manager_id: z.coerce.number().int().positive("El gerente es requerido"),
+  product_id: z.coerce.number().int().positive().optional().nullable(),
   campaign_id: z.coerce.number().int().positive().optional().nullable(),
   drive_folder_id: z.string().optional().nullable(),
   drive_folder_url: z.string().url().optional().nullable(),

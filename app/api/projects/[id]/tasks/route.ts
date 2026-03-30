@@ -7,7 +7,6 @@ import { recalculateProjectProgress } from "@/lib/queries/projects";
 import { db } from "@/lib/db";
 
 const taskSchema = z.object({
-  project_product_id: z.coerce.number().int().positive(),
   title: z.string().min(1, "El título es requerido"),
   description: z.string().optional().nullable(),
   area_id: z.coerce.number().int().positive().optional().nullable(),
@@ -56,16 +55,15 @@ export async function POST(request: NextRequest, { params }: Params) {
       );
     }
 
-    // Get next order_index for this product
+    // Get next order_index for this project
     const orderResult = await db.execute({
-      sql: `SELECT COALESCE(MAX(order_index), -1) + 1 AS next_order FROM project_tasks WHERE project_product_id = $1`,
-      args: [validation.data.project_product_id],
+      sql: `SELECT COALESCE(MAX(order_index), -1) + 1 AS next_order FROM project_tasks WHERE project_id = $1`,
+      args: [projectId],
     });
     const nextOrder = Number((orderResult.rows[0] as unknown as { next_order: number }).next_order);
 
     const task = await createProjectTask({
       project_id: projectId,
-      project_product_id: validation.data.project_product_id,
       title: validation.data.title,
       description: validation.data.description ?? null,
       area_id: validation.data.area_id ?? null,

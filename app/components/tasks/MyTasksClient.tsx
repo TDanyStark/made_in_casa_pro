@@ -132,7 +132,7 @@ export function MyTasksClient() {
       const res = await get<MyTask[]>(`projects/${task.project_id}/tasks`);
       const allTasks = res.ok ? (res.data ?? []) : [];
       const siblings = allTasks
-        .filter((t) => t.project_product_id === task.project_product_id)
+        .filter((t) => t.project_id === task.project_id)
         .sort((a, b) => a.order_index - b.order_index);
       setValidateDialog({ open: true, task, siblings });
       setValidateAction("approve");

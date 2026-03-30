@@ -50,20 +50,13 @@ export function ProjectPreviewCard({ state }: ProjectPreviewCardProps) {
           </div>
         )}
 
-        {/* Products */}
-        {state.products.length > 0 && (
-          <div className="space-y-1.5">
-            <div className="flex items-center gap-1.5 text-xs text-muted-foreground font-medium">
-              <Package className="h-3.5 w-3.5" />
-              Productos ({state.products.length})
-            </div>
-            <div className="flex flex-wrap gap-1.5">
-              {state.products.map((p) => (
-                <Badge key={p.id} variant="secondary" className="text-xs">
-                  {p.name}
-                </Badge>
-              ))}
-            </div>
+        {/* Product */}
+        {state.product && (
+          <div className="flex items-center gap-1.5 text-xs text-muted-foreground font-medium">
+            <Package className="h-3.5 w-3.5" />
+            <Badge variant="secondary" className="text-xs">
+              {state.product.name}
+            </Badge>
           </div>
         )}
 

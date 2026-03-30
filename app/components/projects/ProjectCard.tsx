@@ -39,10 +39,10 @@ export function ProjectCard({ project }: Props) {
               {project.manager_name}
             </span>
 
-            {(project.product_count ?? 0) > 0 && (
+            {project.product_name && (
               <span className="flex items-center gap-1">
                 <Package className="h-3 w-3" />
-                {project.product_count} producto{Number(project.product_count) !== 1 ? "s" : ""}
+                {project.product_name}
               </span>
             )}
 

@@ -30,11 +30,6 @@ const RichTextEditor = dynamic(
 interface DriveResult {
   projectFolderId: string;
   projectFolderUrl: string;
-  productFolders: Array<{
-    productName: string;
-    folderId: string;
-    folderUrl: string;
-  }>;
 }
 
 interface Props {
@@ -49,7 +44,7 @@ export function WizardStep5Confirm({ state, onBack }: Props) {
   const [currentAction, setCurrentAction] = useState("");
 
   const handleConfirm = async () => {
-    if (!state.brand_id || !state.manager_id || !state.title) {
+    if (!state.brand_id || !state.manager_id || !state.title || !state.product) {
       toast.error("Faltan datos obligatorios");
       return;
     }
@@ -69,7 +64,6 @@ export function WizardStep5Confirm({ state, onBack }: Props) {
         clientName: state.client_name,
         brandName: state.brand_name,
         projectTitle: state.title,
-        productNames: state.products.map((p) => p.name),
         shareEmails,
       });
 
@@ -104,21 +98,12 @@ export function WizardStep5Confirm({ state, onBack }: Props) {
         }
       }
 
-      // 4. Add products (auto-instantiates tasks)
-      if (state.products.length > 0) {
-        setCurrentAction("Agregando productos...");
-        for (const product of state.products) {
-          // Find the corresponding drive folder for this product
-          const productDrive = drive.productFolders.find(
-            (pf) => pf.productName === product.name
-          );
-
-          await post(`projects/${project.id}/products`, {
-            product_id: product.id,
-            drive_folder_id: productDrive?.folderId || null,
-            drive_folder_url: productDrive?.folderUrl || null,
-          });
-        }
+      // 4. Add product (auto-instantiates tasks)
+      if (state.product) {
+        setCurrentAction("Agregando producto...");
+        await post(`projects/${project.id}/products`, {
+          product_id: state.product.id,
+        });
       }
 
       toast.success("¡Proyecto creado exitosamente!");
@@ -170,17 +155,19 @@ export function WizardStep5Confirm({ state, onBack }: Props) {
             </div>
           </div>
 
-          {/* Products */}
+          {/* Product */}
           <div className="flex items-start gap-3">
             <span className="text-muted-foreground min-w-24 flex items-center gap-1">
-              <Package className="h-3.5 w-3.5" /> Productos
+              <Package className="h-3.5 w-3.5" /> Producto
             </span>
-            <div className="flex flex-wrap gap-1">
-              {state.products.map((p) => (
-                <Badge key={p.id} variant="outline" className="text-xs">
-                  {p.name}
+            <div>
+              {state.product ? (
+                <Badge variant="outline" className="text-xs">
+                  {state.product.name}
                 </Badge>
-              ))}
+              ) : (
+                <span className="text-muted-foreground text-xs">Sin producto</span>
+              )}
             </div>
           </div>
 

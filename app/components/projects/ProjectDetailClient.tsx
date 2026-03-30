@@ -65,11 +65,6 @@ export function ProjectDetailClient({ projectId, userRole, currentUserId }: Prop
         <TabsList>
           <TabsTrigger value="tasks">
             Tareas
-            {project.products.length > 0 && (
-              <span className="ml-1.5 text-xs opacity-60">
-                {project.products.reduce((sum, p) => sum + Number(p.task_total ?? 0), 0)}
-              </span>
-            )}
           </TabsTrigger>
           {canEdit && (
             <TabsTrigger value="quotes">Cotizaciones</TabsTrigger>
@@ -87,7 +82,7 @@ export function ProjectDetailClient({ projectId, userRole, currentUserId }: Prop
         <TabsContent value="tasks" className="mt-6">
           <ProjectTasksTab
             projectId={projectId}
-            products={project.products}
+            productName={project.product_name}
             canEdit={canEdit}
             currentUserId={currentUserId}
             currentUserRole={userRole}

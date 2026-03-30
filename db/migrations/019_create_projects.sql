@@ -4,6 +4,7 @@ CREATE TABLE IF NOT EXISTS projects (
   title            TEXT        NOT NULL,
   brand_id         INTEGER     NOT NULL REFERENCES brands(id) ON DELETE RESTRICT,
   manager_id       INTEGER     NOT NULL REFERENCES managers(id) ON DELETE RESTRICT,
+  product_id       INTEGER     REFERENCES products(id) ON DELETE SET NULL,
   campaign_id      INTEGER     REFERENCES campaigns(id) ON DELETE SET NULL,
   drive_folder_id  TEXT,
   drive_folder_url TEXT,

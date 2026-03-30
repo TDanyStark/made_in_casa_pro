@@ -3,7 +3,6 @@ import { revalidatePath } from "next/cache";
 import {
   ProjectType,
   ProjectDetailType,
-  ProjectProductType,
   ProjectStatus,
 } from "../definitions";
 import { buildWhereClause, buildPaginationArgs, parseTotal } from "../db/query-helpers";
@@ -22,6 +21,9 @@ const PROJECT_SELECT = `
   cl.name          AS client_name,
   p.campaign_id,
   cam.name         AS campaign_name,
+  p.product_id,
+  pr.name          AS product_name,
+  pc.name          AS product_category_name,
   p.drive_folder_id,
   p.drive_folder_url,
   p.notes,
@@ -35,11 +37,13 @@ const PROJECT_SELECT = `
 
 const PROJECT_JOINS = `
   FROM projects p
-  LEFT JOIN brands    b   ON p.brand_id    = b.id
-  LEFT JOIN managers  m   ON p.manager_id  = m.id
-  LEFT JOIN clients   cl  ON m.client_id   = cl.id
-  LEFT JOIN campaigns cam ON p.campaign_id = cam.id
-  LEFT JOIN users     u   ON p.created_by  = u.id
+  LEFT JOIN brands           b   ON p.brand_id    = b.id
+  LEFT JOIN managers         m   ON p.manager_id  = m.id
+  LEFT JOIN clients          cl  ON m.client_id   = cl.id
+  LEFT JOIN campaigns        cam ON p.campaign_id = cam.id
+  LEFT JOIN products         pr  ON p.product_id  = pr.id
+  LEFT JOIN product_categories pc ON pr.category_id = pc.id
+  LEFT JOIN users            u   ON p.created_by  = u.id
 `;
 
 // ─── Read ─────────────────────────────────────────────────────────────────────
@@ -63,7 +67,6 @@ export async function getProjectDetail(id: number): Promise<ProjectDetailType | 
     const project = await getProjectById(id);
     if (!project) return null;
 
-    // Co-managers
     const coMgrResult = await db.execute({
       sql: `
         SELECT m.id, m.name, m.email
@@ -75,37 +78,9 @@ export async function getProjectDetail(id: number): Promise<ProjectDetailType | 
       args: [id],
     });
 
-    // Products with task counts
-    const productsResult = await db.execute({
-      sql: `
-        SELECT
-          pp.id,
-          pp.project_id,
-          pp.product_id,
-          pr.name          AS product_name,
-          pr.category_id   AS product_category_id,
-          pc.name          AS product_category_name,
-          pp.status,
-          pp.drive_folder_id,
-          pp.drive_folder_url,
-          pp.created_at,
-          COUNT(pt.id)                                          AS task_total,
-          COUNT(pt.id) FILTER (WHERE pt.status = 'completed')  AS task_completed
-        FROM project_products pp
-        JOIN products          pr ON pp.product_id    = pr.id
-        LEFT JOIN product_categories pc ON pr.category_id = pc.id
-        LEFT JOIN project_tasks pt ON pt.project_product_id = pp.id
-        WHERE pp.project_id = $1
-        GROUP BY pp.id, pr.name, pr.category_id, pc.name, pp.status, pp.drive_folder_id, pp.drive_folder_url
-        ORDER BY pp.created_at ASC
-      `,
-      args: [id],
-    });
-
     return {
       ...project,
       co_managers: coMgrResult.rows as unknown as ProjectDetailType["co_managers"],
-      products: productsResult.rows as unknown as ProjectProductType[],
     };
   } catch (error) {
     console.error("Error fetching project detail:", error);
@@ -150,7 +125,6 @@ export async function getProjectsWithPagination({
       sql: `
         SELECT
           ${PROJECT_SELECT},
-          (SELECT COUNT(*) FROM project_products pp WHERE pp.project_id = p.id) AS product_count,
           (SELECT COUNT(*) FROM project_managers pm WHERE pm.project_id = p.id) AS co_manager_count
         ${PROJECT_JOINS}${whereSQL}
         ORDER BY p.updated_at DESC
@@ -175,6 +149,7 @@ export async function createProject(data: {
   title: string;
   brand_id: number;
   manager_id: number;
+  product_id?: number | null;
   campaign_id?: number | null;
   drive_folder_id?: string | null;
   drive_folder_url?: string | null;
@@ -186,14 +161,15 @@ export async function createProject(data: {
     const result = await db.execute({
       sql: `
         INSERT INTO projects
-          (title, brand_id, manager_id, campaign_id, drive_folder_id, drive_folder_url, notes, status, created_by)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+          (title, brand_id, manager_id, product_id, campaign_id, drive_folder_id, drive_folder_url, notes, status, created_by)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
         RETURNING id
       `,
       args: [
         data.title,
         data.brand_id,
         data.manager_id,
+        data.product_id ?? null,
         data.campaign_id ?? null,
         data.drive_folder_id ?? null,
         data.drive_folder_url ?? null,
@@ -218,6 +194,7 @@ export async function updateProject(
   id: number,
   data: Partial<{
     title: string;
+    product_id: number | null;
     campaign_id: number | null;
     drive_folder_id: string | null;
     drive_folder_url: string | null;
@@ -232,6 +209,7 @@ export async function updateProject(
 
     const fields: Array<[string, unknown]> = [
       ["title", data.title],
+      ["product_id", data.product_id],
       ["campaign_id", data.campaign_id],
       ["drive_folder_id", data.drive_folder_id],
       ["drive_folder_url", data.drive_folder_url],
@@ -338,86 +316,3 @@ export async function removeCoManager(projectId: number, managerId: number): Pro
   }
 }
 
-// ─── Project products ─────────────────────────────────────────────────────────
-
-export async function getProjectProducts(projectId: number): Promise<ProjectProductType[]> {
-  try {
-    const result = await db.execute({
-      sql: `
-        SELECT
-          pp.id,
-          pp.project_id,
-          pp.product_id,
-          pr.name          AS product_name,
-          pr.category_id   AS product_category_id,
-          pc.name          AS product_category_name,
-          pp.status,
-          pp.drive_folder_id,
-          pp.drive_folder_url,
-          pp.created_at,
-          COUNT(pt.id)                                         AS task_total,
-          COUNT(pt.id) FILTER (WHERE pt.status = 'completed') AS task_completed
-        FROM project_products pp
-        JOIN products          pr ON pp.product_id    = pr.id
-        LEFT JOIN product_categories pc ON pr.category_id = pc.id
-        LEFT JOIN project_tasks pt ON pt.project_product_id = pp.id
-        WHERE pp.project_id = $1
-        GROUP BY pp.id, pr.name, pr.category_id, pc.name, pp.status, pp.drive_folder_id, pp.drive_folder_url
-        ORDER BY pp.created_at ASC
-      `,
-      args: [projectId],
-    });
-    return result.rows as unknown as ProjectProductType[];
-  } catch (error) {
-    console.error("Error fetching project products:", error);
-    return [];
-  }
-}
-
-export async function addProductToProject(
-  projectId: number,
-  productId: number,
-  drive_folder_id?: string | null,
-  drive_folder_url?: string | null
-): Promise<number> {
-  try {
-    const result = await db.execute({
-      sql: `
-        INSERT INTO project_products (project_id, product_id, drive_folder_id, drive_folder_url)
-        VALUES ($1, $2, $3, $4)
-        ON CONFLICT (project_id, product_id) DO NOTHING
-        RETURNING id
-      `,
-      args: [projectId, productId, drive_folder_id ?? null, drive_folder_url ?? null],
-    });
-    if (result.rows.length === 0) {
-      // Already existed — fetch the existing id
-      const existing = await db.execute({
-        sql: `SELECT id FROM project_products WHERE project_id = $1 AND product_id = $2`,
-        args: [projectId, productId],
-      });
-      return Number(existing.rows[0]?.id);
-    }
-    revalidatePath(`/projects/${projectId}`);
-    return Number(result.rows[0]?.id);
-  } catch (error) {
-    console.error("Error adding product to project:", error);
-    throw error;
-  }
-}
-
-export async function removeProductFromProject(
-  projectId: number,
-  projectProductId: number
-): Promise<void> {
-  try {
-    await db.execute({
-      sql: `DELETE FROM project_products WHERE id = $1 AND project_id = $2`,
-      args: [projectProductId, projectId],
-    });
-    revalidatePath(`/projects/${projectId}`);
-  } catch (error) {
-    console.error("Error removing product from project:", error);
-    throw error;
-  }
-}

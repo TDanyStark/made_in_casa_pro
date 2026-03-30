@@ -60,26 +60,15 @@ export function ProjectInfoTab({ project, canEdit }: Props) {
         )}
       </div>
 
-      {/* Products summary */}
+      {/* Product */}
       <div className="space-y-1">
         <p className="text-sm font-medium flex items-center gap-1.5">
           <Package className="h-3.5 w-3.5" />
-          Productos ({project.products.length})
+          Producto
         </p>
-        {project.products.length === 0 ? (
-          <p className="text-sm text-muted-foreground">Sin productos</p>
-        ) : (
-          <ul className="space-y-1">
-            {project.products.map((p) => (
-              <li key={p.id} className="text-sm flex items-center justify-between gap-2">
-                <span>{p.product_name}</span>
-                <span className="text-xs text-muted-foreground">
-                  {Number(p.task_completed ?? 0)}/{Number(p.task_total ?? 0)} tareas
-                </span>
-              </li>
-            ))}
-          </ul>
-        )}
+        <p className="text-sm text-muted-foreground">
+          {project.product_name ?? "Sin producto"}
+        </p>
       </div>
 
       {/* Metadata */}

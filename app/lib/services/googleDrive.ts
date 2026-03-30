@@ -94,31 +94,24 @@ async function shareFolderWithEmails(
 export interface DriveProjectFolders {
   projectFolderId: string;
   projectFolderUrl: string;
-  productFolders: Array<{
-    productName: string;
-    folderId: string;
-    folderUrl: string;
-  }>;
 }
 
 /**
  * Creates the full folder hierarchy in Google Drive:
- * Made In Casa / {clientName} / {brandName} / {projectTitle} / {productName}
+ * Made In Casa / {clientName} / {brandName} / {projectTitle}
  *
  * Uses findOrCreateFolder so it is idempotent.
- * Shares the project folder and each product sub-folder with shareEmails.
+ * Shares the project folder with shareEmails.
  */
 export async function createProjectFolders({
   clientName,
   brandName,
   projectTitle,
-  productNames,
   shareEmails = [],
 }: {
   clientName: string;
   brandName: string;
   projectTitle: string;
-  productNames: string[];
   shareEmails?: string[];
 }): Promise<DriveProjectFolders> {
   const drive = await getDriveClient();
@@ -140,34 +133,5 @@ export async function createProjectFolders({
     await shareFolderWithEmails(drive, projectId, emails);
   }
 
-  // 5. Product sub-folders — share each one too
-  const productFolders: DriveProjectFolders["productFolders"] = [];
-  for (const productName of productNames) {
-    const prodFolderId = await findOrCreateFolder(drive, productName, projectId);
-    if (emails.length > 0) {
-      await shareFolderWithEmails(drive, prodFolderId, emails);
-    }
-    productFolders.push({
-      productName,
-      folderId: prodFolderId,
-      folderUrl: `https://drive.google.com/drive/folders/${prodFolderId}`,
-    });
-  }
-
-  return { projectFolderId: projectId, projectFolderUrl: projectUrl, productFolders };
-}
-
-/**
- * Creates a single product sub-folder inside an existing project folder.
- */
-export async function createProductFolder(
-  projectFolderId: string,
-  productName: string
-): Promise<{ folderId: string; folderUrl: string }> {
-  const drive = await getDriveClient();
-  const folderId = await findOrCreateFolder(drive, productName, projectFolderId);
-  return {
-    folderId,
-    folderUrl: `https://drive.google.com/drive/folders/${folderId}`,
-  };
+  return { projectFolderId: projectId, projectFolderUrl: projectUrl };
 }

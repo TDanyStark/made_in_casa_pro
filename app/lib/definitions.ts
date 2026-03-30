@@ -206,6 +206,9 @@ export type ProjectType = {
   client_name: string;
   campaign_id: number | null;
   campaign_name: string | null;
+  product_id: number | null;
+  product_name: string | null;
+  product_category_name: string | null;
   drive_folder_id: string | null;
   drive_folder_url: string | null;
   notes: string | null;
@@ -216,31 +219,11 @@ export type ProjectType = {
   created_at: string;
   updated_at: string;
   // aggregates (populated in list queries)
-  product_count?: number;
   co_manager_count?: number;
 };
 
 export type ProjectDetailType = ProjectType & {
   co_managers: Array<{ id: number; name: string; email: string }>;
-  products: ProjectProductType[];
-};
-
-export type ProjectProductStatus = 'pending' | 'in_progress' | 'completed';
-
-export type ProjectProductType = {
-  id: number;
-  project_id: number;
-  product_id: number;
-  product_name: string;
-  product_category_id: number | null;
-  product_category_name: string | null;
-  status: ProjectProductStatus;
-  drive_folder_id: string | null;
-  drive_folder_url: string | null;
-  created_at: string;
-  tasks?: ProjectTaskType[];
-  task_total?: number;
-  task_completed?: number;
 };
 
 export type ProjectTaskStatus = 'not_started' | 'waiting' | 'in_progress' | 'completed' | 'blocked';
@@ -248,7 +231,6 @@ export type ProjectTaskStatus = 'not_started' | 'waiting' | 'in_progress' | 'com
 export type ProjectTaskType = {
   id: number;
   project_id: number;
-  project_product_id: number;
   template_id: number | null;
   title: string;
   description: string | null;
