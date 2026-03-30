@@ -3,8 +3,10 @@ import StarterKit from "@tiptap/starter-kit";
 import { MarkButton } from "../tiptap-ui/mark-button";
 import { HeadingButton } from "../tiptap-ui/heading-button";
 import { ListButton } from "../tiptap-ui/list-button";
+import { LinkButton } from "../tiptap-ui/link-button/link-button";
 import { TaskItem } from '@tiptap/extension-task-item'
 import { TaskList } from '@tiptap/extension-task-list';
+import { Link } from '@tiptap/extension-link';
 
 import { Underline } from '@tiptap/extension-underline'
 import { Superscript } from '@tiptap/extension-superscript'
@@ -28,7 +30,19 @@ export const RichTextEditor = ({
 }) => {
   const editor = useEditor({
     immediatelyRender: false,
-    extensions: [StarterKit, TaskList, TaskItem.configure({ nested: true }), Underline, Superscript, Subscript],
+    extensions: [
+      StarterKit, 
+      TaskList, 
+      TaskItem.configure({ nested: true }), 
+      Underline, 
+      Superscript, 
+      Subscript,
+      Link.configure({
+        openOnClick: false,
+        autolink: true,
+        defaultProtocol: 'https',
+      }),
+    ],
     content: value,
     onUpdate: ({ editor }) => {
       onChange(editor.getHTML());
@@ -58,6 +72,7 @@ export const RichTextEditor = ({
             <HeadingButton level={2}></HeadingButton>
             <HeadingButton level={3}></HeadingButton>
             <ListButton type="bulletList" />
+            <LinkButton />
           </div>
         </div>
         <EditorContent editor={editor} placeholder={placeholder} />
