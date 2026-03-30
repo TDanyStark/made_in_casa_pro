@@ -159,6 +159,11 @@ export type ProductType = {
 export type TaskType = 'execution' | 'validation';
 export type TaskFlag = 'new' | 'correction' | 'adjustment';
 
+export type TemplateQuoter = {
+  user_id: number;
+  user_name: string;
+};
+
 export type ProductTaskTemplateType = {
   id: number;
   product_id: number;
@@ -174,6 +179,8 @@ export type ProductTaskTemplateType = {
   requires_quote: number; // 0 | 1
   assign_to_commercial: number; // 0 | 1
   created_at: string;
+  /** Pre-configured external quoters (only present when requires_quote=1) */
+  quoters?: TemplateQuoter[];
 };
 
 // ─── Projects module ────────────────────────────────────────────────────────

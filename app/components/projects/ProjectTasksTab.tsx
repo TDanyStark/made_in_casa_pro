@@ -121,17 +121,36 @@ const TASK_FLAG_CONFIG: Record<TaskFlag, { label: string; className: string }> =
 
 // ─── Task form schema ────────────────────────────────────────────────────────
 
-const taskSchema = z.object({
-  title: z.string().min(1, "El título es requerido"),
-  description: z.string().optional().nullable(),
-  status: z.enum(["not_started", "waiting", "in_progress", "completed", "blocked"]).optional(),
-  task_type: z.enum(["execution", "validation"]).default("execution"),
-  requires_quote: z.boolean().default(false),
-  // assignment
-  assign_mode: z.enum(["auto", "commercial", "specific"]).default("auto"),
-  area_id: z.coerce.number().positive().optional().nullable(),
-  assigned_user_id: z.coerce.number().positive().optional().nullable(),
-});
+const taskSchema = z
+  .object({
+    title: z.string().min(1, "El título es requerido"),
+    description: z.string().optional().nullable(),
+    status: z.enum(["not_started", "waiting", "in_progress", "completed", "blocked"]).optional(),
+    task_type: z.enum(["execution", "validation"]).default("execution"),
+    requires_quote: z.boolean().default(false),
+    // assignment
+    assign_mode: z.enum(["auto", "commercial", "specific"]).default("auto"),
+    area_id: z.coerce.number().positive().optional().nullable(),
+    assigned_user_id: z.coerce.number().positive().optional().nullable(),
+  })
+  .superRefine((data, ctx) => {
+    // In project tasks (real tasks), "specific" mode requires selecting a person
+    if (data.assign_mode === "specific" && !data.assigned_user_id) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Debes seleccionar una persona cuando el modo es 'Persona específica'",
+        path: ["assigned_user_id"],
+      });
+    }
+    // "auto" mode requires an area to be able to auto-assign
+    if (data.assign_mode === "auto" && !data.area_id && !data.requires_quote) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Selecciona un área para la auto-asignación, o cambia a otro modo",
+        path: ["area_id"],
+      });
+    }
+  });
 
 type TaskFormValues = z.infer<typeof taskSchema>;
 
@@ -950,15 +969,38 @@ export function ProjectTasksTab({
                 )}
 
                 {/* Unified assignment widget */}
-                <TaskAssignmentSelector
-                  assignMode={assignMode}
-                  onAssignModeChange={(mode) => form.setValue("assign_mode", mode)}
-                  areaId={areaId ?? null}
-                  onAreaIdChange={(id) => form.setValue("area_id", id)}
-                  assignedUserId={form.watch("assigned_user_id") ?? null}
-                  onAssignedUserIdChange={(id) => form.setValue("assigned_user_id", id)}
-                  requiresQuote={requiresQuote}
-                />
+                <div className="space-y-1">
+                  <TaskAssignmentSelector
+                    assignMode={assignMode}
+                    onAssignModeChange={(mode) => {
+                      form.setValue("assign_mode", mode);
+                      // Clear validation errors when mode changes
+                      form.clearErrors(["assigned_user_id", "area_id"]);
+                    }}
+                    areaId={areaId ?? null}
+                    onAreaIdChange={(id) => {
+                      form.setValue("area_id", id);
+                      form.clearErrors("area_id");
+                    }}
+                    assignedUserId={form.watch("assigned_user_id") ?? null}
+                    onAssignedUserIdChange={(id) => {
+                      form.setValue("assigned_user_id", id);
+                      if (id) form.clearErrors("assigned_user_id");
+                    }}
+                    requiresQuote={requiresQuote}
+                  />
+                  {/* Show validation errors for assignment fields */}
+                  {form.formState.errors.assigned_user_id && (
+                    <p className="text-xs text-destructive font-medium px-1">
+                      {form.formState.errors.assigned_user_id.message}
+                    </p>
+                  )}
+                  {form.formState.errors.area_id && (
+                    <p className="text-xs text-destructive font-medium px-1">
+                      {form.formState.errors.area_id.message}
+                    </p>
+                  )}
+                </div>
 
                 {editingTask && (
                   <FormField

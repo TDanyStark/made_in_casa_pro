@@ -14,6 +14,25 @@ export async function getAreas() {
   }
 }
 
+/** Returns only areas that have at least one active internal collaborator. */
+export async function getAreasWithActiveInternals() {
+  try {
+    const result = await db.execute(`
+      SELECT DISTINCT a.id, a.name
+      FROM areas a
+      INNER JOIN users u ON u.area_id = a.id
+        AND u.is_active = 1
+        AND u.is_internal = 1
+        AND u.rol_id = 4
+      ORDER BY a.name ASC
+    `);
+    return result.rows as unknown as AreaType[];
+  } catch (error) {
+    console.error("Error fetching areas with active internals:", error);
+    return [];
+  }
+}
+
 export async function getAreaById(id: string) {
   try {
     const result = await db.execute({

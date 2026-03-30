@@ -42,6 +42,7 @@ const taskSchema = z.object({
   assign_mode: z.enum(["auto", "commercial", "specific"]).default("auto"),
   area_id: z.coerce.number().positive().optional().nullable(),
   assigned_user_id: z.coerce.number().positive().optional().nullable(),
+  quoter_ids: z.array(z.number()).default([]),
 });
 
 type TaskFormValues = z.infer<typeof taskSchema>;
@@ -102,10 +103,11 @@ export default function ProductTasksManager({ productId, initialTasks = [] }: Pr
   const requiresQuote = form.watch("requires_quote");
   const assignMode = form.watch("assign_mode");
   const areaId = form.watch("area_id");
+  const quoterIds = form.watch("quoter_ids");
 
   function openCreate() {
     setEditingTask(null);
-    form.reset({ title: "", description: "", task_type: "execution", requires_quote: false, assign_mode: "auto", area_id: null, assigned_user_id: null });
+    form.reset({ title: "", description: "", task_type: "execution", requires_quote: false, assign_mode: "auto", area_id: null, assigned_user_id: null, quoter_ids: [] });
     setDialogOpen(true);
   }
 
@@ -116,6 +118,7 @@ export default function ProductTasksManager({ productId, initialTasks = [] }: Pr
       task_type: task.task_type ?? "execution", requires_quote: task.requires_quote === 1,
       assign_mode: deriveAssignMode(task), area_id: task.area_id ?? null,
       assigned_user_id: task.assigned_user_id ?? null,
+      quoter_ids: task.quoters?.map((q) => q.user_id) ?? [],
     });
     setDialogOpen(true);
   }
@@ -131,6 +134,7 @@ export default function ProductTasksManager({ productId, initialTasks = [] }: Pr
         assign_to_commercial: values.assign_mode === "commercial" ? 1 : 0,
         area_id: values.assign_mode !== "commercial" ? (values.area_id ?? null) : null,
         assigned_user_id: values.assign_mode === "specific" ? (values.assigned_user_id ?? null) : null,
+        quoter_ids: values.requires_quote ? (values.quoter_ids ?? []) : [],
       };
 
       if (editingTask) {
@@ -202,6 +206,9 @@ export default function ProductTasksManager({ productId, initialTasks = [] }: Pr
                   {task.requires_quote === 1 && (
                     <Badge variant="outline" className="text-xs text-amber-700 border-amber-400 bg-amber-50 dark:bg-amber-900/20">
                       Cotización requerida
+                      {task.quoters && task.quoters.length > 0 && (
+                        <span className="ml-1">· {task.quoters.length} externo(s)</span>
+                      )}
                     </Badge>
                   )}
                   {task.assign_to_commercial === 1 && (
@@ -293,7 +300,9 @@ export default function ProductTasksManager({ productId, initialTasks = [] }: Pr
                   <FormLabel>Tipo de tarea</FormLabel>
                   <FormControl>
                     <Select value={field.value} onValueChange={field.onChange}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectTrigger className="h-16">
+                        <SelectValue />
+                      </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="execution">
                           <div className="flex flex-col">
@@ -322,11 +331,16 @@ export default function ProductTasksManager({ productId, initialTasks = [] }: Pr
                         checked={field.value}
                         onCheckedChange={(checked) => {
                           field.onChange(checked);
-                          if (checked) { form.setValue("assigned_user_id", null); form.setValue("assign_mode", "auto"); }
+                          if (checked) {
+                            form.setValue("assigned_user_id", null);
+                            form.setValue("assign_mode", "auto");
+                          } else {
+                            form.setValue("quoter_ids", []);
+                          }
                         }}
                       />
                     </FormControl>
-                    <div className="space-y-0.5">
+                    <div className="space-y-0.5 -mt-2">
                       <FormLabel className="text-sm font-medium cursor-pointer">Requiere cotización de externo</FormLabel>
                       <p className="text-xs text-muted-foreground">
                         El flujo se bloqueará hasta que un externo presente su propuesta y sea aceptada.
@@ -345,6 +359,8 @@ export default function ProductTasksManager({ productId, initialTasks = [] }: Pr
                   onAreaIdChange={(id) => form.setValue("area_id", id)}
                   assignedUserId={form.watch("assigned_user_id") ?? null}
                   onAssignedUserIdChange={(id) => form.setValue("assigned_user_id", id)}
+                  quoterIds={quoterIds}
+                  onQuoterIdsChange={(ids) => form.setValue("quoter_ids", ids)}
                   requiresQuote={requiresQuote}
                 />
               )} />

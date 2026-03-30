@@ -161,6 +161,55 @@ export async function deleteTaskTemplate(id: number): Promise<void> {
   }
 }
 
+// ─── Template quoters (pre-configured externals for requires_quote tasks) ────
+
+export async function getTemplateQuoters(
+  templateId: number
+): Promise<{ user_id: number; user_name: string }[]> {
+  try {
+    const result = await db.execute({
+      sql: `
+        SELECT pttq.user_id, u.name AS user_name
+        FROM product_task_template_quoters pttq
+        INNER JOIN users u ON u.id = pttq.user_id
+        WHERE pttq.template_id = $1
+        ORDER BY u.name ASC
+      `,
+      args: [templateId],
+    });
+    return result.rows as unknown as { user_id: number; user_name: string }[];
+  } catch (error) {
+    console.error("Error fetching template quoters:", error);
+    return [];
+  }
+}
+
+export async function setTemplateQuoters(
+  templateId: number,
+  userIds: number[]
+): Promise<void> {
+  const transaction = await db.transaction("write");
+  try {
+    // Delete existing quoters for this template
+    await transaction.execute({
+      sql: `DELETE FROM product_task_template_quoters WHERE template_id = $1`,
+      args: [templateId],
+    });
+    // Insert new quoters
+    for (const userId of userIds) {
+      await transaction.execute({
+        sql: `INSERT INTO product_task_template_quoters (template_id, user_id) VALUES ($1, $2)`,
+        args: [templateId, userId],
+      });
+    }
+    await transaction.commit();
+  } catch (error) {
+    await transaction.rollback();
+    console.error("Error setting template quoters:", error);
+    throw error;
+  }
+}
+
 export async function reorderTaskTemplates(
   productId: number,
   orderedIds: number[]

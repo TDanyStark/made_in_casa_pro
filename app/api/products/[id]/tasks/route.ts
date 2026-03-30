@@ -4,6 +4,8 @@ import { getProductById } from "@/lib/queries/products";
 import {
   getTaskTemplatesByProductId,
   createTaskTemplate,
+  setTemplateQuoters,
+  getTemplateQuoters,
 } from "@/lib/queries/productTaskTemplates";
 import { validateApiRole, validateHttpMethod } from "@/lib/services/api-auth";
 import { UserRole } from "@/lib/definitions";
@@ -16,6 +18,7 @@ const taskSchema = z.object({
   task_type: z.enum(["execution", "validation"]).optional().default("execution"),
   requires_quote: z.coerce.number().int().min(0).max(1).optional().default(0),
   assign_to_commercial: z.coerce.number().int().min(0).max(1).optional().default(0),
+  quoter_ids: z.array(z.coerce.number().int().positive()).optional().default([]),
 });
 
 export async function GET(
@@ -36,7 +39,14 @@ export async function GET(
   try {
     const { id } = await params;
     const tasks = await getTaskTemplatesByProductId(Number(id));
-    return NextResponse.json(tasks);
+    // Attach quoters to each template
+    const tasksWithQuoters = await Promise.all(
+      tasks.map(async (t) => ({
+        ...t,
+        quoters: t.requires_quote === 1 ? await getTemplateQuoters(t.id) : [],
+      }))
+    );
+    return NextResponse.json(tasksWithQuoters);
   } catch (error) {
     console.error("Error fetching task templates:", error);
     return NextResponse.json({ error: "Error al obtener las tareas" }, { status: 500 });
@@ -77,16 +87,24 @@ export async function POST(
     const existing = await getTaskTemplatesByProductId(Number(id));
     const order_index = existing.length;
 
+    const { quoter_ids, ...templateData } = validation.data;
+
     const task = await createTaskTemplate({
       product_id: Number(id),
       order_index,
-      ...validation.data,
-      task_type: validation.data.task_type ?? "execution",
-      requires_quote: validation.data.requires_quote ?? 0,
-      assign_to_commercial: validation.data.assign_to_commercial ?? 0,
+      ...templateData,
+      task_type: templateData.task_type ?? "execution",
+      requires_quote: templateData.requires_quote ?? 0,
+      assign_to_commercial: templateData.assign_to_commercial ?? 0,
     });
 
-    return NextResponse.json(task, { status: 201 });
+    // Save pre-configured quoters if requires_quote
+    if (templateData.requires_quote === 1 && quoter_ids && quoter_ids.length > 0) {
+      await setTemplateQuoters(task.id, quoter_ids);
+    }
+
+    const quoters = await getTemplateQuoters(task.id);
+    return NextResponse.json({ ...task, quoters }, { status: 201 });
   } catch (error) {
     console.error("Error creating task template:", error);
     return NextResponse.json({ error: "Error al crear la tarea" }, { status: 500 });

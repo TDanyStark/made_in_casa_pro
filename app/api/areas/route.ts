@@ -4,7 +4,8 @@ import {
   getAreas, 
   createArea,
   getAreaById,
-  getAreasWithPagination
+  getAreasWithPagination,
+  getAreasWithActiveInternals
 } from '@/lib/queries/areas';
 import { AreaType, UserRole } from '@/lib/definitions';
 import { validateApiRole, validateHttpMethod } from "@/lib/services/api-auth";
@@ -39,6 +40,7 @@ export async function GET(request: NextRequest) {
     const page = parseInt(url.searchParams.get("page") || "1");
     const limit = parseInt(url.searchParams.get("limit") || ITEMS_PER_PAGE.toString());
     const search = url.searchParams.get("search");
+    const withActiveInternals = url.searchParams.get("with_active_internals") === "1";
     
     // Si se solicita un área específica por ID
     if (id) {
@@ -68,6 +70,11 @@ export async function GET(request: NextRequest) {
         currentPage: page,
         total
       });
+    }
+    else if (withActiveInternals) {
+      // Solo áreas que tienen al menos un colaborador interno activo
+      const areas = await getAreasWithActiveInternals();
+      return NextResponse.json({ data: areas }, { status: 200 });
     }
     else {
       // Get all areas

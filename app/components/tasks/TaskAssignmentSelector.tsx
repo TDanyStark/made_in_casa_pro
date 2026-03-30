@@ -18,7 +18,7 @@
  * The component fetches users/areas internally; parent only gets values back via callbacks.
  */
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { get } from "@/lib/services/apiService";
 import { AreaType, UserRole } from "@/lib/definitions";
@@ -33,7 +33,9 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Users, Zap, UserCheck } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
+import { Users, Zap, UserCheck, X, Search } from "lucide-react";
 
 export type AssignMode = "auto" | "commercial" | "specific";
 
@@ -70,6 +72,10 @@ interface Props {
   assignedUserId: number | null;
   onAssignedUserIdChange: (id: number | null) => void;
 
+  /** Pre-selected external quoters (only relevant when requiresQuote=true) */
+  quoterIds?: number[];
+  onQuoterIdsChange?: (ids: number[]) => void;
+
   requiresQuote?: boolean;
   disabled?: boolean;
 }
@@ -81,15 +87,41 @@ export function TaskAssignmentSelector({
   onAreaIdChange,
   assignedUserId,
   onAssignedUserIdChange,
+  quoterIds = [],
+  onQuoterIdsChange,
   requiresQuote = false,
   disabled = false,
 }: Props) {
-  const { data: areas = [] } = useQuery<AreaType[]>({
+  // For "auto" mode, only show areas that have at least one active internal collaborator
+  const { data: areasForAuto = [] } = useQuery<AreaType[]>({
+    queryKey: ["areas-with-active-internals"],
+    queryFn: async () => {
+      const res = await get<{ data: AreaType[] }>("areas?with_active_internals=1");
+      return res.ok ? ((res.data as unknown as { data: AreaType[] })?.data ?? []) : [];
+    },
+    staleTime: 1000 * 60 * 5,
+  });
+
+  const { data: areasAll = [] } = useQuery<AreaType[]>({
     queryKey: ["areas-all"],
     queryFn: async () => {
       const res = await get<{ data: AreaType[] }>("areas");
       return res.ok ? ((res.data as unknown as { data: AreaType[] })?.data ?? []) : [];
     },
+    staleTime: 1000 * 60 * 5,
+    enabled: assignMode === "specific",
+  });
+
+  const areas = assignMode === "auto" ? areasForAuto : areasAll;
+
+  // External collaborators (for "requires_quote" quoter selection)
+  const { data: externalUsers = [] } = useQuery<UserOption[]>({
+    queryKey: ["external-collaborators-for-quote"],
+    queryFn: async () => {
+      const res = await get<UserOption[]>(`collaborators?only_external=1&all_users=1`);
+      return res.ok ? (res.data ?? []) : [];
+    },
+    enabled: requiresQuote,
     staleTime: 1000 * 60 * 5,
   });
 
@@ -105,6 +137,12 @@ export function TaskAssignmentSelector({
     enabled: assignMode === "specific",
     staleTime: 1000 * 60 * 2,
   });
+
+  const [quoterSearch, setQuoterSearch] = useState("");
+  const filteredExternals = externalUsers.filter((u) =>
+    u.name.toLowerCase().includes(quoterSearch.toLowerCase()) ||
+    (u.area_name ?? "").toLowerCase().includes(quoterSearch.toLowerCase())
+  );
 
   // When mode changes, clear user or area as needed
   useEffect(() => {
@@ -146,111 +184,115 @@ export function TaskAssignmentSelector({
 
   return (
     <div className="space-y-3">
-      {/* Mode selector */}
-      <div>
-        <label className="text-sm font-medium block mb-1.5">Asignación</label>
-        <div className="grid grid-cols-1 gap-2">
-          {/* Auto */}
-          <button
-            type="button"
-            disabled={disabled}
-            onClick={() => onAssignModeChange("auto")}
-            className={`flex items-start gap-3 rounded-md border p-3 text-left transition-colors ${
-              assignMode === "auto"
-                ? "border-primary bg-primary/5"
-                : "border-input hover:bg-muted/50"
-            } ${disabled ? "opacity-50 cursor-not-allowed" : ""}`}
-          >
-            <Zap className={`h-4 w-4 mt-0.5 flex-shrink-0 ${assignMode === "auto" ? "text-primary" : "text-muted-foreground"}`} />
-            <div>
-              <p className="text-sm font-medium leading-none">Auto-asignación por área</p>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                El sistema escoge el colaborador interno con menos carga del área seleccionada
-              </p>
-            </div>
-          </button>
+      {/* Mode selector + area — hidden when requiresQuote (externals don't use internal assignment) */}
+      {!requiresQuote && (
+        <>
+          <div>
+            <label className="text-sm font-medium block mb-1.5">Asignación</label>
+            <div className="grid grid-cols-1 gap-2">
+              {/* Auto */}
+              <button
+                type="button"
+                disabled={disabled}
+                onClick={() => onAssignModeChange("auto")}
+                className={`flex items-start gap-3 rounded-md border p-3 text-left transition-colors ${
+                  assignMode === "auto"
+                    ? "border-primary bg-primary/5"
+                    : "border-input hover:bg-muted/50"
+                } ${disabled ? "opacity-50 cursor-not-allowed" : ""}`}
+              >
+                <Zap className={`h-4 w-4 mt-0.5 flex-shrink-0 ${assignMode === "auto" ? "text-primary" : "text-muted-foreground"}`} />
+                <div>
+                  <p className="text-sm font-medium leading-none">Auto-asignación por área</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    El sistema escoge el colaborador interno con menos carga del área seleccionada
+                  </p>
+                </div>
+              </button>
 
-          {/* Commercial */}
-          <button
-            type="button"
-            disabled={disabled || !!requiresQuote}
-            onClick={() => onAssignModeChange("commercial")}
-            className={`flex items-start gap-3 rounded-md border p-3 text-left transition-colors ${
-              assignMode === "commercial"
-                ? "border-primary bg-primary/5"
-                : "border-input hover:bg-muted/50"
-            } ${(disabled || requiresQuote) ? "opacity-50 cursor-not-allowed" : ""}`}
-          >
-            <UserCheck className={`h-4 w-4 mt-0.5 flex-shrink-0 ${assignMode === "commercial" ? "text-primary" : "text-muted-foreground"}`} />
-            <div>
-              <p className="text-sm font-medium leading-none">Comercial encargado</p>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                Se asigna automáticamente al comercial que crea el proyecto
-              </p>
-            </div>
-          </button>
+              {/* Commercial */}
+              <button
+                type="button"
+                disabled={disabled}
+                onClick={() => onAssignModeChange("commercial")}
+                className={`flex items-start gap-3 rounded-md border p-3 text-left transition-colors ${
+                  assignMode === "commercial"
+                    ? "border-primary bg-primary/5"
+                    : "border-input hover:bg-muted/50"
+                } ${disabled ? "opacity-50 cursor-not-allowed" : ""}`}
+              >
+                <UserCheck className={`h-4 w-4 mt-0.5 flex-shrink-0 ${assignMode === "commercial" ? "text-primary" : "text-muted-foreground"}`} />
+                <div>
+                  <p className="text-sm font-medium leading-none">Comercial encargado</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Se asigna automáticamente al comercial que crea el proyecto
+                  </p>
+                </div>
+              </button>
 
-          {/* Specific */}
-          <button
-            type="button"
-            disabled={disabled || !!requiresQuote}
-            onClick={() => onAssignModeChange("specific")}
-            className={`flex items-start gap-3 rounded-md border p-3 text-left transition-colors ${
-              assignMode === "specific"
-                ? "border-primary bg-primary/5"
-                : "border-input hover:bg-muted/50"
-            } ${(disabled || requiresQuote) ? "opacity-50 cursor-not-allowed" : ""}`}
-          >
-            <Users className={`h-4 w-4 mt-0.5 flex-shrink-0 ${assignMode === "specific" ? "text-primary" : "text-muted-foreground"}`} />
-            <div>
-              <p className="text-sm font-medium leading-none">Persona específica</p>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                Selecciona cualquier usuario de la organización
-              </p>
+              {/* Specific */}
+              <button
+                type="button"
+                disabled={disabled}
+                onClick={() => onAssignModeChange("specific")}
+                className={`flex items-start gap-3 rounded-md border p-3 text-left transition-colors ${
+                  assignMode === "specific"
+                    ? "border-primary bg-primary/5"
+                    : "border-input hover:bg-muted/50"
+                } ${disabled ? "opacity-50 cursor-not-allowed" : ""}`}
+              >
+                <Users className={`h-4 w-4 mt-0.5 flex-shrink-0 ${assignMode === "specific" ? "text-primary" : "text-muted-foreground"}`} />
+                <div>
+                  <p className="text-sm font-medium leading-none">Persona específica</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Selecciona cualquier usuario de la organización
+                  </p>
+                </div>
+              </button>
             </div>
-          </button>
-        </div>
-      </div>
+          </div>
 
-      {/* Area selector — shown for auto and specific modes */}
-      {(assignMode === "auto" || assignMode === "specific") && (
-        <div>
-          <label className="text-sm font-medium block mb-1.5">
-            Área
-            {assignMode === "auto" && <span className="text-destructive ml-1">*</span>}
-            {assignMode === "specific" && <span className="text-muted-foreground text-xs ml-1">(opcional — filtra la lista)</span>}
-          </label>
-          <Select
-            value={areaId?.toString() ?? "none"}
-            onValueChange={(v) => {
-              onAreaIdChange(v === "none" ? null : Number(v));
-              onAssignedUserIdChange(null);
-            }}
-            disabled={disabled}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Seleccionar área" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="none">
-                {assignMode === "specific" ? "Todas las áreas" : "Sin área específica"}
-              </SelectItem>
-              {areas.map((area) => (
-                <SelectItem key={area.id!} value={area.id!.toString()}>
-                  {area.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          {assignMode === "auto" && !areaId && (
-            <p className="text-xs text-muted-foreground mt-1">
-              Si no seleccionas área, la auto-asignación no podrá ejecutarse.
-            </p>
+          {/* Area selector — shown for auto and specific modes */}
+          {(assignMode === "auto" || assignMode === "specific") && (
+            <div>
+              <label className="text-sm font-medium block mb-1.5">
+                Área
+                {assignMode === "auto" && <span className="text-destructive ml-1">*</span>}
+                {assignMode === "specific" && <span className="text-muted-foreground text-xs ml-1">(opcional — filtra la lista)</span>}
+              </label>
+              <Select
+                value={areaId?.toString() ?? "none"}
+                onValueChange={(v) => {
+                  onAreaIdChange(v === "none" ? null : Number(v));
+                  onAssignedUserIdChange(null);
+                }}
+                disabled={disabled}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Seleccionar área" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">
+                    {assignMode === "specific" ? "Todas las áreas" : "Sin área específica"}
+                  </SelectItem>
+                  {areas.map((area) => (
+                    <SelectItem key={area.id!} value={area.id!.toString()}>
+                      {area.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {assignMode === "auto" && !areaId && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  Si no seleccionas área, la auto-asignación no podrá ejecutarse.
+                </p>
+              )}
+            </div>
           )}
-        </div>
+        </>
       )}
 
-      {/* User selector — only for "specific" mode */}
+      {/* User selector — only for "specific" mode (never shown when requiresQuote) */}
       {assignMode === "specific" && !requiresQuote && (
         <div>
           <label className="text-sm font-medium block mb-1.5">Persona asignada</label>
@@ -336,6 +378,74 @@ export function TaskAssignmentSelector({
         </div>
       )}
 
+      {/* Quoters selector — only when requiresQuote is true */}
+      {requiresQuote && onQuoterIdsChange && (
+        <div>
+          <label className="text-sm font-medium block mb-1.5">
+            Externos que cotizarán
+            <span className="text-muted-foreground text-xs ml-1">(opcional — se invitarán automáticamente)</span>
+          </label>
+          {externalUsers.length === 0 ? (
+            <p className="text-xs text-muted-foreground bg-muted/50 rounded-md px-3 py-2">
+              No hay colaboradores externos activos en el sistema.
+            </p>
+          ) : (
+            <div className="rounded-md border divide-y max-h-48 overflow-y-auto">
+              {externalUsers.map((u) => {
+                const checked = quoterIds.includes(u.id);
+                return (
+                  <label
+                    key={u.id}
+                    className={`flex items-center gap-3 px-3 py-2 cursor-pointer hover:bg-muted/50 transition-colors ${disabled ? "opacity-50 pointer-events-none" : ""}`}
+                  >
+                    <Checkbox
+                      checked={checked}
+                      onCheckedChange={(val) => {
+                        if (val) {
+                          onQuoterIdsChange([...quoterIds, u.id]);
+                        } else {
+                          onQuoterIdsChange(quoterIds.filter((id) => id !== u.id));
+                        }
+                      }}
+                      disabled={disabled}
+                    />
+                    <div className="flex-1 min-w-0">
+                      <span className="text-sm">{u.name}</span>
+                      {u.area_name && (
+                        <span className="text-xs text-muted-foreground ml-1.5">· {u.area_name}</span>
+                      )}
+                    </div>
+                    <span className="text-xs text-muted-foreground shrink-0">{u.active_task_count} tarea(s)</span>
+                  </label>
+                );
+              })}
+            </div>
+          )}
+          {quoterIds.length > 0 && (
+            <div className="flex flex-wrap gap-1.5 mt-2">
+              {quoterIds.map((id) => {
+                const u = externalUsers.find((x) => x.id === id);
+                if (!u) return null;
+                return (
+                  <Badge key={id} variant="secondary" className="text-xs gap-1">
+                    {u.name}
+                    {!disabled && (
+                      <button
+                        type="button"
+                        onClick={() => onQuoterIdsChange(quoterIds.filter((x) => x !== id))}
+                        className="hover:text-destructive"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    )}
+                  </Badge>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Info for commercial mode */}
       {assignMode === "commercial" && (
         <p className="text-xs text-muted-foreground bg-muted/50 rounded-md px-3 py-2">
@@ -344,10 +454,10 @@ export function TaskAssignmentSelector({
       )}
 
       {/* Info for requires_quote blocking */}
-      {requiresQuote && assignMode !== "auto" && (
+      {requiresQuote && (
         <p className="text-xs text-amber-600 bg-amber-50 dark:bg-amber-900/20 rounded-md px-3 py-2">
-          Con &quot;Requiere cotización&quot; activo, la asignación la define el externo que gane la cotización.
-          Solo la auto-asignación por área queda disponible como referencia.
+          Con &quot;Requiere cotización&quot; activo, la asignación final la define el externo que gane la cotización.
+          Los externos seleccionados arriba recibirán una invitación automáticamente al crear el proyecto.
         </p>
       )}
     </div>

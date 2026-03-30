@@ -631,13 +631,14 @@ export async function instantiateTasksFromTemplates(
         // First task ready to start, all others wait their turn
         const status: ProjectTaskStatus = i === 0 ? "not_started" : "waiting";
 
-        await transaction.execute({
+        const insertResult = await transaction.execute({
           sql: `
             INSERT INTO project_tasks
               (project_id, project_product_id, template_id, title, description,
                area_id, assigned_user_id, status, task_type, task_flag,
                requires_quote, assign_to_commercial, order_index)
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'new', $10, $11, $12)
+            RETURNING id
           `,
           args: [
             projectId,
@@ -654,6 +655,25 @@ export async function instantiateTasksFromTemplates(
             tpl.order_index,
           ],
         });
+
+        // Copy pre-configured quoters to task_quote_invitations
+        if (Number(tpl.requires_quote) === 1) {
+          const newTaskId = Number(insertResult.rows[0]?.id);
+          const templateQuoters = await db.execute({
+            sql: `SELECT user_id FROM product_task_template_quoters WHERE template_id = $1`,
+            args: [tpl.id],
+          });
+          for (const row of templateQuoters.rows) {
+            await transaction.execute({
+              sql: `
+                INSERT INTO task_quote_invitations (task_id, user_id, invited_by)
+                VALUES ($1, $2, NULL)
+                ON CONFLICT (task_id, user_id) DO NOTHING
+              `,
+              args: [newTaskId, (row as { user_id: number }).user_id],
+            });
+          }
+        }
       }
       await transaction.commit();
     } catch (err) {

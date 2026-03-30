@@ -4,6 +4,8 @@ import {
   getTaskTemplateById,
   updateTaskTemplate,
   deleteTaskTemplate,
+  setTemplateQuoters,
+  getTemplateQuoters,
 } from "@/lib/queries/productTaskTemplates";
 import { validateApiRole, validateHttpMethod } from "@/lib/services/api-auth";
 import { UserRole } from "@/lib/definitions";
@@ -16,6 +18,7 @@ const updateSchema = z.object({
   task_type: z.enum(["execution", "validation"]).optional(),
   requires_quote: z.coerce.number().int().min(0).max(1).optional(),
   assign_to_commercial: z.coerce.number().int().min(0).max(1).optional(),
+  quoter_ids: z.array(z.coerce.number().int().positive()).optional(),
 });
 
 export async function PATCH(
@@ -49,8 +52,17 @@ export async function PATCH(
       return NextResponse.json({ error: "Tarea no encontrada" }, { status: 404 });
     }
 
-    const updated = await updateTaskTemplate(Number(taskId), validation.data);
-    return NextResponse.json(updated);
+    const { quoter_ids, ...templateData } = validation.data;
+    const updated = await updateTaskTemplate(Number(taskId), templateData);
+
+    // Sync quoters: always replace if quoter_ids was explicitly sent
+    if (quoter_ids !== undefined) {
+      const requiresQuote = templateData.requires_quote ?? existing.requires_quote;
+      await setTemplateQuoters(Number(taskId), requiresQuote === 1 ? quoter_ids : []);
+    }
+
+    const quoters = await getTemplateQuoters(Number(taskId));
+    return NextResponse.json({ ...updated, quoters });
   } catch (error) {
     console.error("Error updating task template:", error);
     return NextResponse.json({ error: "Error al actualizar la tarea" }, { status: 500 });
