@@ -1,2 +1,0 @@
--- project_products table removed: product is now a single column on projects.
--- This migration is intentionally empty.

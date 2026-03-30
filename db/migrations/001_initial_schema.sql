@@ -1,4 +1,0 @@
--- SUPERSEDED: este archivo fue reemplazado por migraciones individuales.
--- Ver archivos 001_create_roles.sql … 012_add_indexes.sql
--- Se mantiene en la carpeta para que el tracker lo registre como aplicado
--- y no haya conflictos con historiales existentes.

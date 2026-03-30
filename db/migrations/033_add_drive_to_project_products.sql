@@ -1,2 +1,0 @@
--- Superseded by migration 019 (product_id now lives on projects table).
--- This migration is intentionally empty.

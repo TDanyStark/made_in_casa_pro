@@ -1,2 +1,0 @@
--- SUPERSEDED: los índices fueron movidos a 012_add_indexes.sql
--- Se mantiene para compatibilidad con el historial del tracker.
