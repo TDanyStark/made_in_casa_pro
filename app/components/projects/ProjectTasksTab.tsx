@@ -72,6 +72,7 @@ import {
   AlertTriangle,
   Clock,
   ShieldCheck,
+  HardDrive,
 } from "lucide-react";
 import ReactSelect from "react-select";
 import {
@@ -523,8 +524,19 @@ export function ProjectTasksTab({
                 const taskCount = getProductTasks(p.id).length;
                 return (
                   <AlertDialog key={p.id}>
-                    <div className="flex items-center gap-0 rounded-full border bg-muted/50 pl-3 pr-1 py-1 text-sm">
-                      <span className="mr-1 font-medium">{p.product_name}</span>
+                    <div className="flex items-center gap-1.5 rounded-full border bg-muted/50 pl-3 pr-1 py-1 text-sm">
+                      <span className="font-medium">{p.product_name}</span>
+                      {p.drive_folder_url && (
+                        <a
+                          href={p.drive_folder_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-blue-500 hover:text-blue-700 transition-colors"
+                          title="Ver carpeta en Drive"
+                        >
+                          <HardDrive className="h-3 w-3" />
+                        </a>
+                      )}
                       {taskCount > 0 && (
                         <span className="text-xs text-muted-foreground mr-1.5">
                           ({taskCount} tarea{taskCount !== 1 ? "s" : ""})
@@ -627,6 +639,18 @@ export function ProjectTasksTab({
                 return (
                   <TabsTrigger key={p.id} value={p.id.toString()} className="gap-1.5">
                     {p.product_name}
+                    {p.drive_folder_url && (
+                      <a
+                        href={p.drive_folder_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-blue-500 hover:text-blue-700 transition-colors"
+                        onClick={(e) => e.stopPropagation()}
+                        title="Ver carpeta en Drive"
+                      >
+                        <HardDrive className="h-3 w-3" />
+                      </a>
+                    )}
                     {hasBlocked && (
                       <AlertTriangle className="h-3 w-3 text-destructive" />
                     )}

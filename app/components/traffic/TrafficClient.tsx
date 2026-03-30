@@ -26,7 +26,7 @@ import SearchBar from "@/components/search/search";
 import Pagination from "@/components/pagination/Pagination";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
-import { User, Briefcase, Tag } from "lucide-react";
+import { User, Briefcase, Tag, HardDrive, ExternalLink } from "lucide-react";
 
 export function TrafficClient() {
   const searchParams = useSearchParams();
@@ -192,9 +192,22 @@ export function TrafficClient() {
                       >
                         {row.project_title}
                       </Link>
-                      <span className="text-xs text-muted-foreground">
-                        {row.product_name}
-                      </span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-muted-foreground">
+                          {row.product_name}
+                        </span>
+                        {row.drive_folder_url && (
+                          <a
+                            href={row.drive_folder_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-blue-500 hover:text-blue-700 transition-colors"
+                            title="Ver carpeta en Drive"
+                          >
+                            <HardDrive className="h-3 w-3" />
+                          </a>
+                        )}
+                      </div>
                     </div>
                   </TableCell>
                   <TableCell>

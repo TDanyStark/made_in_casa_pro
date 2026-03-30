@@ -30,6 +30,11 @@ const RichTextEditor = dynamic(
 interface DriveResult {
   projectFolderId: string;
   projectFolderUrl: string;
+  productFolders: Array<{
+    productName: string;
+    folderId: string;
+    folderUrl: string;
+  }>;
 }
 
 interface Props {
@@ -103,7 +108,16 @@ export function WizardStep5Confirm({ state, onBack }: Props) {
       if (state.products.length > 0) {
         setCurrentAction("Agregando productos...");
         for (const product of state.products) {
-          await post(`projects/${project.id}/products`, { product_id: product.id });
+          // Find the corresponding drive folder for this product
+          const productDrive = drive.productFolders.find(
+            (pf) => pf.productName === product.name
+          );
+
+          await post(`projects/${project.id}/products`, {
+            product_id: product.id,
+            drive_folder_id: productDrive?.folderId || null,
+            drive_folder_url: productDrive?.folderUrl || null,
+          });
         }
       }
 

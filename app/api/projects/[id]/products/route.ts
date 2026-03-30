@@ -5,10 +5,12 @@ import { UserRole } from "@/lib/definitions";
 import {
   getProjectProducts,
   addProductToProject,
-  getProjectById,
+  getProjectDetail,
 } from "@/lib/queries/projects";
 import { instantiateTasksFromTemplates } from "@/lib/queries/projectTasks";
 import { recalculateProjectProgress } from "@/lib/queries/projects";
+import { createProductFolder } from "@/lib/services/googleDrive";
+import { getProductById } from "@/lib/queries/products";
 
 const bodySchema = z.object({
   product_id: z.coerce.number().int().positive(),
@@ -53,14 +55,36 @@ export async function POST(request: NextRequest, { params }: Params) {
       );
     }
 
-    const { product_id } = validation.data;
+    let { product_id, drive_folder_id, drive_folder_url } = validation.data;
 
-    // Get project to resolve created_by for assign_to_commercial
-    const project = await getProjectById(projectId);
-    const commercialUserId = project?.created_by ?? null;
+    // Get project to resolve details
+    const project = await getProjectDetail(projectId);
+    if (!project) {
+      return NextResponse.json({ error: "Proyecto no encontrado" }, { status: 404 });
+    }
+
+    // If drive info is not provided but the project has a drive folder, create one for the product
+    if (!drive_folder_id && project.drive_folder_id) {
+      try {
+        const product = await getProductById(product_id);
+        if (product) {
+          const driveRes = await createProductFolder(project.drive_folder_id, product.name);
+          drive_folder_id = driveRes.folderId;
+          drive_folder_url = driveRes.folderUrl;
+          
+          // Note: In a real scenario, we might want to share this folder too.
+          // But createProductFolder doesn't currently take emails.
+          // For now, it will be created under the project folder which is already shared.
+        }
+      } catch (e) {
+        console.error("Error creating product drive folder:", e);
+      }
+    }
+
+    const commercialUserId = project.created_by ?? null;
 
     // Add product → get project_product id
-    const projectProductId = await addProductToProject(projectId, product_id);
+    const projectProductId = await addProductToProject(projectId, product_id, drive_folder_id, drive_folder_url);
 
     // Instantiate task templates as project tasks
     // Pass commercialUserId so assign_to_commercial=1 tasks get the project creator assigned
@@ -76,3 +100,4 @@ export async function POST(request: NextRequest, { params }: Params) {
     return NextResponse.json({ error: "Error al agregar producto al proyecto" }, { status: 500 });
   }
 }
+

@@ -86,6 +86,8 @@ export async function getProjectDetail(id: number): Promise<ProjectDetailType | 
           pr.category_id   AS product_category_id,
           pc.name          AS product_category_name,
           pp.status,
+          pp.drive_folder_id,
+          pp.drive_folder_url,
           pp.created_at,
           COUNT(pt.id)                                          AS task_total,
           COUNT(pt.id) FILTER (WHERE pt.status = 'completed')  AS task_completed
@@ -94,7 +96,7 @@ export async function getProjectDetail(id: number): Promise<ProjectDetailType | 
         LEFT JOIN product_categories pc ON pr.category_id = pc.id
         LEFT JOIN project_tasks pt ON pt.project_product_id = pp.id
         WHERE pp.project_id = $1
-        GROUP BY pp.id, pr.name, pr.category_id, pc.name
+        GROUP BY pp.id, pr.name, pr.category_id, pc.name, pp.status, pp.drive_folder_id, pp.drive_folder_url
         ORDER BY pp.created_at ASC
       `,
       args: [id],
@@ -350,6 +352,8 @@ export async function getProjectProducts(projectId: number): Promise<ProjectProd
           pr.category_id   AS product_category_id,
           pc.name          AS product_category_name,
           pp.status,
+          pp.drive_folder_id,
+          pp.drive_folder_url,
           pp.created_at,
           COUNT(pt.id)                                         AS task_total,
           COUNT(pt.id) FILTER (WHERE pt.status = 'completed') AS task_completed
@@ -358,7 +362,7 @@ export async function getProjectProducts(projectId: number): Promise<ProjectProd
         LEFT JOIN product_categories pc ON pr.category_id = pc.id
         LEFT JOIN project_tasks pt ON pt.project_product_id = pp.id
         WHERE pp.project_id = $1
-        GROUP BY pp.id, pr.name, pr.category_id, pc.name
+        GROUP BY pp.id, pr.name, pr.category_id, pc.name, pp.status, pp.drive_folder_id, pp.drive_folder_url
         ORDER BY pp.created_at ASC
       `,
       args: [projectId],
@@ -372,17 +376,19 @@ export async function getProjectProducts(projectId: number): Promise<ProjectProd
 
 export async function addProductToProject(
   projectId: number,
-  productId: number
+  productId: number,
+  drive_folder_id?: string | null,
+  drive_folder_url?: string | null
 ): Promise<number> {
   try {
     const result = await db.execute({
       sql: `
-        INSERT INTO project_products (project_id, product_id)
-        VALUES ($1, $2)
+        INSERT INTO project_products (project_id, product_id, drive_folder_id, drive_folder_url)
+        VALUES ($1, $2, $3, $4)
         ON CONFLICT (project_id, product_id) DO NOTHING
         RETURNING id
       `,
-      args: [projectId, productId],
+      args: [projectId, productId, drive_folder_id ?? null, drive_folder_url ?? null],
     });
     if (result.rows.length === 0) {
       // Already existed — fetch the existing id

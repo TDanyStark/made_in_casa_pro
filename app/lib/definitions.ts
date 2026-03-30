@@ -235,6 +235,8 @@ export type ProjectProductType = {
   product_category_id: number | null;
   product_category_name: string | null;
   status: ProjectProductStatus;
+  drive_folder_id: string | null;
+  drive_folder_url: string | null;
   created_at: string;
   tasks?: ProjectTaskType[];
   task_total?: number;

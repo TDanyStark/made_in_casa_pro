@@ -8,6 +8,8 @@ export type TrafficRowType = {
   project_title: string;
   project_product_id: number;
   product_name: string;
+  drive_folder_id: string | null;
+  drive_folder_url: string | null;
   task_count: number;
   task_completed: number;
   progress_percentage: number;
@@ -82,6 +84,8 @@ export async function getTrafficWithPagination({
           p.title AS project_title,
           pp.id AS project_product_id,
           pr.name AS product_name,
+          pp.drive_folder_id,
+          pp.drive_folder_url,
           COUNT(pt.id) AS task_count,
           COUNT(pt.id) FILTER (WHERE pt.status = 'completed') AS task_completed,
           b.name AS brand_name,
@@ -112,7 +116,7 @@ export async function getTrafficWithPagination({
         LEFT JOIN managers m ON p.manager_id = m.id
         LEFT JOIN project_tasks pt ON pt.project_product_id = pp.id
         ${whereSQL}
-        GROUP BY p.id, pp.id, pr.name, b.name, u_creator.name, m.name, p.updated_at
+        GROUP BY p.id, pp.id, pr.name, b.name, u_creator.name, m.name, p.updated_at, pp.drive_folder_id, pp.drive_folder_url
         ORDER BY p.updated_at DESC, pp.id ASC
         LIMIT ${limitPH} OFFSET ${offsetPH}
       `,
