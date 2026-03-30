@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm, Controller } from "react-hook-form";
@@ -104,6 +104,14 @@ export default function ProductTasksManager({ productId, initialTasks = [] }: Pr
   const assignMode = form.watch("assign_mode");
   const areaId = form.watch("area_id");
   const quoterIds = form.watch("quoter_ids");
+
+  // Reset quote fields when switching to validation (validation tasks are internal only)
+  useEffect(() => {
+    if (selectedTaskType === "validation") {
+      form.setValue("requires_quote", false);
+      form.setValue("quoter_ids", []);
+    }
+  }, [selectedTaskType, form]);
 
   function openCreate() {
     setEditingTask(null);
@@ -305,13 +313,13 @@ export default function ProductTasksManager({ productId, initialTasks = [] }: Pr
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="execution">
-                          <div className="flex flex-col">
+                          <div className="flex flex-col items-start">
                             <span>Ejecución</span>
                             <span className="text-xs text-muted-foreground">El colaborador ejecuta y pasa al siguiente</span>
                           </div>
                         </SelectItem>
                         <SelectItem value="validation">
-                          <div className="flex flex-col">
+                          <div className="flex flex-col items-start">
                             <span>Validación</span>
                             <span className="text-xs text-muted-foreground">Puede aprobar o rechazar y enviar a cualquier paso</span>
                           </div>

@@ -118,7 +118,7 @@ export function TaskAssignmentSelector({
   const { data: externalUsers = [] } = useQuery<UserOption[]>({
     queryKey: ["external-collaborators-for-quote"],
     queryFn: async () => {
-      const res = await get<UserOption[]>(`collaborators?only_external=1&all_users=1`);
+      const res = await get<UserOption[]>(`collaborators?only_external=1`);
       return res.ok ? (res.data ?? []) : [];
     },
     enabled: requiresQuote,
@@ -380,18 +380,36 @@ export function TaskAssignmentSelector({
 
       {/* Quoters selector — only when requiresQuote is true */}
       {requiresQuote && onQuoterIdsChange && (
-        <div>
-          <label className="text-sm font-medium block mb-1.5">
+        <div className="space-y-2">
+          <label className="text-sm font-medium block">
             Externos que cotizarán
             <span className="text-muted-foreground text-xs ml-1">(opcional — se invitarán automáticamente)</span>
           </label>
+
+          {externalUsers.length > 0 && (
+            <div className="relative">
+              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Buscar colaborador externo..."
+                className="pl-9 h-9"
+                value={quoterSearch}
+                onChange={(e) => setQuoterSearch(e.target.value)}
+                disabled={disabled}
+              />
+            </div>
+          )}
+
           {externalUsers.length === 0 ? (
             <p className="text-xs text-muted-foreground bg-muted/50 rounded-md px-3 py-2">
               No hay colaboradores externos activos en el sistema.
             </p>
+          ) : filteredExternals.length === 0 ? (
+            <p className="text-xs text-muted-foreground py-4 text-center border rounded-md border-dashed">
+              No se encontraron colaboradores que coincidan con &quot;{quoterSearch}&quot;
+            </p>
           ) : (
-            <div className="rounded-md border divide-y max-h-48 overflow-y-auto">
-              {externalUsers.map((u) => {
+            <div className="rounded-md border divide-y max-h-48 overflow-y-auto bg-card">
+              {filteredExternals.map((u) => {
                 const checked = quoterIds.includes(u.id);
                 return (
                   <label
@@ -410,7 +428,7 @@ export function TaskAssignmentSelector({
                       disabled={disabled}
                     />
                     <div className="flex-1 min-w-0">
-                      <span className="text-sm">{u.name}</span>
+                      <span className="text-sm font-medium">{u.name}</span>
                       {u.area_name && (
                         <span className="text-xs text-muted-foreground ml-1.5">· {u.area_name}</span>
                       )}
