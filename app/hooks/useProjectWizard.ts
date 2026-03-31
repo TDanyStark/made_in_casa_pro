@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { ProductType } from "@/lib/definitions";
 
 export interface WizardManager {
@@ -96,17 +96,17 @@ export function useProjectWizard() {
   const [state, setState] = useState<WizardState>(INITIAL_STATE);
   const [currentStep, setCurrentStep] = useState(0);
 
-  const update = (partial: Partial<WizardState>) => {
+  const update = useCallback((partial: Partial<WizardState>) => {
     setState((prev) => ({ ...prev, ...partial }));
-  };
+  }, []);
 
-  const next = () => setCurrentStep((s) => Math.min(s + 1, 5));
-  const prev = () => setCurrentStep((s) => Math.max(s - 1, 0));
-  const goTo = (step: number) => setCurrentStep(step);
-  const reset = () => {
+  const next = useCallback(() => setCurrentStep((s) => Math.min(s + 1, 5)), []);
+  const prev = useCallback(() => setCurrentStep((s) => Math.max(s - 1, 0)), []);
+  const goTo = useCallback((step: number) => setCurrentStep(step), []);
+  const reset = useCallback(() => {
     setState(INITIAL_STATE);
     setCurrentStep(0);
-  };
+  }, []);
 
   return { state, update, currentStep, next, prev, goTo, reset };
 }

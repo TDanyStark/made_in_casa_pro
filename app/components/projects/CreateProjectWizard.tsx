@@ -1,7 +1,7 @@
 "use client";
 
 import { useProjectWizard } from "@/hooks/useProjectWizard";
-import { useEffect } from "react";
+import { useEffect, useCallback } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { get } from "@/lib/services/apiService";
 import { ProjectPreviewCard } from "./ProjectPreviewCard";
@@ -39,7 +39,7 @@ export function CreateProjectWizard() {
 
   // Sync current user to state if not set
   useEffect(() => {
-    if (me && !state.created_by) {
+    if (me?.id && state.created_by === null) {
       update({
         created_by: me.id,
         created_by_name: me.name
@@ -47,10 +47,10 @@ export function CreateProjectWizard() {
     }
   }, [me, state.created_by, update]);
 
-  const handleNext = (data: Partial<WizardState>) => {
+  const handleNext = useCallback((data: Partial<WizardState>) => {
     update(data);
     next();
-  };
+  }, [update, next]);
 
   const renderStep = () => {
     switch (currentStep) {
