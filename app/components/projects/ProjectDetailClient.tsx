@@ -4,7 +4,6 @@ import { useQuery } from "@tanstack/react-query";
 import { get } from "@/lib/services/apiService";
 import { ProjectDetailType, UserRole } from "@/lib/definitions";
 import { ProjectHeader } from "./ProjectHeader";
-import { ProjectTasksTab } from "./ProjectTasksTab";
 import { ProjectQuotesTab } from "./ProjectQuotesTab";
 import { ProjectNotesEditor } from "./ProjectNotesEditor";
 import { ProjectCoManagersTab } from "./ProjectCoManagersTab";
@@ -67,7 +66,6 @@ export function ProjectDetailClient({ projectId, userRole, currentUserId }: Prop
           <TabsTrigger value="tasks">
             Tareas
           </TabsTrigger>
-          <TabsTrigger value="adjustments">Ajustes</TabsTrigger>
           {canEdit && (
             <TabsTrigger value="quotes">Cotizaciones</TabsTrigger>
           )}
@@ -82,17 +80,6 @@ export function ProjectDetailClient({ projectId, userRole, currentUserId }: Prop
         </TabsList>
 
         <TabsContent value="tasks" className="mt-6">
-          <ProjectTasksTab
-            projectId={projectId}
-            productName={project.product_name}
-            canEdit={canEdit && project.status !== 'completed'}
-            currentUserId={currentUserId}
-            currentUserRole={userRole}
-            adjustmentId={null} // Tareas de v1
-          />
-        </TabsContent>
-
-        <TabsContent value="adjustments" className="mt-6">
           <ProjectAdjustmentsTab
             projectId={projectId}
             projectStatus={project.status}
@@ -100,6 +87,9 @@ export function ProjectDetailClient({ projectId, userRole, currentUserId }: Prop
             canEdit={canEdit}
             currentUserId={currentUserId}
             currentUserRole={userRole}
+            projectCreatedAt={project.created_at}
+            projectCompletedAt={project.completed_at}
+            projectDriveUrl={project.drive_folder_url}
           />
         </TabsContent>
 

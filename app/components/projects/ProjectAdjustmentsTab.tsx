@@ -7,7 +7,7 @@ import { ProjectAdjustmentType, UserRole } from "@/lib/definitions";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
-import { Loader2, Plus, ExternalLink, HardDrive } from "lucide-react";
+import { Loader2, Plus, ExternalLink, HardDrive, ChevronDown, ChevronUp } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { ProjectTasksTab } from "./ProjectTasksTab";
@@ -19,6 +19,9 @@ interface Props {
   canEdit: boolean;
   currentUserId?: number;
   currentUserRole: UserRole;
+  projectCreatedAt: string;
+  projectCompletedAt?: string;
+  projectDriveUrl?: string | null;
 }
 
 export function ProjectAdjustmentsTab({
@@ -28,6 +31,9 @@ export function ProjectAdjustmentsTab({
   canEdit,
   currentUserId,
   currentUserRole,
+  projectCreatedAt,
+  projectCompletedAt,
+  projectDriveUrl,
 }: Props) {
   const queryClient = useQueryClient();
 
@@ -40,26 +46,16 @@ export function ProjectAdjustmentsTab({
     staleTime: 1000 * 60,
   });
 
-  const [activeTab, setActiveTab] = useState<number | null>(
-    adjustments.length > 0 ? adjustments[adjustments.length - 1].id : null
-  );
-
-  // If new adjustments are added, switch to the newest one
-  if (adjustments.length > 0 && activeTab === null) {
-    setActiveTab(adjustments[adjustments.length - 1].id);
-  }
-
   const { mutate: createAdjustment, isPending: isCreating } = useMutation({
     mutationFn: async () => {
-      const res = await post<ProjectAdjustmentType>(`projects/${projectId}/adjustments`, {});
+      const res = await post<{ data: ProjectAdjustmentType; ok: boolean; error?: string }>(`projects/${projectId}/adjustments`, {});
       if (!res.ok) throw new Error(res.error || "Error al crear ajuste");
       return res.data;
     },
-    onSuccess: (newAdj) => {
+    onSuccess: () => {
       toast.success("Nuevo ajuste creado");
       queryClient.invalidateQueries({ queryKey: ["project-adjustments", projectId] });
       queryClient.invalidateQueries({ queryKey: ["project", projectId] });
-      if (newAdj) setActiveTab(newAdj.id);
     },
     onError: (error: Error) => {
       toast.error(error.message);
@@ -75,26 +71,34 @@ export function ProjectAdjustmentsTab({
     projectStatus === "completed" || 
     (lastAdjustment && lastAdjustment.status === "completed");
 
-  const currentAdjustment = adjustments.find((a) => a.id === activeTab);
+  // Combinar V1 (proyecto original) y ajustes
+  const allVersions = [
+    {
+      id: "v1",
+      title: "Versión 1 (Original)",
+      adjustmentId: null,
+      status: adjustments.length > 0 ? "completed" : projectStatus,
+      createdAt: projectCreatedAt,
+      completedAt: projectCompletedAt,
+      driveUrl: projectDriveUrl,
+    },
+    ...adjustments.map((adj) => ({
+      id: `v${adj.version_number}`,
+      title: `Versión ${adj.version_number}`,
+      adjustmentId: adj.id,
+      status: adj.status,
+      createdAt: adj.created_at,
+      completedAt: adj.completed_at,
+      driveUrl: adj.drive_folder_url,
+    }))
+  ].reverse(); // Invertir para mostrar la versión más reciente (ej. V2) arriba
 
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div className="flex flex-wrap gap-2">
-          {adjustments.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No hay ajustes (versiones adicionales) para este proyecto.</p>
-          ) : (
-            adjustments.map((adj) => (
-              <Button
-                key={adj.id}
-                variant={activeTab === adj.id ? "default" : "outline"}
-                size="sm"
-                onClick={() => setActiveTab(adj.id)}
-              >
-                v{adj.version_number}
-              </Button>
-            ))
-          )}
+        <div>
+          <h2 className="text-lg font-semibold">Historial de Tareas y Versiones</h2>
+          <p className="text-sm text-muted-foreground">Administra las iteraciones de este proyecto.</p>
         </div>
 
         {canEdit && canCreateNew && (
@@ -105,45 +109,103 @@ export function ProjectAdjustmentsTab({
         )}
       </div>
 
-      {currentAdjustment && (
-        <div className="border rounded-lg p-5 space-y-4">
-          <div className="flex items-center justify-between flex-wrap gap-4 border-b pb-4">
-            <div>
-              <h3 className="text-lg font-semibold">Versión {currentAdjustment.version_number}</h3>
-              <div className="flex items-center gap-2 text-xs text-muted-foreground mt-1">
-                <span>Creado: {format(new Date(currentAdjustment.created_at), "MMM d, yyyy", { locale: es })}</span>
-                {currentAdjustment.completed_at && (
-                  <>
-                    <span>•</span>
-                    <span className="text-green-600 dark:text-green-400 font-medium">
-                      Finalizado: {format(new Date(currentAdjustment.completed_at), "MMM d, yyyy", { locale: es })}
-                    </span>
-                  </>
-                )}
-              </div>
-            </div>
-
-            {currentAdjustment.drive_folder_url && (
-              <Button variant="outline" size="sm" asChild>
-                <a href={currentAdjustment.drive_folder_url} target="_blank" rel="noopener noreferrer">
-                  <HardDrive className="h-3.5 w-3.5 mr-1.5" />
-                  Drive v{currentAdjustment.version_number}
-                  <ExternalLink className="h-3 w-3 ml-1 opacity-60" />
-                </a>
-              </Button>
-            )}
-          </div>
-
-          <div className="pt-2">
-            <ProjectTasksTab
+      <div className="space-y-4">
+        {allVersions.map((version, index) => {
+          // Expandir por defecto solo la versión más reciente
+          return (
+            <VersionAccordion
+              key={version.id}
+              version={version}
+              isInitiallyExpanded={index === 0}
               projectId={projectId}
               productName={productName}
-              canEdit={canEdit && currentAdjustment.status !== 'completed'}
+              canEdit={canEdit}
               currentUserId={currentUserId}
               currentUserRole={currentUserRole}
-              adjustmentId={currentAdjustment.id}
             />
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function VersionAccordion({
+  version,
+  isInitiallyExpanded,
+  projectId,
+  productName,
+  canEdit,
+  currentUserId,
+  currentUserRole,
+}: {
+  version: {
+    id: string;
+    title: string;
+    adjustmentId: number | null;
+    status: string;
+    createdAt: string;
+    completedAt?: string;
+    driveUrl?: string | null;
+  };
+  isInitiallyExpanded: boolean;
+  projectId: number;
+  productName: string | null;
+  canEdit: boolean;
+  currentUserId?: number;
+  currentUserRole: UserRole;
+}) {
+  const [expanded, setExpanded] = useState(isInitiallyExpanded);
+
+  return (
+    <div className="border rounded-lg bg-card overflow-hidden">
+      <div 
+        className="flex items-center justify-between p-4 cursor-pointer hover:bg-muted/50 transition-colors"
+        onClick={() => setExpanded(!expanded)}
+      >
+        <div>
+          <h3 className="text-base font-semibold">{version.title}</h3>
+          <div className="flex items-center gap-2 text-xs text-muted-foreground mt-1">
+            <span className={version.status === 'completed' ? "text-green-600 dark:text-green-400 font-medium" : "text-amber-600 dark:text-amber-400 font-medium"}>
+              {version.status === 'completed' ? 'Completado' : 'Activo'}
+            </span>
+            <span>•</span>
+            <span>Creado: {format(new Date(version.createdAt), "MMM d, yyyy", { locale: es })}</span>
+            {version.completedAt && (
+              <>
+                <span>•</span>
+                <span>Finalizado: {format(new Date(version.completedAt), "MMM d, yyyy", { locale: es })}</span>
+              </>
+            )}
           </div>
+        </div>
+
+        <div className="flex items-center gap-4">
+          {version.driveUrl && (
+            <Button variant="outline" size="sm" asChild onClick={(e) => e.stopPropagation()}>
+              <a href={version.driveUrl} target="_blank" rel="noopener noreferrer">
+                <HardDrive className="h-3.5 w-3.5 mr-1.5" />
+                Drive
+                <ExternalLink className="h-3 w-3 ml-1 opacity-60" />
+              </a>
+            </Button>
+          )}
+          <div className="p-1 text-muted-foreground">
+            {expanded ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
+          </div>
+        </div>
+      </div>
+
+      {expanded && (
+        <div className="p-4 border-t bg-muted/10">
+          <ProjectTasksTab
+            projectId={projectId}
+            productName={productName}
+            canEdit={canEdit && version.status !== 'completed'}
+            currentUserId={currentUserId}
+            currentUserRole={currentUserRole}
+            adjustmentId={version.adjustmentId}
+          />
         </div>
       )}
     </div>

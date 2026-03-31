@@ -30,7 +30,20 @@ export async function GET(request: NextRequest, { params }: Params) {
   if (!roleValidation.isAuthorized) return roleValidation.response;
 
   const { id } = await params;
-  const tasks = await getTasksByProject(parseInt(id));
+  
+  const searchParams = request.nextUrl.searchParams;
+  let adjustmentId: number | null | undefined = undefined;
+  
+  if (searchParams.has("adjustment_id")) {
+    const val = searchParams.get("adjustment_id");
+    if (val === "null") {
+      adjustmentId = null;
+    } else {
+      adjustmentId = parseInt(val!, 10);
+    }
+  }
+
+  const tasks = await getTasksByProject(parseInt(id), adjustmentId);
   return NextResponse.json(tasks);
 }
 
