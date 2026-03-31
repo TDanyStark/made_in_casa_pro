@@ -78,20 +78,17 @@ export function TaskValidationDialog({
 
   if (!task) return null;
 
-  const isCorrection = task.task_flag === "correction";
-  const lastValIndex = isCorrection
-    ? Math.max(
-        ...siblings
-          .filter(
-            (t) =>
-              t.task_type === "validation" &&
-              t.status === "completed" &&
-              t.order_index < task.order_index
-          )
-          .map((t) => t.order_index),
-        -1
+  const lastValIndex = Math.max(
+    ...siblings
+      .filter(
+        (t) =>
+          t.task_type === "validation" &&
+          t.status === "completed" &&
+          t.order_index < task.order_index
       )
-    : -1;
+      .map((t) => t.order_index),
+    -1
+  );
 
   const isRejectAction = action === "reject";
   const isNotesEmpty = isHtmlEmpty(notes);
@@ -216,9 +213,7 @@ export function TaskValidationDialog({
                 <SelectContent>
                   {siblings
                     .filter((t) => {
-                      const baseFilter = t.id !== task.id && t.order_index < task.order_index;
-                      if (!isCorrection) return baseFilter;
-                      return baseFilter && t.order_index > lastValIndex;
+                      return t.id !== task.id && t.order_index < task.order_index && t.order_index > lastValIndex;
                     })
                     .sort((a, b) => a.order_index - b.order_index)
                     .map((t) => (

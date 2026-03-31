@@ -469,6 +469,7 @@ export function ProjectTasksTab({
     try {
       const res = await post(`projects/${projectId}/tasks/reorder`, {
         orderedIds: optimisticTasks.map((t) => t.id),
+        adjustment_id: adjustmentId,
       });
       if (!res.ok) throw new Error(res.error);
       

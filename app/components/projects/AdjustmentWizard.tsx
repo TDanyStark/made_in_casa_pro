@@ -387,6 +387,15 @@ export function AdjustmentWizard({ open, onOpenChange, productId, createdByName,
                             updateTask(task.id, { assigned_user_id: userId, assigned_user_name: name, assign_to_commercial: atc ?? task.assign_to_commercial });
                           }}
                         />
+                        <Select value={task.task_type} onValueChange={v => updateTask(task.id, { task_type: v as "execution" | "validation" })}>
+                          <SelectTrigger className="h-7 text-xs w-[100px] gap-1 px-2">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="execution">Ejecución</SelectItem>
+                            <SelectItem value="validation" disabled={localTasks.findIndex(t => t.id === task.id) === 0}>Validación</SelectItem>
+                          </SelectContent>
+                        </Select>
                         <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive" type="button" onClick={() => handleRemoveTask(task)}>
                           <Trash2 className="h-3.5 w-3.5" />
                         </Button>

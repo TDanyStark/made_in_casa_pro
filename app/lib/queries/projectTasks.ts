@@ -287,26 +287,32 @@ export async function deleteProjectTask(id: number): Promise<void> {
 
 export async function reorderProjectTasks(
   projectId: number,
-  orderedIds: number[]
+  orderedIds: number[],
+  adjustmentId?: number | null
 ): Promise<void> {
-  const currentTasks = await getTasksByProject(projectId);
+  const currentTasks = await getTasksByProject(projectId, adjustmentId);
   const completedTaskIds = currentTasks.filter(t => t.status === "completed").map(t => t.id);
 
   // Business Rule: Completed tasks must not change their position relative to others
   // In practice, this means they stay at their fixed order_index (assuming they were at the top)
   for (const tid of completedTaskIds) {
-    const currentIdx = currentTasks.find(t => t.id === tid)!.order_index;
+    const task = currentTasks.find(t => t.id === tid)!;
+    const currentIdx = task.order_index;
     const newIdx = orderedIds.indexOf(tid);
-    if (newIdx !== currentIdx) {
+    
+    // If the completed task is in the list being reordered, its index must match its current order_index
+    if (newIdx !== -1 && newIdx !== currentIdx) {
       throw new Error("Las tareas completadas no pueden ser reordenadas.");
     }
   }
+
+  const adjustmentFilter = adjustmentId === undefined ? "" : (adjustmentId === null ? "AND adjustment_id IS NULL" : `AND adjustment_id = ${adjustmentId}`);
 
   const transaction = await db.transaction("write");
   try {
     for (let i = 0; i < orderedIds.length; i++) {
       await transaction.execute({
-        sql: `UPDATE project_tasks SET order_index = $1 WHERE id = $2 AND project_id = $3`,
+        sql: `UPDATE project_tasks SET order_index = $1 WHERE id = $2 AND project_id = $3 ${adjustmentFilter}`,
         args: [i, orderedIds[i], projectId],
       });
     }
@@ -315,7 +321,7 @@ export async function reorderProjectTasks(
     // 1. The first task that is NOT completed must be set to 'not_started' if it was 'waiting'
     // 2. All subsequent tasks that are 'not_started' must be set to 'waiting'
     const updatedTasksResult = await transaction.execute({
-      sql: `SELECT id, status, assigned_user_id FROM project_tasks WHERE project_id = $1 ORDER BY order_index ASC`,
+      sql: `SELECT id, status, assigned_user_id FROM project_tasks WHERE project_id = $1 ${adjustmentFilter} ORDER BY order_index ASC`,
       args: [projectId],
     });
     const updatedTasks = updatedTasksResult.rows as unknown as { id: number; status: ProjectTaskStatus; assigned_user_id: number | null }[];
@@ -539,16 +545,21 @@ export async function createRejectionLoopTasks(
   const taskN = taskNResult.rows[0] as unknown as { id: number; order_index: number; task_flag: string; status: string; adjustment_id: number | null };
   const taskM = taskMResult.rows[0] as unknown as { id: number; order_index: number };
 
-  // Step 2: Fetch the range of tasks between M and N inclusive
+  // Step 2: Fetch the range of tasks between M and N inclusive (ONLY within the same adjustment)
+  const adjustmentFilterSQL = taskN.adjustment_id === null ? "AND adjustment_id IS NULL" : "AND adjustment_id = $4";
+  const rangeArgs = [projectId, taskM.order_index, taskN.order_index];
+  if (taskN.adjustment_id !== null) rangeArgs.push(taskN.adjustment_id);
+
   const rangeResult = await db.execute({
     sql: `
       SELECT * FROM project_tasks 
       WHERE project_id = $1 
         AND order_index >= $2 
         AND order_index <= $3
+        ${adjustmentFilterSQL}
       ORDER BY order_index ASC
     `,
-    args: [projectId, taskM.order_index, taskN.order_index],
+    args: rangeArgs,
   });
 
   const rangeTasks = rangeResult.rows as unknown as ProjectTaskType[];

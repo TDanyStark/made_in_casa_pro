@@ -6,6 +6,7 @@ import { reorderProjectTasks } from "@/lib/queries/projectTasks";
 
 const schema = z.object({
   orderedIds: z.array(z.number().int().positive()).min(1),
+  adjustment_id: z.number().int().positive().optional().nullable(),
 });
 
 type Params = { params: Promise<{ id: string }> };
@@ -24,9 +25,10 @@ export async function POST(request: NextRequest, { params }: Params) {
     const body = await request.json();
     const validation = schema.safeParse(body);
     if (!validation.success) {
-      return NextResponse.json({ error: "Datos inválidos" }, { status: 400 });
+      return NextResponse.json({ error: "Datos inválidos", details: validation.error.format() }, { status: 400 });
     }
-    await reorderProjectTasks(parseInt(id), validation.data.orderedIds);
+    const { orderedIds, adjustment_id } = validation.data;
+    await reorderProjectTasks(parseInt(id), orderedIds, adjustment_id);
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("Error reordering tasks:", error);
