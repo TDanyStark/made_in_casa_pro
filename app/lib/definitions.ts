@@ -193,7 +193,7 @@ export type CampaignType = {
   created_at: string;
 };
 
-export type ProjectStatus = 'active' | 'paused' | 'completed' | 'archived';
+export type ProjectStatus = 'active' | 'paused' | 'completed' | 'archived' | 'in_adjustments';
 
 export type ProjectType = {
   id: number;
@@ -218,12 +218,24 @@ export type ProjectType = {
   created_by_name: string | null;
   created_at: string;
   updated_at: string;
+  completed_at?: string;
   // aggregates (populated in list queries)
   co_manager_count?: number;
 };
 
 export type ProjectDetailType = ProjectType & {
   co_managers: Array<{ id: number; name: string; email: string }>;
+};
+
+export type ProjectAdjustmentType = {
+  id: number;
+  project_id: number;
+  version_number: number;
+  drive_folder_id: string | null;
+  drive_folder_url: string | null;
+  status: 'active' | 'completed';
+  created_at: string;
+  completed_at?: string;
 };
 
 export type ProjectTaskStatus = 'not_started' | 'waiting' | 'in_progress' | 'completed' | 'blocked';
@@ -242,6 +254,7 @@ export type ProjectTaskType = {
   status: ProjectTaskStatus;
   task_type: TaskType;
   task_flag: TaskFlag;
+  adjustment_id: number | null;
   requires_quote: number; // 0 | 1
   assign_to_commercial: number; // 0 | 1
   order_index: number;

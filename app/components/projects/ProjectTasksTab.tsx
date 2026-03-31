@@ -237,6 +237,7 @@ interface Props {
   canEdit: boolean;
   currentUserId?: number;
   currentUserRole?: number;
+  adjustmentId?: number | null;
 }
 
 // ─── Validate dialog ─────────────────────────────────────────────────────────
@@ -254,6 +255,7 @@ export function ProjectTasksTab({
   canEdit,
   currentUserId,
   currentUserRole,
+  adjustmentId = null,
 }: Props) {
   const queryClient = useQueryClient();
 
@@ -262,7 +264,7 @@ export function ProjectTasksTab({
   const [editingAssigneeOnly, setEditingAssigneeOnly] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [reordering, setReordering] = useState(false);
-  const [completingTaskId, setCompletingTaskId] = useState<number | null>(null);
+  const [completingTaskId] = useState<number | null>(null);
   const [completeDialogOpen, setCompleteDialogOpen] = useState(false);
   const [taskToComplete, setTaskToComplete] = useState<ProjectTaskType | null>(null);
   const [historyDialogOpen, setHistoryDialogOpen] = useState(false);
@@ -293,9 +295,15 @@ export function ProjectTasksTab({
     refetch,
     dataUpdatedAt,
   } = useQuery({
-    queryKey: ["project-tasks", projectId],
+    queryKey: ["project-tasks", projectId, adjustmentId],
     queryFn: async () => {
-      const res = await get<ProjectTaskType[]>(`projects/${projectId}/tasks`);
+      let url = `projects/${projectId}/tasks`;
+      if (adjustmentId) {
+        url += `?adjustment_id=${adjustmentId}`;
+      } else if (adjustmentId === null) {
+        url += `?adjustment_id=null`;
+      }
+      const res = await get<ProjectTaskType[]>(url);
       return res.ok ? (res.data ?? []) : [];
     },
     staleTime: 1000 * 60,
@@ -313,8 +321,9 @@ export function ProjectTasksTab({
   // ─────────────────────────────────────────────────────────────────────────────
 
   const invalidateAll = () => {
-    queryClient.invalidateQueries({ queryKey: ["project-tasks", projectId] });
+    queryClient.invalidateQueries({ queryKey: ["project-tasks", projectId, adjustmentId] });
     queryClient.invalidateQueries({ queryKey: ["project", projectId] });
+    queryClient.invalidateQueries({ queryKey: ["project-adjustments", projectId] });
   };
 
   const sortedTasks = [...tasks].sort((a, b) => a.order_index - b.order_index || a.id - b.id);
@@ -384,6 +393,7 @@ export function ProjectTasksTab({
         status: values.status, task_type: values.task_type,
         requires_quote: values.requires_quote ? 1 : 0,
         assign_to_commercial, area_id, assigned_user_id,
+        adjustment_id: adjustmentId,
       };
 
       if (editingTask) {
@@ -396,8 +406,9 @@ export function ProjectTasksTab({
         toast.success("Tarea creada");
       }
       setDialogOpen(false);
-      queryClient.invalidateQueries({ queryKey: ["project-tasks", projectId] });
+      queryClient.invalidateQueries({ queryKey: ["project-tasks", projectId, adjustmentId] });
       queryClient.invalidateQueries({ queryKey: ["project", projectId] });
+      queryClient.invalidateQueries({ queryKey: ["project-adjustments", projectId] });
     } catch {
       toast.error("Error al guardar la tarea");
     } finally {
@@ -424,8 +435,9 @@ export function ProjectTasksTab({
       const res = await del(`projects/${projectId}/tasks/${taskId}`);
       if (!res.ok) throw new Error(res.error);
       toast.success("Tarea eliminada");
-      queryClient.invalidateQueries({ queryKey: ["project-tasks", projectId] });
+      queryClient.invalidateQueries({ queryKey: ["project-tasks", projectId, adjustmentId] });
       queryClient.invalidateQueries({ queryKey: ["project", projectId] });
+      queryClient.invalidateQueries({ queryKey: ["project-adjustments", projectId] });
     } catch {
       toast.error("Error al eliminar tarea");
     }
@@ -452,7 +464,7 @@ export function ProjectTasksTab({
       order_index: index,
     }));
 
-    queryClient.setQueryData(["project-tasks", projectId], optimisticTasks);
+    queryClient.setQueryData(["project-tasks", projectId, adjustmentId], optimisticTasks);
 
     try {
       const res = await post(`projects/${projectId}/tasks/reorder`, {

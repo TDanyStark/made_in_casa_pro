@@ -135,3 +135,28 @@ export async function createProjectFolders({
 
   return { projectFolderId: projectId, projectFolderUrl: projectUrl };
 }
+
+/**
+ * Creates a subfolder in Google Drive inside a specified parent folder.
+ */
+export async function createSubFolder({
+  parentFolderId,
+  folderName,
+  shareEmails = [],
+}: {
+  parentFolderId: string;
+  folderName: string;
+  shareEmails?: string[];
+}): Promise<{ folderId: string; folderUrl: string }> {
+  const drive = await getDriveClient();
+  const emails = [...new Set(shareEmails.filter(Boolean))];
+
+  const folderId = await findOrCreateFolder(drive, folderName, parentFolderId);
+  const folderUrl = `https://drive.google.com/drive/folders/${folderId}`;
+
+  if (emails.length > 0) {
+    await shareFolderWithEmails(drive, folderId, emails);
+  }
+
+  return { folderId, folderUrl };
+}

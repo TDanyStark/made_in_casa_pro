@@ -204,6 +204,12 @@ export async function updateProject(
   }>
 ): Promise<ProjectType | null> {
   try {
+    const currentProject = await getProjectById(id);
+    if (!currentProject) return null;
+    if (currentProject.status === 'completed' && data.status !== 'in_adjustments' && data.status !== 'archived' && data.status !== 'active') {
+       throw new Error("No se pueden editar proyectos completados");
+    }
+
     const updates: string[] = [];
     const args: unknown[] = [];
 
@@ -273,10 +279,24 @@ export async function recalculateProjectProgress(projectId: number): Promise<num
     const total = Number(row.total);
     const completed = Number(row.completed);
     const progress = total === 0 ? 0 : Math.round((completed / total) * 100);
+    
+    const updates = ["progress = $1", "updated_at = CURRENT_TIMESTAMP"];
+    const updateArgs: unknown[] = [progress, projectId];
+
+    if (progress === 100 && total > 0) {
+      updates.push("status = 'completed'");
+      updates.push("completed_at = COALESCE(completed_at, CURRENT_TIMESTAMP)");
+      
+      // Complete active adjustments if any
+      await db.execute({
+        sql: `UPDATE project_adjustments SET status = 'completed', completed_at = CURRENT_TIMESTAMP WHERE project_id = $1 AND status = 'active'`,
+        args: [projectId],
+      });
+    }
 
     await db.execute({
-      sql: `UPDATE projects SET progress = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2`,
-      args: [progress, projectId],
+      sql: `UPDATE projects SET ${updates.join(", ")} WHERE id = $${updateArgs.length}`,
+      args: updateArgs,
     });
 
     revalidatePath(`/projects/${projectId}`);

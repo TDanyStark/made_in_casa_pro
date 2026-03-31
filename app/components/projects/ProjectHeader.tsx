@@ -5,6 +5,8 @@ import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { ExternalLink, HardDrive, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { format } from "date-fns";
+import { es } from "date-fns/locale";
 import {
   Select,
   SelectContent,
@@ -22,6 +24,7 @@ const STATUS_OPTIONS: { value: ProjectStatus; label: string }[] = [
   { value: "paused", label: "Pausado" },
   { value: "completed", label: "Completado" },
   { value: "archived", label: "Archivado" },
+  { value: "in_adjustments", label: "En Ajustes" },
 ];
 
 interface Props {
@@ -105,6 +108,16 @@ export function ProjectHeader({ project }: Props) {
             {project.campaign_name}
           </span>
         )}
+        
+        <div className="flex items-center gap-2 text-xs text-muted-foreground ml-auto">
+          <span>Creado: {format(new Date(project.created_at), "MMM d, yyyy", { locale: es })}</span>
+          {project.completed_at && (
+            <>
+              <span>•</span>
+              <span className="text-green-600 dark:text-green-400 font-medium">Finalizado: {format(new Date(project.completed_at), "MMM d, yyyy", { locale: es })}</span>
+            </>
+          )}
+        </div>
       </div>
 
       <ProjectProgressBar progress={project.progress} />

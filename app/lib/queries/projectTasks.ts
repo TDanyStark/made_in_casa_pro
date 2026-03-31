@@ -36,6 +36,7 @@ const TASK_SELECT = `
   pt.updated_at,
   pt.assigned_at,
   pt.completed_at,
+  pt.adjustment_id,
   (SELECT COUNT(*) FROM task_quotes tq WHERE tq.task_id = pt.id) AS quote_count,
   (SELECT COUNT(*) FROM task_quotes tq WHERE tq.task_id = pt.id AND tq.status = 'pending') AS pending_quote_count
 `;
@@ -62,15 +63,27 @@ export async function getProjectTaskById(id: number): Promise<ProjectTaskType | 
   }
 }
 
-export async function getTasksByProject(projectId: number): Promise<ProjectTaskType[]> {
+export async function getTasksByProject(projectId: number, adjustmentId?: number | null): Promise<ProjectTaskType[]> {
   try {
+    let whereSQL = `pt.project_id = $1`;
+    const args: unknown[] = [projectId];
+
+    if (adjustmentId !== undefined) {
+      if (adjustmentId === null) {
+         whereSQL += ` AND pt.adjustment_id IS NULL`;
+      } else {
+         whereSQL += ` AND pt.adjustment_id = $2`;
+         args.push(adjustmentId);
+      }
+    }
+
     const result = await db.execute({
       sql: `
         SELECT ${TASK_SELECT} ${TASK_JOINS}
-        WHERE pt.project_id = $1
+        WHERE ${whereSQL}
         ORDER BY pt.order_index ASC, pt.id ASC
       `,
-      args: [projectId],
+      args,
     });
     return result.rows as unknown as ProjectTaskType[];
   } catch (error) {
@@ -124,6 +137,7 @@ export async function createProjectTask(data: {
   requires_quote?: number;
   assign_to_commercial?: number;
   order_index: number;
+  adjustment_id?: number | null;
 }): Promise<ProjectTaskType> {
   if (data.task_type === "validation" && data.order_index === 0) {
     throw new Error("Una tarea de validación no puede ser la primera tarea del proyecto.");
@@ -138,8 +152,8 @@ export async function createProjectTask(data: {
         INSERT INTO project_tasks
           (project_id, template_id, title, description,
            area_id, assigned_user_id, status, task_type, task_flag,
-           requires_quote, assign_to_commercial, order_index, assigned_at)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+           requires_quote, assign_to_commercial, order_index, assigned_at, adjustment_id)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
         RETURNING id
       `,
       args: [
@@ -156,6 +170,7 @@ export async function createProjectTask(data: {
         data.assign_to_commercial ?? 0,
         data.order_index,
         assignedAt,
+        data.adjustment_id ?? null,
       ],
     });
     const id = Number(result.rows[0]?.id);
@@ -504,7 +519,7 @@ export async function createRejectionLoopTasks(
   // Step 1: Fetch task N (validation being rejected) and task M (target to send back to)
   const [taskNResult, taskMResult] = await Promise.all([
     db.execute({
-      sql: `SELECT id, order_index, task_flag, status FROM project_tasks WHERE id = $1 AND project_id = $2`,
+      sql: `SELECT id, order_index, task_flag, status, adjustment_id FROM project_tasks WHERE id = $1 AND project_id = $2`,
       args: [rejectedValidationTaskId, projectId],
     }),
     db.execute({
@@ -516,7 +531,7 @@ export async function createRejectionLoopTasks(
   if (taskNResult.rows.length === 0) throw new Error("Tarea de validación no encontrada");
   if (taskMResult.rows.length === 0) throw new Error("Tarea destino no encontrada");
 
-  const taskN = taskNResult.rows[0] as unknown as { id: number; order_index: number; task_flag: string; status: string };
+  const taskN = taskNResult.rows[0] as unknown as { id: number; order_index: number; task_flag: string; status: string; adjustment_id: number | null };
   const taskM = taskMResult.rows[0] as unknown as { id: number; order_index: number };
 
   // Step 2: Fetch the range of tasks between M and N inclusive
@@ -532,21 +547,25 @@ export async function createRejectionLoopTasks(
   });
 
   const rangeTasks = rangeResult.rows as unknown as ProjectTaskType[];
-  const K = rangeTasks.length;
+    const K = rangeTasks.length;
 
-  const transaction = await db.transaction("write");
-  try {
-    // Step 3: Shift all tasks after N up by K
-    await transaction.execute({
-      sql: `
-        UPDATE project_tasks
-        SET order_index = order_index + $1, updated_at = CURRENT_TIMESTAMP
-        WHERE project_id = $2 AND order_index > $3
-      `,
-      args: [K, projectId, taskN.order_index],
-    });
+    const adjustmentFilter = taskN.adjustment_id === null ? "AND adjustment_id IS NULL" : "AND adjustment_id = $4";
+    const shiftArgs = [K, projectId, taskN.order_index];
+    if (taskN.adjustment_id !== null) shiftArgs.push(taskN.adjustment_id);
 
-    const newTasksIds: number[] = [];
+    const transaction = await db.transaction("write");
+    try {
+      // Step 3: Shift all tasks after N up by K
+      await transaction.execute({
+        sql: `
+          UPDATE project_tasks
+          SET order_index = order_index + $1, updated_at = CURRENT_TIMESTAMP
+          WHERE project_id = $2 AND order_index > $3 ${adjustmentFilter}
+        `,
+        args: shiftArgs,
+      });
+
+      const newTasksIds: number[] = [];
 
     // Step 4: Clone all tasks in the range
     for (let i = 0; i < K; i++) {
@@ -559,8 +578,8 @@ export async function createRejectionLoopTasks(
           INSERT INTO project_tasks
             (project_id, template_id, title, description,
              area_id, assigned_user_id, status, task_type, task_flag,
-             requires_quote, assign_to_commercial, order_index, assigned_at)
-          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'correction', $9, $10, $11, $12)
+             requires_quote, assign_to_commercial, order_index, assigned_at, adjustment_id)
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'correction', $9, $10, $11, $12, $13)
           RETURNING id
         `,
         args: [
@@ -576,6 +595,7 @@ export async function createRejectionLoopTasks(
           original.assign_to_commercial ?? 0,
           newOrderIndex,
           (newStatus === "not_started" && original.assigned_user_id) ? new Date() : null,
+          taskN.adjustment_id ?? null,
         ],
       });
       const newTaskId = Number(cloneInsert.rows[0]?.id);
@@ -798,7 +818,8 @@ export async function hasInternalCollaboratorsInArea(areaId: number): Promise<bo
 export async function instantiateTasksFromTemplates(
   projectId: number,
   productId: number,
-  commercialUserId?: number | null
+  commercialUserId?: number | null,
+  adjustmentId?: number | null
 ): Promise<void> {
   try {
     const templates = await db.execute({
@@ -850,8 +871,8 @@ export async function instantiateTasksFromTemplates(
             INSERT INTO project_tasks
               (project_id, template_id, title, description,
                area_id, assigned_user_id, status, task_type, task_flag,
-               requires_quote, assign_to_commercial, order_index, assigned_at)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'new', $9, $10, $11, $12)
+               requires_quote, assign_to_commercial, order_index, assigned_at, adjustment_id)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'new', $9, $10, $11, $12, $13)
             RETURNING id
           `,
           args: [
@@ -867,6 +888,7 @@ export async function instantiateTasksFromTemplates(
             tpl.assign_to_commercial ?? 0,
             tpl.order_index,
             assignedAt,
+            adjustmentId ?? null,
           ],
         });
 

@@ -9,6 +9,7 @@ import { ProjectQuotesTab } from "./ProjectQuotesTab";
 import { ProjectNotesEditor } from "./ProjectNotesEditor";
 import { ProjectCoManagersTab } from "./ProjectCoManagersTab";
 import { ProjectInfoTab } from "./ProjectInfoTab";
+import { ProjectAdjustmentsTab } from "./ProjectAdjustmentsTab";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
@@ -66,6 +67,7 @@ export function ProjectDetailClient({ projectId, userRole, currentUserId }: Prop
           <TabsTrigger value="tasks">
             Tareas
           </TabsTrigger>
+          <TabsTrigger value="adjustments">Ajustes</TabsTrigger>
           {canEdit && (
             <TabsTrigger value="quotes">Cotizaciones</TabsTrigger>
           )}
@@ -83,6 +85,18 @@ export function ProjectDetailClient({ projectId, userRole, currentUserId }: Prop
           <ProjectTasksTab
             projectId={projectId}
             productName={project.product_name}
+            canEdit={canEdit && project.status !== 'completed'}
+            currentUserId={currentUserId}
+            currentUserRole={userRole}
+            adjustmentId={null} // Tareas de v1
+          />
+        </TabsContent>
+
+        <TabsContent value="adjustments" className="mt-6">
+          <ProjectAdjustmentsTab
+            projectId={projectId}
+            projectStatus={project.status}
+            productName={project.product_name}
             canEdit={canEdit}
             currentUserId={currentUserId}
             currentUserRole={userRole}
@@ -91,7 +105,7 @@ export function ProjectDetailClient({ projectId, userRole, currentUserId }: Prop
 
         {canEdit && (
           <TabsContent value="quotes" className="mt-6">
-            <ProjectQuotesTab projectId={projectId} canEdit={canEdit} />
+            <ProjectQuotesTab projectId={projectId} canEdit={canEdit && project.status !== 'completed'} />
           </TabsContent>
         )}
 
@@ -107,12 +121,12 @@ export function ProjectDetailClient({ projectId, userRole, currentUserId }: Prop
             projectId={projectId}
             mainManagerId={project.manager_id}
             coManagers={project.co_managers}
-            canEdit={canEdit}
+            canEdit={canEdit && project.status !== 'completed'}
           />
         </TabsContent>
 
         <TabsContent value="info" className="mt-6">
-          <ProjectInfoTab project={project} canEdit={canEdit} />
+          <ProjectInfoTab project={project} canEdit={canEdit && project.status !== 'completed'} />
         </TabsContent>
       </Tabs>
     </div>

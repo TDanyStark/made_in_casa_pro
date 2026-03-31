@@ -17,9 +17,10 @@ const RichTextEditor = dynamic(
 interface Props {
   projectId: number;
   initialContent: string;
+  canEdit?: boolean;
 }
 
-export function ProjectNotesEditor({ projectId, initialContent }: Props) {
+export function ProjectNotesEditor({ projectId, initialContent, canEdit = true }: Props) {
   const queryClient = useQueryClient();
   const [content, setContent] = useState(initialContent);
   const [originalContent, setOriginalContent] = useState(initialContent);
@@ -65,14 +66,20 @@ export function ProjectNotesEditor({ projectId, initialContent }: Props) {
           </Button>
         )}
       </div>
-      <RichTextEditor
-        value={content}
-        onChange={setContent}
-        placeholder="Agrega notas, objetivos o contexto del proyecto..."
-        noBorder={true}
-        expandable={true}
-        title="Notas del proyecto"
-      />
+      {canEdit ? (
+        <RichTextEditor
+          value={content}
+          onChange={setContent}
+          placeholder="Agrega notas, objetivos o contexto del proyecto..."
+          noBorder={true}
+          expandable={true}
+          title="Notas del proyecto"
+        />
+      ) : (
+        <div className="p-4 rounded-md border bg-muted/20 text-sm whitespace-pre-wrap">
+          {content || <span className="text-muted-foreground italic">Sin notas</span>}
+        </div>
+      )}
     </div>
   );
 }
