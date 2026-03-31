@@ -3,21 +3,13 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
-import { post } from "@/lib/services/apiService";
+import { post, patch, get, del } from "@/lib/services/apiService";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-  Loader2,
-  CheckCircle2,
-  User,
-  Package,
-  Tag,
-  HardDrive,
-} from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { WizardState } from "@/hooks/useProjectWizard";
-import { ProjectType } from "@/lib/definitions";
+import { ProjectType, ProjectTaskType } from "@/lib/definitions";
 
 const RichTextEditor = dynamic(
   () => import("@/components/clients/RichTextEditor").then((m) => m.RichTextEditor),
@@ -37,7 +29,7 @@ interface Props {
   onBack: () => void;
 }
 
-export function WizardStep5Confirm({ state, onBack }: Props) {
+export function WizardStep6Confirm({ state, onBack }: Props) {
   const router = useRouter();
   const [notes, setNotes] = useState(state.notes);
   const [submitting, setSubmitting] = useState(false);
@@ -54,7 +46,6 @@ export function WizardStep5Confirm({ state, onBack }: Props) {
       // 1. Create Drive folder (mandatory)
       setCurrentAction("Creando carpeta en Drive...");
 
-      // Collect emails: manager principal + co-managers
       const shareEmails = [
         state.manager_email,
         ...state.co_manager_emails,
@@ -98,12 +89,103 @@ export function WizardStep5Confirm({ state, onBack }: Props) {
         }
       }
 
-      // 4. Add product (auto-instantiates tasks)
+      // 4. Add product (auto-instantiates tasks from templates)
       if (state.product) {
         setCurrentAction("Agregando producto...");
         await post(`projects/${project.id}/products`, {
           product_id: state.product.id,
         });
+      }
+
+      // 5. Apply task customizations
+      if (
+        state.task_overrides.length > 0 ||
+        state.removed_template_ids.length > 0 ||
+        state.extra_tasks.length > 0
+      ) {
+        setCurrentAction("Configurando tareas...");
+
+        // Fetch the created project tasks (instantiated from product)
+        const tasksRes = await get<ProjectTaskType[]>(`projects/${project.id}/tasks`);
+        const createdTasks = tasksRes.ok ? (tasksRes.data ?? []) : [];
+
+        // B. Handle DELETIONS (removed template tasks)
+        if (state.removed_template_ids.length > 0) {
+          for (const templateId of state.removed_template_ids) {
+            const taskToDelete = createdTasks.find(
+              (t) => t.template_id === templateId
+            );
+            if (taskToDelete) {
+              await del(`projects/${project.id}/tasks/${taskToDelete.id}`);
+            }
+          }
+        }
+
+        // C. Handle UPDATES (task_overrides)
+        for (const override of state.task_overrides) {
+          const createdTask = createdTasks.find(
+            (t) => t.template_id === override.template_id
+          );
+          if (!createdTask) continue;
+
+          const hasChanges =
+            override.title !== undefined || 
+            override.assigned_user_id !== undefined ||
+            override.assign_to_commercial !== undefined;
+
+          if (hasChanges) {
+            await patch(`projects/${project.id}/tasks/${createdTask.id}`, {
+              ...(override.title !== undefined && { title: override.title }),
+              ...(override.assigned_user_id !== undefined && {
+                assigned_user_id: override.assigned_user_id,
+              }),
+              ...(override.assign_to_commercial !== undefined && {
+                assign_to_commercial: override.assign_to_commercial,
+              }),
+            });
+          }
+        }
+
+        // D. Handle EXTRA TASKS (ad-hoc)
+        const extraTaskMap = new Map<number, number>();
+        if (state.extra_tasks.length > 0) {
+          for (const extra of state.extra_tasks) {
+            const res = await post<ProjectTaskType>(`projects/${project.id}/tasks`, {
+              title: extra.title,
+              assigned_user_id: extra.assigned_user_id,
+              assign_to_commercial: extra.assign_to_commercial,
+              area_id: extra.area_id,
+              task_type: extra.task_type,
+            });
+            if (res.ok && res.data) {
+              const createdExtra = res.data as unknown as ProjectTaskType;
+              extraTaskMap.set(extra.localId, createdExtra.id);
+            }
+          }
+        }
+
+        // E. Handle FINAL REORDER
+        const finalOrderedList = [
+          ...state.task_overrides.map((o) => ({
+            id: createdTasks.find((t) => t.template_id === o.template_id)?.id,
+            order_index: o.order_index ?? 0,
+          })),
+          ...state.extra_tasks.map((e) => ({
+            id: extraTaskMap.get(e.localId),
+            order_index: e.order_index,
+          })),
+        ];
+
+        const orderedIds = finalOrderedList
+          .sort((a, b) => a.order_index - b.order_index)
+          .map((item) => item.id)
+          .filter((id): id is number => id !== undefined);
+
+        if (orderedIds.length > 1) {
+          await post(`projects/${project.id}/tasks/reorder`, {
+            orderedIds,
+          });
+        }
       }
 
       toast.success("¡Proyecto creado exitosamente!");
@@ -118,81 +200,6 @@ export function WizardStep5Confirm({ state, onBack }: Props) {
 
   return (
     <div className="space-y-6">
-      {/* Summary */}
-      <div className="rounded-lg border bg-muted/30 p-4 space-y-4">
-        <h3 className="font-semibold text-base">{state.title}</h3>
-
-        <div className="grid gap-3 text-sm">
-          {/* Brand */}
-          <div className="flex items-start gap-3">
-            <span className="text-muted-foreground min-w-24">Marca</span>
-            <span className="font-medium">
-              {state.brand_name}
-              {state.client_name && (
-                <span className="text-muted-foreground font-normal ml-1">
-                  — {state.client_name}
-                </span>
-              )}
-            </span>
-          </div>
-
-          {/* Manager */}
-          <div className="flex items-start gap-3">
-            <span className="text-muted-foreground min-w-24 flex items-center gap-1">
-              <User className="h-3.5 w-3.5" /> Gerente
-            </span>
-            <div>
-              <span className="font-medium">{state.manager_name}</span>
-              {state.co_manager_names.length > 0 && (
-                <div className="flex flex-wrap gap-1 mt-1">
-                  {state.co_manager_names.map((n, i) => (
-                    <Badge key={i} variant="secondary" className="text-xs">
-                      {n}
-                    </Badge>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Product */}
-          <div className="flex items-start gap-3">
-            <span className="text-muted-foreground min-w-24 flex items-center gap-1">
-              <Package className="h-3.5 w-3.5" /> Producto
-            </span>
-            <div>
-              {state.product ? (
-                <Badge variant="outline" className="text-xs">
-                  {state.product.name}
-                </Badge>
-              ) : (
-                <span className="text-muted-foreground text-xs">Sin producto</span>
-              )}
-            </div>
-          </div>
-
-          {/* Campaign */}
-          {state.campaign_name && (
-            <div className="flex items-start gap-3">
-              <span className="text-muted-foreground min-w-24 flex items-center gap-1">
-                <Tag className="h-3.5 w-3.5" /> Campaña
-              </span>
-              <span className="font-medium">{state.campaign_name}</span>
-            </div>
-          )}
-
-          {/* Drive — always created */}
-          <div className="flex items-start gap-3">
-            <span className="text-muted-foreground min-w-24 flex items-center gap-1">
-              <HardDrive className="h-3.5 w-3.5" /> Drive
-            </span>
-            <span className="text-xs text-muted-foreground">
-              Se creará automáticamente al confirmar
-            </span>
-          </div>
-        </div>
-      </div>
-
       {/* Notes */}
       <div className="space-y-2">
         <label className="text-sm font-medium">
@@ -208,11 +215,6 @@ export function WizardStep5Confirm({ state, onBack }: Props) {
             title="Notas del proyecto"
           />
         </div>
-      </div>
-
-      <div className="flex items-center gap-2 rounded-md border border-blue-200 bg-blue-50 dark:bg-blue-950/20 px-4 py-3 text-sm text-blue-700 dark:text-blue-400">
-        <CheckCircle2 className="h-4 w-4 shrink-0" />
-        Las tareas se crearán automáticamente a partir de las plantillas de cada producto.
       </div>
 
       <div className="flex justify-between pt-2">

@@ -12,7 +12,7 @@ interface Props {
   onBack: () => void;
 }
 
-export function WizardStep4Campaign({ state, onNext, onBack }: Props) {
+export function WizardStep5Campaign({ state, onNext, onBack }: Props) {
   const [campaignId, setCampaignId] = useState<number | null>(state.campaign_id ?? null);
   const [campaignName, setCampaignName] = useState<string>(state.campaign_name ?? "");
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -66,6 +66,7 @@ import {
   AlertTriangle,
   Clock,
   ShieldCheck,
+  RotateCcw,
 } from "lucide-react";
 import {
   Tooltip,
@@ -157,6 +158,72 @@ function rolLabel(rolId: number | null): string | null {
   return null;
 }
 
+// ─── RefreshCountdown ─────────────────────────────────────────────────────────
+
+function RefreshCountdown({
+  onRefresh,
+  dataUpdatedAt,
+}: {
+  onRefresh: () => void;
+  dataUpdatedAt: number;
+}) {
+  const [progress, setProgress] = useState(1); // 1 = full, 0 = empty
+  const INTERVAL_MS = 30_000;
+  const size = 32;
+  const radius = 13;
+  const circumference = 2 * Math.PI * radius;
+
+  useEffect(() => {
+    setProgress(1);
+    const start = Date.now();
+    const timer = setInterval(() => {
+      const elapsed = Date.now() - start;
+      const remaining = Math.max(0, 1 - elapsed / INTERVAL_MS);
+      setProgress(remaining);
+    }, 100);
+    return () => clearInterval(timer);
+  }, [dataUpdatedAt]);
+
+  const strokeDashoffset = circumference * (1 - progress);
+
+  return (
+    <button
+      onClick={onRefresh}
+      title="Actualizar tareas"
+      className="relative flex items-center justify-center hover:opacity-75 transition-opacity"
+      style={{ width: size, height: size }}
+    >
+      <svg width={size} height={size} className="-rotate-90">
+        {/* Background ring */}
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          fill="none"
+          stroke="hsl(var(--muted-foreground))"
+          strokeWidth={2.5}
+          opacity={0.2}
+        />
+        {/* Progress ring */}
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          fill="none"
+          stroke="hsl(var(--primary))"
+          strokeWidth={2.5}
+          strokeDasharray={circumference}
+          strokeDashoffset={strokeDashoffset}
+          strokeLinecap="round"
+          style={{ transition: "stroke-dashoffset 0.1s linear" }}
+        />
+      </svg>
+      {/* Reload icon centered */}
+      <RotateCcw className="absolute" size={12} />
+    </button>
+  );
+}
+
 // ─── Props ────────────────────────────────────────────────────────────────────
 
 interface Props {
@@ -187,6 +254,7 @@ export function ProjectTasksTab({
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<ProjectTaskType | null>(null);
+  const [editingAssigneeOnly, setEditingAssigneeOnly] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [reordering, setReordering] = useState(false);
   const [completingTaskId, setCompletingTaskId] = useState<number | null>(null);
@@ -213,13 +281,21 @@ export function ProjectTasksTab({
 
   // ── Queries ──────────────────────────────────────────────────────────────────
 
-  const { data: tasks = [], isLoading: isLoadingTasks } = useQuery({
+  const {
+    data: tasks = [],
+    isLoading: isLoadingTasks,
+    isFetching,
+    refetch,
+    dataUpdatedAt,
+  } = useQuery({
     queryKey: ["project-tasks", projectId],
     queryFn: async () => {
       const res = await get<ProjectTaskType[]>(`projects/${projectId}/tasks`);
       return res.ok ? (res.data ?? []) : [];
     },
     staleTime: 1000 * 60,
+    refetchInterval: 30_000,
+    refetchIntervalInBackground: false,
   });
 
   const selectedTaskType = form.watch("task_type");
@@ -249,6 +325,7 @@ export function ProjectTasksTab({
 
   const openCreate = () => {
     setEditingTask(null);
+    setEditingAssigneeOnly(false);
     form.reset({
       title: "", description: "", task_type: "execution", requires_quote: false,
       assign_mode: "auto", area_id: null, assigned_user_id: null,
@@ -257,7 +334,9 @@ export function ProjectTasksTab({
   };
 
   const openEdit = (task: ProjectTaskType) => {
+    const assigneeOnly = task.status === "blocked";
     setEditingTask(task);
+    setEditingAssigneeOnly(assigneeOnly);
     form.reset({
       title: task.title, description: task.description ?? "",
       status: task.status, task_type: task.task_type ?? "execution",
@@ -428,6 +507,13 @@ export function ProjectTasksTab({
                 {reordering && <Loader2 className="inline ml-2 h-3.5 w-3.5 animate-spin" />}
               </span>
             )}
+            <RefreshCountdown
+              onRefresh={() => refetch()}
+              dataUpdatedAt={dataUpdatedAt}
+            />
+            {isFetching && !isLoadingTasks && (
+              <span className="text-xs text-muted-foreground">Actualizando...</span>
+            )}
           </div>
           {canEdit && (
             <Button size="sm" onClick={openCreate}>
@@ -455,10 +541,16 @@ export function ProjectTasksTab({
               const isWaiting = task.status === "waiting";
               const isBlocked = task.status === "blocked";
               const isInProgress = task.status === "in_progress";
+              const isCompleted = task.status === "completed";
               const isValidation = taskType === "validation";
               const canComplete = isInProgress && !isValidation && (isMyTask(task) || isAdmin);
               const canValidate = isInProgress && isValidation && (isMyTask(task) || isAdmin);
               const needsQuote = task.requires_quote === 1 && isBlocked;
+
+              // Editability lock
+              const isLocked = isInProgress || isCompleted;
+              const canEditThisTask = canEdit && !isLocked && !isBlocked;
+              const canEditAssigneeOnly = canEdit && isBlocked;
 
               return (
                 <div
@@ -466,13 +558,15 @@ export function ProjectTasksTab({
                     isWaiting ? "opacity-60" : ""
                   } ${isBlocked ? "border-destructive/50 bg-destructive/5" : ""}`}
                 >
-                  {canEdit && !isWaiting && !isBlocked && (
+                  {canEditThisTask && !isWaiting && (
                     <div className="flex-shrink-0 pt-0.5">{dragHandle}</div>
                   )}
-                  {(isWaiting || isBlocked) && (
+                  {(isWaiting || isBlocked || isLocked) && (
                     <div className="flex-shrink-0 pt-1 pl-1">
                       {isBlocked ? (
                         <AlertTriangle className="h-4 w-4 text-destructive" />
+                      ) : isLocked ? (
+                        <Lock className="h-4 w-4 text-muted-foreground" />
                       ) : (
                         <Lock className="h-4 w-4 text-muted-foreground" />
                       )}
@@ -481,8 +575,9 @@ export function ProjectTasksTab({
 
                   <div className="flex-1 min-w-0">
                     {/* Title + type/flag badges */}
-                    <div className="flex items-center flex-wrap gap-1.5 mb-0.5">
-                      <p className="font-medium text-sm leading-snug">{task.title}</p>
+                    <div className="flex items-center flex-wrap gap-2 mb-0.5">
+                      <p className="font-semibold text-sm leading-snug">{task.title}</p>
+                      <span className="text-muted-foreground/40 text-xs select-none">·</span>
                       <Badge
                         variant="outline"
                         className={`text-xs ${TASK_TYPE_CONFIG[taskType]?.className}`}
@@ -526,11 +621,14 @@ export function ProjectTasksTab({
                     )}
 
                     {/* Area / user badges */}
-                    <div className="flex flex-wrap gap-1.5 mt-1.5">
+                    <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
                       {task.area_name && (
-                        <Badge variant="secondary" className="text-xs">
-                          {task.area_name}
-                        </Badge>
+                        <>
+                          <Badge variant="secondary" className="text-xs">
+                            {task.area_name}
+                          </Badge>
+                          <span className="text-muted-foreground/40 text-xs select-none">·</span>
+                        </>
                       )}
                       {task.assign_to_commercial === 1 && !task.assigned_user_name && (
                         <Badge variant="outline" className="text-xs text-blue-700 border-blue-300 bg-blue-50 dark:bg-blue-900/20">
@@ -607,45 +705,45 @@ export function ProjectTasksTab({
                       </Button>
                     )}
 
-                    {canEdit && (
-                      <>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-7 w-7"
-                          onClick={() => openEdit(task)}
-                        >
-                          <Pencil className="h-3.5 w-3.5" />
-                        </Button>
-                        <AlertDialog>
-                          <AlertDialogTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-7 w-7 text-destructive hover:text-destructive"
+                    {(canEditThisTask || canEditAssigneeOnly) && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7"
+                        onClick={() => openEdit(task)}
+                      >
+                        <Pencil className="h-3.5 w-3.5" />
+                      </Button>
+                    )}
+                    {canEditThisTask && (
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 text-destructive hover:text-destructive"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>¿Eliminar tarea?</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              Se eliminará &quot;{task.title}&quot;. Esta acción no se puede deshacer.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                            <AlertDialogAction
+                              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                              onClick={() => handleDeleteTask(task.id)}
                             >
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </Button>
-                          </AlertDialogTrigger>
-                          <AlertDialogContent>
-                            <AlertDialogHeader>
-                              <AlertDialogTitle>¿Eliminar tarea?</AlertDialogTitle>
-                              <AlertDialogDescription>
-                                Se eliminará &quot;{task.title}&quot;. Esta acción no se puede deshacer.
-                              </AlertDialogDescription>
-                            </AlertDialogHeader>
-                            <AlertDialogFooter>
-                              <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                              <AlertDialogAction
-                                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                                onClick={() => handleDeleteTask(task.id)}
-                              >
-                                Eliminar
-                              </AlertDialogAction>
-                            </AlertDialogFooter>
-                          </AlertDialogContent>
-                        </AlertDialog>
-                      </>
+                              Eliminar
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
                     )}
                   </div>
                 </div>
@@ -659,9 +757,18 @@ export function ProjectTasksTab({
           <DialogContent className="sm:max-w-[520px] max-h-[90vh] overflow-y-auto" aria-describedby={undefined}>
             <DialogHeader>
               <DialogTitle>
-                {editingTask ? "Editar tarea" : "Nueva tarea"}
+                {editingTask
+                  ? editingAssigneeOnly
+                    ? "Asignar colaborador"
+                    : "Editar tarea"
+                  : "Nueva tarea"}
               </DialogTitle>
             </DialogHeader>
+            {editingAssigneeOnly && (
+              <p className="text-xs text-muted-foreground -mt-1">
+                Esta tarea está bloqueada. Solo puedes cambiar el colaborador asignado.
+              </p>
+            )}
             <Form {...form}>
               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 mt-2">
                 <FormField
@@ -671,7 +778,11 @@ export function ProjectTasksTab({
                     <FormItem>
                       <FormLabel>Título</FormLabel>
                       <FormControl>
-                        <Input placeholder="Ej: Diseñar el contenido del email" {...field} />
+                        <Input
+                          placeholder="Ej: Diseñar el contenido del email"
+                          disabled={editingAssigneeOnly}
+                          {...field}
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -684,36 +795,43 @@ export function ProjectTasksTab({
                     <FormItem>
                       <FormLabel>Descripción (opcional)</FormLabel>
                       <FormControl>
-                        <Textarea rows={2} {...field} value={field.value ?? ""} />
+                        <Textarea
+                          rows={2}
+                          disabled={editingAssigneeOnly}
+                          {...field}
+                          value={field.value ?? ""}
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
 
-                <FormField
-                  control={form.control}
-                  name="task_type"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Tipo de tarea</FormLabel>
-                      <FormControl>
-                        <Select value={field.value} onValueChange={field.onChange}>
-                          <SelectTrigger className="h-auto min-h-9 py-2 *:data-[slot=select-value]:items-start *:data-[slot=select-value]:justify-start *:data-[slot=select-value]:text-left [&>span]:line-clamp-none">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="execution">Ejecución — el colaborador ejecuta y pasa al siguiente</SelectItem>
-                            <SelectItem value="validation">Validación — puede aprobar o rechazar y enviar a cualquier paso</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                {!editingAssigneeOnly && (
+                  <FormField
+                    control={form.control}
+                    name="task_type"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Tipo de tarea</FormLabel>
+                        <FormControl>
+                          <Select value={field.value} onValueChange={field.onChange}>
+                            <SelectTrigger className="h-auto min-h-9 py-2 *:data-[slot=select-value]:items-start *:data-[slot=select-value]:justify-start *:data-[slot=select-value]:text-left [&>span]:line-clamp-none">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="execution">Ejecución — el colaborador ejecuta y pasa al siguiente</SelectItem>
+                              <SelectItem value="validation">Validación — puede aprobar o rechazar y enviar a cualquier paso</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                )}
 
-                {selectedTaskType === "execution" && (
+                {!editingAssigneeOnly && selectedTaskType === "execution" && (
                   <FormField
                     control={form.control}
                     name="requires_quote"
@@ -772,7 +890,7 @@ export function ProjectTasksTab({
                   )}
                 </div>
 
-                {editingTask && (
+                {editingTask && !editingAssigneeOnly && (
                   <FormField
                     control={form.control}
                     name="status"
