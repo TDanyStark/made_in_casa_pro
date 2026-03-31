@@ -118,6 +118,9 @@ export async function createProjectTask(data: {
   assign_to_commercial?: number;
   order_index: number;
 }): Promise<ProjectTaskType> {
+  if (data.task_type === "validation" && data.order_index === 0) {
+    throw new Error("Una tarea de validación no puede ser la primera tarea del proyecto.");
+  }
   try {
     const result = await db.execute({
       sql: `
@@ -194,6 +197,14 @@ export async function updateProjectTask(
 
     if (updates.length === 0) return getProjectTaskById(id);
 
+    // Business rule validation: Validation task cannot be in first position
+    if (data.task_type === "validation") {
+      const currentTask = await getProjectTaskById(id);
+      if (currentTask && currentTask.order_index === 0) {
+        throw new Error("Una tarea de validación no puede ser la primera tarea del proyecto.");
+      }
+    }
+
     updates.push("updated_at = CURRENT_TIMESTAMP");
     args.push(id);
 
@@ -230,6 +241,19 @@ export async function reorderProjectTasks(
   projectId: number,
   orderedIds: number[]
 ): Promise<void> {
+  const currentTasks = await getTasksByProject(projectId);
+  const completedTaskIds = currentTasks.filter(t => t.status === "completed").map(t => t.id);
+
+  // Business Rule: Completed tasks must not change their position relative to others
+  // In practice, this means they stay at their fixed order_index (assuming they were at the top)
+  for (const tid of completedTaskIds) {
+    const currentIdx = currentTasks.find(t => t.id === tid)!.order_index;
+    const newIdx = orderedIds.indexOf(tid);
+    if (newIdx !== currentIdx) {
+      throw new Error("Las tareas completadas no pueden ser reordenadas.");
+    }
+  }
+
   const transaction = await db.transaction("write");
   try {
     for (let i = 0; i < orderedIds.length; i++) {
@@ -238,6 +262,38 @@ export async function reorderProjectTasks(
         args: [i, orderedIds[i], projectId],
       });
     }
+
+    // Status logic:
+    // 1. The first task that is NOT completed must be set to 'not_started' if it was 'waiting'
+    // 2. All subsequent tasks that are 'not_started' must be set to 'waiting'
+    const updatedTasksResult = await transaction.execute({
+      sql: `SELECT id, status FROM project_tasks WHERE project_id = $1 ORDER BY order_index ASC`,
+      args: [projectId],
+    });
+    const updatedTasks = updatedTasksResult.rows as unknown as { id: number; status: ProjectTaskStatus }[];
+    
+    let firstNonCompletedFound = false;
+    for (const task of updatedTasks) {
+      if (task.status === "completed") continue;
+
+      if (!firstNonCompletedFound) {
+        firstNonCompletedFound = true;
+        if (task.status === "waiting") {
+          await transaction.execute({
+            sql: `UPDATE project_tasks SET status = 'not_started', updated_at = CURRENT_TIMESTAMP WHERE id = $1`,
+            args: [task.id],
+          });
+        }
+      } else {
+        if (task.status === "not_started") {
+          await transaction.execute({
+            sql: `UPDATE project_tasks SET status = 'waiting', updated_at = CURRENT_TIMESTAMP WHERE id = $1`,
+            args: [task.id],
+          });
+        }
+      }
+    }
+
     await transaction.commit();
     revalidatePath(`/projects/${projectId}`);
   } catch (error) {
@@ -361,13 +417,13 @@ export async function completeTask(
       } else {
         // Activate next task
         await transaction.execute({
-          sql: `UPDATE project_tasks SET status = 'in_progress', updated_at = CURRENT_TIMESTAMP WHERE id = $1`,
+          sql: `UPDATE project_tasks SET status = 'not_started', updated_at = CURRENT_TIMESTAMP WHERE id = $1`,
           args: [next.id],
         });
         await transaction.execute({
           sql: `
             INSERT INTO task_transitions (task_id, project_id, from_status, to_status, from_flag, to_flag, moved_by, notes)
-            VALUES ($1, $2, $3, 'in_progress', $4, $4, $5, $6)
+            VALUES ($1, $2, $3, 'not_started', $4, $4, $5, $6)
           `,
           args: [next.id, task.project_id, next.status, next.task_flag, userId, "Activada automáticamente al completar tarea anterior"],
         });

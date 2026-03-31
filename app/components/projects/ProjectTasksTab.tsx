@@ -18,6 +18,7 @@ import { SortableList } from "@/components/ui/sortable-list";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { TaskValidationDialog } from "@/components/tasks/TaskValidationDialog";
 import {
   Dialog,
   DialogContent,
@@ -261,10 +262,6 @@ export function ProjectTasksTab({
     open: false,
     task: null,
   });
-  const [validateAction, setValidateAction] = useState<"approve" | "reject">("approve");
-  const [validateTarget, setValidateTarget] = useState<string>("");
-  const [validateNotes, setValidateNotes] = useState("");
-  const [validating, setValidating] = useState(false);
 
   const form = useForm<TaskFormValues>({
     resolver: zodResolver(taskSchema),
@@ -355,6 +352,18 @@ export function ProjectTasksTab({
   };
 
   const onSubmit = async (values: TaskFormValues) => {
+    // Rule: Validation task cannot be the first one (order_index === 0)
+    // For new task: it's the first if there are no tasks yet
+    // For editing: it's the first if its order_index is 0
+    const isFirstTask = editingTask ? editingTask.order_index === 0 : tasks.length === 0;
+    if (values.task_type === "validation" && isFirstTask) {
+      form.setError("task_type", { 
+        type: "manual", 
+        message: "Una tarea de validación no puede ser la primera tarea del proyecto." 
+      });
+      return;
+    }
+
     setSubmitting(true);
     try {
       const assign_to_commercial = values.assign_mode === "commercial" ? 1 : 0;
@@ -410,52 +419,6 @@ export function ProjectTasksTab({
 
   const openValidateDialog = (task: ProjectTaskType) => {
     setValidateDialog({ open: true, task });
-    setValidateAction("approve");
-    setValidateTarget("");
-    setValidateNotes("");
-  };
-
-  const handleValidate = async () => {
-    if (!validateDialog.task) return;
-    setValidating(true);
-    try {
-      const body: Record<string, unknown> = {
-        action: validateAction,
-        notes: validateNotes || null,
-      };
-      if (validateAction === "reject") {
-        if (!validateTarget) {
-          toast.error("Selecciona a qué tarea regresar");
-          return;
-        }
-        body.target_order_index = parseInt(validateTarget);
-      }
-
-      const res = await post(
-        `projects/${projectId}/tasks/${validateDialog.task.id}/validate`,
-        body
-      );
-      if (!res.ok) throw new Error(res.error);
-
-      const data = res.data as { blockedReason?: string | null };
-      if (validateAction === "approve") {
-        if (data?.blockedReason) {
-          toast.warning(data.blockedReason, { duration: 6000 });
-        } else {
-          toast.success("Validación aprobada. Se activó la siguiente tarea.");
-        }
-      } else {
-        toast.success("Tarea enviada a corrección.");
-      }
-
-      setValidateDialog({ open: false, task: null });
-      invalidateAll();
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : "Error al validar";
-      toast.error(msg);
-    } finally {
-      setValidating(false);
-    }
   };
 
   const handleDeleteTask = async (taskId: number) => {
@@ -471,6 +434,17 @@ export function ProjectTasksTab({
   };
 
   const handleReorder = async (reordered: ProjectTaskType[]) => {
+    // Business Rule: Completed tasks cannot be reordered
+    // Check if any task that was completed moved or if a new task took its place
+    for (let i = 0; i < tasks.length; i++) {
+      if (tasks[i].status === "completed") {
+        if (reordered[i].id !== tasks[i].id) {
+          toast.error("No puedes reordenar las tareas completadas ni mover tareas antes de ellas.");
+          return;
+        }
+      }
+    }
+
     setReordering(true);
 
     // Actualizamos localmente el order_index de cada tarea para que el
@@ -565,10 +539,11 @@ export function ProjectTasksTab({
               const isWaiting = task.status === "waiting";
               const isBlocked = task.status === "blocked";
               const isInProgress = task.status === "in_progress";
+              const isNotStarted = task.status === "not_started";
               const isCompleted = task.status === "completed";
               const isValidation = taskType === "validation";
-              const canComplete = isInProgress && !isValidation && (isMyTask(task) || isAdmin);
-              const canValidate = isInProgress && isValidation && (isMyTask(task) || isAdmin);
+              const canComplete = (isInProgress || isNotStarted) && !isValidation && (isMyTask(task) || isAdmin);
+              const canValidate = (isInProgress || isNotStarted) && isValidation && (isMyTask(task) || isAdmin);
               const needsQuote = task.requires_quote === 1 && isBlocked;
 
               return (
@@ -578,7 +553,15 @@ export function ProjectTasksTab({
                   } ${isBlocked ? "border-destructive/50 bg-destructive/5" : ""}`}
                 >
                   {canEdit && (
-                    <div className="flex-shrink-0 pt-0.5">{dragHandle}</div>
+                    <div className="flex-shrink-0 pt-0.5">
+                      {isCompleted ? (
+                        <div className="p-1.5 opacity-20 grayscale cursor-not-allowed">
+                          <ChevronDown className="h-4 w-4" />
+                        </div>
+                      ) : (
+                        dragHandle
+                      )}
+                    </div>
                   )}
                   {(isWaiting || isBlocked) && (
                     <div className="flex-shrink-0 pt-1 pl-1">
@@ -843,10 +826,16 @@ export function ProjectTasksTab({
                                   <span className="text-xs text-muted-foreground whitespace-normal">El colaborador ejecuta y pasa automáticamente al siguiente paso</span>
                                 </div>
                               </SelectItem>
-                              <SelectItem value="validation">
+                              <SelectItem
+                                value="validation"
+                                disabled={editingTask ? editingTask.order_index === 0 : tasks.length === 0}
+                              >
                                 <div className="flex flex-col items-start text-left">
                                   <span>Validación</span>
                                   <span className="text-xs text-muted-foreground whitespace-normal">Paso de control: puede aprobar o rechazar (regresar el flujo)</span>
+                                  {(editingTask ? editingTask.order_index === 0 : tasks.length === 0) && (
+                                    <span className="text-[10px] text-destructive mt-0.5">No disponible para la primera tarea</span>
+                                  )}
                                 </div>
                               </SelectItem>
                             </SelectContent>
@@ -963,123 +952,15 @@ export function ProjectTasksTab({
         </Dialog>
 
         {/* ── Validate Dialog ── */}
-        <Dialog
+        <TaskValidationDialog
           open={validateDialog.open}
           onOpenChange={(open) => {
             if (!open) setValidateDialog({ open: false, task: null });
           }}
-        >
-          <DialogContent className="sm:max-w-[480px] max-h-[90vh] overflow-y-auto" aria-describedby={undefined}>
-            <DialogHeader>
-              <DialogTitle className="flex items-center gap-2">
-                <ShieldCheck className="h-5 w-5 text-purple-600" />
-                Validar tarea
-              </DialogTitle>
-            </DialogHeader>
-            {validateDialog.task && (
-              <div className="space-y-4 mt-2">
-                <p className="text-sm text-muted-foreground">
-                  Tarea: <span className="font-medium text-foreground">{validateDialog.task.title}</span>
-                </p>
-
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Acción</label>
-                  <div className="grid grid-cols-2 gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setValidateAction("approve")}
-                      className={`rounded-md border p-3 text-sm font-medium transition-colors ${
-                        validateAction === "approve"
-                          ? "border-green-500 bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-400"
-                          : "border-input hover:bg-muted"
-                      }`}
-                    >
-                      <CheckCircle className="h-4 w-4 mx-auto mb-1" />
-                      Aprobar
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setValidateAction("reject")}
-                      className={`rounded-md border p-3 text-sm font-medium transition-colors ${
-                        validateAction === "reject"
-                          ? "border-destructive bg-destructive/10 text-destructive"
-                          : "border-input hover:bg-muted"
-                      }`}
-                    >
-                      <ChevronDown className="h-4 w-4 mx-auto mb-1" />
-                      Rechazar
-                    </button>
-                  </div>
-                </div>
-
-                {validateAction === "reject" && (
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Regresar al paso</label>
-                    <Select value={validateTarget} onValueChange={setValidateTarget}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Seleccionar tarea destino" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {sortedTasks
-                          .filter(
-                            (t) =>
-                              t.id !== validateDialog.task!.id &&
-                              t.order_index < validateDialog.task!.order_index
-                          )
-                          .map((t) => (
-                            <SelectItem key={t.id} value={t.order_index.toString()}>
-                              {t.order_index + 1}. {t.title}
-                              {t.assigned_user_name && (
-                                <span className="text-muted-foreground ml-1">
-                                  — {t.assigned_user_name}
-                                </span>
-                              )}
-                            </SelectItem>
-                          ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                )}
-
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">
-                    Notas {validateAction === "reject" ? "(requeridas)" : "(opcional)"}
-                  </label>
-                  <Textarea
-                    rows={2}
-                    placeholder={
-                      validateAction === "approve"
-                        ? "Comentario opcional..."
-                        : "Explica qué debe corregirse..."
-                    }
-                    value={validateNotes}
-                    onChange={(e) => setValidateNotes(e.target.value)}
-                  />
-                </div>
-              </div>
-            )}
-            <DialogFooter>
-              <Button
-                variant="outline"
-                onClick={() => setValidateDialog({ open: false, task: null })}
-              >
-                Cancelar
-              </Button>
-              <Button
-                onClick={handleValidate}
-                disabled={validating || (validateAction === "reject" && !validateTarget)}
-                className={`gap-2 ${
-                  validateAction === "reject"
-                    ? "bg-destructive hover:bg-destructive/90"
-                    : "bg-green-600 hover:bg-green-700"
-                }`}
-              >
-                {validating && <Loader2 className="h-4 w-4 animate-spin" />}
-                {validateAction === "approve" ? "Aprobar" : "Rechazar y enviar"}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+          task={validateDialog.task}
+          siblings={tasks}
+          onSuccess={invalidateAll}
+        />
       </>
     </TooltipProvider>
   );

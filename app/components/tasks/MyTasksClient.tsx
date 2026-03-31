@@ -13,27 +13,12 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
+import { TaskValidationDialog } from "./TaskValidationDialog";
 import {
   CheckCircle,
   Loader2,
   ShieldCheck,
   AlertTriangle,
-  ChevronDown,
   Clock,
   ExternalLink,
 } from "lucide-react";
@@ -86,10 +71,6 @@ export function MyTasksClient() {
     task: null,
     siblings: [],
   });
-  const [validateAction, setValidateAction] = useState<"approve" | "reject">("approve");
-  const [validateTarget, setValidateTarget] = useState("");
-  const [validateNotes, setValidateNotes] = useState("");
-  const [validating, setValidating] = useState(false);
 
   const { data: tasks = [], isLoading } = useQuery<MyTask[]>({
     queryKey: ["my-tasks"],
@@ -135,53 +116,8 @@ export function MyTasksClient() {
         .filter((t) => t.project_id === task.project_id)
         .sort((a, b) => a.order_index - b.order_index);
       setValidateDialog({ open: true, task, siblings });
-      setValidateAction("approve");
-      setValidateTarget("");
-      setValidateNotes("");
     } catch {
       toast.error("Error al cargar las tareas del producto");
-    }
-  };
-
-  const handleValidate = async () => {
-    if (!validateDialog.task) return;
-    setValidating(true);
-    try {
-      const body: Record<string, unknown> = {
-        action: validateAction,
-        notes: validateNotes || null,
-      };
-      if (validateAction === "reject") {
-        if (!validateTarget) {
-          toast.error("Selecciona a qué tarea regresar");
-          return;
-        }
-        body.target_order_index = parseInt(validateTarget);
-      }
-
-      const res = await post(
-        `projects/${validateDialog.task.project_id}/tasks/${validateDialog.task.id}/validate`,
-        body
-      );
-      if (!res.ok) throw new Error(res.error);
-
-      const data = res.data as { blockedReason?: string | null };
-      if (validateAction === "approve") {
-        if (data?.blockedReason) {
-          toast.warning(data.blockedReason, { duration: 6000 });
-        } else {
-          toast.success("Validación aprobada");
-        }
-      } else {
-        toast.success("Enviado a corrección");
-      }
-
-      setValidateDialog({ open: false, task: null, siblings: [] });
-      queryClient.invalidateQueries({ queryKey: ["my-tasks"] });
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Error al validar");
-    } finally {
-      setValidating(false);
     }
   };
 
@@ -332,117 +268,17 @@ export function MyTasksClient() {
       )}
 
       {/* Validate dialog */}
-      <Dialog
+      <TaskValidationDialog
         open={validateDialog.open}
         onOpenChange={(open) => {
           if (!open) setValidateDialog({ open: false, task: null, siblings: [] });
         }}
-      >
-        <DialogContent className="sm:max-w-[480px] max-h-[90vh] overflow-y-auto" aria-describedby={undefined}>
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <ShieldCheck className="h-5 w-5 text-purple-600" />
-              Validar tarea
-            </DialogTitle>
-          </DialogHeader>
-          {validateDialog.task && (
-            <div className="space-y-4 mt-2">
-              <p className="text-sm text-muted-foreground">
-                Tarea: <span className="font-medium text-foreground">{validateDialog.task.title}</span>
-              </p>
-
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Acción</label>
-                <div className="grid grid-cols-2 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setValidateAction("approve")}
-                    className={`rounded-md border p-3 text-sm font-medium transition-colors ${
-                      validateAction === "approve"
-                        ? "border-green-500 bg-green-50 text-green-700"
-                        : "border-input hover:bg-muted"
-                    }`}
-                  >
-                    <CheckCircle className="h-4 w-4 mx-auto mb-1" />
-                    Aprobar
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setValidateAction("reject")}
-                    className={`rounded-md border p-3 text-sm font-medium transition-colors ${
-                      validateAction === "reject"
-                        ? "border-destructive bg-destructive/10 text-destructive"
-                        : "border-input hover:bg-muted"
-                    }`}
-                  >
-                    <ChevronDown className="h-4 w-4 mx-auto mb-1" />
-                    Rechazar
-                  </button>
-                </div>
-              </div>
-
-              {validateAction === "reject" && (
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Regresar al paso</label>
-                  <Select value={validateTarget} onValueChange={setValidateTarget}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Seleccionar tarea destino" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {validateDialog.siblings
-                        .filter(
-                          (t) =>
-                            t.id !== validateDialog.task!.id &&
-                            t.order_index < validateDialog.task!.order_index
-                        )
-                        .map((t) => (
-                          <SelectItem key={t.id} value={t.order_index.toString()}>
-                            {t.order_index + 1}. {t.title}
-                            {t.assigned_user_name && ` — ${t.assigned_user_name}`}
-                          </SelectItem>
-                        ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
-
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Notas (opcional)</label>
-                <Textarea
-                  rows={2}
-                  placeholder={
-                    validateAction === "approve"
-                      ? "Comentario opcional..."
-                      : "Explica qué debe corregirse..."
-                  }
-                  value={validateNotes}
-                  onChange={(e) => setValidateNotes(e.target.value)}
-                />
-              </div>
-            </div>
-          )}
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setValidateDialog({ open: false, task: null, siblings: [] })}
-            >
-              Cancelar
-            </Button>
-            <Button
-              onClick={handleValidate}
-              disabled={validating || (validateAction === "reject" && !validateTarget)}
-              className={`gap-2 ${
-                validateAction === "reject"
-                  ? "bg-destructive hover:bg-destructive/90"
-                  : "bg-green-600 hover:bg-green-700"
-              }`}
-            >
-              {validating && <Loader2 className="h-4 w-4 animate-spin" />}
-              {validateAction === "approve" ? "Aprobar" : "Rechazar y enviar"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+        task={validateDialog.task}
+        siblings={validateDialog.siblings}
+        onSuccess={() => {
+          queryClient.invalidateQueries({ queryKey: ["my-tasks"] });
+        }}
+      />
     </div>
   );
 }
