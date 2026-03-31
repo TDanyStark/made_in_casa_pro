@@ -352,7 +352,7 @@ export function WizardStep4Tasks({ state, onNext, onBack, update }: Props) {
           assigned_user_name: resolvedUserName,
           assign_to_commercial: assignToComm,
           order_index: existing?.order_index ?? t.order_index,
-          task_type: "execution",
+          task_type: existing?.task_type ?? t.task_type,
         };
       });
 
@@ -399,6 +399,7 @@ export function WizardStep4Tasks({ state, onNext, onBack, update }: Props) {
         assigned_user_id: t.assigned_user_id,
         assign_to_commercial: t.assign_to_commercial,
         order_index: tasks.indexOf(t),
+        task_type: t.task_type,
       }));
 
     const extra_tasks: ExtraTask[] = tasks
@@ -581,6 +582,27 @@ export function WizardStep4Tasks({ state, onNext, onBack, update }: Props) {
                     syncWizardState(updated, removedTemplateIds);
                   }}
                 />
+                <Select
+                  value={task.task_type}
+                  onValueChange={(v) => {
+                    const type = v as "execution" | "validation";
+                    const updated = localTasks.map((t) =>
+                      t.id === task.id ? { ...t, task_type: type } : t
+                    );
+                    setLocalTasks(updated);
+                    syncWizardState(updated, removedTemplateIds);
+                  }}
+                >
+                  <SelectTrigger className="h-7 text-xs w-[100px] gap-1 px-2">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="execution">Ejecución</SelectItem>
+                    <SelectItem value="validation" disabled={localTasks.indexOf(task) === 0}>
+                      Validación
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
                 <Button
                   variant="ghost"
                   size="icon"

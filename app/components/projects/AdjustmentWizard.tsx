@@ -253,7 +253,7 @@ export function AdjustmentWizard({ open, onOpenChange, productId, createdByName,
         assigned_user_name: getResolvedName({ assigned_user_id: resolvedUserId, assign_to_commercial: t.assign_to_commercial, area_id: t.area_id }),
         assign_to_commercial: t.assign_to_commercial,
         order_index: t.order_index,
-        task_type: "execution" as const,
+        task_type: t.task_type,
       };
     });
 

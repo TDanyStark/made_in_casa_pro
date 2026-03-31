@@ -15,6 +15,7 @@ export interface TaskOverride {
   assigned_user_id?: number | null;
   assign_to_commercial?: number;
   order_index?: number;
+  task_type?: "execution" | "validation";
 }
 
 export interface ExtraTask {
