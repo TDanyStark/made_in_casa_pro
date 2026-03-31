@@ -412,7 +412,11 @@ export async function completeTask(
       args: [taskId, task.project_id, task.status, task.task_flag, userId, notes ?? null],
     });
 
-    // 3. Find next task in this project (lowest order_index with status='waiting' or 'not_started')
+    // 3. Find next task in this project — must be in the same adjustment version
+    const adjFilter = task.adjustment_id !== null
+      ? `AND adjustment_id = ${task.adjustment_id}`
+      : `AND adjustment_id IS NULL`;
+
     const nextResult = await transaction.execute({
       sql: `
         SELECT id, assigned_user_id, requires_quote, task_flag, status
@@ -420,6 +424,7 @@ export async function completeTask(
         WHERE project_id = $1
           AND order_index > (SELECT order_index FROM project_tasks WHERE id = $2)
           AND status IN ('waiting', 'not_started')
+          ${adjFilter}
         ORDER BY order_index ASC
         LIMIT 1
       `,

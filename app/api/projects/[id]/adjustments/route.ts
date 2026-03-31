@@ -165,6 +165,16 @@ export async function POST(
         }
       }
 
+      // After removals, find the first remaining task of this adjustment (by order_index)
+      // so we can keep its status as not_started
+      const firstTaskResult = await db.execute({
+        sql: `SELECT id, template_id, order_index FROM project_tasks WHERE project_id = $1 AND adjustment_id = $2 ORDER BY order_index ASC LIMIT 1`,
+        args: [projectId, adjustment.id],
+      });
+      const firstTaskId = firstTaskResult.rows.length > 0
+        ? Number((firstTaskResult.rows[0] as unknown as { id: number }).id)
+        : null;
+
       // Apply overrides — update title / assignee for template tasks
       if (task_overrides.length > 0) {
         for (const override of task_overrides) {
@@ -176,7 +186,15 @@ export async function POST(
             updates.push(`title = $${args.length}`);
           }
           if (override.assigned_user_id !== undefined) {
-            args.push(override.assigned_user_id);
+            // If assign_to_commercial is being set to 1, resolve the actual user
+            const resolvedUserId = (override.assign_to_commercial === 1 && !override.assigned_user_id)
+              ? (project.created_by ?? null)
+              : override.assigned_user_id;
+            args.push(resolvedUserId);
+            updates.push(`assigned_user_id = $${args.length}`);
+          } else if (override.assign_to_commercial === 1 && project.created_by) {
+            // assign_to_commercial=1 without explicit user_id — resolve to created_by
+            args.push(project.created_by);
             updates.push(`assigned_user_id = $${args.length}`);
           }
           if (override.assign_to_commercial !== undefined) {
@@ -197,6 +215,29 @@ export async function POST(
           }
         }
       }
+
+      // After all overrides, re-check the first task:
+      // Its status must be not_started and assigned_at must reflect the final assigned user.
+      // Re-query to get the actual first task after potential order overrides.
+      const firstTaskFinalResult = await db.execute({
+        sql: `SELECT id, assigned_user_id FROM project_tasks WHERE project_id = $1 AND adjustment_id = $2 ORDER BY order_index ASC LIMIT 1`,
+        args: [projectId, adjustment.id],
+      });
+      if (firstTaskFinalResult.rows.length > 0) {
+        const ft = firstTaskFinalResult.rows[0] as unknown as { id: number; assigned_user_id: number | null };
+        // Only set assigned_at if someone is assigned
+        await db.execute({
+          sql: `UPDATE project_tasks SET status = 'not_started', assigned_at = CASE WHEN assigned_user_id IS NOT NULL THEN CURRENT_TIMESTAMP ELSE NULL END WHERE id = $1`,
+          args: [ft.id],
+        });
+        // All other tasks must be 'waiting' (reset in case overrides changed order)
+        await db.execute({
+          sql: `UPDATE project_tasks SET status = 'waiting' WHERE project_id = $1 AND adjustment_id = $2 AND id != $3 AND status = 'not_started'`,
+          args: [projectId, adjustment.id, ft.id],
+        });
+      }
+      // Suppress unused variable warning
+      void firstTaskId;
     }
 
     // Create extra (non-template) tasks
