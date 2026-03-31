@@ -6,6 +6,7 @@ import {
   getProjectTaskById,
   updateProjectTask,
   deleteProjectTask,
+  resolveProjectTaskAssignment,
 } from "@/lib/queries/projectTasks";
 import { recalculateProjectProgress } from "@/lib/queries/projects";
 
@@ -55,7 +56,27 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     if (!validation.success) {
       return NextResponse.json({ error: "Datos inválidos" }, { status: 400 });
     }
-    const updated = await updateProjectTask(parseInt(tid), validation.data);
+
+    const taskId = parseInt(tid);
+    const existingTask = await getProjectTaskById(taskId);
+    if (!existingTask) return NextResponse.json({ error: "Tarea no encontrada" }, { status: 404 });
+
+    const updateData = { ...validation.data };
+
+    // Re-resolve assignment if mode or area changes
+    const modeChanged = validation.data.assign_to_commercial !== undefined && validation.data.assign_to_commercial !== existingTask.assign_to_commercial;
+    const areaChanged = validation.data.area_id !== undefined && validation.data.area_id !== existingTask.area_id;
+    const userExplicitlySet = validation.data.assigned_user_id !== undefined;
+
+    if (modeChanged || areaChanged || userExplicitlySet) {
+      updateData.assigned_user_id = await resolveProjectTaskAssignment(projectId, {
+        assigned_user_id: validation.data.assigned_user_id ?? (userExplicitlySet ? null : existingTask.assigned_user_id),
+        area_id: validation.data.area_id !== undefined ? validation.data.area_id : existingTask.area_id,
+        assign_to_commercial: validation.data.assign_to_commercial !== undefined ? validation.data.assign_to_commercial : existingTask.assign_to_commercial,
+      });
+    }
+
+    const updated = await updateProjectTask(taskId, updateData);
     if (!updated) return NextResponse.json({ error: "Tarea no encontrada" }, { status: 404 });
 
     // Recalculate progress when status changes

@@ -78,6 +78,7 @@ interface Props {
 
   requiresQuote?: boolean;
   disabled?: boolean;
+  projectId?: number;
 }
 
 export function TaskAssignmentSelector({
@@ -91,6 +92,7 @@ export function TaskAssignmentSelector({
   onQuoterIdsChange,
   requiresQuote = false,
   disabled = false,
+  projectId,
 }: Props) {
   // For "auto" mode, only show areas that have at least one active internal collaborator
   const { data: areasForAuto = [] } = useQuery<AreaType[]>({
@@ -136,6 +138,24 @@ export function TaskAssignmentSelector({
     },
     enabled: assignMode === "specific",
     staleTime: 1000 * 60 * 2,
+  });
+
+  const { data: previewUser, isLoading: isLoadingPreview } = useQuery<{ id: number; name: string } | null>({
+    queryKey: ["least-loaded-preview", assignMode, areaId, projectId],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      if (assignMode === "commercial" && projectId) {
+        params.set("mode", "commercial");
+        params.set("project_id", projectId.toString());
+      } else if (assignMode === "auto" && areaId) {
+        params.set("area_id", areaId.toString());
+      } else {
+        return null;
+      }
+      const res = await get<{ data: { id: number; name: string } | null }>(`users/least-loaded?${params}`);
+      return res.ok ? ((res.data as unknown as { data: { id: number; name: string } | null })?.data ?? null) : null;
+    },
+    enabled: (assignMode === "auto" && !!areaId) || (assignMode === "commercial" && !!projectId),
   });
 
   const [quoterSearch, setQuoterSearch] = useState("");
@@ -207,6 +227,17 @@ export function TaskAssignmentSelector({
                   <p className="text-xs text-muted-foreground mt-0.5">
                     El sistema escoge el colaborador interno con menos carga del área seleccionada
                   </p>
+                  {assignMode === "auto" && areaId && (
+                    <div className="mt-2 flex items-center gap-1.5 text-xs text-primary font-medium bg-primary/10 px-2 py-1 rounded">
+                      {isLoadingPreview ? (
+                        <span className="flex items-center gap-1"><Zap className="h-3 w-3 animate-pulse" /> Resolviendo...</span>
+                      ) : previewUser ? (
+                        <span className="flex items-center gap-1"><UserCheck className="h-3 w-3" /> Se asignará a: {previewUser.name}</span>
+                      ) : (
+                        <span className="flex items-center gap-1 text-destructive"><X className="h-3 w-3" /> Sin colaborador disponible</span>
+                      )}
+                    </div>
+                  )}
                 </div>
               </button>
 
@@ -227,6 +258,17 @@ export function TaskAssignmentSelector({
                   <p className="text-xs text-muted-foreground mt-0.5">
                     Se asigna automáticamente al comercial que crea el proyecto
                   </p>
+                  {assignMode === "commercial" && projectId && (
+                    <div className="mt-2 flex items-center gap-1.5 text-xs text-primary font-medium bg-primary/10 px-2 py-1 rounded">
+                      {isLoadingPreview ? (
+                        <span className="flex items-center gap-1"><Zap className="h-3 w-3 animate-pulse" /> Buscando...</span>
+                      ) : previewUser ? (
+                        <span className="flex items-center gap-1"><UserCheck className="h-3 w-3" /> Se asignará a: {previewUser.name}</span>
+                      ) : (
+                        <span className="flex items-center gap-1 text-destructive"><X className="h-3 w-3" /> Sin comercial asignado al proyecto</span>
+                      )}
+                    </div>
+                  )}
                 </div>
               </button>
 

@@ -135,7 +135,7 @@ export async function createProjectTask(data: {
         data.description ?? null,
         data.area_id ?? null,
         data.assigned_user_id ?? null,
-        data.status ?? "not_started",
+        data.status ?? (data.order_index === 0 ? "not_started" : "waiting"),
         data.task_type ?? "execution",
         data.task_flag ?? "new",
         data.requires_quote ?? 0,
@@ -487,6 +487,72 @@ export async function validateTask(
 }
 
 // ─── Auto-assignment helpers ──────────────────────────────────────────────────
+
+/**
+ * Resolves the assigned_user_id based on assignment mode.
+ * Priority: 
+ * 1. Specific User (fixed)
+ * 2. Commercial (Project Manager email lookup -> Creator fallback)
+ * 3. Auto-assign (Least loaded in Area)
+ */
+export async function resolveProjectTaskAssignment(
+  projectId: number,
+  data: {
+    assigned_user_id?: number | null;
+    area_id?: number | null;
+    assign_to_commercial?: number;
+  }
+): Promise<number | null> {
+  try {
+    // 1. Explicitly assigned user
+    if (data.assigned_user_id) {
+      return data.assigned_user_id;
+    }
+
+    // 2. Commercial mode
+    if (Number(data.assign_to_commercial) === 1) {
+      const projectResult = await db.execute({
+        sql: `
+          SELECT p.created_by, m.email AS manager_email
+          FROM projects p
+          LEFT JOIN managers m ON p.manager_id = m.id
+          WHERE p.id = $1
+        `,
+        args: [projectId],
+      });
+
+      if (projectResult.rows.length > 0) {
+        const row = projectResult.rows[0] as unknown as { created_by: number | null; manager_email: string | null };
+        
+        if (row.manager_email) {
+          const userResult = await db.execute({
+            sql: `SELECT id FROM users WHERE email = $1 AND is_active = 1 LIMIT 1`,
+            args: [row.manager_email],
+          });
+          if (userResult.rows.length > 0) {
+            return Number((userResult.rows[0] as unknown as { id: number }).id);
+          }
+        }
+        
+        // Fallback to creator
+        if (row.created_by) {
+          return row.created_by;
+        }
+      }
+      return null;
+    }
+
+    // 3. Auto-assign by Area (if area_id is provided and no specific user)
+    if (data.area_id) {
+      return findLeastLoadedInternalCollaborator(data.area_id);
+    }
+
+    return null;
+  } catch (error) {
+    console.error("Error resolving project task assignment:", error);
+    return null;
+  }
+}
 
 /**
  * Finds the internal collaborator (is_internal=1, rol_id=4) with the fewest

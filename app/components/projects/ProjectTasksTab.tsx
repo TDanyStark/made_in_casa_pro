@@ -60,7 +60,6 @@ import {
   Pencil,
   Trash2,
   Package,
-  Lock,
   CheckCircle,
   ChevronDown,
   AlertTriangle,
@@ -326,9 +325,17 @@ export function ProjectTasksTab({
   const openCreate = () => {
     setEditingTask(null);
     setEditingAssigneeOnly(false);
+    // New tasks default to waiting unless it's the very first one
+    const defaultStatus = tasks.length === 0 ? "not_started" : "waiting";
     form.reset({
-      title: "", description: "", task_type: "execution", requires_quote: false,
-      assign_mode: "auto", area_id: null, assigned_user_id: null,
+      title: "",
+      description: "",
+      status: defaultStatus,
+      task_type: "execution",
+      requires_quote: false,
+      assign_mode: "auto",
+      area_id: null,
+      assigned_user_id: null,
     });
     setDialogOpen(true);
   };
@@ -538,6 +545,11 @@ export function ProjectTasksTab({
             renderItem={(task, dragHandle) => {
               const taskType = task.task_type ?? "execution";
               const taskFlag = task.task_flag ?? "new";
+              // Editability lock
+              // Reordering and basic editing is now always allowed if the user has edit permissions
+              const canEditThisTask = canEdit;
+              const canEditAssigneeOnly = false; // We use canEditThisTask for everything now
+
               const isWaiting = task.status === "waiting";
               const isBlocked = task.status === "blocked";
               const isInProgress = task.status === "in_progress";
@@ -547,28 +559,21 @@ export function ProjectTasksTab({
               const canValidate = isInProgress && isValidation && (isMyTask(task) || isAdmin);
               const needsQuote = task.requires_quote === 1 && isBlocked;
 
-              // Editability lock
-              const isLocked = isInProgress || isCompleted;
-              const canEditThisTask = canEdit && !isLocked && !isBlocked;
-              const canEditAssigneeOnly = canEdit && isBlocked;
-
               return (
                 <div
                   className={`flex items-start gap-3 rounded-md border bg-card p-3 transition-opacity ${
                     isWaiting ? "opacity-60" : ""
                   } ${isBlocked ? "border-destructive/50 bg-destructive/5" : ""}`}
                 >
-                  {canEditThisTask && !isWaiting && (
+                  {canEdit && (
                     <div className="flex-shrink-0 pt-0.5">{dragHandle}</div>
                   )}
-                  {(isWaiting || isBlocked || isLocked) && (
+                  {(isWaiting || isBlocked) && (
                     <div className="flex-shrink-0 pt-1 pl-1">
                       {isBlocked ? (
                         <AlertTriangle className="h-4 w-4 text-destructive" />
-                      ) : isLocked ? (
-                        <Lock className="h-4 w-4 text-muted-foreground" />
                       ) : (
-                        <Lock className="h-4 w-4 text-muted-foreground" />
+                        <Clock className="h-4 w-4 text-muted-foreground/50" />
                       )}
                     </div>
                   )}
@@ -661,7 +666,7 @@ export function ProjectTasksTab({
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <span
-                          className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium ${
+                           className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium ${
                             TASK_STATUS_CONFIG[task.status]?.className ?? ""
                           }`}
                         >
@@ -754,7 +759,7 @@ export function ProjectTasksTab({
 
         {/* ── Create / Edit Task Dialog ── */}
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-          <DialogContent className="sm:max-w-[520px] max-h-[90vh] overflow-y-auto" aria-describedby={undefined}>
+          <DialogContent className="sm:max-w-[560px] max-h-[90vh] overflow-y-auto" aria-describedby={undefined}>
             <DialogHeader>
               <DialogTitle>
                 {editingTask
@@ -816,12 +821,22 @@ export function ProjectTasksTab({
                         <FormLabel>Tipo de tarea</FormLabel>
                         <FormControl>
                           <Select value={field.value} onValueChange={field.onChange}>
-                            <SelectTrigger className="h-auto min-h-9 py-2 *:data-[slot=select-value]:items-start *:data-[slot=select-value]:justify-start *:data-[slot=select-value]:text-left [&>span]:line-clamp-none">
+                            <SelectTrigger className="h-16">
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
-                              <SelectItem value="execution">Ejecución — el colaborador ejecuta y pasa al siguiente</SelectItem>
-                              <SelectItem value="validation">Validación — puede aprobar o rechazar y enviar a cualquier paso</SelectItem>
+                              <SelectItem value="execution">
+                                <div className="flex flex-col items-start text-left">
+                                  <span>Ejecución</span>
+                                  <span className="text-xs text-muted-foreground whitespace-normal">El colaborador ejecuta y pasa automáticamente al siguiente paso</span>
+                                </div>
+                              </SelectItem>
+                              <SelectItem value="validation">
+                                <div className="flex flex-col items-start text-left">
+                                  <span>Validación</span>
+                                  <span className="text-xs text-muted-foreground whitespace-normal">Paso de control: puede aprobar o rechazar (regresar el flujo)</span>
+                                </div>
+                              </SelectItem>
                             </SelectContent>
                           </Select>
                         </FormControl>
@@ -846,7 +861,7 @@ export function ProjectTasksTab({
                             }}
                           />
                         </FormControl>
-                        <div className="space-y-0.5">
+                        <div className="space-y-0.5 -mt-1">
                           <FormLabel className="text-sm font-medium cursor-pointer">
                             Requiere cotización de externo
                           </FormLabel>
@@ -877,6 +892,7 @@ export function ProjectTasksTab({
                       if (id) form.clearErrors("assigned_user_id");
                     }}
                     requiresQuote={requiresQuote}
+                    projectId={projectId}
                   />
                   {form.formState.errors.assigned_user_id && (
                     <p className="text-xs text-destructive font-medium px-1">

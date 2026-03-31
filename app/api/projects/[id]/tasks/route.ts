@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { validateApiRole, validateHttpMethod } from "@/lib/services/api-auth";
 import { UserRole } from "@/lib/definitions";
-import { getTasksByProject, createProjectTask } from "@/lib/queries/projectTasks";
+import { getTasksByProject, createProjectTask, resolveProjectTaskAssignment } from "@/lib/queries/projectTasks";
 import { recalculateProjectProgress } from "@/lib/queries/projects";
 import { db } from "@/lib/db";
 
@@ -61,14 +61,21 @@ export async function POST(request: NextRequest, { params }: Params) {
       args: [projectId],
     });
     const nextOrder = Number((orderResult.rows[0] as unknown as { next_order: number }).next_order);
-
+    
+    // Resolve assignment before creation
+    const resolvedAssignedUserId = await resolveProjectTaskAssignment(projectId, {
+      assigned_user_id: validation.data.assigned_user_id,
+      area_id: validation.data.area_id,
+      assign_to_commercial: validation.data.assign_to_commercial,
+    });
+    
     const task = await createProjectTask({
       project_id: projectId,
       title: validation.data.title,
       description: validation.data.description ?? null,
       area_id: validation.data.area_id ?? null,
-      assigned_user_id: validation.data.assigned_user_id ?? null,
-      status: validation.data.status ?? "not_started",
+      assigned_user_id: resolvedAssignedUserId,
+      status: validation.data.status,
       task_type: validation.data.task_type ?? "execution",
       task_flag: validation.data.task_flag ?? "new",
       requires_quote: validation.data.requires_quote ?? 0,
