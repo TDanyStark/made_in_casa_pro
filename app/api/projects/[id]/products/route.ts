@@ -7,6 +7,7 @@ import {
   updateProject,
   recalculateProjectProgress,
 } from "@/lib/queries/projects";
+import { getAdjustmentsByProject } from "@/lib/queries/adjustments";
 import { instantiateTasksFromTemplates } from "@/lib/queries/projectTasks";
 
 const bodySchema = z.object({
@@ -53,9 +54,12 @@ export async function POST(request: NextRequest, { params }: Params) {
     // Set product on the project
     await updateProject(projectId, { product_id });
 
-    // Instantiate task templates
+    // Instantiate task templates for V1
+    const adjustments = await getAdjustmentsByProject(projectId);
+    const v1 = adjustments.find(a => a.version_number === 1);
+    
     const commercialUserId = project.created_by ?? null;
-    await instantiateTasksFromTemplates(projectId, product_id, commercialUserId);
+    await instantiateTasksFromTemplates(projectId, product_id, commercialUserId, v1?.id);
 
     // Recalculate progress
     await recalculateProjectProgress(projectId);

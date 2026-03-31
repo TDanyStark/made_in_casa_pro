@@ -87,9 +87,6 @@ export function ProjectDetailClient({ projectId, userRole, currentUserId }: Prop
             canEdit={canEdit}
             currentUserId={currentUserId}
             currentUserRole={userRole}
-            projectCreatedAt={project.created_at}
-            projectCompletedAt={project.completed_at}
-            projectDriveUrl={project.drive_folder_url}
           />
         </TabsContent>
 

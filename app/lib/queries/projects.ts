@@ -179,6 +179,16 @@ export async function createProject(data: {
       ],
     });
     const id = Number(result.rows[0]?.id);
+
+    // Initialize V1 adjustment record
+    await db.execute({
+      sql: `
+        INSERT INTO project_adjustments (project_id, version_number, status, drive_folder_id, drive_folder_url)
+        VALUES ($1, 1, 'active', $2, $3)
+      `,
+      args: [id, data.drive_folder_id ?? null, data.drive_folder_url ?? null],
+    });
+
     revalidatePath("/projects");
     const created = await getProjectById(id);
     return created!;

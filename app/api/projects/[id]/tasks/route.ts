@@ -16,6 +16,7 @@ const taskSchema = z.object({
   task_flag: z.enum(["new", "correction", "adjustment"]).optional().default("new"),
   requires_quote: z.coerce.number().int().min(0).max(1).optional().default(0),
   assign_to_commercial: z.coerce.number().int().min(0).max(1).optional().default(0),
+  adjustment_id: z.coerce.number().int().positive().optional().nullable(),
 });
 
 type Params = { params: Promise<{ id: string }> };
@@ -68,14 +69,26 @@ export async function POST(request: NextRequest, { params }: Params) {
       );
     }
 
-    // Get next order_index for this project
+    // 1. Get adjustment ID if not provided (default to latest)
+    let adjustmentId = validation.data.adjustment_id;
+    if (!adjustmentId) {
+      const adjResult = await db.execute({
+        sql: `SELECT id FROM project_adjustments WHERE project_id = $1 ORDER BY version_number DESC LIMIT 1`,
+        args: [projectId],
+      });
+      if (adjResult.rows.length > 0) {
+        adjustmentId = Number((adjResult.rows[0] as unknown as { id: number }).id);
+      }
+    }
+
+    // 2. Get next order_index for this project and adjustment
     const orderResult = await db.execute({
-      sql: `SELECT COALESCE(MAX(order_index), -1) + 1 AS next_order FROM project_tasks WHERE project_id = $1`,
-      args: [projectId],
+      sql: `SELECT COALESCE(MAX(order_index), -1) + 1 AS next_order FROM project_tasks WHERE project_id = $1 AND adjustment_id = $2`,
+      args: [projectId, adjustmentId],
     });
     const nextOrder = Number((orderResult.rows[0] as unknown as { next_order: number }).next_order);
     
-    // Resolve assignment before creation
+    // 3. Resolve assignment before creation
     const resolvedAssignedUserId = await resolveProjectTaskAssignment(projectId, {
       assigned_user_id: validation.data.assigned_user_id,
       area_id: validation.data.area_id,
@@ -94,6 +107,7 @@ export async function POST(request: NextRequest, { params }: Params) {
       requires_quote: validation.data.requires_quote ?? 0,
       assign_to_commercial: validation.data.assign_to_commercial ?? 0,
       order_index: nextOrder,
+      adjustment_id: adjustmentId,
     });
 
     await recalculateProjectProgress(projectId);

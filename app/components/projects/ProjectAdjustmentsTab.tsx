@@ -19,9 +19,6 @@ interface Props {
   canEdit: boolean;
   currentUserId?: number;
   currentUserRole: UserRole;
-  projectCreatedAt: string;
-  projectCompletedAt?: string;
-  projectDriveUrl?: string | null;
 }
 
 export function ProjectAdjustmentsTab({
@@ -31,9 +28,6 @@ export function ProjectAdjustmentsTab({
   canEdit,
   currentUserId,
   currentUserRole,
-  projectCreatedAt,
-  projectCompletedAt,
-  projectDriveUrl,
 }: Props) {
   const queryClient = useQueryClient();
 
@@ -71,27 +65,15 @@ export function ProjectAdjustmentsTab({
     projectStatus === "completed" || 
     (lastAdjustment && lastAdjustment.status === "completed");
 
-  // Combinar V1 (proyecto original) y ajustes
-  const allVersions = [
-    {
-      id: "v1",
-      title: "Versión 1 (Original)",
-      adjustmentId: null,
-      status: adjustments.length > 0 ? "completed" : projectStatus,
-      createdAt: projectCreatedAt,
-      completedAt: projectCompletedAt,
-      driveUrl: projectDriveUrl,
-    },
-    ...adjustments.map((adj) => ({
-      id: `v${adj.version_number}`,
-      title: `Versión ${adj.version_number}`,
-      adjustmentId: adj.id,
-      status: adj.status,
-      createdAt: adj.created_at,
-      completedAt: adj.completed_at,
-      driveUrl: adj.drive_folder_url,
-    }))
-  ].reverse(); // Invertir para mostrar la versión más reciente (ej. V2) arriba
+  const allVersions = adjustments.map((adj) => ({
+    id: `v${adj.id}`,
+    title: adj.version_number === 1 ? "Versión 1 (Original)" : `Versión ${adj.version_number}`,
+    adjustmentId: adj.id,
+    status: adj.status,
+    createdAt: adj.created_at,
+    completedAt: adj.completed_at,
+    driveUrl: adj.drive_folder_url,
+  })).reverse(); 
 
   return (
     <div className="space-y-6">

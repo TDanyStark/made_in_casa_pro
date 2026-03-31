@@ -33,7 +33,7 @@ export async function createProjectAdjustment(data: {
       args: [data.project_id],
     });
     const maxV = (maxVersionResult.rows[0] as unknown as { max_v: number | null }).max_v;
-    const nextVersion = maxV ? Number(maxV) + 1 : 2; // Always starts at 2 since 1 is the original project
+    const nextVersion = maxV ? Number(maxV) + 1 : 1; 
 
     // Insert new adjustment
     const insertResult = await transaction.execute({
