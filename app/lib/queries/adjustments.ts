@@ -6,7 +6,7 @@ export async function getAdjustmentsByProject(projectId: number): Promise<Projec
   try {
     const result = await db.execute({
       sql: `
-        SELECT id, project_id, version_number, drive_folder_id, drive_folder_url, status, created_at, completed_at
+        SELECT id, project_id, version_number, drive_folder_id, drive_folder_url, status, notes, created_at, completed_at
         FROM project_adjustments
         WHERE project_id = $1
         ORDER BY version_number ASC
@@ -24,6 +24,7 @@ export async function createProjectAdjustment(data: {
   project_id: number;
   drive_folder_id?: string | null;
   drive_folder_url?: string | null;
+  notes?: string | null;
 }): Promise<ProjectAdjustmentType> {
   const transaction = await db.transaction("write");
   try {
@@ -38,8 +39,8 @@ export async function createProjectAdjustment(data: {
     // Insert new adjustment
     const insertResult = await transaction.execute({
       sql: `
-        INSERT INTO project_adjustments (project_id, version_number, drive_folder_id, drive_folder_url, status)
-        VALUES ($1, $2, $3, $4, 'active')
+        INSERT INTO project_adjustments (project_id, version_number, drive_folder_id, drive_folder_url, status, notes)
+        VALUES ($1, $2, $3, $4, 'active', $5)
         RETURNING *
       `,
       args: [
@@ -47,6 +48,7 @@ export async function createProjectAdjustment(data: {
         nextVersion,
         data.drive_folder_id ?? null,
         data.drive_folder_url ?? null,
+        data.notes ?? null,
       ],
     });
 

@@ -83,10 +83,12 @@ export function ProjectDetailClient({ projectId, userRole, currentUserId }: Prop
           <ProjectAdjustmentsTab
             projectId={projectId}
             projectStatus={project.status}
+            productId={project.product_id ?? null}
             productName={project.product_name}
             canEdit={canEdit}
             currentUserId={currentUserId}
             currentUserRole={userRole}
+            createdByName={project.created_by_name}
           />
         </TabsContent>
 

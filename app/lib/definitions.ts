@@ -234,6 +234,7 @@ export type ProjectAdjustmentType = {
   drive_folder_id: string | null;
   drive_folder_url: string | null;
   status: 'active' | 'completed';
+  notes: string | null;
   created_at: string;
   completed_at?: string;
 };

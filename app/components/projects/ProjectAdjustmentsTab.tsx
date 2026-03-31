@@ -1,35 +1,42 @@
 "use client";
 
 import { useState } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { get, post } from "@/lib/services/apiService";
 import { ProjectAdjustmentType, UserRole } from "@/lib/definitions";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
-import { Loader2, Plus, ExternalLink, HardDrive, ChevronDown, ChevronUp } from "lucide-react";
+import { Plus, ExternalLink, HardDrive, ChevronDown, ChevronUp } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { ProjectTasksTab } from "./ProjectTasksTab";
+import { AdjustmentWizard } from "./AdjustmentWizard";
 
 interface Props {
   projectId: number;
   projectStatus: string;
+  productId: number | null;
   productName: string | null;
   canEdit: boolean;
   currentUserId?: number;
   currentUserRole: UserRole;
+  createdByName?: string | null;
 }
 
 export function ProjectAdjustmentsTab({
   projectId,
   projectStatus,
+  productId,
   productName,
   canEdit,
   currentUserId,
   currentUserRole,
+  createdByName,
 }: Props) {
   const queryClient = useQueryClient();
+  const [wizardOpen, setWizardOpen] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const { data: adjustments = [], isLoading } = useQuery({
     queryKey: ["project-adjustments", projectId],
@@ -40,64 +47,60 @@ export function ProjectAdjustmentsTab({
     staleTime: 1000 * 60,
   });
 
-  const { mutate: createAdjustment, isPending: isCreating } = useMutation({
-    mutationFn: async () => {
-      const res = await post<{ data: ProjectAdjustmentType; ok: boolean; error?: string }>(`projects/${projectId}/adjustments`, {});
+  const lastAdjustment = adjustments.length > 0 ? adjustments[adjustments.length - 1] : null;
+  const canCreateNew =
+    projectStatus === "completed" ||
+    (lastAdjustment && lastAdjustment.status === "completed");
+
+  const handleConfirm = async (data: {
+    notes: string;
+    task_overrides: object[];
+    extra_tasks: object[];
+    removed_template_ids: number[];
+  }) => {
+    setIsSubmitting(true);
+    try {
+      const res = await post<ProjectAdjustmentType>(`projects/${projectId}/adjustments`, data);
       if (!res.ok) throw new Error(res.error || "Error al crear ajuste");
-      return res.data;
-    },
-    onSuccess: () => {
-      toast.success("Nuevo ajuste creado");
-      queryClient.invalidateQueries({ queryKey: ["project-adjustments", projectId] });
-      queryClient.invalidateQueries({ queryKey: ["project", projectId] });
-    },
-    onError: (error: Error) => {
-      toast.error(error.message);
-    },
-  });
+      toast.success("Ajuste creado correctamente");
+      setWizardOpen(false);
+      queryClient.invalidateQueries({ queryKey: ["project-adjustments", projectId], refetchType: "all" });
+      queryClient.invalidateQueries({ queryKey: ["project", projectId], refetchType: "all" });
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : "Error al crear ajuste");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   if (isLoading) {
     return <Skeleton className="h-64 w-full" />;
   }
 
-  const lastAdjustment = adjustments.length > 0 ? adjustments[adjustments.length - 1] : null;
-  const canCreateNew = 
-    projectStatus === "completed" || 
-    (lastAdjustment && lastAdjustment.status === "completed");
-
-  const allVersions = adjustments.map((adj) => ({
-    id: `v${adj.id}`,
-    title: adj.version_number === 1 ? "Versión 1 (Original)" : `Versión ${adj.version_number}`,
-    adjustmentId: adj.id,
-    status: adj.status,
-    createdAt: adj.created_at,
-    completedAt: adj.completed_at,
-    driveUrl: adj.drive_folder_url,
-  })).reverse(); 
+  const allVersions = [...adjustments].reverse();
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h2 className="text-lg font-semibold">Historial de Tareas y Versiones</h2>
-          <p className="text-sm text-muted-foreground">Administra las iteraciones de este proyecto.</p>
+    <>
+      <div className="space-y-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <h2 className="text-lg font-semibold">Tareas y Versiones</h2>
+            <p className="text-sm text-muted-foreground">Historial de todas las iteraciones del proyecto.</p>
+          </div>
+
+          {canEdit && canCreateNew && (
+            <Button onClick={() => setWizardOpen(true)} size="sm">
+              <Plus className="mr-2 h-4 w-4" />
+              Nuevo Ajuste
+            </Button>
+          )}
         </div>
 
-        {canEdit && canCreateNew && (
-          <Button onClick={() => createAdjustment()} disabled={isCreating} size="sm">
-            {isCreating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Plus className="mr-2 h-4 w-4" />}
-            Nuevo Ajuste
-          </Button>
-        )}
-      </div>
-
-      <div className="space-y-4">
-        {allVersions.map((version, index) => {
-          // Expandir por defecto solo la versión más reciente
-          return (
+        <div className="space-y-4">
+          {allVersions.map((adj, index) => (
             <VersionAccordion
-              key={version.id}
-              version={version}
+              key={adj.id}
+              adjustment={adj}
               isInitiallyExpanded={index === 0}
               projectId={projectId}
               productName={productName}
@@ -105,15 +108,26 @@ export function ProjectAdjustmentsTab({
               currentUserId={currentUserId}
               currentUserRole={currentUserRole}
             />
-          );
-        })}
+          ))}
+        </div>
       </div>
-    </div>
+
+      <AdjustmentWizard
+        open={wizardOpen}
+        onOpenChange={setWizardOpen}
+        projectId={projectId}
+        productId={productId}
+        createdByName={createdByName}
+        userRole={currentUserRole}
+        onConfirm={handleConfirm}
+        isSubmitting={isSubmitting}
+      />
+    </>
   );
 }
 
 function VersionAccordion({
-  version,
+  adjustment,
   isInitiallyExpanded,
   projectId,
   productName,
@@ -121,15 +135,7 @@ function VersionAccordion({
   currentUserId,
   currentUserRole,
 }: {
-  version: {
-    id: string;
-    title: string;
-    adjustmentId: number | null;
-    status: string;
-    createdAt: string;
-    completedAt?: string;
-    driveUrl?: string | null;
-  };
+  adjustment: ProjectAdjustmentType;
   isInitiallyExpanded: boolean;
   projectId: number;
   productName: string | null;
@@ -139,33 +145,36 @@ function VersionAccordion({
 }) {
   const [expanded, setExpanded] = useState(isInitiallyExpanded);
 
+  const isCompleted = adjustment.status === "completed";
+  const label = adjustment.version_number === 1 ? "Versión 1 (Original)" : `Versión ${adjustment.version_number}`;
+
   return (
     <div className="border rounded-lg bg-card overflow-hidden">
-      <div 
+      <div
         className="flex items-center justify-between p-4 cursor-pointer hover:bg-muted/50 transition-colors"
         onClick={() => setExpanded(!expanded)}
       >
         <div>
-          <h3 className="text-base font-semibold">{version.title}</h3>
+          <h3 className="text-base font-semibold">{label}</h3>
           <div className="flex items-center gap-2 text-xs text-muted-foreground mt-1">
-            <span className={version.status === 'completed' ? "text-green-600 dark:text-green-400 font-medium" : "text-amber-600 dark:text-amber-400 font-medium"}>
-              {version.status === 'completed' ? 'Completado' : 'Activo'}
+            <span className={isCompleted ? "text-green-600 dark:text-green-400 font-medium" : "text-amber-600 dark:text-amber-400 font-medium"}>
+              {isCompleted ? "Completado" : "Activo"}
             </span>
             <span>•</span>
-            <span>Creado: {format(new Date(version.createdAt), "MMM d, yyyy", { locale: es })}</span>
-            {version.completedAt && (
+            <span>Creado: {format(new Date(adjustment.created_at), "MMM d, yyyy", { locale: es })}</span>
+            {adjustment.completed_at && (
               <>
                 <span>•</span>
-                <span>Finalizado: {format(new Date(version.completedAt), "MMM d, yyyy", { locale: es })}</span>
+                <span>Finalizado: {format(new Date(adjustment.completed_at), "MMM d, yyyy", { locale: es })}</span>
               </>
             )}
           </div>
         </div>
 
-        <div className="flex items-center gap-4">
-          {version.driveUrl && (
-            <Button variant="outline" size="sm" asChild onClick={(e) => e.stopPropagation()}>
-              <a href={version.driveUrl} target="_blank" rel="noopener noreferrer">
+        <div className="flex items-center gap-3">
+          {adjustment.drive_folder_url && (
+            <Button variant="outline" size="sm" asChild onClick={e => e.stopPropagation()}>
+              <a href={adjustment.drive_folder_url} target="_blank" rel="noopener noreferrer">
                 <HardDrive className="h-3.5 w-3.5 mr-1.5" />
                 Drive
                 <ExternalLink className="h-3 w-3 ml-1 opacity-60" />
@@ -179,15 +188,28 @@ function VersionAccordion({
       </div>
 
       {expanded && (
-        <div className="p-4 border-t bg-muted/10">
-          <ProjectTasksTab
-            projectId={projectId}
-            productName={productName}
-            canEdit={canEdit && version.status !== 'completed'}
-            currentUserId={currentUserId}
-            currentUserRole={currentUserRole}
-            adjustmentId={version.adjustmentId}
-          />
+        <div className="border-t">
+          {/* Notes section */}
+          {adjustment.notes && (
+            <div className="px-5 pt-4 pb-3 border-b bg-muted/10">
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5">Notas del ajuste</p>
+              <div
+                className="text-sm prose prose-sm dark:prose-invert max-w-none"
+                dangerouslySetInnerHTML={{ __html: adjustment.notes }}
+              />
+            </div>
+          )}
+
+          <div className="p-4">
+            <ProjectTasksTab
+              projectId={projectId}
+              productName={productName}
+              canEdit={canEdit && !isCompleted}
+              currentUserId={currentUserId}
+              currentUserRole={currentUserRole}
+              adjustmentId={adjustment.id}
+            />
+          </div>
         </div>
       )}
     </div>
