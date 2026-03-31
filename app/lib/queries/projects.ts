@@ -275,19 +275,32 @@ export async function deleteProject(id: number): Promise<void> {
 
 export async function recalculateProjectProgress(projectId: number): Promise<number> {
   try {
-    const result = await db.execute({
-      sql: `
-        SELECT
-          COUNT(*)                                         AS total,
-          COUNT(*) FILTER (WHERE status = 'completed')    AS completed
-        FROM project_tasks
-        WHERE project_id = $1
-      `,
+    // Get the active adjustment (the current version being worked on)
+    const activeAdjResult = await db.execute({
+      sql: `SELECT id FROM project_adjustments WHERE project_id = $1 AND status = 'active' ORDER BY version_number DESC LIMIT 1`,
       args: [projectId],
     });
-    const row = result.rows[0] as unknown as { total: string; completed: string };
-    const total = Number(row.total);
-    const completed = Number(row.completed);
+
+    let total = 0;
+    let completed = 0;
+
+    if (activeAdjResult.rows.length > 0) {
+      const activeAdjId = Number((activeAdjResult.rows[0] as unknown as { id: number }).id);
+      const result = await db.execute({
+        sql: `
+          SELECT
+            COUNT(*)                                         AS total,
+            COUNT(*) FILTER (WHERE status = 'completed')    AS completed
+          FROM project_tasks
+          WHERE project_id = $1 AND adjustment_id = $2
+        `,
+        args: [projectId, activeAdjId],
+      });
+      const row = result.rows[0] as unknown as { total: string; completed: string };
+      total = Number(row.total);
+      completed = Number(row.completed);
+    }
+
     const progress = total === 0 ? 0 : Math.round((completed / total) * 100);
     
     const updates = ["progress = $1", "updated_at = CURRENT_TIMESTAMP"];
@@ -297,7 +310,7 @@ export async function recalculateProjectProgress(projectId: number): Promise<num
       updates.push("status = 'completed'");
       updates.push("completed_at = COALESCE(completed_at, CURRENT_TIMESTAMP)");
       
-      // Complete active adjustments if any
+      // Mark the active adjustment as completed too
       await db.execute({
         sql: `UPDATE project_adjustments SET status = 'completed', completed_at = CURRENT_TIMESTAMP WHERE project_id = $1 AND status = 'active'`,
         args: [projectId],

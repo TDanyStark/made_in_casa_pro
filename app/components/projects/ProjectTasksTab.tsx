@@ -321,9 +321,9 @@ export function ProjectTasksTab({
   // ─────────────────────────────────────────────────────────────────────────────
 
   const invalidateAll = () => {
-    queryClient.invalidateQueries({ queryKey: ["project-tasks", projectId, adjustmentId] });
-    queryClient.invalidateQueries({ queryKey: ["project", projectId] });
-    queryClient.invalidateQueries({ queryKey: ["project-adjustments", projectId] });
+    queryClient.invalidateQueries({ queryKey: ["project-tasks", projectId, adjustmentId], refetchType: "all" });
+    queryClient.invalidateQueries({ queryKey: ["project", projectId], refetchType: "all" });
+    queryClient.invalidateQueries({ queryKey: ["project-adjustments", projectId], refetchType: "all" });
   };
 
   const sortedTasks = [...tasks].sort((a, b) => a.order_index - b.order_index || a.id - b.id);
