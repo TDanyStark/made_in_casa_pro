@@ -6,7 +6,12 @@ import {
   TaskType,
   TaskFlag,
   TaskTransitionType,
+  TaskCommandCenterFilters,
+  TaskCommandCenterRow,
+  ProjectCreatorRoleFilter,
 } from "../definitions";
+import { buildPaginationArgs, buildWhereClause, parseTotal } from "../db/query-helpers";
+import { ITEMS_PER_PAGE } from "@/config/constants";
 
 // ─── Shared SELECT fragments ──────────────────────────────────────────────────
 
@@ -947,4 +952,95 @@ export async function logTaskTransition(
   notes?: string | null
 ): Promise<void> {
   return logTransition(taskId, projectId, fromStatus, toStatus, fromFlag, toFlag, movedBy, notes);
+}
+
+const CREATOR_ROLE_TO_ID: Record<ProjectCreatorRoleFilter, number> = {
+  admin: 1,
+  directivo: 2,
+  comercial: 3,
+};
+
+export async function getTasksCommandCenterWithPagination({
+  page = 1,
+  limit = ITEMS_PER_PAGE,
+  includeCompleted = false,
+  creatorRole,
+  areaId,
+  assignedUserId,
+  status,
+  taskType,
+  taskFlag,
+  assignedFrom,
+  assignedTo,
+  completedFrom,
+  completedTo,
+}: TaskCommandCenterFilters): Promise<{ tasks: TaskCommandCenterRow[]; total: number }> {
+  try {
+    const creatorRoleId = creatorRole ? CREATOR_ROLE_TO_ID[creatorRole] : undefined;
+
+    const conditions: Array<{ sql: string; value: unknown }> = [
+      { sql: "pt.status <> 'completed'", value: includeCompleted ? undefined : 1 },
+      { sql: "creator.rol_id = $", value: creatorRoleId },
+      { sql: "pt.area_id = $", value: areaId },
+      { sql: "pt.assigned_user_id = $", value: assignedUserId },
+      { sql: "pt.status = $", value: status },
+      { sql: "pt.task_type = $", value: taskType },
+      { sql: "pt.task_flag = $", value: taskFlag },
+      { sql: "pt.assigned_at >= $", value: assignedFrom },
+      { sql: "pt.assigned_at <= $", value: assignedTo },
+      { sql: "pt.completed_at >= $", value: completedFrom },
+      { sql: "pt.completed_at <= $", value: completedTo },
+    ];
+
+    const { whereSQL, args } = buildWhereClause(conditions);
+
+    const countResult = await db.execute({
+      sql: `
+        SELECT COUNT(*) AS count
+        FROM project_tasks pt
+        INNER JOIN projects p ON p.id = pt.project_id
+        LEFT JOIN users creator ON creator.id = p.created_by
+        ${whereSQL}
+      `,
+      args,
+    });
+
+    const total = parseTotal(countResult.rows as Record<string, unknown>[]);
+    const { limitPH, offsetPH, paginationArgs } = buildPaginationArgs(args, page, limit);
+
+    const result = await db.execute({
+      sql: `
+        SELECT
+          pt.id,
+          pt.title,
+          pt.project_id,
+          p.title AS project_title,
+          pr.name AS product_name,
+          pt.assigned_user_id,
+          assignee.name AS assigned_user_name,
+          pt.task_flag,
+          pt.task_type,
+          pt.status,
+          pt.assigned_at,
+          pt.completed_at
+        FROM project_tasks pt
+        INNER JOIN projects p ON p.id = pt.project_id
+        LEFT JOIN users creator ON creator.id = p.created_by
+        LEFT JOIN users assignee ON assignee.id = pt.assigned_user_id
+        LEFT JOIN products pr ON pr.id = p.product_id
+        ${whereSQL}
+        ORDER BY COALESCE(pt.assigned_at, pt.created_at) DESC, pt.id DESC
+        LIMIT ${limitPH} OFFSET ${offsetPH}
+      `,
+      args: [...args, ...paginationArgs],
+    });
+
+    return {
+      tasks: result.rows as unknown as TaskCommandCenterRow[],
+      total,
+    };
+  } catch (error) {
+    console.error("Error fetching command center tasks:", error);
+    return { tasks: [], total: 0 };
+  }
 }

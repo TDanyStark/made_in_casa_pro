@@ -594,6 +594,38 @@ Entidad simple para agrupar proyectos en informes.
 
 ---
 
-**Última actualización:** 2026-03-26
+### 1️⃣1️⃣ Centro de Mando de Tareas (`/tasks`)
+
+Vista operativa para seguimiento transversal de tareas de proyectos con filtros avanzados y paginación.
+
+**¿Qué se puede hacer?**
+- ✅ Ver listado paginado de tareas con columnas: tarea, proyecto, producto, asignado, bandera, tipo, estado, fecha de asignación y fecha de completado.
+- ✅ Navegar al detalle del proyecto desde cada fila (`/projects/[id]`).
+- ✅ Filtrar por:
+  - Incluir completadas (por defecto **no**)
+  - Rol del creador del proyecto (admin/directivo/comercial)
+  - Área organizacional
+  - Usuario asignado
+  - Estado
+  - Tipo de tarea
+  - Bandera de tarea
+  - Rango de `assigned_at`
+  - Rango de `completed_at`
+- ✅ Sincronización de filtros en URL para compartir y recargar contexto.
+
+**Permisos:**
+- Vista y consumo API: ADMIN, DIRECTIVO, COMERCIAL
+
+**Endpoints API:**
+- `GET /api/tasks` — listado paginado productivo (reemplaza demo in-memory)
+  - Response: `{ data, pageCount, currentPage, total }`
+  - Fuente de datos: `project_tasks` + joins a proyectos, productos y usuarios
+
+**Endpoints auxiliares del frontend:**
+- `GET /api/users/assignable` — usuarios disponibles para filtro de asignación
+
+---
+
+**Última actualización:** 2026-03-31
 **Versión de Next.js:** 15.3.2
 **Versión de React:** 19

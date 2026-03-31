@@ -1,104 +1,80 @@
-/**
- * Este es un ejemplo para demostrar cómo los datos almacenados en memoria
- * persisten entre diferentes peticiones en Next.js
- * 
- * IMPORTANTE: Este enfoque es solo para demostración y no es recomendado para producción
- * ya que los datos se perderán cuando se reinicie el servidor o si hay múltiples instancias.
- */
+import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
+import { ITEMS_PER_PAGE } from "@/config/constants";
+import { UserRole } from "@/lib/definitions";
+import { validateApiRole, validateHttpMethod } from "@/lib/services/api-auth";
+import { getTasksCommandCenterWithPagination } from "@/lib/queries/projectTasks";
 
-// Interfaz para las tareas
-interface Task {
-  id: string;
-  title: string;
-  createdAt: Date;
-}
+const querySchema = z.object({
+  page: z.coerce.number().int().positive().default(1),
+  includeCompleted: z
+    .enum(["0", "1", "true", "false"])
+    .optional()
+    .transform((value) => value === "1" || value === "true"),
+  creatorRole: z.enum(["admin", "directivo", "comercial"]).optional(),
+  areaId: z.coerce.number().int().positive().optional(),
+  assignedUserId: z.coerce.number().int().positive().optional(),
+  status: z.enum(["not_started", "waiting", "in_progress", "completed", "blocked"]).optional(),
+  taskType: z.enum(["execution", "validation"]).optional(),
+  taskFlag: z.enum(["new", "correction", "adjustment"]).optional(),
+  assignedFrom: z.string().datetime({ offset: true }).optional(),
+  assignedTo: z.string().datetime({ offset: true }).optional(),
+  completedFrom: z.string().datetime({ offset: true }).optional(),
+  completedTo: z.string().datetime({ offset: true }).optional(),
+});
 
-// Almacén de tareas en memoria - persistirá entre peticiones mientras el servidor esté en ejecución
-const tasksStore: Task[] = [];
+export async function GET(request: NextRequest) {
+  const methodValidation = validateHttpMethod(request, ["GET"]);
+  if (!methodValidation.isValidMethod) return methodValidation.response;
 
-/**
- * POST /api/tasks
- * Crea una nueva tarea y la almacena en memoria
- */
-export async function POST(request: Request) {
+  const roleValidation = await validateApiRole(request, [
+    UserRole.ADMIN,
+    UserRole.DIRECTIVO,
+    UserRole.COMERCIAL,
+  ]);
+  if (!roleValidation.isAuthorized) return roleValidation.response;
+
   try {
-    // Parsear el cuerpo de la petición
-    const body = await request.json();
-    
-    // Validar que tenga los campos requeridos
-    if (!body.title) {
-      return Response.json(
-        { error: "Se requieren los campos title y description" },
+    const url = new URL(request.url);
+    const rawQuery = Object.fromEntries(url.searchParams.entries());
+    const parsed = querySchema.safeParse(rawQuery);
+
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: "Parámetros de consulta inválidos", details: parsed.error.format() },
         { status: 400 }
       );
     }
-    
-    // Crear una nueva tarea con ID único
-    const newTask: Task = {
-      id: crypto.randomUUID(), // Genera un ID único
-      title: body.title,
-      createdAt: new Date()
-    };
-    
-    // Añadir la tarea al almacén en memoria
-    tasksStore.push(newTask);
-    
-    // Devolver la tarea creada
-    return Response.json(
-      { 
-        message: "Tarea creada correctamente",
-        task: newTask,
-        totalTasks: tasksStore.length
-      },
-      { status: 201 }
-    );
-  } catch (error) {
-    console.error("Error al crear tarea:", error);
-    return Response.json(
-      { error: "Error al procesar la solicitud" },
-      { status: 500 }
-    );
-  }
-}
 
-/**
- * GET /api/tasks
- * Recupera todas las tareas almacenadas en memoria
- */
-export async function GET() {
-  try {
-    return Response.json({
-      tasks: tasksStore,
-      count: tasksStore.length,
-      serverTime: new Date().toISOString()
+    const query = parsed.data;
+    const limit = ITEMS_PER_PAGE;
+
+    const { tasks, total } = await getTasksCommandCenterWithPagination({
+      page: query.page,
+      limit,
+      includeCompleted: query.includeCompleted ?? false,
+      creatorRole: query.creatorRole,
+      areaId: query.areaId,
+      assignedUserId: query.assignedUserId,
+      status: query.status,
+      taskType: query.taskType,
+      taskFlag: query.taskFlag,
+      assignedFrom: query.assignedFrom ? new Date(query.assignedFrom) : undefined,
+      assignedTo: query.assignedTo ? new Date(query.assignedTo) : undefined,
+      completedFrom: query.completedFrom ? new Date(query.completedFrom) : undefined,
+      completedTo: query.completedTo ? new Date(query.completedTo) : undefined,
+    });
+
+    const pageCount = Math.ceil(total / limit);
+
+    return NextResponse.json({
+      data: tasks,
+      pageCount,
+      currentPage: query.page,
+      total,
     });
   } catch (error) {
-    console.error("Error al obtener tareas:", error);
-    return Response.json(
-      { error: "Error al procesar la solicitud" },
-      { status: 500 }
-    );
-  }
-}
-
-/**
- * DELETE /api/tasks
- * Elimina todas las tareas (útil para reiniciar el estado)
- */
-export async function DELETE() {
-  try {
-    const previousCount = tasksStore.length;
-    tasksStore.length = 0; // Vaciar el array
-    
-    return Response.json({
-      message: `Se han eliminado ${previousCount} tareas`,
-      tasksRemaining: tasksStore.length
-    });
-  } catch (error) {
-    console.error("Error al eliminar tareas:", error);
-    return Response.json(
-      { error: "Error al procesar la solicitud" },
-      { status: 500 }
-    );
+    console.error("Error fetching tasks command center:", error);
+    return NextResponse.json({ error: "Error al obtener las tareas" }, { status: 500 });
   }
 }

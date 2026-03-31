@@ -268,6 +268,39 @@ export type TaskTransitionType = {
   transitioned_at: string;
 };
 
+export type ProjectCreatorRoleFilter = "admin" | "directivo" | "comercial";
+
+export type TaskCommandCenterFilters = {
+  page?: number;
+  limit?: number;
+  includeCompleted?: boolean;
+  creatorRole?: ProjectCreatorRoleFilter;
+  areaId?: number;
+  assignedUserId?: number;
+  status?: ProjectTaskStatus;
+  taskType?: TaskType;
+  taskFlag?: TaskFlag;
+  assignedFrom?: Date;
+  assignedTo?: Date;
+  completedFrom?: Date;
+  completedTo?: Date;
+};
+
+export type TaskCommandCenterRow = {
+  id: number;
+  title: string;
+  project_id: number;
+  project_title: string;
+  product_name: string | null;
+  assigned_user_id: number | null;
+  assigned_user_name: string | null;
+  task_flag: TaskFlag;
+  task_type: TaskType;
+  status: ProjectTaskStatus;
+  assigned_at: string | null;
+  completed_at: string | null;
+};
+
 export type QuoteStatus = 'pending' | 'accepted' | 'rejected';
 
 export type TaskQuoteType = {
