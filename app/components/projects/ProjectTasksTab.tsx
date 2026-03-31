@@ -293,7 +293,7 @@ export function ProjectTasksTab({
       return res.ok ? (res.data ?? []) : [];
     },
     staleTime: 1000 * 60,
-    refetchInterval: 30_000,
+    refetchInterval: reordering ? false : 30_000,
     refetchIntervalInBackground: false,
   });
 
@@ -472,15 +472,27 @@ export function ProjectTasksTab({
 
   const handleReorder = async (reordered: ProjectTaskType[]) => {
     setReordering(true);
-    queryClient.setQueryData(["project-tasks", projectId], reordered);
+
+    // Actualizamos localmente el order_index de cada tarea para que el
+    // componente no "salte" de vuelta al orden anterior mientras se guarda.
+    const optimisticTasks = reordered.map((task, index) => ({
+      ...task,
+      order_index: index,
+    }));
+
+    queryClient.setQueryData(["project-tasks", projectId], optimisticTasks);
+
     try {
       const res = await post(`projects/${projectId}/tasks/reorder`, {
-        orderedIds: reordered.map((t) => t.id),
+        orderedIds: optimisticTasks.map((t) => t.id),
       });
       if (!res.ok) throw new Error(res.error);
+      
+      // Invalidamos para asegurar que tenemos los datos frescos del servidor
+      invalidateAll();
     } catch {
       toast.error("Error al reordenar");
-      queryClient.invalidateQueries({ queryKey: ["project-tasks", projectId] });
+      invalidateAll();
     } finally {
       setReordering(false);
     }
