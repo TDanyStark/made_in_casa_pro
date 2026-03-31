@@ -101,7 +101,7 @@ export function TaskValidationDialog({
       interface ValidationBody {
         action: "approve" | "reject";
         notes: string | null;
-        target_order_index?: number;
+        targetTaskId?: number;
         [key: string]: string | number | null | undefined;
       }
 
@@ -111,7 +111,7 @@ export function TaskValidationDialog({
       };
 
       if (isRejectAction) {
-        body.target_order_index = parseInt(targetTaskId);
+        body.targetTaskId = parseInt(targetTaskId);
       }
 
       const res = await post(`projects/${task.project_id}/tasks/${task.id}/validate`, body);
@@ -203,7 +203,7 @@ export function TaskValidationDialog({
                     .filter((t) => t.id !== task.id && t.order_index < task.order_index)
                     .sort((a, b) => a.order_index - b.order_index)
                     .map((t) => (
-                      <SelectItem key={t.id} value={t.order_index.toString()}>
+                      <SelectItem key={t.id} value={t.id.toString()}>
                         {t.order_index + 1}. {t.title}
                         {t.assigned_user_name && ` — asignado a ${t.assigned_user_name}`}
                       </SelectItem>

@@ -338,6 +338,7 @@ export async function completeTask(
 ): Promise<{ task: ProjectTaskType; nextTask: ProjectTaskType | null; blockedReason?: string }> {
   const task = await getProjectTaskById(taskId);
   if (!task) throw new Error("Tarea no encontrada");
+  if (task.status === "completed") throw new Error("Esta tarea ya está completada y no puede modificarse");
   if (task.task_type !== "execution") throw new Error("Solo se pueden completar tareas de ejecución con este endpoint");
   if (task.status !== "in_progress" && task.status !== "not_started") {
     throw new Error("La tarea no está en un estado que permita completarla");
@@ -447,23 +448,155 @@ export async function completeTask(
   }
 }
 
+// ─── Rejection loop — append-only new tasks ──────────────────────────────────
+
+/**
+ * On validation rejection, inserts two new tasks after the rejected validation task N:
+ *   N+1: clone of target task M (task_flag='correction', status='not_started')
+ *   N+2: clone of validation task N (task_flag='correction', task_type='validation', status='not_started')
+ * All tasks with order_index > N.order_index are shifted by +2.
+ * Task N is marked as completed and logged in task_transitions.
+ * Everything runs inside a single transaction.
+ */
+export async function createRejectionLoopTasks(
+  projectId: number,
+  rejectedValidationTaskId: number,
+  targetTaskId: number,
+  userId: number,
+  notes?: string | null
+): Promise<{ correctionTask: ProjectTaskType; reValidationTask: ProjectTaskType }> {
+  // Step 1: Fetch task N (validation being rejected) and task M (target to send back to)
+  const [taskNResult, taskMResult] = await Promise.all([
+    db.execute({
+      sql: `SELECT id, order_index, task_flag, status FROM project_tasks WHERE id = $1 AND project_id = $2`,
+      args: [rejectedValidationTaskId, projectId],
+    }),
+    db.execute({
+      sql: `SELECT id, order_index FROM project_tasks WHERE id = $1 AND project_id = $2`,
+      args: [targetTaskId, projectId],
+    }),
+  ]);
+
+  if (taskNResult.rows.length === 0) throw new Error("Tarea de validación no encontrada");
+  if (taskMResult.rows.length === 0) throw new Error("Tarea destino no encontrada");
+
+  const taskN = taskNResult.rows[0] as unknown as { id: number; order_index: number; task_flag: string; status: string };
+
+  const transaction = await db.transaction("write");
+  try {
+    // Step 2: Shift all tasks after N up by 2
+    await transaction.execute({
+      sql: `
+        UPDATE project_tasks
+        SET order_index = order_index + 2, updated_at = CURRENT_TIMESTAMP
+        WHERE project_id = $1 AND order_index > $2
+      `,
+      args: [projectId, taskN.order_index],
+    });
+
+    // Step 3: INSERT task N+1 — clone of M with task_flag='correction', status='not_started'
+    const correctionInsert = await transaction.execute({
+      sql: `
+        INSERT INTO project_tasks
+          (project_id, template_id, title, description,
+           area_id, assigned_user_id, status, task_type, task_flag,
+           requires_quote, assign_to_commercial, order_index)
+        SELECT
+          project_id, template_id, title, description,
+          area_id, assigned_user_id, 'not_started', task_type, 'correction',
+          requires_quote, assign_to_commercial, $1
+        FROM project_tasks
+        WHERE id = $2
+        RETURNING id
+      `,
+      args: [taskN.order_index + 1, targetTaskId],
+    });
+    const correctionTaskId = Number(correctionInsert.rows[0]?.id);
+
+    // Step 4: INSERT task N+2 — clone of N with task_flag='correction', task_type='validation', status='not_started'
+    const reValidationInsert = await transaction.execute({
+      sql: `
+        INSERT INTO project_tasks
+          (project_id, template_id, title, description,
+           area_id, assigned_user_id, status, task_type, task_flag,
+           requires_quote, assign_to_commercial, order_index)
+        SELECT
+          project_id, template_id, title, description,
+          area_id, assigned_user_id, 'not_started', 'validation', 'correction',
+          requires_quote, assign_to_commercial, $1
+        FROM project_tasks
+        WHERE id = $2
+        RETURNING id
+      `,
+      args: [taskN.order_index + 2, rejectedValidationTaskId],
+    });
+    const reValidationTaskId = Number(reValidationInsert.rows[0]?.id);
+
+    // Step 5: Mark task N as completed
+    await transaction.execute({
+      sql: `UPDATE project_tasks SET status = 'completed', updated_at = CURRENT_TIMESTAMP WHERE id = $1`,
+      args: [rejectedValidationTaskId],
+    });
+
+    // Step 6: Log transition for task N (in_progress → completed)
+    await transaction.execute({
+      sql: `
+        INSERT INTO task_transitions (task_id, project_id, from_status, to_status, from_flag, to_flag, moved_by, notes)
+        VALUES ($1, $2, 'in_progress', 'completed', $3, $3, $4, $5)
+      `,
+      args: [rejectedValidationTaskId, projectId, taskN.task_flag, userId, notes ?? "Validación rechazada, enviada a corrección"],
+    });
+
+    // Step 7: Log transition for new task N+1 (null → not_started)
+    await transaction.execute({
+      sql: `
+        INSERT INTO task_transitions (task_id, project_id, from_status, to_status, from_flag, to_flag, moved_by, notes)
+        VALUES ($1, $2, NULL, 'not_started', NULL, 'correction', $3, NULL)
+      `,
+      args: [correctionTaskId, projectId, userId],
+    });
+
+    // Step 8: Log transition for new task N+2 (null → not_started)
+    await transaction.execute({
+      sql: `
+        INSERT INTO task_transitions (task_id, project_id, from_status, to_status, from_flag, to_flag, moved_by, notes)
+        VALUES ($1, $2, NULL, 'not_started', NULL, 'correction', $3, NULL)
+      `,
+      args: [reValidationTaskId, projectId, userId],
+    });
+
+    await transaction.commit();
+
+    const correctionTask = await getProjectTaskById(correctionTaskId);
+    const reValidationTask = await getProjectTaskById(reValidationTaskId);
+
+    revalidatePath(`/projects/${projectId}`);
+    return { correctionTask: correctionTask!, reValidationTask: reValidationTask! };
+  } catch (error) {
+    await transaction.rollback();
+    console.error("Error creating rejection loop tasks:", error);
+    throw error;
+  }
+}
+
 // ─── Validate task (validation flow) ─────────────────────────────────────────
 
 /**
  * Handles validation task actions:
  * - approve: same as complete, moves to next task in order
- * - reject: marks current validation as completed (historical), sets target task to in_progress
- *           with flag='correction', leaves intermediate tasks as completed (historical)
+ * - reject: creates two new tasks (correction clone of M + re-validation clone of N) after N,
+ *           marks N as completed, and shifts all subsequent order_indexes by 2
  */
 export async function validateTask(
   taskId: number,
   userId: number,
   action: "approve" | "reject",
-  targetOrderIndex?: number,
+  targetTaskId?: number,
   notes?: string | null
 ): Promise<{ task: ProjectTaskType; targetTask: ProjectTaskType | null; blockedReason?: string }> {
   const task = await getProjectTaskById(taskId);
   if (!task) throw new Error("Tarea no encontrada");
+  if (task.status === "completed") throw new Error("Esta tarea ya está completada y no puede modificarse");
   if (task.task_type !== "validation") throw new Error("Solo se pueden validar tareas de tipo validación");
   if (task.status !== "in_progress") throw new Error("La tarea de validación no está en progreso");
 
@@ -472,74 +605,14 @@ export async function validateTask(
     return { task: result.task, targetTask: result.nextTask, blockedReason: result.blockedReason };
   }
 
-  // Reject: find the target task to send back to
-  if (targetOrderIndex === undefined) throw new Error("Se requiere indicar a qué tarea volver");
+  // Reject: create two new tasks (correction + re-validation) instead of mutating existing tasks
+  if (targetTaskId === undefined) throw new Error("Se requiere indicar a qué tarea volver");
 
-  const targetResult = await db.execute({
-    sql: `
-      SELECT id, status, task_flag, order_index
-      FROM project_tasks
-      WHERE project_id = $1 AND order_index = $2
-      LIMIT 1
-    `,
-    args: [task.project_id, targetOrderIndex],
-  });
-  if (targetResult.rows.length === 0) throw new Error("Tarea destino no encontrada");
+  const loopResult = await createRejectionLoopTasks(task.project_id, taskId, targetTaskId, userId, notes);
 
-  const target = targetResult.rows[0] as unknown as {
-    id: number;
-    status: string;
-    task_flag: string;
-    order_index: number;
-  };
-
-  const transaction = await db.transaction("write");
-  try {
-    // 1. Mark validation task as completed (historical record)
-    await transaction.execute({
-      sql: `UPDATE project_tasks SET status = 'completed', updated_at = CURRENT_TIMESTAMP WHERE id = $1`,
-      args: [taskId],
-    });
-    await transaction.execute({
-      sql: `
-        INSERT INTO task_transitions (task_id, project_id, from_status, to_status, from_flag, to_flag, moved_by, notes)
-        VALUES ($1, $2, 'in_progress', 'completed', $3, $3, $4, $5)
-      `,
-      args: [taskId, task.project_id, task.task_flag, userId, notes ?? "Validación rechazada, enviada a corrección"],
-    });
-
-    // 2. Set target task to in_progress with flag=correction
-    await transaction.execute({
-      sql: `
-        UPDATE project_tasks
-        SET status = 'in_progress', task_flag = 'correction', updated_at = CURRENT_TIMESTAMP
-        WHERE id = $1
-      `,
-      args: [target.id],
-    });
-    await transaction.execute({
-      sql: `
-        INSERT INTO task_transitions (task_id, project_id, from_status, to_status, from_flag, to_flag, moved_by, notes)
-        VALUES ($1, $2, $3, 'in_progress', $4, 'correction', $5, $6)
-      `,
-      args: [target.id, task.project_id, target.status, target.task_flag, userId, notes ?? "Regresada para corrección"],
-    });
-
-    // 3. Tasks between target and validation task: leave as completed (historical)
-    // They will get new instances if the flow passes through them again
-
-    await transaction.commit();
-
-    const updatedTask = await getProjectTaskById(taskId);
-    const targetTask = await getProjectTaskById(target.id);
-
-    revalidatePath(`/projects/${task.project_id}`);
-    return { task: updatedTask!, targetTask };
-  } catch (error) {
-    await transaction.rollback();
-    console.error("Error validating task:", error);
-    throw error;
-  }
+  const updatedTask = await getProjectTaskById(taskId);
+  revalidatePath(`/projects/${task.project_id}`);
+  return { task: updatedTask!, targetTask: loopResult.correctionTask };
 }
 
 // ─── Auto-assignment helpers ──────────────────────────────────────────────────

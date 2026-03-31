@@ -9,7 +9,7 @@ import { cookies } from "next/headers";
 
 const bodySchema = z.object({
   action: z.enum(["approve", "reject"]),
-  target_order_index: z.coerce.number().int().min(0).optional(),
+  targetTaskId: z.coerce.number().int().positive().optional(),
   notes: z.string().optional().nullable(),
 });
 
@@ -73,16 +73,16 @@ export async function POST(request: NextRequest, { params }: Params) {
       );
     }
 
-    const { action, target_order_index, notes } = validation.data;
+    const { action, targetTaskId, notes } = validation.data;
 
-    if (action === "reject" && target_order_index === undefined) {
+    if (action === "reject" && targetTaskId === undefined) {
       return NextResponse.json(
-        { error: "Se debe indicar target_order_index al rechazar" },
+        { error: "targetTaskId is required for rejection" },
         { status: 400 }
       );
     }
 
-    const result = await validateTask(taskId, userId, action, target_order_index, notes);
+    const result = await validateTask(taskId, userId, action, targetTaskId, notes);
     await recalculateProjectProgress(projectId);
 
     return NextResponse.json({
