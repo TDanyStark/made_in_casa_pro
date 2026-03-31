@@ -9,6 +9,36 @@ import { getAdminAndDirectivoEmails } from "@/lib/queries/users";
 import { decrypt } from "@/lib/session";
 import { cookies } from "next/headers";
 
+export async function GET(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const methodValidation = validateHttpMethod(request, ["GET"]);
+  if (!methodValidation.isValidMethod) return methodValidation.response;
+
+  const roleValidation = await validateApiRole(request, [
+    UserRole.ADMIN,
+    UserRole.DIRECTIVO,
+    UserRole.COMERCIAL,
+    UserRole.COLABORADOR,
+  ]);
+  if (!roleValidation.isAuthorized) return roleValidation.response;
+
+  try {
+    const { id } = await params;
+    const projectId = parseInt(id, 10);
+    if (isNaN(projectId)) {
+      return NextResponse.json({ error: "ID de proyecto inválido" }, { status: 400 });
+    }
+
+    const adjustments = await getAdjustmentsByProject(projectId);
+    return NextResponse.json(adjustments);
+  } catch (error) {
+    console.error("Error al obtener ajustes:", error);
+    return NextResponse.json({ error: "Error interno al obtener ajustes" }, { status: 500 });
+  }
+}
+
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
