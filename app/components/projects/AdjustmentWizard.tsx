@@ -81,9 +81,7 @@ interface Props {
   userRole: UserRole;
   onConfirm: (data: {
     notes: string;
-    task_overrides: { template_id: number; title?: string; assigned_user_id?: number | null; assign_to_commercial?: number; order_index: number }[];
-    extra_tasks: { title: string; assigned_user_id?: number | null; assign_to_commercial?: number; area_id?: number | null; task_type?: string; order_index: number }[];
-    removed_template_ids: number[];
+    tasks: { template_id?: number | null; title: string; assigned_user_id?: number | null; assign_to_commercial?: number; area_id?: number | null; task_type?: string }[];
   }) => Promise<void>;
   isSubmitting: boolean;
 }
@@ -186,7 +184,6 @@ export function AdjustmentWizard({ open, onOpenChange, productId, createdByName,
   const [notes, setNotes] = useState("");
 
   const [localTasks, setLocalTasks] = useState<LocalTask[]>([]);
-  const [removedTemplateIds, setRemovedTemplateIds] = useState<number[]>([]);
   const [newTaskId, setNewTaskId] = useState<number | null>(null);
   const nextLocalId = useRef(-1);
   const initialized = useRef(false);
@@ -197,7 +194,6 @@ export function AdjustmentWizard({ open, onOpenChange, productId, createdByName,
       setStep(1);
       setNotes("");
       setLocalTasks([]);
-      setRemovedTemplateIds([]);
       initialized.current = false;
     }
   }, [open]);
@@ -239,19 +235,27 @@ export function AdjustmentWizard({ open, onOpenChange, productId, createdByName,
       return null;
     };
 
-    const rows: LocalTask[] = templates.map(t => ({
-      id: t.id,
-      template_id: t.id,
-      isExtra: false,
-      title: t.title,
-      area_id: t.area_id,
-      area_name: t.area_name,
-      assigned_user_id: t.assigned_user_id,
-      assigned_user_name: getResolvedName({ assigned_user_id: t.assigned_user_id, assign_to_commercial: t.assign_to_commercial, area_id: t.area_id }),
-      assign_to_commercial: t.assign_to_commercial,
-      order_index: t.order_index,
-      task_type: "execution",
-    }));
+    const rows: LocalTask[] = templates.map(t => {
+      // Resolve the actual user for area-based auto-assign so we show the right name
+      let resolvedUserId = t.assigned_user_id;
+      if (!resolvedUserId && Number(t.assign_to_commercial) !== 1 && t.area_id) {
+        const areaUser = users.find(u => u.area_id === t.area_id && u.rol_id === 4 && u.is_internal === 1);
+        resolvedUserId = areaUser?.id ?? null;
+      }
+      return {
+        id: t.id,
+        template_id: t.id,
+        isExtra: false,
+        title: t.title,
+        area_id: t.area_id,
+        area_name: t.area_name,
+        assigned_user_id: resolvedUserId,
+        assigned_user_name: getResolvedName({ assigned_user_id: resolvedUserId, assign_to_commercial: t.assign_to_commercial, area_id: t.area_id }),
+        assign_to_commercial: t.assign_to_commercial,
+        order_index: t.order_index,
+        task_type: "execution" as const,
+      };
+    });
 
     setLocalTasks(rows.sort((a, b) => a.order_index - b.order_index));
   }, [step, templates, users, createdByName]);
@@ -274,20 +278,22 @@ export function AdjustmentWizard({ open, onOpenChange, productId, createdByName,
   };
 
   const handleRemoveTask = (task: LocalTask) => {
+    // Simply remove from the local list — the final task list sent to the API omits it
     setLocalTasks(prev => prev.filter(t => t.id !== task.id).map((t, i) => ({ ...t, order_index: i })));
-    if (task.template_id !== null) setRemovedTemplateIds(prev => [...prev, task.template_id!]);
   };
 
   const handleSubmit = async () => {
-    const task_overrides = localTasks
-      .filter(t => t.template_id !== null)
-      .map((t, i) => ({ template_id: t.template_id!, title: t.title, assigned_user_id: t.assigned_user_id, assign_to_commercial: t.assign_to_commercial, order_index: i }));
+    // Send the full ordered list — backend resolves auto-assignments server-side
+    const tasks = localTasks.map(t => ({
+      template_id: t.template_id ?? null,
+      title: t.title,
+      assigned_user_id: t.assigned_user_id,
+      assign_to_commercial: t.assign_to_commercial,
+      area_id: t.area_id,
+      task_type: t.task_type,
+    }));
 
-    const extra_tasks = localTasks
-      .filter(t => t.isExtra)
-      .map((t, i) => ({ title: t.title, assigned_user_id: t.assigned_user_id, assign_to_commercial: t.assign_to_commercial, area_id: t.area_id, task_type: t.task_type, order_index: i }));
-
-    await onConfirm({ notes, task_overrides, extra_tasks, removed_template_ids: removedTemplateIds });
+    await onConfirm({ notes, tasks });
   };
 
   const STEPS = [

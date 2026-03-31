@@ -54,9 +54,7 @@ export function ProjectAdjustmentsTab({
 
   const handleConfirm = async (data: {
     notes: string;
-    task_overrides: object[];
-    extra_tasks: object[];
-    removed_template_ids: number[];
+    tasks: object[];
   }) => {
     setIsSubmitting(true);
     try {
