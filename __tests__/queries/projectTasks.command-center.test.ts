@@ -24,7 +24,7 @@ describe("getTasksCommandCenterWithPagination", () => {
     jest.clearAllMocks();
   });
 
-  it("returns rows and total with default exclusion of completed", async () => {
+  it("always constrains creator role to admin/directivo/comercial", async () => {
     mockExecute
       .mockResolvedValueOnce(makeResult([{ count: 2 }]))
       .mockResolvedValueOnce(
@@ -53,19 +53,32 @@ describe("getTasksCommandCenterWithPagination", () => {
     expect(mockExecute).toHaveBeenCalledTimes(2);
 
     const countCall = mockExecute.mock.calls[0][0] as { sql: string; args: unknown[] };
-    expect(countCall.sql).toContain("pt.status <> 'completed'");
+    expect(countCall.sql).toContain("creator.rol_id = ANY($");
+    expect(countCall.args).toContainEqual([1, 2, 3]);
   });
 
-  it("applies creatorRole/admin filter as rol_id=1", async () => {
+  it("applies creatorUserId filter over project creator user", async () => {
     mockExecute
       .mockResolvedValueOnce(makeResult([{ count: 0 }]))
       .mockResolvedValueOnce(makeResult([]));
 
-    await getTasksCommandCenterWithPagination({ creatorRole: "admin", page: 1, limit: 10 });
+    await getTasksCommandCenterWithPagination({ creatorUserId: 7, page: 1, limit: 10 });
 
     const countCall = mockExecute.mock.calls[0][0] as { sql: string; args: unknown[] };
-    expect(countCall.sql).toContain("creator.rol_id = $");
-    expect(countCall.args).toContain(1);
+    expect(countCall.sql).toContain("p.created_by = $");
+    expect(countCall.args).toContain(7);
+  });
+
+  it("builds OR filter when statuses include completed plus others", async () => {
+    mockExecute
+      .mockResolvedValueOnce(makeResult([{ count: 0 }]))
+      .mockResolvedValueOnce(makeResult([]));
+
+    await getTasksCommandCenterWithPagination({ page: 1, limit: 10, statuses: ["completed", "in_progress"] });
+
+    const countCall = mockExecute.mock.calls[0][0] as { sql: string; args: unknown[] };
+    expect(countCall.sql).toContain("pt.status = 'completed' OR pt.status = ANY($");
+    expect(countCall.args).toContainEqual(["in_progress"]);
   });
 
   it("uses pagination placeholders and appends limit/offset args", async () => {
@@ -73,7 +86,7 @@ describe("getTasksCommandCenterWithPagination", () => {
       .mockResolvedValueOnce(makeResult([{ count: 0 }]))
       .mockResolvedValueOnce(makeResult([]));
 
-    await getTasksCommandCenterWithPagination({ page: 3, limit: 10, includeCompleted: true });
+    await getTasksCommandCenterWithPagination({ page: 3, limit: 10, statuses: ["not_started"] });
 
     const dataCall = mockExecute.mock.calls[1][0] as { sql: string; args: unknown[] };
     expect(dataCall.sql).toContain("LIMIT $");

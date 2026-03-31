@@ -15,6 +15,7 @@ import {
   TaskType,
   UserType,
   AreaType,
+  UserRole,
 } from "@/lib/definitions";
 import { ITEMS_PER_PAGE } from "@/config/constants";
 import {
@@ -59,6 +60,14 @@ const FLAG_LABELS: Record<TaskFlag, string> = {
   adjustment: "Ajuste",
 };
 
+const STATUS_OPTIONS: ProjectTaskStatus[] = [
+  "not_started",
+  "waiting",
+  "in_progress",
+  "completed",
+  "blocked",
+];
+
 function toStartOfDayIso(value: string) {
   return new Date(`${value}T00:00:00.000Z`).toISOString();
 }
@@ -73,17 +82,25 @@ export function TasksCommandCenterClient() {
   const { replace } = useRouter();
 
   const page = searchParams.get("page") || "1";
-  const includeCompleted = searchParams.get("includeCompleted") === "1";
-  const creatorRole = searchParams.get("creatorRole") || "";
+  const creatorUserId = searchParams.get("creatorUserId") || "";
   const areaId = searchParams.get("areaId") || "";
   const assignedUserId = searchParams.get("assignedUserId") || "";
-  const status = searchParams.get("status") || "";
+  const statusParams = searchParams.getAll("status").filter((value): value is ProjectTaskStatus =>
+    STATUS_OPTIONS.includes(value as ProjectTaskStatus)
+  );
+  const selectedStatuses = statusParams.length > 0 ? Array.from(new Set(statusParams)) : STATUS_OPTIONS;
   const taskType = searchParams.get("taskType") || "";
   const taskFlag = searchParams.get("taskFlag") || "";
   const assignedFrom = searchParams.get("assignedFrom") || "";
   const assignedTo = searchParams.get("assignedTo") || "";
   const completedFrom = searchParams.get("completedFrom") || "";
   const completedTo = searchParams.get("completedTo") || "";
+
+  const setStatusParams = (sp: URLSearchParams, statuses: ProjectTaskStatus[]) => {
+    sp.delete("status");
+    if (statuses.length === 0 || statuses.length === STATUS_OPTIONS.length) return;
+    statuses.forEach((taskStatus) => sp.append("status", taskStatus));
+  };
 
   const createQueryString = (params: Record<string, string | null>) => {
     const sp = new URLSearchParams(searchParams.toString());
@@ -94,13 +111,21 @@ export function TasksCommandCenterClient() {
     return sp.toString();
   };
 
+  const createQueryStringWithStatuses = (statuses: ProjectTaskStatus[]) => {
+    const sp = new URLSearchParams(searchParams.toString());
+    sp.set("page", "1");
+    setStatusParams(sp, statuses);
+    return sp.toString();
+  };
+
   const queryString = useMemo(() => {
     const params = new URLSearchParams({ page, limit: ITEMS_PER_PAGE.toString() });
-    if (includeCompleted) params.set("includeCompleted", "1");
-    if (creatorRole) params.set("creatorRole", creatorRole);
+    if (creatorUserId) params.set("creatorUserId", creatorUserId);
     if (areaId) params.set("areaId", areaId);
     if (assignedUserId) params.set("assignedUserId", assignedUserId);
-    if (status) params.set("status", status);
+    if (selectedStatuses.length > 0 && selectedStatuses.length < STATUS_OPTIONS.length) {
+      selectedStatuses.forEach((taskStatus) => params.append("status", taskStatus));
+    }
     if (taskType) params.set("taskType", taskType);
     if (taskFlag) params.set("taskFlag", taskFlag);
     if (assignedFrom) params.set("assignedFrom", toStartOfDayIso(assignedFrom));
@@ -110,11 +135,10 @@ export function TasksCommandCenterClient() {
     return params.toString();
   }, [
     page,
-    includeCompleted,
-    creatorRole,
+    creatorUserId,
     areaId,
     assignedUserId,
-    status,
+    selectedStatuses,
     taskType,
     taskFlag,
     assignedFrom,
@@ -148,6 +172,14 @@ export function TasksCommandCenterClient() {
     },
   });
 
+  const creatorUsers = useMemo(
+    () =>
+      assignableUsers.filter((user) =>
+        [UserRole.ADMIN, UserRole.DIRECTIVO, UserRole.COMERCIAL].includes(user.rol_id)
+      ),
+    [assignableUsers]
+  );
+
   const rows = data?.data || [];
   const currentPage = data?.currentPage || 1;
   const pageCount = data?.pageCount || 1;
@@ -156,38 +188,27 @@ export function TasksCommandCenterClient() {
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
-        <div className="flex items-center gap-2">
-          <Checkbox
-            id="includeCompleted"
-            checked={includeCompleted}
-            onCheckedChange={(checked) =>
-              replace(
-                `${pathname}?${createQueryString({
-                  page: "1",
-                  includeCompleted: checked ? "1" : null,
-                })}`
-              )
-            }
-          />
-          <Label htmlFor="includeCompleted">Incluir completadas</Label>
-        </div>
-
         <Select
-          value={creatorRole || "all"}
+          value={creatorUserId || "all"}
           onValueChange={(value) =>
             replace(
-              `${pathname}?${createQueryString({ page: "1", creatorRole: value === "all" ? null : value })}`
+              `${pathname}?${createQueryString({
+                page: "1",
+                creatorUserId: value === "all" ? null : value,
+              })}`
             )
           }
         >
           <SelectTrigger>
-            <SelectValue placeholder="Rol creador" />
+            <SelectValue placeholder="Usuario creador" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">Rol creador: todos</SelectItem>
-            <SelectItem value="admin">Admin</SelectItem>
-            <SelectItem value="directivo">Directivo</SelectItem>
-            <SelectItem value="comercial">Comercial</SelectItem>
+            <SelectItem value="all">Usuario creador: todos</SelectItem>
+            {creatorUsers.map((user) => (
+              <SelectItem key={user.id} value={String(user.id)}>
+                {user.name}
+              </SelectItem>
+            ))}
           </SelectContent>
         </Select>
 
@@ -232,25 +253,6 @@ export function TasksCommandCenterClient() {
         </Select>
 
         <Select
-          value={status || "all"}
-          onValueChange={(value) =>
-            replace(`${pathname}?${createQueryString({ page: "1", status: value === "all" ? null : value })}`)
-          }
-        >
-          <SelectTrigger>
-            <SelectValue placeholder="Estado" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Estado: todos</SelectItem>
-            <SelectItem value="not_started">Sin iniciar</SelectItem>
-            <SelectItem value="waiting">En espera</SelectItem>
-            <SelectItem value="in_progress">En progreso</SelectItem>
-            <SelectItem value="completed">Completada</SelectItem>
-            <SelectItem value="blocked">Bloqueada</SelectItem>
-          </SelectContent>
-        </Select>
-
-        <Select
           value={taskType || "all"}
           onValueChange={(value) =>
             replace(`${pathname}?${createQueryString({ page: "1", taskType: value === "all" ? null : value })}`)
@@ -289,11 +291,9 @@ export function TasksCommandCenterClient() {
             replace(
               `${pathname}?${createQueryString({
                 page: null,
-                includeCompleted: null,
-                creatorRole: null,
+                creatorUserId: null,
                 areaId: null,
                 assignedUserId: null,
-                status: null,
                 taskType: null,
                 taskFlag: null,
                 assignedFrom: null,
@@ -308,35 +308,75 @@ export function TasksCommandCenterClient() {
         </Button>
       </div>
 
+      <div className="space-y-2">
+        <p className="text-sm font-medium">Estado</p>
+        <div className="flex flex-wrap gap-4">
+          {STATUS_OPTIONS.map((taskStatus) => {
+            const isChecked = selectedStatuses.includes(taskStatus);
+            return (
+              <div key={taskStatus} className="flex items-center gap-2">
+                <Checkbox
+                  id={`status-${taskStatus}`}
+                  checked={isChecked}
+                  onCheckedChange={(checked) => {
+                    const nextStatuses = checked
+                      ? Array.from(new Set([...selectedStatuses, taskStatus]))
+                      : selectedStatuses.filter((statusValue) => statusValue !== taskStatus);
+                    replace(`${pathname}?${createQueryStringWithStatuses(nextStatuses)}`);
+                  }}
+                />
+                <Label htmlFor={`status-${taskStatus}`}>{STATUS_LABELS[taskStatus]}</Label>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
-        <Input
-          type="date"
-          value={assignedFrom}
-          onChange={(e) =>
-            replace(`${pathname}?${createQueryString({ page: "1", assignedFrom: e.target.value || null })}`)
-          }
-        />
-        <Input
-          type="date"
-          value={assignedTo}
-          onChange={(e) =>
-            replace(`${pathname}?${createQueryString({ page: "1", assignedTo: e.target.value || null })}`)
-          }
-        />
-        <Input
-          type="date"
-          value={completedFrom}
-          onChange={(e) =>
-            replace(`${pathname}?${createQueryString({ page: "1", completedFrom: e.target.value || null })}`)
-          }
-        />
-        <Input
-          type="date"
-          value={completedTo}
-          onChange={(e) =>
-            replace(`${pathname}?${createQueryString({ page: "1", completedTo: e.target.value || null })}`)
-          }
-        />
+        <div className="space-y-1">
+          <Label htmlFor="assignedFrom">Asignada desde</Label>
+          <Input
+            id="assignedFrom"
+            type="date"
+            value={assignedFrom}
+            onChange={(e) =>
+              replace(`${pathname}?${createQueryString({ page: "1", assignedFrom: e.target.value || null })}`)
+            }
+          />
+        </div>
+        <div className="space-y-1">
+          <Label htmlFor="assignedTo">Asignada hasta</Label>
+          <Input
+            id="assignedTo"
+            type="date"
+            value={assignedTo}
+            onChange={(e) =>
+              replace(`${pathname}?${createQueryString({ page: "1", assignedTo: e.target.value || null })}`)
+            }
+          />
+        </div>
+        <div className="space-y-1">
+          <Label htmlFor="completedFrom">Completada desde</Label>
+          <Input
+            id="completedFrom"
+            type="date"
+            value={completedFrom}
+            onChange={(e) =>
+              replace(`${pathname}?${createQueryString({ page: "1", completedFrom: e.target.value || null })}`)
+            }
+          />
+        </div>
+        <div className="space-y-1">
+          <Label htmlFor="completedTo">Completada hasta</Label>
+          <Input
+            id="completedTo"
+            type="date"
+            value={completedTo}
+            onChange={(e) =>
+              replace(`${pathname}?${createQueryString({ page: "1", completedTo: e.target.value || null })}`)
+            }
+          />
+        </div>
       </div>
 
       <div className="rounded-md border bg-card">

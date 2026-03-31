@@ -47,7 +47,13 @@ jest.mock("@tanstack/react-query", () => ({
     }
 
     if (key === "assignable-users") {
-      return { data: [{ id: 7, name: "Ana", email: "ana@test.com", rol_id: 4 }] };
+      return {
+        data: [
+          { id: 1, name: "Admin Uno", email: "admin@test.com", rol_id: 1 },
+          { id: 2, name: "Directivo Dos", email: "directivo@test.com", rol_id: 2 },
+          { id: 7, name: "Colaborador", email: "colab@test.com", rol_id: 4 },
+        ],
+      };
     }
 
     return { data: undefined, isLoading: false, isError: false };
@@ -68,10 +74,18 @@ jest.mock("@/components/ui/select", () => {
 });
 
 jest.mock("@/components/ui/checkbox", () => ({
-  Checkbox: ({ id, checked, onCheckedChange }: { id: string; checked?: boolean; onCheckedChange?: (v: boolean) => void }) => (
+  Checkbox: ({
+    id,
+    checked,
+    onCheckedChange,
+  }: {
+    id: string;
+    checked?: boolean;
+    onCheckedChange?: (v: boolean) => void;
+  }) => (
     <input
       id={id}
-      data-testid="include-completed"
+      data-testid={id}
       type="checkbox"
       checked={checked}
       onChange={(e) => onCheckedChange?.(e.target.checked)}
@@ -107,9 +121,17 @@ jest.mock("@/components/ui/badge", () => ({
 }));
 
 jest.mock("@/components/ui/input", () => ({
-  Input: ({ value, onChange, type }: { value?: string; onChange?: (e: React.ChangeEvent<HTMLInputElement>) => void; type?: string }) => (
-    <input type={type} value={value} onChange={onChange} />
-  ),
+  Input: ({
+    value,
+    onChange,
+    type,
+    id,
+  }: {
+    value?: string;
+    onChange?: (e: React.ChangeEvent<HTMLInputElement>) => void;
+    type?: string;
+    id?: string;
+  }) => <input id={id} type={type} value={value} onChange={onChange} />,
 }));
 
 jest.mock("@/components/ui/skeleton", () => ({
@@ -134,10 +156,22 @@ describe("TasksCommandCenterClient", () => {
     expect(screen.getByText("Producto demo")).toBeInTheDocument();
   });
 
-  it("updates URL when includeCompleted checkbox changes", () => {
+  it("renders explicit date labels", () => {
     render(<TasksCommandCenterClient />);
 
-    fireEvent.click(screen.getByTestId("include-completed"));
+    expect(screen.getByLabelText("Asignada desde")).toBeInTheDocument();
+    expect(screen.getByLabelText("Asignada hasta")).toBeInTheDocument();
+    expect(screen.getByLabelText("Completada desde")).toBeInTheDocument();
+    expect(screen.getByLabelText("Completada hasta")).toBeInTheDocument();
+  });
+
+  it("shows status checkboxes selected by default and updates URL when toggled", () => {
+    render(<TasksCommandCenterClient />);
+
+    const statusCompleted = screen.getByTestId("status-completed") as HTMLInputElement;
+    expect(statusCompleted.checked).toBe(true);
+
+    fireEvent.click(statusCompleted);
     expect(mockReplace).toHaveBeenCalled();
   });
 });

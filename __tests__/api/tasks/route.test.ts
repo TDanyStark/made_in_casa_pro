@@ -39,7 +39,7 @@ describe("GET /api/tasks", () => {
     } as never);
   });
 
-  it("returns paginated payload and defaults includeCompleted=false", async () => {
+  it("returns paginated payload and supports default statuses behavior", async () => {
     mockGetTasks.mockResolvedValue({
       tasks: [
         {
@@ -68,7 +68,7 @@ describe("GET /api/tasks", () => {
     expect(data.currentPage).toBe(2);
     expect(data.total).toBe(1);
     expect(mockGetTasks).toHaveBeenCalledWith(
-      expect.objectContaining({ page: 2, includeCompleted: false })
+      expect.objectContaining({ page: 2, statuses: undefined })
     );
   });
 
@@ -86,14 +86,14 @@ describe("GET /api/tasks", () => {
     mockGetTasks.mockResolvedValue({ tasks: [], total: 0 });
 
     const req = new NextRequest(
-      "http://localhost/api/tasks?page=1&includeCompleted=1&creatorRole=directivo&taskType=validation&taskFlag=correction"
+      "http://localhost/api/tasks?page=1&creatorUserId=12&status=in_progress&status=completed&taskType=validation&taskFlag=correction"
     );
     await callGet(req);
 
     expect(mockGetTasks).toHaveBeenCalledWith(
       expect.objectContaining({
-        includeCompleted: true,
-        creatorRole: "directivo",
+        creatorUserId: 12,
+        statuses: ["in_progress", "completed"],
         taskType: "validation",
         taskFlag: "correction",
       })

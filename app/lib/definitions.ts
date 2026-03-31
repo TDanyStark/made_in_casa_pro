@@ -268,16 +268,13 @@ export type TaskTransitionType = {
   transitioned_at: string;
 };
 
-export type ProjectCreatorRoleFilter = "admin" | "directivo" | "comercial";
-
 export type TaskCommandCenterFilters = {
   page?: number;
   limit?: number;
-  includeCompleted?: boolean;
-  creatorRole?: ProjectCreatorRoleFilter;
+  creatorUserId?: number;
   areaId?: number;
   assignedUserId?: number;
-  status?: ProjectTaskStatus;
+  statuses?: ProjectTaskStatus[];
   taskType?: TaskType;
   taskFlag?: TaskFlag;
   assignedFrom?: Date;

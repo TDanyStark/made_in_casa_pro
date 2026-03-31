@@ -7,14 +7,13 @@ import { getTasksCommandCenterWithPagination } from "@/lib/queries/projectTasks"
 
 const querySchema = z.object({
   page: z.coerce.number().int().positive().default(1),
-  includeCompleted: z
-    .enum(["0", "1", "true", "false"])
-    .optional()
-    .transform((value) => value === "1" || value === "true"),
-  creatorRole: z.enum(["admin", "directivo", "comercial"]).optional(),
+  creatorUserId: z.coerce.number().int().positive().optional(),
   areaId: z.coerce.number().int().positive().optional(),
   assignedUserId: z.coerce.number().int().positive().optional(),
-  status: z.enum(["not_started", "waiting", "in_progress", "completed", "blocked"]).optional(),
+  statuses: z
+    .array(z.enum(["not_started", "waiting", "in_progress", "completed", "blocked"]))
+    .optional()
+    .transform((value) => (value && value.length > 0 ? Array.from(new Set(value)) : undefined)),
   taskType: z.enum(["execution", "validation"]).optional(),
   taskFlag: z.enum(["new", "correction", "adjustment"]).optional(),
   assignedFrom: z.string().datetime({ offset: true }).optional(),
@@ -36,7 +35,11 @@ export async function GET(request: NextRequest) {
 
   try {
     const url = new URL(request.url);
-    const rawQuery = Object.fromEntries(url.searchParams.entries());
+    const statusValues = url.searchParams.getAll("status");
+    const rawQuery = {
+      ...Object.fromEntries(url.searchParams.entries()),
+      statuses: statusValues.length > 0 ? statusValues : undefined,
+    };
     const parsed = querySchema.safeParse(rawQuery);
 
     if (!parsed.success) {
@@ -52,11 +55,10 @@ export async function GET(request: NextRequest) {
     const { tasks, total } = await getTasksCommandCenterWithPagination({
       page: query.page,
       limit,
-      includeCompleted: query.includeCompleted ?? false,
-      creatorRole: query.creatorRole,
+      creatorUserId: query.creatorUserId,
       areaId: query.areaId,
       assignedUserId: query.assignedUserId,
-      status: query.status,
+      statuses: query.statuses,
       taskType: query.taskType,
       taskFlag: query.taskFlag,
       assignedFrom: query.assignedFrom ? new Date(query.assignedFrom) : undefined,

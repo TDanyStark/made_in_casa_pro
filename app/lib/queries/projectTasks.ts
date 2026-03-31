@@ -8,7 +8,7 @@ import {
   TaskTransitionType,
   TaskCommandCenterFilters,
   TaskCommandCenterRow,
-  ProjectCreatorRoleFilter,
+  UserRole,
 } from "../definitions";
 import { buildPaginationArgs, buildWhereClause, parseTotal } from "../db/query-helpers";
 import { ITEMS_PER_PAGE } from "@/config/constants";
@@ -134,8 +134,8 @@ export async function createProjectTask(data: {
         INSERT INTO project_tasks
           (project_id, template_id, title, description,
            area_id, assigned_user_id, status, task_type, task_flag,
-           requires_quote, assign_to_commercial, order_index, assigned_at)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+           requires_quote, assign_to_commercial, order_index)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
         RETURNING id
       `,
       args: [
@@ -151,7 +151,6 @@ export async function createProjectTask(data: {
         data.requires_quote ?? 0,
         data.assign_to_commercial ?? 0,
         data.order_index,
-        data.assigned_user_id ? new Date() : null,
       ],
     });
     const id = Number(result.rows[0]?.id);
@@ -192,8 +191,15 @@ export async function updateProjectTask(
     const updates: string[] = [];
     const args: unknown[] = [];
 
-    // Auto-update assigned_at if assigned_user_id is changing from null to value
-    if (data.assigned_user_id && !currentTask.assigned_user_id) {
+    // Auto-update assigned_at if:
+    // 1. Status is changing from 'waiting' to 'not_started' (and it has a user)
+    // 2. A user is being assigned AND the resulting status is NOT 'waiting'
+    const newStatus = data.status || currentTask.status;
+    const isChangingToNotStarted = currentTask.status === "waiting" && data.status === "not_started";
+    const isAssigningUser = data.assigned_user_id && !currentTask.assigned_user_id;
+    const isAlreadyActive = newStatus !== "waiting";
+
+    if ((isChangingToNotStarted && (data.assigned_user_id || currentTask.assigned_user_id)) || (isAssigningUser && isAlreadyActive)) {
       updates.push("assigned_at = CURRENT_TIMESTAMP");
     }
 
@@ -289,10 +295,10 @@ export async function reorderProjectTasks(
     // 1. The first task that is NOT completed must be set to 'not_started' if it was 'waiting'
     // 2. All subsequent tasks that are 'not_started' must be set to 'waiting'
     const updatedTasksResult = await transaction.execute({
-      sql: `SELECT id, status FROM project_tasks WHERE project_id = $1 ORDER BY order_index ASC`,
+      sql: `SELECT id, status, assigned_user_id FROM project_tasks WHERE project_id = $1 ORDER BY order_index ASC`,
       args: [projectId],
     });
-    const updatedTasks = updatedTasksResult.rows as unknown as { id: number; status: ProjectTaskStatus }[];
+    const updatedTasks = updatedTasksResult.rows as unknown as { id: number; status: ProjectTaskStatus; assigned_user_id: number | null }[];
     
     let firstNonCompletedFound = false;
     for (const task of updatedTasks) {
@@ -302,8 +308,8 @@ export async function reorderProjectTasks(
         firstNonCompletedFound = true;
         if (task.status === "waiting") {
           await transaction.execute({
-            sql: `UPDATE project_tasks SET status = 'not_started', updated_at = CURRENT_TIMESTAMP WHERE id = $1`,
-            args: [task.id],
+            sql: `UPDATE project_tasks SET status = 'not_started', assigned_at = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $1`,
+            args: [task.id, task.assigned_user_id ? new Date() : null],
           });
         }
       } else {
@@ -443,7 +449,7 @@ export async function completeTask(
       } else {
         // Activate next task
         await transaction.execute({
-          sql: `UPDATE project_tasks SET status = 'not_started', updated_at = CURRENT_TIMESTAMP WHERE id = $1`,
+          sql: `UPDATE project_tasks SET status = 'not_started', assigned_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id = $1`,
           args: [next.id],
         });
         await transaction.execute({
@@ -548,8 +554,8 @@ export async function createRejectionLoopTasks(
           INSERT INTO project_tasks
             (project_id, template_id, title, description,
              area_id, assigned_user_id, status, task_type, task_flag,
-             requires_quote, assign_to_commercial, order_index)
-          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'correction', $9, $10, $11)
+             requires_quote, assign_to_commercial, order_index, assigned_at)
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'correction', $9, $10, $11, $12)
           RETURNING id
         `,
         args: [
@@ -564,6 +570,7 @@ export async function createRejectionLoopTasks(
           original.requires_quote ?? 0,
           original.assign_to_commercial ?? 0,
           newOrderIndex,
+          (newStatus === "not_started" && original.assigned_user_id) ? new Date() : null,
         ],
       });
       const newTaskId = Number(cloneInsert.rows[0]?.id);
@@ -581,7 +588,7 @@ export async function createRejectionLoopTasks(
 
     // Step 6: Mark task N as completed
     await transaction.execute({
-      sql: `UPDATE project_tasks SET status = 'completed', updated_at = CURRENT_TIMESTAMP WHERE id = $1`,
+      sql: `UPDATE project_tasks SET status = 'completed', completed_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id = $1`,
       args: [rejectedValidationTaskId],
     });
 
@@ -837,8 +844,8 @@ export async function instantiateTasksFromTemplates(
             INSERT INTO project_tasks
               (project_id, template_id, title, description,
                area_id, assigned_user_id, status, task_type, task_flag,
-               requires_quote, assign_to_commercial, order_index, assigned_at)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'new', $9, $10, $11, $12)
+               requires_quote, assign_to_commercial, order_index)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'new', $9, $10, $11)
             RETURNING id
           `,
           args: [
@@ -853,7 +860,6 @@ export async function instantiateTasksFromTemplates(
             tpl.requires_quote ?? 0,
             tpl.assign_to_commercial ?? 0,
             tpl.order_index,
-            assignedTo ? new Date() : null,
           ],
         });
 
@@ -954,20 +960,13 @@ export async function logTaskTransition(
   return logTransition(taskId, projectId, fromStatus, toStatus, fromFlag, toFlag, movedBy, notes);
 }
 
-const CREATOR_ROLE_TO_ID: Record<ProjectCreatorRoleFilter, number> = {
-  admin: 1,
-  directivo: 2,
-  comercial: 3,
-};
-
 export async function getTasksCommandCenterWithPagination({
   page = 1,
   limit = ITEMS_PER_PAGE,
-  includeCompleted = false,
-  creatorRole,
+  creatorUserId,
   areaId,
   assignedUserId,
-  status,
+  statuses,
   taskType,
   taskFlag,
   assignedFrom,
@@ -976,14 +975,20 @@ export async function getTasksCommandCenterWithPagination({
   completedTo,
 }: TaskCommandCenterFilters): Promise<{ tasks: TaskCommandCenterRow[]; total: number }> {
   try {
-    const creatorRoleId = creatorRole ? CREATOR_ROLE_TO_ID[creatorRole] : undefined;
+    const requestedStatuses = statuses && statuses.length > 0
+      ? Array.from(new Set(statuses))
+      : ["not_started", "waiting", "in_progress", "completed", "blocked"];
+
+    const hasAllStatuses = requestedStatuses.length === 5;
+    const includeCompleted = requestedStatuses.includes("completed");
+    const statusesWithoutCompleted = requestedStatuses.filter((taskStatus) => taskStatus !== "completed");
+    const restrictByStatuses = !hasAllStatuses;
 
     const conditions: Array<{ sql: string; value: unknown }> = [
-      { sql: "pt.status <> 'completed'", value: includeCompleted ? undefined : 1 },
-      { sql: "creator.rol_id = $", value: creatorRoleId },
+      { sql: "creator.rol_id = ANY($)", value: [UserRole.ADMIN, UserRole.DIRECTIVO, UserRole.COMERCIAL] },
+      { sql: "p.created_by = $", value: creatorUserId },
       { sql: "pt.area_id = $", value: areaId },
       { sql: "pt.assigned_user_id = $", value: assignedUserId },
-      { sql: "pt.status = $", value: status },
       { sql: "pt.task_type = $", value: taskType },
       { sql: "pt.task_flag = $", value: taskFlag },
       { sql: "pt.assigned_at >= $", value: assignedFrom },
@@ -991,6 +996,18 @@ export async function getTasksCommandCenterWithPagination({
       { sql: "pt.completed_at >= $", value: completedFrom },
       { sql: "pt.completed_at <= $", value: completedTo },
     ];
+
+    if (restrictByStatuses) {
+      if (requestedStatuses.length === 0) {
+        conditions.push({ sql: "pt.status = ANY($::text[])", value: [] });
+      } else if (includeCompleted && statusesWithoutCompleted.length === 0) {
+        conditions.push({ sql: "pt.status = ANY($)", value: ["completed"] });
+      } else if (includeCompleted && statusesWithoutCompleted.length > 0) {
+        conditions.push({ sql: "(pt.status = 'completed' OR pt.status = ANY($))", value: statusesWithoutCompleted });
+      } else {
+        conditions.push({ sql: "pt.status = ANY($)", value: statusesWithoutCompleted });
+      }
+    }
 
     const { whereSQL, args } = buildWhereClause(conditions);
 
