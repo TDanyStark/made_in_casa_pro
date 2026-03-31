@@ -29,6 +29,8 @@ const TASK_SELECT = `
   pt.order_index,
   pt.created_at,
   pt.updated_at,
+  pt.assigned_at,
+  pt.completed_at,
   (SELECT COUNT(*) FROM task_quotes tq WHERE tq.task_id = pt.id) AS quote_count,
   (SELECT COUNT(*) FROM task_quotes tq WHERE tq.task_id = pt.id AND tq.status = 'pending') AS pending_quote_count
 `;
@@ -127,8 +129,8 @@ export async function createProjectTask(data: {
         INSERT INTO project_tasks
           (project_id, template_id, title, description,
            area_id, assigned_user_id, status, task_type, task_flag,
-           requires_quote, assign_to_commercial, order_index)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+           requires_quote, assign_to_commercial, order_index, assigned_at)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
         RETURNING id
       `,
       args: [
@@ -144,6 +146,7 @@ export async function createProjectTask(data: {
         data.requires_quote ?? 0,
         data.assign_to_commercial ?? 0,
         data.order_index,
+        data.assigned_user_id ? new Date() : null,
       ],
     });
     const id = Number(result.rows[0]?.id);
@@ -173,8 +176,21 @@ export async function updateProjectTask(
   }>
 ): Promise<ProjectTaskType | null> {
   try {
+    const currentTask = await getProjectTaskById(id);
+    if (!currentTask) return null;
+
+    // Protection: Completed tasks are read-only
+    if (currentTask.status === "completed") {
+      throw new Error("No se pueden editar tareas completadas.");
+    }
+
     const updates: string[] = [];
     const args: unknown[] = [];
+
+    // Auto-update assigned_at if assigned_user_id is changing from null to value
+    if (data.assigned_user_id && !currentTask.assigned_user_id) {
+      updates.push("assigned_at = CURRENT_TIMESTAMP");
+    }
 
     const fields: Array<[string, unknown]> = [
       ["title", data.title],
@@ -195,14 +211,11 @@ export async function updateProjectTask(
       }
     }
 
-    if (updates.length === 0) return getProjectTaskById(id);
+    if (updates.length === 0) return currentTask;
 
     // Business rule validation: Validation task cannot be in first position
-    if (data.task_type === "validation") {
-      const currentTask = await getProjectTaskById(id);
-      if (currentTask && currentTask.order_index === 0) {
-        throw new Error("Una tarea de validación no puede ser la primera tarea del proyecto.");
-      }
+    if (data.task_type === "validation" && currentTask.order_index === 0) {
+      throw new Error("Una tarea de validación no puede ser la primera tarea del proyecto.");
     }
 
     updates.push("updated_at = CURRENT_TIMESTAMP");
@@ -227,8 +240,12 @@ export async function updateProjectTask(
 export async function deleteProjectTask(id: number): Promise<void> {
   try {
     const task = await getProjectTaskById(id);
+    if (!task) return;
+    if (task.status === "completed") {
+      throw new Error("No se pueden eliminar tareas completadas.");
+    }
     await db.execute({ sql: `DELETE FROM project_tasks WHERE id = $1`, args: [id] });
-    if (task) revalidatePath(`/projects/${task.project_id}`);
+    revalidatePath(`/projects/${task.project_id}`);
   } catch (error) {
     console.error("Error deleting project task:", error);
     throw error;
@@ -351,7 +368,7 @@ export async function completeTask(
   try {
     // 1. Mark current task as completed
     await transaction.execute({
-      sql: `UPDATE project_tasks SET status = 'completed', updated_at = CURRENT_TIMESTAMP WHERE id = $1`,
+      sql: `UPDATE project_tasks SET status = 'completed', completed_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id = $1`,
       args: [taskId],
     });
 
@@ -815,8 +832,8 @@ export async function instantiateTasksFromTemplates(
             INSERT INTO project_tasks
               (project_id, template_id, title, description,
                area_id, assigned_user_id, status, task_type, task_flag,
-               requires_quote, assign_to_commercial, order_index)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'new', $9, $10, $11)
+               requires_quote, assign_to_commercial, order_index, assigned_at)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'new', $9, $10, $11, $12)
             RETURNING id
           `,
           args: [
@@ -831,6 +848,7 @@ export async function instantiateTasksFromTemplates(
             tpl.requires_quote ?? 0,
             tpl.assign_to_commercial ?? 0,
             tpl.order_index,
+            assignedTo ? new Date() : null,
           ],
         });
 

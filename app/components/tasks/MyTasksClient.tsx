@@ -14,6 +14,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { TaskValidationDialog } from "./TaskValidationDialog";
+import { TaskCompleteDialog } from "./TaskCompleteDialog";
+import { TaskHistoryDialog } from "./TaskHistoryDialog";
 import {
   CheckCircle,
   Loader2,
@@ -21,8 +23,11 @@ import {
   AlertTriangle,
   Clock,
   ExternalLink,
+  History as HistoryIcon,
 } from "lucide-react";
 import Link from "next/link";
+import { format } from "date-fns";
+import { es } from "date-fns/locale";
 
 // ─── Status/type configs ──────────────────────────────────────────────────────
 
@@ -66,6 +71,10 @@ export function MyTasksClient() {
   const queryClient = useQueryClient();
 
   const [completingId, setCompletingId] = useState<number | null>(null);
+  const [completeDialogOpen, setCompleteDialogOpen] = useState(false);
+  const [taskToComplete, setTaskToComplete] = useState<MyTask | null>(null);
+  const [historyDialogOpen, setHistoryDialogOpen] = useState(false);
+  const [taskForHistory, setTaskForHistory] = useState<MyTask | null>(null);
   const [validateDialog, setValidateDialog] = useState<ValidateDialogState>({
     open: false,
     task: null,
@@ -87,24 +96,14 @@ export function MyTasksClient() {
   const blockedTasks = tasks.filter((t) => t.status === "blocked");
 
   // Complete execution task
-  const handleComplete = async (task: MyTask) => {
-    setCompletingId(task.id);
-    try {
-      const res = await post(`projects/${task.project_id}/tasks/${task.id}/complete`, {});
-      if (!res.ok) throw new Error(res.error);
-      const data = res.data as { blockedReason?: string | null };
-      if (data?.blockedReason) {
-        toast.warning(data.blockedReason, { duration: 6000 });
-      } else {
-        toast.success("Tarea completada");
-      }
-      queryClient.invalidateQueries({ queryKey: ["my-tasks"] });
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : "Error al completar";
-      toast.error(msg);
-    } finally {
-      setCompletingId(null);
-    }
+  const openCompleteDialog = (task: MyTask) => {
+    setTaskToComplete(task);
+    setCompleteDialogOpen(true);
+  };
+
+  const openHistoryDialog = (task: MyTask) => {
+    setTaskForHistory(task);
+    setHistoryDialogOpen(true);
   };
 
   // Open validate dialog — need to fetch siblings
@@ -174,6 +173,25 @@ export function MyTasksClient() {
             {task.description && (
               <p className="text-xs text-muted-foreground line-clamp-2">{task.description}</p>
             )}
+
+            {/* Dates section */}
+            {(task.assigned_at || task.completed_at) && (
+              <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2 mb-1">
+                 {task.assigned_at && (
+                    <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
+                       <Clock className="h-3 w-3" />
+                       Asignada: {format(new Date(task.assigned_at), "d MMM, HH:mm", { locale: es })}
+                    </div>
+                 )}
+                 {task.completed_at && (
+                    <div className="flex items-center gap-1 text-[10px] text-green-600 font-medium">
+                       <CheckCircle className="h-3 w-3" />
+                       Completada: {format(new Date(task.completed_at), "d MMM, HH:mm", { locale: es })}
+                    </div>
+                 )}
+              </div>
+            )}
+
             <div className="flex flex-wrap items-center gap-2 mt-2 text-xs text-muted-foreground">
               {task.project_title && (
                 <Link
@@ -190,32 +208,43 @@ export function MyTasksClient() {
             </div>
           </div>
 
-          <div className="flex flex-col items-end gap-2">
-            <span
-              className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium ${
-                STATUS_CONFIG[task.status]?.className
-              }`}
-            >
-              {task.status === "waiting" && <Clock className="h-3 w-3" />}
-              {task.status === "blocked" && <AlertTriangle className="h-3 w-3" />}
-              {STATUS_CONFIG[task.status]?.label}
-            </span>
+            <div className="flex flex-col items-end gap-2">
+              <div className="flex items-center gap-1.5">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7 text-muted-foreground"
+                  onClick={() => openHistoryDialog(task)}
+                  title="Ver historial de entregables"
+                >
+                  <HistoryIcon className="h-3.5 w-3.5" />
+                </Button>
+                <span
+                  className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium ${
+                    STATUS_CONFIG[task.status]?.className
+                  }`}
+                >
+                  {task.status === "waiting" && <Clock className="h-3 w-3" />}
+                  {task.status === "blocked" && <AlertTriangle className="h-3 w-3" />}
+                  {STATUS_CONFIG[task.status]?.label}
+                </span>
+              </div>
 
-            {canAct && !isValidation && (
-              <Button
-                size="sm"
-                className="h-7 text-xs gap-1"
-                onClick={() => handleComplete(task)}
-                disabled={completingId === task.id}
-              >
-                {completingId === task.id ? (
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                ) : (
-                  <CheckCircle className="h-3.5 w-3.5" />
-                )}
-                Completar
-              </Button>
-            )}
+              {canAct && !isValidation && (
+                <Button
+                  size="sm"
+                  className="h-7 text-xs gap-1"
+                  onClick={() => openCompleteDialog(task)}
+                  disabled={completingId === task.id}
+                >
+                  {completingId === task.id ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <CheckCircle className="h-3.5 w-3.5" />
+                  )}
+                  Completar
+                </Button>
+              )}
 
             {canAct && isValidation && (
               <Button
@@ -278,6 +307,24 @@ export function MyTasksClient() {
         onSuccess={() => {
           queryClient.invalidateQueries({ queryKey: ["my-tasks"] });
         }}
+      />
+
+      {/* Complete Dialog */}
+      <TaskCompleteDialog
+        open={completeDialogOpen}
+        onOpenChange={setCompleteDialogOpen}
+        task={taskToComplete}
+        onSuccess={() => {
+          queryClient.invalidateQueries({ queryKey: ["my-tasks"] });
+        }}
+      />
+
+      {/* History Dialog */}
+      <TaskHistoryDialog
+        open={historyDialogOpen}
+        onOpenChange={setHistoryDialogOpen}
+        taskId={taskForHistory?.id ?? null}
+        taskTitle={taskForHistory?.title ?? ""}
       />
     </div>
   );

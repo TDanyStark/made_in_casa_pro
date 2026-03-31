@@ -247,6 +247,8 @@ export type ProjectTaskType = {
   order_index: number;
   created_at: string;
   updated_at: string;
+  assigned_at?: string;
+  completed_at?: string;
   // aggregates
   quote_count?: number;
   pending_quote_count?: number;

@@ -5,6 +5,8 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
+import { format } from "date-fns";
+import { es } from "date-fns/locale";
 import { toast } from "sonner";
 import { get, post, patch, del } from "@/lib/services/apiService";
 import {
@@ -19,6 +21,8 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { TaskValidationDialog } from "@/components/tasks/TaskValidationDialog";
+import { TaskCompleteDialog } from "@/components/tasks/TaskCompleteDialog";
+import { TaskHistoryDialog } from "@/components/tasks/TaskHistoryDialog";
 import {
   Dialog,
   DialogContent,
@@ -67,6 +71,7 @@ import {
   Clock,
   ShieldCheck,
   RotateCcw,
+  History as HistoryIcon,
 } from "lucide-react";
 import {
   Tooltip,
@@ -258,6 +263,10 @@ export function ProjectTasksTab({
   const [submitting, setSubmitting] = useState(false);
   const [reordering, setReordering] = useState(false);
   const [completingTaskId, setCompletingTaskId] = useState<number | null>(null);
+  const [completeDialogOpen, setCompleteDialogOpen] = useState(false);
+  const [taskToComplete, setTaskToComplete] = useState<ProjectTaskType | null>(null);
+  const [historyDialogOpen, setHistoryDialogOpen] = useState(false);
+  const [taskForHistory, setTaskForHistory] = useState<ProjectTaskType | null>(null);
   const [validateDialog, setValidateDialog] = useState<ValidateDialogState>({
     open: false,
     task: null,
@@ -396,29 +405,18 @@ export function ProjectTasksTab({
     }
   };
 
-  const handleCompleteTask = async (task: ProjectTaskType) => {
-    setCompletingTaskId(task.id);
-    try {
-      const res = await post(`projects/${projectId}/tasks/${task.id}/complete`, {});
-      if (!res.ok) throw new Error(res.error);
-
-      const data = res.data as { blockedReason?: string | null };
-      if (data?.blockedReason) {
-        toast.warning(data.blockedReason, { duration: 6000 });
-      } else {
-        toast.success("Tarea completada. Se activó la siguiente tarea.");
-      }
-      invalidateAll();
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : "Error al completar tarea";
-      toast.error(msg);
-    } finally {
-      setCompletingTaskId(null);
-    }
+  const openCompleteDialog = (task: ProjectTaskType) => {
+    setTaskToComplete(task);
+    setCompleteDialogOpen(true);
   };
 
   const openValidateDialog = (task: ProjectTaskType) => {
     setValidateDialog({ open: true, task });
+  };
+
+  const openHistoryDialog = (task: ProjectTaskType) => {
+    setTaskForHistory(task);
+    setHistoryDialogOpen(true);
   };
 
   const handleDeleteTask = async (taskId: number) => {
@@ -542,215 +540,249 @@ export function ProjectTasksTab({
               const isNotStarted = task.status === "not_started";
               const isCompleted = task.status === "completed";
               const isValidation = taskType === "validation";
-              const canComplete = (isInProgress || isNotStarted) && !isValidation && (isMyTask(task) || isAdmin);
-              const canValidate = (isInProgress || isNotStarted) && isValidation && (isMyTask(task) || isAdmin);
-              const needsQuote = task.requires_quote === 1 && isBlocked;
+                      const canComplete = (isInProgress || isNotStarted) && !isValidation && (isMyTask(task) || isAdmin);
+                      const canValidate = (isInProgress || isNotStarted) && isValidation && (isMyTask(task) || isAdmin);
+                      const needsQuote = task.requires_quote === 1 && isBlocked;
 
-              return (
-                <div
-                  className={`flex items-start gap-3 rounded-md border bg-card p-3 transition-opacity ${
-                    isWaiting ? "opacity-60" : ""
-                  } ${isBlocked ? "border-destructive/50 bg-destructive/5" : ""}`}
-                >
-                  {canEdit && (
-                    <div className="flex-shrink-0 pt-0.5">
-                      {isCompleted ? (
-                        <div className="p-1.5 opacity-20 grayscale cursor-not-allowed">
-                          <ChevronDown className="h-4 w-4" />
-                        </div>
-                      ) : (
-                        dragHandle
-                      )}
-                    </div>
-                  )}
-                  {(isWaiting || isBlocked) && (
-                    <div className="flex-shrink-0 pt-1 pl-1">
-                      {isBlocked ? (
-                        <AlertTriangle className="h-4 w-4 text-destructive" />
-                      ) : (
-                        <Clock className="h-4 w-4 text-muted-foreground/50" />
-                      )}
-                    </div>
-                  )}
-
-                  <div className="flex-1 min-w-0">
-                    {/* Title + type/flag badges */}
-                    <div className="flex items-center flex-wrap gap-2 mb-0.5">
-                      <p className="font-semibold text-sm leading-snug">{task.title}</p>
-                      <span className="text-muted-foreground/40 text-xs select-none">·</span>
-                      <Badge
-                        variant="outline"
-                        className={`text-xs ${TASK_TYPE_CONFIG[taskType]?.className}`}
-                      >
-                        {isValidation ? (
-                          <ShieldCheck className="h-3 w-3 mr-1" />
-                        ) : null}
-                        {TASK_TYPE_CONFIG[taskType]?.label}
-                      </Badge>
-                      {taskFlag !== "new" && (
-                        <Badge
-                          variant="outline"
-                          className={`text-xs ${TASK_FLAG_CONFIG[taskFlag]?.className}`}
+                      return (
+                        <div
+                          className={`flex items-start gap-3 rounded-md border bg-card p-3 transition-opacity ${
+                            isWaiting ? "opacity-60" : ""
+                          } ${isBlocked ? "border-destructive/50 bg-destructive/5" : ""} ${isCompleted ? "border-green-100 dark:border-green-900/30" : ""}`}
                         >
-                          {TASK_FLAG_CONFIG[taskFlag]?.label}
-                        </Badge>
-                      )}
-                      {task.requires_quote === 1 && (
-                        <Badge variant="outline" className="text-xs text-amber-700 border-amber-400 bg-amber-50 dark:bg-amber-900/20">
-                          Cotización
-                        </Badge>
-                      )}
-                    </div>
-
-                    {task.description && (
-                      <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">
-                        {task.description}
-                      </p>
-                    )}
-
-                    {/* Blocked reason */}
-                    {isBlocked && needsQuote && (
-                      <p className="text-xs text-destructive mt-1 font-medium">
-                        Esperando cotización de externo
-                      </p>
-                    )}
-                    {isBlocked && !needsQuote && (
-                      <p className="text-xs text-destructive mt-1 font-medium">
-                        Sin colaborador asignado
-                      </p>
-                    )}
-
-                    {/* Area / user badges */}
-                    <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
-                      {task.area_name && (
-                        <>
-                          <Badge variant="secondary" className="text-xs">
-                            {task.area_name}
-                          </Badge>
-                          <span className="text-muted-foreground/40 text-xs select-none">·</span>
-                        </>
-                      )}
-                      {task.assign_to_commercial === 1 && !task.assigned_user_name && (
-                        <Badge variant="outline" className="text-xs text-blue-700 border-blue-300 bg-blue-50 dark:bg-blue-900/20">
-                          Comercial del proyecto
-                        </Badge>
-                      )}
-                      {task.assigned_user_name && (
-                        <Badge variant="outline" className="text-xs">
-                          {task.assigned_user_name}
-                          {rolLabel(task.assigned_user_rol_id ?? null) && (
-                            <span className="ml-1 text-muted-foreground">
-                              ({rolLabel(task.assigned_user_rol_id ?? null)})
-                            </span>
+                          {canEdit && (
+                            <div className="flex-shrink-0 pt-0.5">
+                              {isCompleted ? (
+                                <div className="p-1.5 opacity-20 grayscale cursor-not-allowed">
+                                  <ChevronDown className="h-4 w-4" />
+                                </div>
+                              ) : (
+                                dragHandle
+                              )}
+                            </div>
                           )}
-                          {isMyTask(task) && (
-                            <span className="ml-1 text-primary">(tú)</span>
+                          {(isWaiting || isBlocked) && (
+                            <div className="flex-shrink-0 pt-1 pl-1">
+                              {isBlocked ? (
+                                <AlertTriangle className="h-4 w-4 text-destructive" />
+                              ) : (
+                                <Clock className="h-4 w-4 text-muted-foreground/50" />
+                              )}
+                            </div>
                           )}
-                        </Badge>
-                      )}
-                      {!task.assigned_user_name && task.assign_to_commercial !== 1 && (
-                        <Badge variant="outline" className="text-xs text-muted-foreground">
-                          Sin asignar
-                        </Badge>
-                      )}
-                    </div>
-                  </div>
+                          {isCompleted && (
+                            <div className="flex-shrink-0 pt-1 pl-1">
+                               <CheckCircle className="h-4 w-4 text-green-600" />
+                            </div>
+                          )}
 
-                  {/* Right: status + actions */}
-                  <div className="flex items-center gap-1.5 flex-shrink-0 flex-wrap justify-end">
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <span
-                           className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium ${
-                            TASK_STATUS_CONFIG[task.status]?.className ?? ""
-                          }`}
-                        >
-                          {TASK_STATUS_CONFIG[task.status]?.icon}
-                          {TASK_STATUS_CONFIG[task.status]?.label ?? task.status}
-                        </span>
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        {isWaiting
-                          ? "Esta tarea está asignada pero esperando que termine la anterior"
-                          : TASK_STATUS_CONFIG[task.status]?.label}
-                      </TooltipContent>
-                    </Tooltip>
+                          <div className="flex-1 min-w-0">
+                            {/* Title + type/flag badges */}
+                            <div className="flex items-center flex-wrap gap-2 mb-0.5">
+                              <p className={`font-semibold text-sm leading-snug ${isCompleted ? "text-muted-foreground line-through" : ""}`}>{task.title}</p>
+                              <span className="text-muted-foreground/40 text-xs select-none">·</span>
+                              <Badge
+                                variant="outline"
+                                className={`text-xs ${TASK_TYPE_CONFIG[taskType]?.className}`}
+                              >
+                                {isValidation ? (
+                                  <ShieldCheck className="h-3 w-3 mr-1" />
+                                ) : null}
+                                {TASK_TYPE_CONFIG[taskType]?.label}
+                              </Badge>
+                              {taskFlag !== "new" && (
+                                <Badge
+                                  variant="outline"
+                                  className={`text-xs ${TASK_FLAG_CONFIG[taskFlag]?.className}`}
+                                >
+                                  {TASK_FLAG_CONFIG[taskFlag]?.label}
+                                </Badge>
+                              )}
+                              {task.requires_quote === 1 && (
+                                <Badge variant="outline" className="text-xs text-amber-700 border-amber-400 bg-amber-50 dark:bg-amber-900/20">
+                                  Cotización
+                                </Badge>
+                              )}
+                            </div>
 
-                    {canComplete && (
-                      <Button
-                        size="sm"
-                        variant="default"
-                        className="h-7 text-xs gap-1"
-                        onClick={() => handleCompleteTask(task)}
-                        disabled={completingTaskId === task.id}
-                      >
-                        {completingTaskId === task.id ? (
-                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                        ) : (
-                          <CheckCircle className="h-3.5 w-3.5" />
-                        )}
-                        Completar
-                      </Button>
-                    )}
+                            {task.description && (
+                              <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">
+                                {task.description}
+                              </p>
+                            )}
 
-                    {canValidate && (
-                      <Button
-                        size="sm"
-                        variant="default"
-                        className="h-7 text-xs gap-1 bg-purple-600 hover:bg-purple-700"
-                        onClick={() => openValidateDialog(task)}
-                      >
-                        <ShieldCheck className="h-3.5 w-3.5" />
-                        Validar
-                      </Button>
-                    )}
+                            {/* Dates section */}
+                            {(task.assigned_at || task.completed_at) && (
+                              <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2 mb-1">
+                                 {task.assigned_at && (
+                                    <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
+                                       <Clock className="h-3 w-3" />
+                                       Asignada: {format(new Date(task.assigned_at), "d MMM, HH:mm", { locale: es })}
+                                    </div>
+                                 )}
+                                 {task.completed_at && (
+                                    <div className="flex items-center gap-1 text-[10px] text-green-600 font-medium">
+                                       <CheckCircle className="h-3 w-3" />
+                                       Completada: {format(new Date(task.completed_at), "d MMM, HH:mm", { locale: es })}
+                                    </div>
+                                 )}
+                              </div>
+                            )}
 
-                    {(canEditThisTask || canEditAssigneeOnly) && (
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-7 w-7"
-                        onClick={() => openEdit(task)}
-                      >
-                        <Pencil className="h-3.5 w-3.5" />
-                      </Button>
-                    )}
-                    {canEditThisTask && (
-                      <AlertDialog>
-                        <AlertDialogTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-7 w-7 text-destructive hover:text-destructive"
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </Button>
-                        </AlertDialogTrigger>
-                        <AlertDialogContent>
-                          <AlertDialogHeader>
-                            <AlertDialogTitle>¿Eliminar tarea?</AlertDialogTitle>
-                            <AlertDialogDescription>
-                              Se eliminará &quot;{task.title}&quot;. Esta acción no se puede deshacer.
-                            </AlertDialogDescription>
-                          </AlertDialogHeader>
-                          <AlertDialogFooter>
-                            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                            <AlertDialogAction
-                              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                              onClick={() => handleDeleteTask(task.id)}
+                            {/* Blocked reason */}
+                            {isBlocked && needsQuote && (
+                              <p className="text-xs text-destructive mt-1 font-medium">
+                                Esperando cotización de externo
+                              </p>
+                            )}
+                            {isBlocked && !needsQuote && (
+                              <p className="text-xs text-destructive mt-1 font-medium">
+                                Sin colaborador asignado
+                              </p>
+                            )}
+
+                            {/* Area / user badges */}
+                            <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
+                              {task.area_name && (
+                                <>
+                                  <Badge variant="secondary" className="text-xs">
+                                    {task.area_name}
+                                  </Badge>
+                                  <span className="text-muted-foreground/40 text-xs select-none">·</span>
+                                </>
+                              )}
+                              {task.assign_to_commercial === 1 && !task.assigned_user_name && (
+                                <Badge variant="outline" className="text-xs text-blue-700 border-blue-300 bg-blue-50 dark:bg-blue-900/20">
+                                  Comercial del proyecto
+                                </Badge>
+                              )}
+                              {task.assigned_user_name && (
+                                <Badge variant="outline" className="text-xs">
+                                  {task.assigned_user_name}
+                                  {rolLabel(task.assigned_user_rol_id ?? null) && (
+                                    <span className="ml-1 text-muted-foreground">
+                                      ({rolLabel(task.assigned_user_rol_id ?? null)})
+                                    </span>
+                                  )}
+                                  {isMyTask(task) && (
+                                    <span className="ml-1 text-primary">(tú)</span>
+                                  )}
+                                </Badge>
+                              )}
+                              {!task.assigned_user_name && task.assign_to_commercial !== 1 && (
+                                <Badge variant="outline" className="text-xs text-muted-foreground">
+                                  Sin asignar
+                                </Badge>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Right: status + actions */}
+                          <div className="flex items-center gap-1.5 flex-shrink-0 flex-wrap justify-end">
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <span
+                                   className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium ${
+                                    TASK_STATUS_CONFIG[task.status]?.className ?? ""
+                                  }`}
+                                >
+                                  {TASK_STATUS_CONFIG[task.status]?.icon}
+                                  {TASK_STATUS_CONFIG[task.status]?.label ?? task.status}
+                                </span>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                {isWaiting
+                                  ? "Esta tarea está asignada pero esperando que termine la anterior"
+                                  : TASK_STATUS_CONFIG[task.status]?.label}
+                              </TooltipContent>
+                            </Tooltip>
+
+                            <Button
+                               variant="ghost"
+                               size="icon"
+                               className="h-7 w-7 text-muted-foreground"
+                               onClick={() => openHistoryDialog(task)}
+                               title="Ver historial de entregables"
                             >
-                              Eliminar
-                            </AlertDialogAction>
-                          </AlertDialogFooter>
-                        </AlertDialogContent>
-                      </AlertDialog>
-                    )}
-                  </div>
-                </div>
-              );
-            }}
-          />
-        )}
+                               <HistoryIcon className="h-3.5 w-3.5" />
+                            </Button>
+
+                            {canComplete && (
+                              <Button
+                                size="sm"
+                                variant="default"
+                                className="h-7 text-xs gap-1"
+                                onClick={() => openCompleteDialog(task)}
+                                disabled={completingTaskId === task.id}
+                              >
+                                {completingTaskId === task.id ? (
+                                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                ) : (
+                                  <CheckCircle className="h-3.5 w-3.5" />
+                                )}
+                                Completar
+                              </Button>
+                            )}
+
+                            {canValidate && (
+                              <Button
+                                size="sm"
+                                variant="default"
+                                className="h-7 text-xs gap-1 bg-purple-600 hover:bg-purple-700"
+                                onClick={() => openValidateDialog(task)}
+                              >
+                                <ShieldCheck className="h-3.5 w-3.5" />
+                                Validar
+                              </Button>
+                            )}
+
+                            {(canEditThisTask || canEditAssigneeOnly) && !isCompleted && (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-7 w-7"
+                                onClick={() => openEdit(task)}
+                              >
+                                <Pencil className="h-3.5 w-3.5" />
+                              </Button>
+                            )}
+                            {canEditThisTask && !isCompleted && (
+                              <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-7 w-7 text-destructive hover:text-destructive"
+                                  >
+                                    <Trash2 className="h-3.5 w-3.5" />
+                                  </Button>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent>
+                                  <AlertDialogHeader>
+                                    <AlertDialogTitle>¿Eliminar tarea?</AlertDialogTitle>
+                                    <AlertDialogDescription>
+                                      Se eliminará &quot;{task.title}&quot;. Esta acción no se puede deshacer.
+                                    </AlertDialogDescription>
+                                  </AlertDialogHeader>
+                                  <AlertDialogFooter>
+                                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                    <AlertDialogAction
+                                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                      onClick={() => handleDeleteTask(task.id)}
+                                    >
+                                      Eliminar
+                                    </AlertDialogAction>
+                                  </AlertDialogFooter>
+                                </AlertDialogContent>
+                              </AlertDialog>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    }}
+                  />
+                )}
+
 
         {/* ── Create / Edit Task Dialog ── */}
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
@@ -960,6 +992,22 @@ export function ProjectTasksTab({
           task={validateDialog.task}
           siblings={tasks}
           onSuccess={invalidateAll}
+        />
+
+        {/* ── Complete Dialog ── */}
+        <TaskCompleteDialog
+          open={completeDialogOpen}
+          onOpenChange={setCompleteDialogOpen}
+          task={taskToComplete}
+          onSuccess={invalidateAll}
+        />
+
+        {/* ── History Dialog ── */}
+        <TaskHistoryDialog
+          open={historyDialogOpen}
+          onOpenChange={setHistoryDialogOpen}
+          taskId={taskForHistory?.id ?? null}
+          taskTitle={taskForHistory?.title ?? ""}
         />
       </>
     </TooltipProvider>
