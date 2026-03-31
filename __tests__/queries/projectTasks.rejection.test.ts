@@ -102,117 +102,131 @@ describe('createRejectionLoopTasks()', () => {
   it('5.1 — calls transaction.execute to shift order_index for tasks after N', async () => {
     // Step 1: db.execute returns task N (validation at order_index=3)
     // Step 1: db.execute returns task M (target at order_index=2)
+    // Step 2: db.execute returns range [M, N] (K=2)
     mockExecute
       .mockResolvedValueOnce(makeResult([{ id: 10, order_index: 3, task_flag: 'new', status: 'in_progress' }]))
-      .mockResolvedValueOnce(makeResult([{ id: 7, order_index: 2 }]));
+      .mockResolvedValueOnce(makeResult([{ id: 7, order_index: 2 }]))
+      .mockResolvedValueOnce(makeResult([
+        makeTargetTaskRow({ id: 7, order_index: 2 }), // task M
+        makeTaskRow({ id: 10, order_index: 3 }),       // task N
+      ]));
 
-    // transaction.execute calls:
-    // 1. shift order_index UPDATE
-    // 2. INSERT N+1 (correction clone of M) → returns correctionTaskId=101
-    // 3. INSERT N+2 (re-validation clone of N) → returns reValidationTaskId=102
-    // 4. UPDATE task N to completed
-    // 5. INSERT transition for N (in_progress → completed)
-    // 6. INSERT transition for N+1 (null → not_started)
-    // 7. INSERT transition for N+2 (null → not_started)
+    // transaction.execute calls (K=2):
+    // 1. shift order_index UPDATE (+K=2)
+    // 2. INSERT N+1 (clone of M) -> returns 101
+    // 3. Transition N+1 (null -> not_started)
+    // 4. INSERT N+2 (clone of N) -> returns 102
+    // 5. Transition N+2 (null -> waiting)
+    // 6. UPDATE task N to completed
+    // 7. Transition task N (in_progress -> completed)
     mockTransaction.execute
-      .mockResolvedValueOnce(makeResult([]))      // shift
-      .mockResolvedValueOnce(makeResult([{ id: 101 }]))  // INSERT N+1
-      .mockResolvedValueOnce(makeResult([{ id: 102 }]))  // INSERT N+2
-      .mockResolvedValueOnce(makeResult([]))      // UPDATE N to completed
-      .mockResolvedValueOnce(makeResult([]))      // transition N
-      .mockResolvedValueOnce(makeResult([]))      // transition N+1
-      .mockResolvedValueOnce(makeResult([]));     // transition N+2
+      .mockResolvedValueOnce(makeResult([]))            // shift
+      .mockResolvedValueOnce(makeResult([{ id: 101 }])) // INSERT N+1
+      .mockResolvedValueOnce(makeResult([]))            // transition N+1
+      .mockResolvedValueOnce(makeResult([{ id: 102 }])) // INSERT N+2
+      .mockResolvedValueOnce(makeResult([]))            // transition N+2
+      .mockResolvedValueOnce(makeResult([]))            // UPDATE N
+      .mockResolvedValueOnce(makeResult([]));           // transition N
 
-    // getProjectTaskById called for correctionTask (101) and reValidationTask (102)
+    // getProjectTaskById called for firstCorrectionTask (101)
     mockExecute
-      .mockResolvedValueOnce(makeResult([makeTaskRow({ id: 101, order_index: 4, task_flag: 'correction', status: 'not_started' })]))
-      .mockResolvedValueOnce(makeResult([makeTaskRow({ id: 102, order_index: 5, task_flag: 'correction', status: 'not_started', task_type: 'validation' })]));
+      .mockResolvedValueOnce(makeResult([makeTaskRow({ id: 101, order_index: 4, task_flag: 'correction', status: 'not_started' })]));
 
     await createRejectionLoopTasks(1, 10, 7, 5, 'needs fixes');
 
     // Verify shift query was called with correct project_id and order_index
     expect(mockTransaction.execute).toHaveBeenCalledWith(expect.objectContaining({
-      sql: expect.stringContaining('order_index = order_index + 2'),
-      args: expect.arrayContaining([1, 3]),  // projectId=1, N.order_index=3
+      sql: expect.stringContaining('order_index = order_index + $1'),
+      args: expect.arrayContaining([2, 1, 3]),  // K=2, projectId=1, N.order_index=3
     }));
   });
 
   it('5.1 — inserts correction task N+1 at order_index N+1 with flag=correction and status=not_started', async () => {
     mockExecute
       .mockResolvedValueOnce(makeResult([{ id: 10, order_index: 3, task_flag: 'new', status: 'in_progress' }]))
-      .mockResolvedValueOnce(makeResult([{ id: 7, order_index: 2 }]));
+      .mockResolvedValueOnce(makeResult([{ id: 7, order_index: 2 }]))
+      .mockResolvedValueOnce(makeResult([
+        makeTargetTaskRow({ id: 7, order_index: 2 }),
+        makeTaskRow({ id: 10, order_index: 3 }),
+      ]));
 
     mockTransaction.execute
-      .mockResolvedValueOnce(makeResult([]))
-      .mockResolvedValueOnce(makeResult([{ id: 101 }]))
-      .mockResolvedValueOnce(makeResult([{ id: 102 }]))
-      .mockResolvedValueOnce(makeResult([]))
-      .mockResolvedValueOnce(makeResult([]))
-      .mockResolvedValueOnce(makeResult([]))
-      .mockResolvedValueOnce(makeResult([]));
+      .mockResolvedValueOnce(makeResult([]))            // shift
+      .mockResolvedValueOnce(makeResult([{ id: 101 }])) // INSERT N+1
+      .mockResolvedValueOnce(makeResult([]))            // transition N+1
+      .mockResolvedValueOnce(makeResult([{ id: 102 }])) // INSERT N+2
+      .mockResolvedValueOnce(makeResult([]))            // transition N+2
+      .mockResolvedValueOnce(makeResult([]))            // UPDATE N
+      .mockResolvedValueOnce(makeResult([]));           // transition N
 
     mockExecute
-      .mockResolvedValueOnce(makeResult([makeTaskRow({ id: 101, order_index: 4 })]))
-      .mockResolvedValueOnce(makeResult([makeTaskRow({ id: 102, order_index: 5 })]));
+      .mockResolvedValueOnce(makeResult([makeTaskRow({ id: 101, order_index: 4 })]));
 
     await createRejectionLoopTasks(1, 10, 7, 5);
 
-    // The second transaction.execute call is INSERT N+1 with order_index=4 (3+1) and targetTaskId=7
+    // The second transaction.execute call is INSERT N+1 with order_index=4 (3+1) and projectId=1
+    // (Note: we check if it contains correction flag and correct order_index)
     expect(mockTransaction.execute).toHaveBeenNthCalledWith(2, expect.objectContaining({
       sql: expect.stringContaining("'correction'"),
-      args: expect.arrayContaining([4, 7]),  // order_index=N+1=4, targetTaskId=7
+      args: expect.arrayContaining([1, 4]),  // projectId=1, order_index=N+1=4
     }));
   });
 
-  it('5.1 — inserts re-validation task N+2 at order_index N+2 (clone of N) with type=validation and flag=correction', async () => {
+  it('5.1 — inserts re-validation task N+2 at order_index N+2 (clone of N) with status=waiting and flag=correction', async () => {
     mockExecute
       .mockResolvedValueOnce(makeResult([{ id: 10, order_index: 3, task_flag: 'new', status: 'in_progress' }]))
-      .mockResolvedValueOnce(makeResult([{ id: 7, order_index: 2 }]));
+      .mockResolvedValueOnce(makeResult([{ id: 7, order_index: 2 }]))
+      .mockResolvedValueOnce(makeResult([
+        makeTargetTaskRow({ id: 7, order_index: 2 }),
+        makeTaskRow({ id: 10, order_index: 3 }),
+      ]));
 
     mockTransaction.execute
-      .mockResolvedValueOnce(makeResult([]))
-      .mockResolvedValueOnce(makeResult([{ id: 101 }]))
-      .mockResolvedValueOnce(makeResult([{ id: 102 }]))
-      .mockResolvedValueOnce(makeResult([]))
-      .mockResolvedValueOnce(makeResult([]))
-      .mockResolvedValueOnce(makeResult([]))
-      .mockResolvedValueOnce(makeResult([]));
+      .mockResolvedValueOnce(makeResult([]))            // shift
+      .mockResolvedValueOnce(makeResult([{ id: 101 }])) // INSERT N+1
+      .mockResolvedValueOnce(makeResult([]))            // transition N+1
+      .mockResolvedValueOnce(makeResult([{ id: 102 }])) // INSERT N+2
+      .mockResolvedValueOnce(makeResult([]))            // transition N+2
+      .mockResolvedValueOnce(makeResult([]))            // UPDATE N
+      .mockResolvedValueOnce(makeResult([]));           // transition N
 
     mockExecute
-      .mockResolvedValueOnce(makeResult([makeTaskRow({ id: 101, order_index: 4 })]))
-      .mockResolvedValueOnce(makeResult([makeTaskRow({ id: 102, order_index: 5 })]));
+      .mockResolvedValueOnce(makeResult([makeTaskRow({ id: 101, order_index: 4 })]));
 
     await createRejectionLoopTasks(1, 10, 7, 5);
 
-    // Third transaction.execute call: INSERT N+2 with order_index=5 (3+2) and taskId=10 (N)
-    expect(mockTransaction.execute).toHaveBeenNthCalledWith(3, expect.objectContaining({
-      sql: expect.stringContaining("'validation'"),
-      args: expect.arrayContaining([5, 10]),  // order_index=N+2=5, rejectedValidationTaskId=10
+    // Fourth transaction.execute call: INSERT N+2 with order_index=5 (3+2) and status=waiting
+    expect(mockTransaction.execute).toHaveBeenNthCalledWith(4, expect.objectContaining({
+      sql: expect.stringContaining("'correction'"),
+      args: expect.arrayContaining([5, 'waiting']),  // order_index=N+2=5, status=waiting
     }));
   });
 
   it('5.1 — marks task N as completed inside the transaction', async () => {
     mockExecute
       .mockResolvedValueOnce(makeResult([{ id: 10, order_index: 3, task_flag: 'new', status: 'in_progress' }]))
-      .mockResolvedValueOnce(makeResult([{ id: 7, order_index: 2 }]));
+      .mockResolvedValueOnce(makeResult([{ id: 7, order_index: 2 }]))
+      .mockResolvedValueOnce(makeResult([
+        makeTargetTaskRow({ id: 7, order_index: 2 }),
+        makeTaskRow({ id: 10, order_index: 3 }),
+      ]));
 
     mockTransaction.execute
-      .mockResolvedValueOnce(makeResult([]))
-      .mockResolvedValueOnce(makeResult([{ id: 101 }]))
-      .mockResolvedValueOnce(makeResult([{ id: 102 }]))
-      .mockResolvedValueOnce(makeResult([]))
-      .mockResolvedValueOnce(makeResult([]))
-      .mockResolvedValueOnce(makeResult([]))
-      .mockResolvedValueOnce(makeResult([]));
+      .mockResolvedValueOnce(makeResult([]))            // shift
+      .mockResolvedValueOnce(makeResult([{ id: 101 }])) // INSERT N+1
+      .mockResolvedValueOnce(makeResult([]))            // transition N+1
+      .mockResolvedValueOnce(makeResult([{ id: 102 }])) // INSERT N+2
+      .mockResolvedValueOnce(makeResult([]))            // transition N+2
+      .mockResolvedValueOnce(makeResult([]))            // UPDATE N
+      .mockResolvedValueOnce(makeResult([]));           // transition N
 
     mockExecute
-      .mockResolvedValueOnce(makeResult([makeTaskRow({ id: 101 })]))
-      .mockResolvedValueOnce(makeResult([makeTaskRow({ id: 102 })]));
+      .mockResolvedValueOnce(makeResult([makeTaskRow({ id: 101 })]));
 
     await createRejectionLoopTasks(1, 10, 7, 5);
 
-    // Fourth transaction.execute: UPDATE task N to completed
-    expect(mockTransaction.execute).toHaveBeenNthCalledWith(4, expect.objectContaining({
+    // Sixth transaction.execute: UPDATE task N to completed
+    expect(mockTransaction.execute).toHaveBeenNthCalledWith(6, expect.objectContaining({
       sql: expect.stringContaining("status = 'completed'"),
       args: expect.arrayContaining([10]),  // taskId = N = 10
     }));
@@ -221,13 +235,16 @@ describe('createRejectionLoopTasks()', () => {
   it('5.1 — commits the transaction on success', async () => {
     mockExecute
       .mockResolvedValueOnce(makeResult([{ id: 10, order_index: 3, task_flag: 'new', status: 'in_progress' }]))
-      .mockResolvedValueOnce(makeResult([{ id: 7, order_index: 2 }]));
+      .mockResolvedValueOnce(makeResult([{ id: 7, order_index: 2 }]))
+      .mockResolvedValueOnce(makeResult([
+        makeTargetTaskRow({ id: 7, order_index: 2 }),
+        makeTaskRow({ id: 10, order_index: 3 }),
+      ]));
 
     mockTransaction.execute
       .mockResolvedValue(makeResult([{ id: 99 }]));
 
     mockExecute
-      .mockResolvedValueOnce(makeResult([makeTaskRow({ id: 99 })]))
       .mockResolvedValueOnce(makeResult([makeTaskRow({ id: 99 })]));
 
     await createRejectionLoopTasks(1, 10, 7, 5);
