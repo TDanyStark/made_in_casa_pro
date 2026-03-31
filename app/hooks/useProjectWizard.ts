@@ -36,6 +36,8 @@ export interface WizardState {
   brand_name: string;
   client_id: number | null;
   client_name: string;
+  created_by: number | null;
+  created_by_name: string;
 
   // Manager auto-assigned from brand (not manually selected)
   manager_id: number | null;
@@ -71,6 +73,8 @@ const INITIAL_STATE: WizardState = {
   brand_name: "",
   client_id: null,
   client_name: "",
+  created_by: null,
+  created_by_name: "",
   manager_id: null,
   manager_name: "",
   manager_email: "",

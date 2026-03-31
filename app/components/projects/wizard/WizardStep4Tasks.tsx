@@ -284,7 +284,17 @@ export function WizardStep4Tasks({ state, onNext, onBack, update }: Props) {
       return;
     }
 
-    if (initialized.current) return;
+    if (initialized.current && localTasks.length > 0) {
+      // If already initialized but name was fallback, update names
+      const hasFallbackName = localTasks.some(t => t.assign_to_commercial === 1 && t.assigned_user_name === "Comercial del proyecto");
+      if (hasFallbackName && state.created_by_name) {
+        setLocalTasks(prev => prev.map(t => 
+          t.assign_to_commercial === 1 ? { ...t, assigned_user_name: state.created_by_name } : t
+        ));
+      }
+      return;
+    }
+    
     if (users.length === 0) return; // Wait for users to be loaded to resolve auto-assignees
     initialized.current = true;
 
@@ -298,9 +308,9 @@ export function WizardStep4Tasks({ state, onNext, onBack, update }: Props) {
         const u = users.find((u) => u.id === task.assigned_user_id);
         return { id: u?.id ?? null, name: u?.name ?? null };
       }
-      // 2. Assign to commercial
+      // 2. Assign to commercial (the user who creates the project)
       if (task.assign_to_commercial === 1) {
-        return { id: null, name: state.manager_name }; // id is null because it's dynamic but we show the name
+        return { id: null, name: state.created_by_name || "Comercial del proyecto" };
       }
       // 3. Area-based auto assign
       if (task.area_id) {
@@ -377,7 +387,7 @@ export function WizardStep4Tasks({ state, onNext, onBack, update }: Props) {
       const minId = Math.min(...state.extra_tasks.map(e => e.localId));
       if (minId < 0) nextLocalId.current = minId - 1;
     }
-  }, [templates, users, state.task_overrides, state.extra_tasks, state.removed_template_ids]);
+  }, [templates, users, state.task_overrides, state.extra_tasks, state.removed_template_ids, state.created_by_name]);
 
   // Sync state to wizard — called on every meaningful change
   const syncWizardState = (tasks: LocalTask[], removedIds: number[]) => {
@@ -548,7 +558,7 @@ export function WizardStep4Tasks({ state, onNext, onBack, update }: Props) {
                     let resolvedName = userName;
                     if (!userId) {
                       if (assignToComm === 1) {
-                        resolvedName = state.manager_name;
+                        resolvedName = state.created_by_name || "Comercial del proyecto";
                       } else if (task.area_id) {
                         const areaUsers = users.filter(u => u.area_id === task.area_id && u.rol_id === 4 && u.is_internal === 1);
                         if (areaUsers.length > 0) {
