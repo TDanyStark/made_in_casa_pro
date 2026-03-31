@@ -129,13 +129,17 @@ export async function createProjectTask(data: {
     throw new Error("Una tarea de validación no puede ser la primera tarea del proyecto.");
   }
   try {
+    const status = data.status ?? (data.order_index === 0 ? "not_started" : "waiting");
+    const assignedUserId = data.assigned_user_id ?? null;
+    const assignedAt = (status === "not_started" && assignedUserId) ? new Date() : null;
+
     const result = await db.execute({
       sql: `
         INSERT INTO project_tasks
           (project_id, template_id, title, description,
            area_id, assigned_user_id, status, task_type, task_flag,
-           requires_quote, assign_to_commercial, order_index)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+           requires_quote, assign_to_commercial, order_index, assigned_at)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
         RETURNING id
       `,
       args: [
@@ -144,13 +148,14 @@ export async function createProjectTask(data: {
         data.title,
         data.description ?? null,
         data.area_id ?? null,
-        data.assigned_user_id ?? null,
-        data.status ?? (data.order_index === 0 ? "not_started" : "waiting"),
+        assignedUserId,
+        status,
         data.task_type ?? "execution",
         data.task_flag ?? "new",
         data.requires_quote ?? 0,
         data.assign_to_commercial ?? 0,
         data.order_index,
+        assignedAt,
       ],
     });
     const id = Number(result.rows[0]?.id);
@@ -838,14 +843,15 @@ export async function instantiateTasksFromTemplates(
 
         // First task ready to start, all others wait their turn
         const status: ProjectTaskStatus = i === 0 ? "not_started" : "waiting";
+        const assignedAt = (status === "not_started" && assignedTo) ? new Date() : null;
 
         const insertResult = await transaction.execute({
           sql: `
             INSERT INTO project_tasks
               (project_id, template_id, title, description,
                area_id, assigned_user_id, status, task_type, task_flag,
-               requires_quote, assign_to_commercial, order_index)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'new', $9, $10, $11)
+               requires_quote, assign_to_commercial, order_index, assigned_at)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'new', $9, $10, $11, $12)
             RETURNING id
           `,
           args: [
@@ -860,6 +866,7 @@ export async function instantiateTasksFromTemplates(
             tpl.requires_quote ?? 0,
             tpl.assign_to_commercial ?? 0,
             tpl.order_index,
+            assignedAt,
           ],
         });
 
