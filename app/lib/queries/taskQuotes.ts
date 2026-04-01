@@ -308,7 +308,7 @@ export async function acceptQuote(
     await transaction.execute({
       sql: `
         UPDATE project_tasks
-        SET assigned_user_id = $1, status = 'not_started', updated_at = CURRENT_TIMESTAMP
+        SET assigned_user_id = $1, status = 'not_started', updated_at = CURRENT_TIMESTAMP, assigned_at = CURRENT_TIMESTAMP
         WHERE id = $2
       `,
       args: [quote.user_id, quote.task_id],
@@ -318,7 +318,7 @@ export async function acceptQuote(
     await transaction.execute({
       sql: `
         INSERT INTO task_transitions (task_id, project_id, from_status, to_status, from_flag, to_flag, moved_by, notes)
-        VALUES ($1, $2, $3, 'in_progress', $4, $4, $5, 'Cotización aceptada, colaborador externo asignado')
+        VALUES ($1, $2, $3, 'not_started', $4, $4, $5, 'Cotización aceptada, colaborador externo asignado')
       `,
       args: [quote.task_id, task.project_id, task.status, task.task_flag, acceptedBy],
     });
