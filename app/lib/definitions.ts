@@ -298,6 +298,51 @@ export type TaskCommandCenterFilters = {
   completedTo?: Date;
 };
 
+export type MyTaskRowPaginated = {
+  // Core task
+  id: number;
+  title: string;
+  description: string | null;
+  project_id: number;
+  area_id: number | null;
+  area_name: string | null;
+  assigned_user_id: number | null;
+  assigned_user_name: string | null;
+  assigned_user_rol_id: number | null;
+  status: ProjectTaskStatus;
+  task_type: TaskType;
+  task_flag: TaskFlag;
+  adjustment_id: number | null;
+  requires_quote: number;
+  assign_to_commercial: number;
+  order_index: number;
+  assigned_at: string | null;
+  completed_at: string | null;
+  created_at: string;
+  updated_at: string;
+  quoter_ids?: number[];
+  quote_count?: number;
+  pending_quote_count?: number;
+  // Joined fields
+  project_title: string;
+  product_name: string | null;
+  brand_id: number | null;
+  brand_name: string | null;
+  creator_user_id: number | null;
+  creator_user_name: string | null;
+};
+
+export type MyTasksFilters = {
+  page?: number;
+  limit?: number;
+  statuses?: ProjectTaskStatus[];
+  brandId?: number;
+  creatorUserId?: number;
+  assignedFrom?: Date;
+  assignedTo?: Date;
+  q?: string;
+};
+
 export type TaskCommandCenterRow = {
   id: number;
   title: string;

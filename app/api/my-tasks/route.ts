@@ -1,13 +1,32 @@
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
+import { ITEMS_PER_PAGE } from "@/config/constants";
 import { validateApiRole, validateHttpMethod } from "@/lib/services/api-auth";
 import { UserRole } from "@/lib/definitions";
-import { getMyTasks } from "@/lib/queries/projectTasks";
+import { getMyTasksWithPagination } from "@/lib/queries/projectTasks";
 import { decrypt } from "@/lib/session";
 import { cookies } from "next/headers";
 
+const querySchema = z.object({
+  page: z.coerce.number().int().positive().default(1),
+  statuses: z
+    .array(
+      z.enum(["not_started", "waiting", "in_progress", "completed", "blocked"])
+    )
+    .optional()
+    .transform((v) =>
+      v && v.length > 0 ? Array.from(new Set(v)) : undefined
+    ),
+  brandId: z.coerce.number().int().positive().optional(),
+  creatorUserId: z.coerce.number().int().positive().optional(),
+  assignedFrom: z.string().datetime({ offset: true }).optional(),
+  assignedTo: z.string().datetime({ offset: true }).optional(),
+  q: z.string().min(1).optional(),
+});
+
 /**
  * GET /api/my-tasks
- * Returns all active tasks assigned to the current user.
+ * Returns paginated tasks assigned to the current user, with optional filters.
  * Used for the collaborator dashboard.
  */
 export async function GET(request: NextRequest) {
@@ -15,7 +34,10 @@ export async function GET(request: NextRequest) {
   if (!methodValidation.isValidMethod) return methodValidation.response;
 
   const roleValidation = await validateApiRole(request, [
-    UserRole.ADMIN, UserRole.DIRECTIVO, UserRole.COMERCIAL, UserRole.COLABORADOR,
+    UserRole.ADMIN,
+    UserRole.DIRECTIVO,
+    UserRole.COMERCIAL,
+    UserRole.COLABORADOR,
   ]);
   if (!roleValidation.isAuthorized) return roleValidation.response;
 
@@ -26,8 +48,48 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "No autenticado" }, { status: 401 });
     }
 
-    const tasks = await getMyTasks(session.id);
-    return NextResponse.json(tasks);
+    const url = new URL(request.url);
+    const statusValues = url.searchParams.getAll("status");
+    const rawQuery = {
+      ...Object.fromEntries(url.searchParams.entries()),
+      statuses: statusValues.length > 0 ? statusValues : undefined,
+    };
+
+    const parsed = querySchema.safeParse(rawQuery);
+
+    if (!parsed.success) {
+      return NextResponse.json(
+        {
+          error: "Parámetros de consulta inválidos",
+          details: parsed.error.format(),
+        },
+        { status: 400 }
+      );
+    }
+
+    const query = parsed.data;
+    const limit = ITEMS_PER_PAGE;
+
+    const { tasks, total } = await getMyTasksWithPagination({
+      userId: session.id,
+      page: query.page,
+      limit,
+      statuses: query.statuses,
+      brandId: query.brandId,
+      creatorUserId: query.creatorUserId,
+      assignedFrom: query.assignedFrom ? new Date(query.assignedFrom) : undefined,
+      assignedTo: query.assignedTo ? new Date(query.assignedTo) : undefined,
+      q: query.q,
+    });
+
+    const pageCount = Math.ceil(total / limit);
+
+    return NextResponse.json({
+      data: tasks,
+      pageCount,
+      currentPage: query.page,
+      total,
+    });
   } catch (error) {
     console.error("Error fetching my tasks:", error);
     return NextResponse.json({ error: "Error al obtener tareas" }, { status: 500 });

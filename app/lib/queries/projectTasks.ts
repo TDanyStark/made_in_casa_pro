@@ -8,6 +8,8 @@ import {
   TaskTransitionType,
   TaskCommandCenterFilters,
   TaskCommandCenterRow,
+  MyTaskRowPaginated,
+  MyTasksFilters,
   UserRole,
 } from "../definitions";
 import { buildPaginationArgs, buildWhereClause, parseTotal } from "../db/query-helpers";
@@ -990,7 +992,6 @@ export async function getMyTasks(userId: number): Promise<ProjectTaskType[]> {
         SELECT
           pt.id,
           pt.project_id,
-          pt.project_product_id,
           pt.template_id,
           pt.title,
           pt.description,
@@ -1008,18 +1009,14 @@ export async function getMyTasks(userId: number): Promise<ProjectTaskType[]> {
           pt.created_at,
           pt.updated_at,
           p.title           AS project_title,
-          pr.product_name,
+          pr.name           AS product_name,
           0                 AS quote_count,
           0                 AS pending_quote_count
         FROM project_tasks pt
         LEFT JOIN areas a            ON pt.area_id           = a.id
         LEFT JOIN users u            ON pt.assigned_user_id  = u.id
         LEFT JOIN projects p         ON pt.project_id        = p.id
-        LEFT JOIN (
-          SELECT pp.id, pr2.name AS product_name
-          FROM project_products pp
-          JOIN products pr2 ON pp.product_id = pr2.id
-        ) pr ON pt.project_product_id = pr.id
+        LEFT JOIN products pr        ON p.product_id         = pr.id
         WHERE pt.assigned_user_id = $1
           AND pt.status IN ('in_progress', 'not_started', 'blocked')
         ORDER BY pt.status = 'in_progress' DESC, pt.updated_at DESC
@@ -1044,6 +1041,172 @@ export async function logTaskTransition(
   notes?: string | null
 ): Promise<void> {
   return logTransition(taskId, projectId, fromStatus, toStatus, fromFlag, toFlag, movedBy, notes);
+}
+
+// ─── My Tasks — paginated ─────────────────────────────────────────────────────
+
+const DEFAULT_MY_TASK_STATUSES: ProjectTaskStatus[] = [
+  "not_started",
+  "in_progress",
+  "blocked",
+  "waiting",
+];
+
+export async function getMyTasksWithPagination(
+  filters: MyTasksFilters & { userId: number }
+): Promise<{ tasks: MyTaskRowPaginated[]; total: number }> {
+  try {
+    const {
+      userId,
+      page = 1,
+      limit = ITEMS_PER_PAGE,
+      statuses,
+      brandId,
+      creatorUserId,
+      assignedFrom,
+      assignedTo,
+      q,
+    } = filters;
+
+    const resolvedStatuses =
+      statuses && statuses.length > 0
+        ? Array.from(new Set(statuses))
+        : DEFAULT_MY_TASK_STATUSES;
+
+    // Build base args + handle the OR search manually before buildWhereClause
+    const baseArgs: unknown[] = [];
+    const extraClauses: string[] = [];
+
+    // Handle q (search) manually — two columns share the same $N placeholder
+    if (q) {
+      const pct = `%${q}%`;
+      baseArgs.push(pct);
+      extraClauses.push(
+        `(pt.title ILIKE $${baseArgs.length} OR p.title ILIKE $${baseArgs.length})`
+      );
+    }
+
+    // Build remaining WHERE conditions via buildWhereClause
+    const conditions: Array<{ sql: string; value: unknown }> = [
+      { sql: "pt.assigned_user_id = $", value: userId },
+      { sql: "pt.status = ANY($)", value: resolvedStatuses },
+      { sql: "p.brand_id = $", value: brandId },
+      { sql: "p.created_by = $", value: creatorUserId },
+      { sql: "pt.assigned_at >= $", value: assignedFrom },
+      { sql: "pt.assigned_at <= $", value: assignedTo },
+    ];
+
+    const { whereSQL: dynamicWhereSQL, args: whereArgs } = buildWhereClause(conditions);
+    const dynamicClauses = dynamicWhereSQL
+      .replace(/^\s*WHERE\s*/i, "")
+      .split(" AND ")
+      .filter(Boolean)
+      .map((clause) =>
+        clause.replace(/\$(\d+)/g, (_, idx) => `$${Number(idx) + baseArgs.length}`)
+      );
+
+    const dynamicArgs: unknown[] = [...baseArgs, ...whereArgs];
+    const whereParts = [...extraClauses, ...dynamicClauses];
+    const whereSQL = whereParts.length > 0 ? ` WHERE ${whereParts.join(" AND ")}` : "";
+
+    // Count query (lighter JOINs: only what WHERE clause references)
+    const countQuery = db.execute({
+      sql: `
+        SELECT COUNT(*) AS count
+        FROM project_tasks pt
+        INNER JOIN projects p     ON p.id = pt.project_id
+        LEFT JOIN brands b        ON b.id = p.brand_id
+        LEFT JOIN users creator   ON creator.id = p.created_by
+        ${whereSQL}
+      `,
+      args: dynamicArgs,
+    });
+
+    const { limitPH, offsetPH, paginationArgs } = buildPaginationArgs(
+      dynamicArgs,
+      page,
+      limit
+    );
+
+    // Main data query (full JOIN set)
+    const dataQuery = db.execute({
+      sql: `
+        SELECT
+          pt.id,
+          pt.title,
+          pt.description,
+          pt.project_id,
+          p.title              AS project_title,
+          pr.name              AS product_name,
+          b.name               AS brand_name,
+          b.id                 AS brand_id,
+          creator.id           AS creator_user_id,
+          creator.name         AS creator_user_name,
+          pt.assigned_user_id,
+          u.name               AS assigned_user_name,
+          u.rol_id             AS assigned_user_rol_id,
+          pt.area_id,
+          a.name               AS area_name,
+          pt.status,
+          pt.task_type,
+          pt.task_flag,
+          pt.requires_quote,
+          pt.assign_to_commercial,
+          pt.order_index,
+          pt.adjustment_id,
+          pt.assigned_at,
+          pt.completed_at,
+          pt.created_at,
+          pt.updated_at,
+          (SELECT json_agg(user_id) FROM task_quote_invitations WHERE task_id = pt.id) AS quoter_ids,
+          (SELECT COUNT(*) FROM task_quotes tq WHERE tq.task_id = pt.id)               AS quote_count,
+          (SELECT COUNT(*) FROM task_quotes tq WHERE tq.task_id = pt.id AND tq.status = 'pending') AS pending_quote_count
+        FROM project_tasks pt
+        INNER JOIN projects p     ON p.id = pt.project_id
+        LEFT JOIN products pr     ON pr.id = p.product_id
+        LEFT JOIN brands b        ON b.id = p.brand_id
+        LEFT JOIN users creator   ON creator.id = p.created_by
+        LEFT JOIN users u         ON u.id = pt.assigned_user_id
+        LEFT JOIN areas a         ON a.id = pt.area_id
+        ${whereSQL}
+        ORDER BY
+          CASE pt.status
+            WHEN 'in_progress' THEN 0
+            WHEN 'not_started' THEN 1
+            WHEN 'blocked'     THEN 2
+            WHEN 'waiting'     THEN 3
+            WHEN 'completed'   THEN 4
+          END ASC,
+          COALESCE(pt.assigned_at, pt.created_at) DESC
+        LIMIT ${limitPH} OFFSET ${offsetPH}
+      `,
+      args: [...dynamicArgs, ...paginationArgs],
+    });
+
+    const [countResult, dataResult] = await Promise.all([countQuery, dataQuery]);
+
+    const total = parseTotal(countResult.rows as Record<string, unknown>[]);
+
+    const tasks = (dataResult.rows as unknown as MyTaskRowPaginated[]).map((task) => {
+      if (typeof (task as unknown as { quoter_ids: unknown }).quoter_ids === "string") {
+        try {
+          task.quoter_ids = JSON.parse(
+            (task as unknown as { quoter_ids: string }).quoter_ids
+          );
+        } catch {
+          task.quoter_ids = [];
+        }
+      } else if (!(task as unknown as { quoter_ids: unknown }).quoter_ids) {
+        task.quoter_ids = [];
+      }
+      return task;
+    });
+
+    return { tasks, total };
+  } catch (error) {
+    console.error("Error fetching my tasks with pagination:", error);
+    return { tasks: [], total: 0 };
+  }
 }
 
 export async function getTasksCommandCenterWithPagination({

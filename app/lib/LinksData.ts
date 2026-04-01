@@ -37,7 +37,7 @@ export const links: LinksType[] = [
     name: 'Mis Cotizaciones',
     route: '/my-quotes',
     icon: Receipt,
-    roles: [UserRole.ADMIN, UserRole.COMERCIAL, UserRole.DIRECTIVO, UserRole.COLABORADOR]
+    roles: [UserRole.COLABORADOR]
   },
   { 
     name: 'Tareas', 

@@ -534,7 +534,7 @@ El núcleo central de la aplicación. Organiza la ejecución de productos (servi
 **¿Qué se puede hacer?**
 - ✅ Crear proyectos mediante un wizard multi-paso con vista previa en tiempo real
 - ✅ Asociar proyecto a una marca → gerente principal → co-responsables opcionales
-- ✅ Agregar productos al proyecto (instancia automáticamente las tareas desde `product_task_templates`)
+- ✅ Asociar un producto al proyecto (instancia automáticamente las tareas desde `product_task_templates`)
 - ✅ Asignación automática de tareas al colaborador interno con menor carga
 - ✅ Asociar proyecto a una campaña (creatable inline con React Select async)
 - ✅ Crear carpetas en Google Drive con estructura: `Made In Casa/{cliente}/{marca}/{proyecto}/{producto}/`
@@ -559,9 +559,6 @@ El núcleo central de la aplicación. Organiza la ejecución de productos (servi
 - `DELETE /api/projects/[id]` — eliminar
 - `POST /api/projects/[id]/managers` — agregar co-responsable
 - `DELETE /api/projects/[id]/managers` — quitar co-responsable
-- `GET /api/projects/[id]/products` — productos del proyecto
-- `POST /api/projects/[id]/products` — agregar producto + instanciar tareas
-- `DELETE /api/projects/[id]/products/[pid]` — quitar producto
 - `GET /api/projects/[id]/tasks` — todas las tareas del proyecto
 - `POST /api/projects/[id]/tasks` — crear tarea manual
 - `PATCH /api/projects/[id]/tasks/[tid]` — actualizar estado/asignación
@@ -572,9 +569,8 @@ El núcleo central de la aplicación. Organiza la ejecución de productos (servi
 
 **Tablas de base de datos:**
 - `campaigns` — campañas (nombre, fecha)
-- `projects` — proyectos con FK a brand, manager, campaign; campos drive, notes, status, progress
+- `projects` — proyectos con FK a brand, manager, campaign, product; campos drive, notes, status, progress
 - `project_managers` — join table de co-responsables
-- `project_products` — productos asignados al proyecto
 - `project_tasks` — instancias de tareas (heredadas de templates o manuales)
 
 **Variable de entorno requerida:**
