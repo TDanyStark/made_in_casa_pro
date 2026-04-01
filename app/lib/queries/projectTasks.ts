@@ -37,6 +37,7 @@ const TASK_SELECT = `
   pt.assigned_at,
   pt.completed_at,
   pt.adjustment_id,
+  (SELECT '[' || group_concat(user_id) || ']' FROM task_quote_invitations WHERE task_id = pt.id) AS quoter_ids,
   (SELECT COUNT(*) FROM task_quotes tq WHERE tq.task_id = pt.id) AS quote_count,
   (SELECT COUNT(*) FROM task_quotes tq WHERE tq.task_id = pt.id AND tq.status = 'pending') AS pending_quote_count
 `;
@@ -56,7 +57,17 @@ export async function getProjectTaskById(id: number): Promise<ProjectTaskType | 
       args: [id],
     });
     if (result.rows.length === 0) return null;
-    return result.rows[0] as unknown as ProjectTaskType;
+    const task = result.rows[0] as unknown as ProjectTaskType;
+    if (typeof (task as any).quoter_ids === "string") {
+      try {
+        task.quoter_ids = JSON.parse((task as any).quoter_ids);
+      } catch {
+        task.quoter_ids = [];
+      }
+    } else if (!(task as any).quoter_ids) {
+      task.quoter_ids = [];
+    }
+    return task;
   } catch (error) {
     console.error("Error fetching project task by ID:", error);
     return null;
@@ -85,7 +96,19 @@ export async function getTasksByProject(projectId: number, adjustmentId?: number
       `,
       args,
     });
-    return result.rows as unknown as ProjectTaskType[];
+    const tasks = result.rows as unknown as ProjectTaskType[];
+    for (const task of tasks) {
+      if (typeof (task as any).quoter_ids === "string") {
+        try {
+          task.quoter_ids = JSON.parse((task as any).quoter_ids);
+        } catch {
+          task.quoter_ids = [];
+        }
+      } else if (!(task as any).quoter_ids) {
+        task.quoter_ids = [];
+      }
+    }
+    return tasks;
   } catch (error) {
     console.error("Error fetching tasks by project:", error);
     return [];
@@ -835,7 +858,8 @@ export async function instantiateTasksFromTemplates(
   projectId: number,
   productId: number,
   commercialUserId?: number | null,
-  adjustmentId?: number | null
+  adjustmentId?: number | null,
+  invitedBy?: number | null
 ): Promise<void> {
   try {
     const templates = await db.execute({
@@ -879,8 +903,14 @@ export async function instantiateTasksFromTemplates(
         }
 
         // First task ready to start, all others wait their turn
-        const status: ProjectTaskStatus = i === 0 ? "not_started" : "waiting";
-        const assignedAt = (status === "not_started" && assignedTo) ? new Date() : null;
+        let status: ProjectTaskStatus = i === 0 ? "not_started" : "waiting";
+        const isBlockedByQuote = status === "not_started" && Number(tpl.requires_quote) === 1 && !assignedTo;
+        
+        if (isBlockedByQuote) {
+          status = "blocked";
+        }
+
+        const assignedAt = (status === "not_started" || status === "blocked") && assignedTo ? new Date() : null;
 
         const insertResult = await transaction.execute({
           sql: `
@@ -908,9 +938,10 @@ export async function instantiateTasksFromTemplates(
           ],
         });
 
+        const newTaskId = Number(insertResult.rows[0]?.id);
+
         // Copy pre-configured quoters to task_quote_invitations
         if (Number(tpl.requires_quote) === 1) {
-          const newTaskId = Number(insertResult.rows[0]?.id);
           const templateQuoters = await db.execute({
             sql: `SELECT user_id FROM product_task_template_quoters WHERE template_id = $1`,
             args: [tpl.id],
@@ -919,10 +950,19 @@ export async function instantiateTasksFromTemplates(
             await transaction.execute({
               sql: `
                 INSERT INTO task_quote_invitations (task_id, user_id, invited_by)
-                VALUES ($1, $2, NULL)
+                VALUES ($1, $2, $3)
                 ON CONFLICT (task_id, user_id) DO NOTHING
               `,
-              args: [newTaskId, (row as { user_id: number }).user_id],
+              args: [newTaskId, (row as { user_id: number }).user_id, invitedBy ?? null],
+            });
+          }
+
+          // Log transition if blocked
+          if (isBlockedByQuote && invitedBy) {
+            await transaction.execute({
+              sql: `INSERT INTO task_transitions (task_id, project_id, from_status, to_status, from_flag, to_flag, moved_by, notes)
+                    VALUES ($1, $2, NULL, $3, NULL, 'new', $4, $5)`,
+              args: [newTaskId, projectId, "blocked", invitedBy, "Requiere cotización de colaborador externo"],
             });
           }
         }

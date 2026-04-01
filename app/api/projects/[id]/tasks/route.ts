@@ -5,6 +5,8 @@ import { UserRole } from "@/lib/definitions";
 import { getTasksByProject, createProjectTask, resolveProjectTaskAssignment } from "@/lib/queries/projectTasks";
 import { recalculateProjectProgress } from "@/lib/queries/projects";
 import { db } from "@/lib/db";
+import { cookies } from "next/headers";
+import { decrypt } from "@/lib/session";
 
 const taskSchema = z.object({
   title: z.string().min(1, "El título es requerido"),
@@ -17,6 +19,7 @@ const taskSchema = z.object({
   requires_quote: z.coerce.number().int().min(0).max(1).optional().default(0),
   assign_to_commercial: z.coerce.number().int().min(0).max(1).optional().default(0),
   adjustment_id: z.coerce.number().int().positive().optional().nullable(),
+  quoter_ids: z.array(z.coerce.number().int().positive()).optional().default([]),
 });
 
 type Params = { params: Promise<{ id: string }> };
@@ -95,13 +98,23 @@ export async function POST(request: NextRequest, { params }: Params) {
       assign_to_commercial: validation.data.assign_to_commercial,
     });
     
+    // 4. Determine status based on requires_quote
+    let initialStatus = validation.data.status ?? (nextOrder === 0 ? "not_started" : "waiting");
+    const isBlockedByQuote = (initialStatus === "not_started" || initialStatus === "in_progress") && 
+                             Number(validation.data.requires_quote) === 1 && 
+                             !resolvedAssignedUserId;
+    
+    if (isBlockedByQuote) {
+      initialStatus = "blocked";
+    }
+
     const task = await createProjectTask({
       project_id: projectId,
       title: validation.data.title,
       description: validation.data.description ?? null,
       area_id: validation.data.area_id ?? null,
       assigned_user_id: resolvedAssignedUserId,
-      status: validation.data.status,
+      status: initialStatus as any,
       task_type: validation.data.task_type ?? "execution",
       task_flag: validation.data.task_flag ?? "new",
       requires_quote: validation.data.requires_quote ?? 0,
@@ -109,6 +122,37 @@ export async function POST(request: NextRequest, { params }: Params) {
       order_index: nextOrder,
       adjustment_id: adjustmentId,
     });
+
+    // 5. Handle quoter invitations and transition log
+    const cookie = (await cookies()).get("session")?.value;
+    const session = cookie ? await decrypt(cookie) : null;
+    const currentUserId = session?.id ? Number(session.id) : null;
+
+    if (validation.data.quoter_ids.length > 0 || isBlockedByQuote) {
+      const transaction = await db.transaction("write");
+      try {
+        if (validation.data.quoter_ids.length > 0) {
+          for (const quoterId of validation.data.quoter_ids) {
+            await transaction.execute({
+              sql: `INSERT INTO task_quote_invitations (task_id, user_id, invited_by) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING`,
+              args: [task.id, quoterId, currentUserId],
+            });
+          }
+        }
+
+        if (isBlockedByQuote && currentUserId) {
+          await transaction.execute({
+            sql: `INSERT INTO task_transitions (task_id, project_id, from_status, to_status, from_flag, to_flag, moved_by, notes)
+                  VALUES ($1, $2, NULL, $3, NULL, $4, $5, $6)`,
+            args: [task.id, projectId, "blocked", task.task_flag, currentUserId, "Requiere cotización de colaborador externo"],
+          });
+        }
+        await transaction.commit();
+      } catch (err) {
+        await transaction.rollback();
+        console.error("Error persisting invitations/transitions:", err);
+      }
+    }
 
     await recalculateProjectProgress(projectId);
     return NextResponse.json(task, { status: 201 });

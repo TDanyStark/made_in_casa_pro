@@ -5,9 +5,11 @@ import { useQuery } from "@tanstack/react-query";
 import { get } from "@/lib/services/apiService";
 import { ProductTaskTemplateType, UserRole } from "@/lib/definitions";
 import { SortableList } from "@/components/ui/sortable-list";
+import { TaskAssignmentSelector, AssignMode } from "@/components/tasks/TaskAssignmentSelector";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Dialog,
@@ -68,6 +70,9 @@ interface LocalTask {
   assigned_user_id: number | null;
   assigned_user_name: string | null;
   assign_to_commercial: number;
+  assign_mode: AssignMode;
+  requires_quote: boolean;
+  quoter_ids: number[];
   order_index: number;
   task_type: "execution" | "validation";
 }
@@ -81,9 +86,24 @@ interface Props {
   userRole: UserRole;
   onConfirm: (data: {
     notes: string;
-    tasks: { template_id?: number | null; title: string; assigned_user_id?: number | null; assign_to_commercial?: number; area_id?: number | null; task_type?: string }[];
+    tasks: { 
+      template_id?: number | null; 
+      title: string; 
+      assigned_user_id?: number | null; 
+      assign_to_commercial?: number; 
+      area_id?: number | null; 
+      task_type?: string;
+      requires_quote?: number;
+      quoter_ids?: number[];
+    }[];
   }) => Promise<void>;
   isSubmitting: boolean;
+}
+
+function deriveAssignMode(task: Partial<LocalTask>): AssignMode {
+  if (task.assign_to_commercial === 1) return "commercial";
+  if (task.assigned_user_id !== null) return "specific";
+  return "auto";
 }
 
 // ─── Inline editable title ────────────────────────────────────────────────────
@@ -185,6 +205,7 @@ export function AdjustmentWizard({ open, onOpenChange, productId, createdByName,
 
   const [localTasks, setLocalTasks] = useState<LocalTask[]>([]);
   const [newTaskId, setNewTaskId] = useState<number | null>(null);
+  const [taskToEdit, setTaskToEdit] = useState<LocalTask | null>(null);
   const nextLocalId = useRef(-1);
   const initialized = useRef(false);
 
@@ -252,6 +273,9 @@ export function AdjustmentWizard({ open, onOpenChange, productId, createdByName,
         assigned_user_id: resolvedUserId,
         assigned_user_name: getResolvedName({ assigned_user_id: resolvedUserId, assign_to_commercial: t.assign_to_commercial, area_id: t.area_id }),
         assign_to_commercial: t.assign_to_commercial,
+        assign_mode: deriveAssignMode({ assigned_user_id: resolvedUserId, assign_to_commercial: t.assign_to_commercial }),
+        requires_quote: t.requires_quote === 1,
+        quoter_ids: t.quoters?.map(q => q.user_id) ?? [],
         order_index: t.order_index,
         task_type: t.task_type,
       };
@@ -271,7 +295,9 @@ export function AdjustmentWizard({ open, onOpenChange, productId, createdByName,
     const task: LocalTask = {
       id: lid, template_id: null, isExtra: true, title: "Nueva tarea",
       area_id: null, area_name: null, assigned_user_id: null, assigned_user_name: null,
-      assign_to_commercial: 0, order_index: localTasks.length, task_type: "execution",
+      assign_to_commercial: 0, assign_mode: "auto",
+      requires_quote: false, quoter_ids: [],
+      order_index: localTasks.length, task_type: "execution",
     };
     setLocalTasks(prev => [...prev, task]);
     setNewTaskId(lid);
@@ -291,6 +317,8 @@ export function AdjustmentWizard({ open, onOpenChange, productId, createdByName,
       assign_to_commercial: t.assign_to_commercial,
       area_id: t.area_id,
       task_type: t.task_type,
+      requires_quote: t.requires_quote ? 1 : 0,
+      quoter_ids: t.quoter_ids,
     }));
 
     await onConfirm({ notes, tasks });

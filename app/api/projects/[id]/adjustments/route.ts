@@ -19,6 +19,8 @@ const taskSchema = z.object({
   assign_to_commercial: z.number().int().min(0).max(1).optional().default(0),
   area_id: z.number().int().positive().optional().nullable(),
   task_type: z.enum(["execution", "validation"]).optional().default("execution"),
+  requires_quote: z.coerce.number().int().min(0).max(1).optional().default(0),
+  quoter_ids: z.array(z.coerce.number().int().positive()).optional().default([]),
 });
 
 const bodySchema = z.object({
@@ -99,6 +101,10 @@ export async function POST(
     }
     const { notes, tasks } = parsed.data;
 
+    const cookie = (await cookies()).get("session")?.value;
+    const session = cookie ? await decrypt(cookie) : null;
+    const currentUserId = session?.id ? Number(session.id) : null;
+
     const nextVersion = lastAdjustment ? lastAdjustment.version_number + 1 : 2;
 
     // Create Drive subfolder
@@ -106,8 +112,6 @@ export async function POST(
     let adjustmentFolderUrl: string | null = null;
     if (project.drive_folder_id) {
       try {
-        const cookie = (await cookies()).get("session")?.value;
-        const session = cookie ? await decrypt(cookie) : null;
         const creatorEmail = session?.email ?? null;
         const adminEmails = await getAdminAndDirectivoEmails();
         const allEmails = [...adminEmails, ...(creatorEmail ? [creatorEmail] : [])];
@@ -132,16 +136,29 @@ export async function POST(
 
     // ── Build and insert tasks ────────────────────────────────────────────────
     // If wizard sent an explicit task list, use it. Otherwise fall back to templates.
-    let taskList = tasks;
+    let taskList = tasks as any[];
 
     if (taskList.length === 0 && project.product_id) {
       // No wizard tasks sent — load from templates as-is
       const tplResult = await db.execute({
-        sql: `SELECT id AS template_id, title, area_id, assigned_user_id, assign_to_commercial, task_type
+        sql: `SELECT id AS template_id, title, area_id, assigned_user_id, assign_to_commercial, task_type, requires_quote
               FROM product_task_templates WHERE product_id = $1 ORDER BY order_index ASC, id ASC`,
         args: [project.product_id],
       });
-      taskList = tplResult.rows as unknown as typeof taskList;
+      
+      const tplTasks = tplResult.rows as any[];
+      for (const t of tplTasks) {
+        if (Number(t.requires_quote) === 1) {
+          const quotersResult = await db.execute({
+            sql: `SELECT user_id FROM product_task_template_quoters WHERE template_id = $1`,
+            args: [t.template_id],
+          });
+          t.quoter_ids = quotersResult.rows.map(r => (r as { user_id: number }).user_id);
+        } else {
+          t.quoter_ids = [];
+        }
+      }
+      taskList = tplTasks;
     }
 
     if (taskList.length > 0) {
@@ -163,16 +180,24 @@ export async function POST(
           }
 
           const isFirst = i === 0;
-          const status = isFirst ? "not_started" : "waiting";
-          const assignedAt = isFirst && assignedTo ? new Date() : null;
+          let status = isFirst ? "not_started" : "waiting";
+          const requiresQuote = Number(t.requires_quote || 0);
+          
+          const isBlockedByQuote = status === "not_started" && requiresQuote === 1 && !assignedTo;
+          if (isBlockedByQuote) {
+            status = "blocked";
+          }
 
-          await transaction.execute({
+          const assignedAt = (status === "not_started" || status === "blocked") && assignedTo ? new Date() : null;
+
+          const insertResult = await transaction.execute({
             sql: `
               INSERT INTO project_tasks
                 (project_id, template_id, title, area_id, assigned_user_id,
                  status, task_type, task_flag, requires_quote, assign_to_commercial,
                  order_index, assigned_at, adjustment_id)
-              VALUES ($1, $2, $3, $4, $5, $6, $7, 'new', 0, $8, $9, $10, $11)
+              VALUES ($1, $2, $3, $4, $5, $6, $7, 'new', $8, $9, $10, $11, $12)
+              RETURNING id
             `,
             args: [
               projectId,
@@ -182,12 +207,34 @@ export async function POST(
               assignedTo,
               status,
               t.task_type ?? "execution",
+              requiresQuote,
               t.assign_to_commercial ?? 0,
               i,             // order_index = position in the final list
               assignedAt,
               adjustment.id,
             ],
           });
+
+          const taskId = Number(insertResult.rows[0]?.id);
+
+          // Insert invitations
+          if (t.quoter_ids && t.quoter_ids.length > 0) {
+            for (const quoterId of t.quoter_ids) {
+              await transaction.execute({
+                sql: `INSERT INTO task_quote_invitations (task_id, user_id, invited_by) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING`,
+                args: [taskId, quoterId, currentUserId],
+              });
+            }
+          }
+
+          // Log transition if blocked
+          if (isBlockedByQuote && currentUserId) {
+             await transaction.execute({
+              sql: `INSERT INTO task_transitions (task_id, project_id, from_status, to_status, from_flag, to_flag, moved_by, notes)
+                    VALUES ($1, $2, NULL, $3, NULL, 'new', $4, $5)`,
+              args: [taskId, projectId, "blocked", currentUserId, "Requiere cotización de colaborador externo"],
+            });
+          }
         }
         await transaction.commit();
       } catch (err) {

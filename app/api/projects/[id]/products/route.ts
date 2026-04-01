@@ -9,6 +9,8 @@ import {
 } from "@/lib/queries/projects";
 import { getAdjustmentsByProject } from "@/lib/queries/adjustments";
 import { instantiateTasksFromTemplates } from "@/lib/queries/projectTasks";
+import { cookies } from "next/headers";
+import { decrypt } from "@/lib/session";
 
 const bodySchema = z.object({
   product_id: z.coerce.number().int().positive(),
@@ -58,8 +60,12 @@ export async function POST(request: NextRequest, { params }: Params) {
     const adjustments = await getAdjustmentsByProject(projectId);
     const v1 = adjustments.find(a => a.version_number === 1);
     
+    const cookie = (await cookies()).get("session")?.value;
+    const session = cookie ? await decrypt(cookie) : null;
+    const currentUserId = session?.id ? Number(session.id) : null;
+
     const commercialUserId = project.created_by ?? null;
-    await instantiateTasksFromTemplates(projectId, product_id, commercialUserId, v1?.id);
+    await instantiateTasksFromTemplates(projectId, product_id, commercialUserId, v1?.id, currentUserId);
 
     // Recalculate progress
     await recalculateProjectProgress(projectId);

@@ -9,6 +9,9 @@ import {
   resolveProjectTaskAssignment,
 } from "@/lib/queries/projectTasks";
 import { recalculateProjectProgress } from "@/lib/queries/projects";
+import { db } from "@/lib/db";
+import { cookies } from "next/headers";
+import { decrypt } from "@/lib/session";
 
 const patchSchema = z.object({
   title: z.string().min(1).optional(),
@@ -20,6 +23,7 @@ const patchSchema = z.object({
   task_flag: z.enum(["new", "correction", "adjustment"]).optional(),
   requires_quote: z.coerce.number().int().min(0).max(1).optional(),
   assign_to_commercial: z.coerce.number().int().min(0).max(1).optional(),
+  quoter_ids: z.array(z.coerce.number().int().positive()).optional(),
 });
 
 type Params = { params: Promise<{ id: string; tid: string }> };
@@ -76,8 +80,41 @@ export async function PATCH(request: NextRequest, { params }: Params) {
       });
     }
 
+    // New blocked logic for updates
+    const finalRequiresQuote = validation.data.requires_quote !== undefined ? validation.data.requires_quote : existingTask.requires_quote;
+    const finalAssignedUser = updateData.assigned_user_id !== undefined ? updateData.assigned_user_id : existingTask.assigned_user_id;
+
+    if (Number(finalRequiresQuote) === 1 && !finalAssignedUser && validation.data.status === undefined) {
+      updateData.status = "blocked";
+    }
+
     const updated = await updateProjectTask(taskId, updateData);
     if (!updated) return NextResponse.json({ error: "Tarea no encontrada" }, { status: 404 });
+
+    // Handle quoter invitations sync
+    if (validation.data.quoter_ids !== undefined) {
+      const cookie = (await cookies()).get("session")?.value;
+      const session = cookie ? await decrypt(cookie) : null;
+      const currentUserId = session?.id ? Number(session.id) : null;
+
+      const transaction = await db.transaction("write");
+      try {
+        await transaction.execute({
+          sql: `DELETE FROM task_quote_invitations WHERE task_id = $1`,
+          args: [taskId],
+        });
+        for (const quoterId of validation.data.quoter_ids) {
+          await transaction.execute({
+            sql: `INSERT INTO task_quote_invitations (task_id, user_id, invited_by) VALUES ($1, $2, $3)`,
+            args: [taskId, quoterId, currentUserId],
+          });
+        }
+        await transaction.commit();
+      } catch (err) {
+        await transaction.rollback();
+        console.error("Error syncing quoter invitations:", err);
+      }
+    }
 
     // Recalculate progress when status changes
     if (validation.data.status !== undefined) {

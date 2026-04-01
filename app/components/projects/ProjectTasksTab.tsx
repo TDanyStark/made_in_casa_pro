@@ -127,6 +127,7 @@ const taskSchema = z
     status: z.enum(["not_started", "waiting", "in_progress", "completed", "blocked"]).optional(),
     task_type: z.enum(["execution", "validation"]).default("execution"),
     requires_quote: z.boolean().default(false),
+    quoter_ids: z.array(z.number()).default([]),
     assign_mode: z.enum(["auto", "commercial", "specific"]).default("auto"),
     area_id: z.coerce.number().positive().optional().nullable(),
     assigned_user_id: z.coerce.number().positive().optional().nullable(),
@@ -283,6 +284,7 @@ export function ProjectTasksTab({
       assigned_user_id: null,
       task_type: "execution",
       requires_quote: false,
+      quoter_ids: [],
     },
   });
 
@@ -348,6 +350,7 @@ export function ProjectTasksTab({
       status: defaultStatus,
       task_type: "execution",
       requires_quote: false,
+      quoter_ids: [],
       assign_mode: "auto",
       area_id: null,
       assigned_user_id: null,
@@ -363,6 +366,7 @@ export function ProjectTasksTab({
       title: task.title, description: task.description ?? "",
       status: task.status, task_type: task.task_type ?? "execution",
       requires_quote: task.requires_quote === 1,
+      quoter_ids: task.quoter_ids ?? [],
       assign_mode: deriveAssignMode(task),
       area_id: task.area_id ?? null, assigned_user_id: task.assigned_user_id ?? null,
     });
@@ -392,6 +396,7 @@ export function ProjectTasksTab({
         title: values.title, description: values.description ?? null,
         status: values.status, task_type: values.task_type,
         requires_quote: values.requires_quote ? 1 : 0,
+        quoter_ids: values.quoter_ids,
         assign_to_commercial, area_id, assigned_user_id,
         adjustment_id: adjustmentId,
       };
@@ -936,6 +941,10 @@ export function ProjectTasksTab({
                     onAssignedUserIdChange={(id) => {
                       form.setValue("assigned_user_id", id);
                       if (id) form.clearErrors("assigned_user_id");
+                    }}
+                    quoterIds={form.watch("quoter_ids")}
+                    onQuoterIdsChange={(ids) => {
+                      form.setValue("quoter_ids", ids);
                     }}
                     requiresQuote={requiresQuote}
                     projectId={projectId}
