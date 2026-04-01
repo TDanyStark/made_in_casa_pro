@@ -116,6 +116,13 @@ jest.mock("@/components/ui/select", () => {
   return { Select, SelectTrigger, SelectValue, SelectContent, SelectItem };
 });
 
+jest.mock("@/components/ui/dropdown-menu", () => {
+  const DropdownMenu = ({ children }: { children: React.ReactNode }) => <div>{children}</div>;
+  const DropdownMenuTrigger = ({ children }: { children: React.ReactNode }) => <div>{children}</div>;
+  const DropdownMenuContent = ({ children }: { children: React.ReactNode }) => <div>{children}</div>;
+  return { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent };
+});
+
 jest.mock("@/components/ui/checkbox", () => ({
   Checkbox: ({
     id,
@@ -179,6 +186,7 @@ jest.mock("@/components/pagination/Pagination", () => ({
 
 jest.mock("lucide-react", () => ({
   AlertTriangle: () => null,
+  CalendarDays: () => null,
   CheckCircle: () => null,
   Clock: () => null,
   ExternalLink: () => null,
@@ -211,8 +219,9 @@ describe("MyTasksClient", () => {
     expect(screen.getByText("Estado")).toBeInTheDocument();
     expect(screen.getByText("Limpiar filtros")).toBeInTheDocument();
     expect(screen.getByLabelText("Buscar")).toBeInTheDocument();
-    expect(screen.getByLabelText("Asignada desde")).toBeInTheDocument();
-    expect(screen.getByLabelText("Asignada hasta")).toBeInTheDocument();
+    expect(screen.getByText("Rango de asignación")).toBeInTheDocument();
+    expect(screen.getByLabelText("Desde")).toBeInTheDocument();
+    expect(screen.getByLabelText("Hasta")).toBeInTheDocument();
   });
 
   it("updates URL when status filter changes", () => {
@@ -227,6 +236,36 @@ describe("MyTasksClient", () => {
     const lastCall = mockReplace.mock.calls[mockReplace.mock.calls.length - 1][0] as string;
     expect(lastCall).toContain("page=1");
     expect(lastCall).toContain("status=in_progress");
+  });
+
+  it("allows enabling completed status explicitly", () => {
+    render(<MyTasksClient />);
+
+    const checkbox = screen.getByTestId("my-task-status-completed") as HTMLInputElement;
+    expect(checkbox.checked).toBe(false);
+
+    fireEvent.click(checkbox);
+    expect(mockReplace).toHaveBeenCalled();
+
+    const lastCall = mockReplace.mock.calls[mockReplace.mock.calls.length - 1][0] as string;
+    expect(lastCall).toContain("status=completed");
+  });
+
+  it("updates URL when date range changes", () => {
+    render(<MyTasksClient />);
+
+    const from = screen.getByLabelText("Desde") as HTMLInputElement;
+    const to = screen.getByLabelText("Hasta") as HTMLInputElement;
+
+    fireEvent.change(from, { target: { value: "2026-03-01" } });
+    let lastCall = mockReplace.mock.calls[mockReplace.mock.calls.length - 1][0] as string;
+    expect(lastCall).toContain("assignedFrom=2026-03-01");
+    expect(lastCall).toContain("page=1");
+
+    fireEvent.change(to, { target: { value: "2026-03-31" } });
+    lastCall = mockReplace.mock.calls[mockReplace.mock.calls.length - 1][0] as string;
+    expect(lastCall).toContain("assignedTo=2026-03-31");
+    expect(lastCall).toContain("page=1");
   });
 
   it("clear filters resets URL params to defaults", () => {

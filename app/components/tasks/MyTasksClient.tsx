@@ -36,6 +36,7 @@ import { TaskCompleteDialog } from "./TaskCompleteDialog";
 import { TaskHistoryDialog } from "./TaskHistoryDialog";
 import {
   AlertTriangle,
+  CalendarIcon,
   CheckCircle,
   Clock,
   ExternalLink,
@@ -45,6 +46,14 @@ import {
 import Link from "next/link";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
+import { Calendar } from "@/components/ui/calendar";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { cn } from "@/lib/utils";
+import type { DateRange } from "react-day-picker";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -69,6 +78,13 @@ const STATUS_LABELS: Record<ProjectTaskStatus, string> = {
   in_progress: "En progreso",
   completed: "Completada",
   blocked: "Bloqueada",
+};
+
+const DEFAULT_STATUS_SET = new Set(DEFAULT_STATUS_OPTIONS);
+
+const hasSameStatuses = (a: ProjectTaskStatus[], b: Set<ProjectTaskStatus>) => {
+  if (a.length !== b.size) return false;
+  return a.every((value) => b.has(value));
 };
 
 // ─── Status/type configs ──────────────────────────────────────────────────────
@@ -130,6 +146,17 @@ function toStartOfDayIso(value: string) {
 
 function toEndOfDayIso(value: string) {
   return new Date(`${value}T23:59:59.999Z`).toISOString();
+}
+
+function parseDateParam(value: string): Date | undefined {
+  if (!value) return undefined;
+  const [year, month, day] = value.split("-").map(Number);
+  if (!year || !month || !day) return undefined;
+  return new Date(year, month - 1, day);
+}
+
+function toDateParam(value: Date) {
+  return format(value, "yyyy-MM-dd");
 }
 
 // ─── Dialog state ─────────────────────────────────────────────────────────────
@@ -198,7 +225,7 @@ export function MyTasksClient() {
   // ─── URL helpers ──────────────────────────────────────────────────────────
   const setStatusParams = (sp: URLSearchParams, statuses: ProjectTaskStatus[]) => {
     sp.delete("status");
-    if (statuses.length === 0 || statuses.length === STATUS_OPTIONS.length) return;
+    if (statuses.length === 0 || hasSameStatuses(statuses, DEFAULT_STATUS_SET)) return;
     statuses.forEach((s) => sp.append("status", s));
   };
 
@@ -254,10 +281,18 @@ export function MyTasksClient() {
     queryKey: ["brands-for-filter"],
     queryFn: async () => {
       const res = await get<ApiResponseWithPagination<BrandType[]>>("brands?limit=500");
-      return res.ok ? res.data?.data || [] : [];
+      if (!res.ok || !res.data) return [];
+
+      const rows = (res.data as unknown as { data?: Array<BrandType & { brand_name?: string }> })
+        .data;
+
+      return (rows || []).map((row) => ({
+        id: Number(row.id),
+        name: row.name || row.brand_name || "",
+      }));
     },
   });
-  const brands = brandsData || [];
+  const brands = (brandsData || []).filter((brand) => brand.id && brand.name);
 
   // Creator users (admin/directivo/comercial)
   const { data: assignableUsers = [] } = useQuery({
@@ -270,10 +305,47 @@ export function MyTasksClient() {
   const creatorUsers = useMemo(
     () =>
       assignableUsers.filter((u) =>
-        [UserRole.ADMIN, UserRole.DIRECTIVO, UserRole.COMERCIAL].includes(u.rol_id)
+        [UserRole.ADMIN, UserRole.DIRECTIVO, UserRole.COMERCIAL].includes(
+          Number(u.rol_id) as UserRole
+        )
       ),
     [assignableUsers]
   );
+
+  const assignedRangeLabel = useMemo(() => {
+    if (assignedFrom && assignedTo) {
+      return `${format(parseDateParam(assignedFrom)!, "dd MMM yyyy", {
+        locale: es,
+      })} - ${format(parseDateParam(assignedTo)!, "dd MMM yyyy", { locale: es })}`;
+    }
+    if (assignedFrom) {
+      return format(parseDateParam(assignedFrom)!, "dd MMM yyyy", { locale: es });
+    }
+    if (assignedTo) {
+      return format(parseDateParam(assignedTo)!, "dd MMM yyyy", { locale: es });
+    }
+    return "Todas las fechas";
+  }, [assignedFrom, assignedTo]);
+
+  const assignedDateRange = useMemo<DateRange | undefined>(() => {
+    const from = parseDateParam(assignedFrom);
+    const to = parseDateParam(assignedTo);
+    if (!from && !to) return undefined;
+    return { from, to };
+  }, [assignedFrom, assignedTo]);
+
+  const updateAssignedRange = (range: DateRange | undefined) => {
+    const nextAssignedFrom = range?.from ? toDateParam(range.from) : null;
+    const nextAssignedTo = range?.to ? toDateParam(range.to) : null;
+
+    replace(
+      `${pathname}?${createQueryString({
+        page: "1",
+        assignedFrom: nextAssignedFrom,
+        assignedTo: nextAssignedTo,
+      })}`
+    );
+  };
 
   // ─── Derived data ─────────────────────────────────────────────────────────
   const tasks = data?.data || [];
@@ -569,37 +641,50 @@ export function MyTasksClient() {
               onChange={(e) => setSearchInput(e.target.value)}
             />
           </div>
-          <div className="space-y-1">
-            <Label htmlFor="my-tasks-assignedFrom">Asignada desde</Label>
-            <Input
-              id="my-tasks-assignedFrom"
-              type="date"
-              value={assignedFrom}
-              onChange={(e) =>
-                replace(
-                  `${pathname}?${createQueryString({
-                    page: "1",
-                    assignedFrom: e.target.value || null,
-                  })}`
-                )
-              }
-            />
-          </div>
-          <div className="space-y-1">
-            <Label htmlFor="my-tasks-assignedTo">Asignada hasta</Label>
-            <Input
-              id="my-tasks-assignedTo"
-              type="date"
-              value={assignedTo}
-              onChange={(e) =>
-                replace(
-                  `${pathname}?${createQueryString({
-                    page: "1",
-                    assignedTo: e.target.value || null,
-                  })}`
-                )
-              }
-            />
+          <div className="space-y-1 md:col-span-2">
+            <Label>Rango de asignación</Label>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  id="my-tasks-assigned-range"
+                  variant="outline"
+                  className={cn(
+                    "w-full justify-start text-left font-normal",
+                    !assignedDateRange?.from && "text-muted-foreground"
+                  )}
+                >
+                  <CalendarIcon className="h-4 w-4" />
+                  <span className="truncate">{assignedRangeLabel}</span>
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <Calendar
+                  mode="range"
+                  numberOfMonths={2}
+                  selected={assignedDateRange}
+                  defaultMonth={assignedDateRange?.from}
+                  onSelect={updateAssignedRange}
+                  initialFocus
+                />
+                <div className="border-t p-2 flex justify-end">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() =>
+                      replace(
+                        `${pathname}?${createQueryString({
+                          page: "1",
+                          assignedFrom: null,
+                          assignedTo: null,
+                        })}`
+                      )
+                    }
+                  >
+                    Limpiar rango
+                  </Button>
+                </div>
+              </PopoverContent>
+            </Popover>
           </div>
         </div>
       </div>

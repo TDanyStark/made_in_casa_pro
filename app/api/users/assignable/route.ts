@@ -11,6 +11,7 @@ export async function GET(request: NextRequest) {
     UserRole.ADMIN,
     UserRole.DIRECTIVO,
     UserRole.COMERCIAL,
+    UserRole.COLABORADOR,
   ]);
   if (!roleValidation.isAuthorized) return roleValidation.response;
 
