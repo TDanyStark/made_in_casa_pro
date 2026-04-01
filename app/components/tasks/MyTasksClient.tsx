@@ -416,6 +416,9 @@ export function MyTasksClient() {
                 {isValidation && <ShieldCheck className="h-3 w-3 mr-1" />}
                 {TYPE_CONFIG[taskType]?.label}
               </Badge>
+              <Badge variant="secondary" className="text-xs">
+                V{task.version_number}
+              </Badge>
               {taskFlag !== "new" && (
                 <Badge
                   variant="outline"

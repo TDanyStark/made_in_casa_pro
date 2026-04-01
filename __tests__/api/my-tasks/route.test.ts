@@ -76,6 +76,7 @@ describe("GET /api/my-tasks", () => {
           task_type: "execution",
           task_flag: "new",
           adjustment_id: null,
+          version_number: 1,
           requires_quote: 0,
           assign_to_commercial: 0,
           order_index: 1,

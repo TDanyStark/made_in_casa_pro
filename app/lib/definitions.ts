@@ -313,6 +313,7 @@ export type MyTaskRowPaginated = {
   task_type: TaskType;
   task_flag: TaskFlag;
   adjustment_id: number | null;
+  version_number: number;
   requires_quote: number;
   assign_to_commercial: number;
   order_index: number;

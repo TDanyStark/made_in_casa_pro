@@ -47,6 +47,7 @@ jest.mock("@tanstack/react-query", () => ({
               assign_to_commercial: 0,
               order_index: 1,
               adjustment_id: null,
+              version_number: 1,
               assigned_at: null,
               completed_at: null,
               created_at: "2026-01-01",
@@ -186,6 +187,7 @@ jest.mock("@/components/pagination/Pagination", () => ({
 
 jest.mock("lucide-react", () => ({
   AlertTriangle: () => null,
+  CalendarIcon: () => null,
   CalendarDays: () => null,
   CheckCircle: () => null,
   Clock: () => null,

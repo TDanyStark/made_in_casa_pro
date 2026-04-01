@@ -1154,6 +1154,7 @@ export async function getMyTasksWithPagination(
           pt.assign_to_commercial,
           pt.order_index,
           pt.adjustment_id,
+          COALESCE(pa.version_number, 1) AS version_number,
           pt.assigned_at,
           pt.completed_at,
           pt.created_at,
@@ -1168,6 +1169,7 @@ export async function getMyTasksWithPagination(
         LEFT JOIN users creator   ON creator.id = p.created_by
         LEFT JOIN users u         ON u.id = pt.assigned_user_id
         LEFT JOIN areas a         ON a.id = pt.area_id
+        LEFT JOIN project_adjustments pa ON pa.id = pt.adjustment_id
         ${whereSQL}
         ORDER BY
           CASE pt.status
