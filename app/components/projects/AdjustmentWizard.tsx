@@ -10,29 +10,24 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Switch } from "@/components/ui/switch";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogFooter,
 } from "@/components/ui/dialog";
 import {
   Select,
   SelectContent,
-  SelectGroup,
   SelectItem,
-  SelectLabel,
-  SelectSeparator,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
 import {
   Package,
   Pencil,
-  Check,
-  X,
   User,
   Plus,
   Trash2,
@@ -41,6 +36,8 @@ import {
   ChevronLeft,
   FileText,
   ListTodo,
+  Clock,
+  ShieldCheck,
 } from "lucide-react";
 import dynamic from "next/dynamic";
 
@@ -66,6 +63,7 @@ interface LocalTask {
   template_id: number | null;
   isExtra: boolean;
   title: string;
+  description: string;
   area_id: number | null;
   area_name: string | null;
   assigned_user_id: number | null;
@@ -90,6 +88,7 @@ interface Props {
     tasks: { 
       template_id?: number | null; 
       title: string; 
+      description: string;
       assigned_user_id?: number | null; 
       assign_to_commercial?: number; 
       area_id?: number | null; 
@@ -107,42 +106,6 @@ function deriveAssignMode(task: Partial<LocalTask>): AssignMode {
   return "auto";
 }
 
-// ─── Inline editable title ────────────────────────────────────────────────────
-
-function InlineTitle({ taskId, value, autoFocus, onSave }: { taskId: number; value: string; autoFocus?: boolean; onSave: (v: string) => void }) {
-  const [editing, setEditing] = useState(autoFocus ?? false);
-  const [draft, setDraft] = useState(value);
-  const inputRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    if (autoFocus) { setDraft(value); setEditing(true); }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [taskId]);
-
-  useEffect(() => { if (editing) inputRef.current?.focus(); }, [editing]);
-
-  const commit = () => { const t = draft.trim() || value; if (t !== value) onSave(t); setEditing(false); };
-  const cancel = () => { setDraft(value); setEditing(false); };
-
-  if (editing) return (
-    <div className="flex items-center gap-1 flex-1">
-      <Input ref={inputRef} value={draft} onChange={e => setDraft(e.target.value)}
-        onBlur={commit} onKeyDown={e => { if (e.key === "Enter") commit(); if (e.key === "Escape") cancel(); }}
-        className="h-7 text-sm py-0 px-2" />
-      <button type="button" onMouseDown={e => { e.preventDefault(); commit(); }} className="text-primary hover:text-primary/80 p-0.5"><Check className="h-3.5 w-3.5" /></button>
-      <button type="button" onMouseDown={e => { e.preventDefault(); cancel(); }} className="text-muted-foreground hover:text-destructive p-0.5"><X className="h-3.5 w-3.5" /></button>
-    </div>
-  );
-
-  return (
-    <button type="button" onClick={() => { setDraft(value); setEditing(true); }}
-      className="group flex items-center gap-1.5 text-left text-sm font-medium hover:text-primary transition-colors">
-      {value}
-      <Pencil className="h-3 w-3 opacity-0 group-hover:opacity-50 transition-opacity shrink-0" />
-    </button>
-  );
-}
-
 // ─── Task Settings Dialog ─────────────────────────────────────────────────────
 
 interface TaskSettingsDialogProps {
@@ -156,45 +119,135 @@ interface TaskSettingsDialogProps {
 }
 
 function TaskSettingsDialog({ open, onOpenChange, task, projectId, onSave, users, createdByName }: TaskSettingsDialogProps) {
+  const [draftTitle, setDraftTitle] = useState("");
+  const [draftDescription, setDraftDescription] = useState("");
+  const [draftType, setDraftType] = useState<"execution" | "validation">("execution");
+
+  useEffect(() => {
+    if (task) {
+      setDraftTitle(task.title);
+      setDraftDescription(task.description || "");
+      setDraftType(task.task_type);
+    }
+  }, [task, open]);
+
   if (!task) return null;
+
+  const handleDone = () => {
+    onSave(task.id, {
+      title: draftTitle,
+      description: draftDescription,
+      task_type: draftType,
+    });
+    onOpenChange(false);
+  };
+
+  const resolveAndSave = (changes: Partial<LocalTask>) => {
+    const nextTask = { ...task, ...changes };
+    let resolvedName = nextTask.assigned_user_name;
+
+    if (changes.assign_mode || changes.area_id !== undefined || changes.assigned_user_id !== undefined || changes.requires_quote !== undefined) {
+      if (nextTask.requires_quote) {
+        resolvedName = null;
+      } else if (nextTask.assign_mode === "specific" && nextTask.assigned_user_id) {
+        resolvedName = users.find(u => u.id === nextTask.assigned_user_id)?.name ?? null;
+      } else if (nextTask.assign_mode === "commercial") {
+        resolvedName = createdByName || "Comercial del proyecto";
+      } else if (nextTask.assign_mode === "auto" && nextTask.area_id) {
+        const u = users.find(u => u.area_id === nextTask.area_id && u.rol_id === 4 && u.is_internal === 1);
+        resolvedName = u?.name ?? null;
+      } else {
+        resolvedName = null;
+      }
+    }
+
+    onSave(task.id, { ...changes, assigned_user_name: resolvedName });
+  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[500px]">
+      <DialogContent className="sm:max-w-[540px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Configurar tarea: {task.title}</DialogTitle>
+          <DialogTitle>Configurar tarea</DialogTitle>
         </DialogHeader>
+        
         <div className="space-y-4 pt-4">
-          <div className="flex items-center justify-between rounded-md border p-3">
-            <div className="space-y-0.5 -mt-2">
-              <label className="text-sm font-medium">Requiere cotización de externo</label>
-              <p className="text-xs text-muted-foreground">El flujo se bloqueará hasta que un externo presente su propuesta y sea aceptada.</p>
-            </div>
-            <Checkbox
-              checked={task.requires_quote}
-              onCheckedChange={(checked) => onSave(task.id, { requires_quote: !!checked, assigned_user_id: checked ? null : task.assigned_user_id, assigned_user_name: checked ? null : task.assigned_user_name })}
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Título</label>
+            <Input
+              value={draftTitle}
+              onChange={(e) => setDraftTitle(e.target.value)}
+              placeholder="Título de la tarea"
             />
           </div>
 
-          <TaskAssignmentSelector
-            assignMode={task.assign_mode}
-            onAssignModeChange={(mode) => onSave(task.id, { assign_mode: mode })}
-            areaId={task.area_id}
-            onAreaIdChange={(id) => onSave(task.id, { area_id: id, area_name: users.find(u => u.area_id === id)?.area_name ?? null })}
-            assignedUserId={task.assigned_user_id}
-            onAssignedUserIdChange={(id) => {
-              const u = users.find(x => x.id === id);
-              onSave(task.id, { assigned_user_id: id, assigned_user_name: u?.name ?? null });
-            }}
-            quoterIds={task.quoter_ids}
-            onQuoterIdsChange={(ids) => onSave(task.id, { quoter_ids: ids })}
-            requiresQuote={task.requires_quote}
-            projectId={projectId}
-          />
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Descripción (opcional)</label>
+            <Input
+              value={draftDescription}
+              onChange={(e) => setDraftDescription(e.target.value)}
+              placeholder="Añade detalles sobre esta tarea..."
+            />
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Tipo de tarea</label>
+            <Select 
+              value={draftType} 
+              onValueChange={(v) => setDraftType(v as "execution" | "validation")}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="execution">Ejecución</SelectItem>
+                <SelectItem value="validation">Validación</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="flex items-start gap-3 rounded-md border p-3">
+            <Checkbox
+              id="requires_quote_wizard"
+              checked={task.requires_quote}
+              onCheckedChange={(checked) => resolveAndSave({ 
+                requires_quote: !!checked, 
+                assigned_user_id: checked ? null : task.assigned_user_id,
+                assign_mode: checked ? "auto" : task.assign_mode
+              })}
+            />
+            <div className="space-y-1 -mt-1">
+              <label htmlFor="requires_quote_wizard" className="text-sm font-medium leading-none cursor-pointer">
+                Requiere cotización de externo
+              </label>
+              <p className="text-xs text-muted-foreground">
+                El flujo se bloqueará hasta que un externo presente su propuesta y sea aceptada.
+              </p>
+            </div>
+          </div>
+
+          <div className="space-y-1">
+            <TaskAssignmentSelector
+              assignMode={task.assign_mode}
+              onAssignModeChange={(mode) => resolveAndSave({ assign_mode: mode })}
+              areaId={task.area_id}
+              onAreaIdChange={(id) => resolveAndSave({ 
+                area_id: id, 
+                area_name: users.find(u => u.area_id === id)?.area_name ?? null 
+              })}
+              assignedUserId={task.assigned_user_id}
+              onAssignedUserIdChange={(id) => resolveAndSave({ assigned_user_id: id })}
+              quoterIds={task.quoter_ids}
+              onQuoterIdsChange={(ids) => resolveAndSave({ quoter_ids: ids })}
+              requiresQuote={task.requires_quote}
+              projectId={projectId}
+            />
+          </div>
         </div>
-        <div className="flex justify-end pt-4">
-          <Button onClick={() => onOpenChange(false)}>Listo</Button>
-        </div>
+
+        <DialogFooter className="mt-6">
+          <Button onClick={handleDone}>Listo</Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );
@@ -215,7 +268,6 @@ export function AdjustmentWizard({
   const [notes, setNotes] = useState("");
 
   const [localTasks, setLocalTasks] = useState<LocalTask[]>([]);
-  const [newTaskId, setNewTaskId] = useState<number | null>(null);
   const [taskToEdit, setTaskToEdit] = useState<LocalTask | null>(null);
   const nextLocalId = useRef(-1);
   const initialized = useRef(false);
@@ -268,7 +320,6 @@ export function AdjustmentWizard({
     };
 
     const rows: LocalTask[] = templates.map(t => {
-      // Resolve the actual user for area-based auto-assign so we show the right name
       let resolvedUserId = t.assigned_user_id;
       if (!resolvedUserId && Number(t.assign_to_commercial) !== 1 && t.area_id) {
         const areaUser = users.find(u => u.area_id === t.area_id && u.rol_id === 4 && u.is_internal === 1);
@@ -279,6 +330,7 @@ export function AdjustmentWizard({
         template_id: t.id,
         isExtra: false,
         title: t.title,
+        description: t.description || "",
         area_id: t.area_id,
         area_name: t.area_name,
         assigned_user_id: resolvedUserId,
@@ -305,25 +357,25 @@ export function AdjustmentWizard({
     const lid = nextLocalId.current--;
     const task: LocalTask = {
       id: lid, template_id: null, isExtra: true, title: "Nueva tarea",
+      description: "",
       area_id: null, area_name: null, assigned_user_id: null, assigned_user_name: null,
       assign_to_commercial: 0, assign_mode: "auto",
       requires_quote: false, quoter_ids: [],
       order_index: localTasks.length, task_type: "execution",
     };
     setLocalTasks(prev => [...prev, task]);
-    setNewTaskId(lid);
+    setTaskToEdit(task);
   };
 
   const handleRemoveTask = (task: LocalTask) => {
-    // Simply remove from the local list — the final task list sent to the API omits it
     setLocalTasks(prev => prev.filter(t => t.id !== task.id).map((t, i) => ({ ...t, order_index: i })));
   };
 
   const handleSubmit = async () => {
-    // Send the full ordered list — backend resolves auto-assignments server-side
     const tasks = localTasks.map(t => ({
       template_id: t.template_id ?? null,
       title: t.title,
+      description: t.description,
       assigned_user_id: t.assigned_user_id,
       assign_to_commercial: t.assign_to_commercial,
       area_id: t.area_id,
@@ -391,90 +443,121 @@ export function AdjustmentWizard({
                 Revisa las tareas para este ajuste. Puedes reordenarlas, cambiar responsables, agregar o eliminar tareas.
               </p>
 
-              {loadingTemplates ? (
-                <div className="space-y-2">{[1,2,3].map(i => <Skeleton key={i} className="h-12 w-full" />)}</div>
-              ) : localTasks.length > 0 ? (
-                <SortableList
-                  items={localTasks}
-                  onReorder={handleReorder}
-                  renderItem={(task, dragHandle) => (
-                    <div className="flex items-center gap-2 rounded-md border bg-card px-3 py-2.5">
-                      <div className="flex-shrink-0">{dragHandle}</div>
-                      <span className="text-xs text-muted-foreground font-mono w-5 shrink-0 text-center">
-                        {localTasks.findIndex(t => t.id === task.id) + 1}
-                      </span>
-                      <div className="flex-1 min-w-0">
-                        <InlineTitle
-                          taskId={task.id}
-                          value={task.title}
-                          autoFocus={task.id === newTaskId}
-                          onSave={v => { updateTask(task.id, { title: v }); if (task.id === newTaskId) setNewTaskId(null); }}
-                        />
-                        <div className="flex flex-wrap items-center gap-1.5 mt-0.5">
-                          {task.area_name && <Badge variant="secondary" className="text-xs">{task.area_name}</Badge>}
-                          {task.requires_quote && (
-                            <Badge variant="outline" className="text-xs text-amber-700 border-amber-400 bg-amber-50 dark:bg-amber-900/20">
-                              Cotización requerida
-                              {task.quoter_ids && task.quoter_ids.length > 0 && (
-                                <span className="ml-1">· {task.quoter_ids.length} externo(s)</span>
+              <div className="border rounded-lg bg-card overflow-hidden">
+                <div className="flex items-center justify-between p-4 bg-muted/50 border-b">
+                  <div>
+                    <h3 className="text-base font-semibold text-primary/80">Ajuste de tareas</h3>
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground mt-1">
+                      <span className="text-amber-600 dark:text-amber-400 font-medium italic">Nueva iteración</span>
+                      <span>•</span>
+                      <span>Total: {localTasks.length} tareas</span>
+                    </div>
+                  </div>
+                  <Button variant="outline" size="sm" onClick={handleAddTask} className="h-8">
+                    <Plus className="h-3.5 w-3.5 mr-1.5" />
+                    Agregar tarea
+                  </Button>
+                </div>
+
+                <div className="p-4 space-y-4">
+                  {loadingTemplates ? (
+                    <div className="space-y-2">{[1,2,3].map(i => <Skeleton key={i} className="h-12 w-full" />)}</div>
+                  ) : localTasks.length > 0 ? (
+                    <SortableList
+                      items={localTasks}
+                      onReorder={handleReorder}
+                      renderItem={(task, dragHandle) => {
+                        const isValidation = task.task_type === "validation";
+                        return (
+                          <div className="flex items-start gap-3 rounded-md border bg-card p-3 shadow-sm hover:shadow-md transition-shadow">
+                            <div className="flex-shrink-0 pt-0.5">{dragHandle}</div>
+                            
+                            <div className="flex-shrink-0 pt-1 pl-1">
+                              <Clock className="h-4 w-4 text-muted-foreground/50" />
+                            </div>
+
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center flex-wrap gap-2 mb-0.5">
+                                <p className="font-semibold text-sm leading-snug">{task.title}</p>
+                                <span className="text-muted-foreground/40 text-xs select-none">·</span>
+                                <Badge variant="outline" className={`text-[10px] h-4 px-1.5 ${isValidation ? "bg-purple-50 text-purple-700 border-purple-200" : "bg-blue-50 text-blue-700 border-blue-200"}`}>
+                                  {isValidation && <ShieldCheck className="h-2.5 w-2.5 mr-1" />}
+                                  {isValidation ? "Validación" : "Ejecución"}
+                                </Badge>
+                                {task.requires_quote && (
+                                  <Badge variant="outline" className="text-[10px] h-4 px-1.5 text-amber-700 border-amber-400 bg-amber-50">
+                                    Cotización requerida
+                                  </Badge>
+                                )}
+                                {task.isExtra && (
+                                  <Badge variant="outline" className="text-[10px] h-4 px-1.5 text-emerald-700 border-emerald-400 bg-emerald-50">
+                                    Nueva
+                                  </Badge>
+                                )}
+                              </div>
+
+                              {task.description && (
+                                <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">{task.description}</p>
                               )}
-                            </Badge>
-                          )}
-                          {task.isExtra && <Badge variant="outline" className="text-xs text-muted-foreground">Nueva</Badge>}
-                        </div>
-                      </div>
-                      <div className="flex-shrink-0 flex items-center gap-3">
-                        <div className="flex items-center gap-1.5">
-                          <label className="text-[10px] uppercase font-medium text-muted-foreground">Cotizar</label>
-                          <Switch
-                            checked={task.requires_quote}
-                            onCheckedChange={(checked) => updateTask(task.id, { 
-                              requires_quote: !!checked, 
-                              assigned_user_id: checked ? null : task.assigned_user_id,
-                              assigned_user_name: checked ? null : task.assigned_user_name,
-                              assign_mode: checked ? "auto" : task.assign_mode
-                            })}
-                          />
-                        </div>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-7 text-xs gap-1 px-2 text-muted-foreground border-dashed border"
-                          type="button"
-                          onClick={() => setTaskToEdit(task)}
-                        >
-                          <User className="h-3 w-3" />
-                          <span className="max-w-[100px] truncate">
-                            {task.assigned_user_name || (task.requires_quote ? "Por cotizar" : (task.area_name ? `Auto (${task.area_name})` : "Sin asignar"))}
-                          </span>
-                        </Button>
-                        <Select value={task.task_type} onValueChange={v => updateTask(task.id, { task_type: v as "execution" | "validation" })}>
-                          <SelectTrigger className="h-7 text-xs w-[100px] gap-1 px-2">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="execution">Ejecución</SelectItem>
-                            <SelectItem value="validation" disabled={localTasks.findIndex(t => t.id === task.id) === 0}>Validación</SelectItem>
-                          </SelectContent>
-                        </Select>
-                        <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive" type="button" onClick={() => handleRemoveTask(task)}>
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </Button>
-                      </div>
+
+                              <div className="flex flex-wrap items-center gap-1.5 mt-2">
+                                {task.area_name && (
+                                  <>
+                                    <Badge variant="secondary" className="text-[10px] h-4 px-1.5 uppercase font-semibold tracking-wider">
+                                      {task.area_name}
+                                    </Badge>
+                                    <span className="text-muted-foreground/40 text-xs select-none">·</span>
+                                  </>
+                                )}
+                                {task.assigned_user_name ? (
+                                  <Badge variant="outline" className="text-[10px] h-4 px-1.5 flex items-center gap-1">
+                                    <User className="h-2.5 w-2.5" />
+                                    {task.assigned_user_name}
+                                    {task.assign_mode === "auto" && <span className="text-[9px] opacity-60 ml-0.5 italic">(auto)</span>}
+                                  </Badge>
+                                ) : (
+                                  <Badge variant="outline" className="text-[10px] h-4 px-1.5 text-muted-foreground border-dashed">
+                                     Sin asignar
+                                  </Badge>
+                                )}
+                              </div>
+                            </div>
+
+                            <div className="flex items-center gap-1 flex-shrink-0">
+                              <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium bg-muted text-muted-foreground">
+                                En espera
+                              </div>
+                              
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-7 w-7"
+                                onClick={() => setTaskToEdit(task)}
+                              >
+                                <Pencil className="h-3.5 w-3.5 text-muted-foreground" />
+                              </Button>
+
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-7 w-7 text-destructive hover:text-destructive"
+                                onClick={() => handleRemoveTask(task)}
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </Button>
+                            </div>
+                          </div>
+                        );
+                      }}
+                    />
+                  ) : (
+                    <div className="flex flex-col items-center justify-center py-8 text-center border rounded-lg border-dashed">
+                      <Package className="h-8 w-8 text-muted-foreground/40 mb-2" />
+                      <p className="text-sm text-muted-foreground">No hay tareas. Agrega tareas personalizadas.</p>
                     </div>
                   )}
-                />
-              ) : (
-                <div className="flex flex-col items-center justify-center py-8 text-center border rounded-lg border-dashed">
-                  <Package className="h-8 w-8 text-muted-foreground/40 mb-2" />
-                  <p className="text-sm text-muted-foreground">No hay tareas. Agrega tareas personalizadas.</p>
                 </div>
-              )}
-
-              <Button variant="outline" size="sm" type="button" onClick={handleAddTask} className="w-full">
-                <Plus className="mr-2 h-4 w-4" />
-                Agregar tarea
-              </Button>
+              </div>
             </div>
           )}
         </div>
