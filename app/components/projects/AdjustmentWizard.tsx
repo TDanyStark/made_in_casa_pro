@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Switch } from "@/components/ui/switch";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Dialog,
@@ -142,64 +143,74 @@ function InlineTitle({ taskId, value, autoFocus, onSave }: { taskId: number; val
   );
 }
 
-// ─── Assignee picker ──────────────────────────────────────────────────────────
+// ─── Task Settings Dialog ─────────────────────────────────────────────────────
 
-function AssigneePicker({ task, users, onAssign }: {
-  task: LocalTask; users: UserOption[];
-  onAssign: (userId: number | null, userName: string | null, assignToCommercial?: number) => void;
-}) {
-  const currentValue = task.assigned_user_id ? task.assigned_user_id.toString() : task.assign_to_commercial === 1 ? "commercial" : "none";
-  const admins = users.filter(u => u.rol_id === 1);
-  const directivos = users.filter(u => u.rol_id === 2);
-  const comerciales = users.filter(u => u.rol_id === 3);
-  const internals = users.filter(u => u.rol_id === 4 && u.is_internal === 1);
-  const externals = users.filter(u => u.rol_id === 4 && u.is_internal === 0);
+interface TaskSettingsDialogProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  task: LocalTask | null;
+  projectId: number;
+  onSave: (taskId: number, changes: Partial<LocalTask>) => void;
+  users: UserOption[];
+  createdByName?: string | null;
+}
 
-  const renderGroup = (label: string, groupUsers: UserOption[]) => {
-    if (groupUsers.length === 0) return null;
-    return (
-      <SelectGroup>
-        <SelectLabel className="text-xs text-muted-foreground/60 font-normal py-1 px-2 uppercase tracking-wider">{label}</SelectLabel>
-        {groupUsers.map(u => (
-          <SelectItem key={u.id} value={u.id.toString()}>
-            <span className="flex items-center gap-1.5">{u.name}{u.area_name && <span className="text-xs text-muted-foreground">· {u.area_name}</span>}</span>
-          </SelectItem>
-        ))}
-      </SelectGroup>
-    );
-  };
+function TaskSettingsDialog({ open, onOpenChange, task, projectId, onSave, users, createdByName }: TaskSettingsDialogProps) {
+  if (!task) return null;
 
   return (
-    <Select value={currentValue} onValueChange={val => {
-      if (val === "none") onAssign(null, null, 0);
-      else if (val === "commercial") onAssign(null, null, 1);
-      else { const u = users.find(u => u.id.toString() === val); onAssign(u?.id ?? null, u?.name ?? null, 0); }
-    }}>
-      <SelectTrigger className="h-7 text-xs w-auto min-w-[140px] max-w-[200px] gap-1 px-2">
-        <User className="h-3 w-3 text-muted-foreground shrink-0" />
-        <SelectValue><span className={!task.assigned_user_name ? "text-muted-foreground" : ""}>{task.assigned_user_name || "Sin asignar"}</span></SelectValue>
-      </SelectTrigger>
-      <SelectContent>
-        <SelectItem value="none"><span className="text-xs">{task.area_name ? `Auto (${task.area_name})` : "Sin asignar"}</span></SelectItem>
-        <SelectItem value="commercial"><span className="text-xs">Comercial del proyecto</span></SelectItem>
-        <SelectSeparator />
-        {renderGroup("Admin", admins)}
-        {directivos.length > 0 && admins.length > 0 && <SelectSeparator />}
-        {renderGroup("Directivo", directivos)}
-        {comerciales.length > 0 && <SelectSeparator />}
-        {renderGroup("Comercial", comerciales)}
-        {internals.length > 0 && <SelectSeparator />}
-        {renderGroup("Colaborador interno", internals)}
-        {externals.length > 0 && <SelectSeparator />}
-        {renderGroup("Colaborador externo", externals)}
-      </SelectContent>
-    </Select>
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-[500px]">
+        <DialogHeader>
+          <DialogTitle>Configurar tarea: {task.title}</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4 pt-4">
+          <div className="flex items-center justify-between rounded-md border p-3">
+            <div className="space-y-0.5 -mt-2">
+              <label className="text-sm font-medium">Requiere cotización de externo</label>
+              <p className="text-xs text-muted-foreground">El flujo se bloqueará hasta que un externo presente su propuesta y sea aceptada.</p>
+            </div>
+            <Checkbox
+              checked={task.requires_quote}
+              onCheckedChange={(checked) => onSave(task.id, { requires_quote: !!checked, assigned_user_id: checked ? null : task.assigned_user_id, assigned_user_name: checked ? null : task.assigned_user_name })}
+            />
+          </div>
+
+          <TaskAssignmentSelector
+            assignMode={task.assign_mode}
+            onAssignModeChange={(mode) => onSave(task.id, { assign_mode: mode })}
+            areaId={task.area_id}
+            onAreaIdChange={(id) => onSave(task.id, { area_id: id, area_name: users.find(u => u.area_id === id)?.area_name ?? null })}
+            assignedUserId={task.assigned_user_id}
+            onAssignedUserIdChange={(id) => {
+              const u = users.find(x => x.id === id);
+              onSave(task.id, { assigned_user_id: id, assigned_user_name: u?.name ?? null });
+            }}
+            quoterIds={task.quoter_ids}
+            onQuoterIdsChange={(ids) => onSave(task.id, { quoter_ids: ids })}
+            requiresQuote={task.requires_quote}
+            projectId={projectId}
+          />
+        </div>
+        <div className="flex justify-end pt-4">
+          <Button onClick={() => onOpenChange(false)}>Listo</Button>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 
 // ─── Main wizard ──────────────────────────────────────────────────────────────
 
-export function AdjustmentWizard({ open, onOpenChange, productId, createdByName, onConfirm, isSubmitting }: Props) {
+export function AdjustmentWizard({ 
+  open, 
+  onOpenChange, 
+  projectId, 
+  productId, 
+  createdByName, 
+  onConfirm, 
+  isSubmitting 
+}: Props) {
   const [step, setStep] = useState<1 | 2>(1);
   const [notes, setNotes] = useState("");
 
@@ -399,22 +410,44 @@ export function AdjustmentWizard({ open, onOpenChange, productId, createdByName,
                           autoFocus={task.id === newTaskId}
                           onSave={v => { updateTask(task.id, { title: v }); if (task.id === newTaskId) setNewTaskId(null); }}
                         />
-                        {task.area_name && <Badge variant="secondary" className="text-xs mt-0.5">{task.area_name}</Badge>}
-                        {task.isExtra && <Badge variant="outline" className="text-xs mt-0.5 text-muted-foreground">Nueva</Badge>}
+                        <div className="flex flex-wrap items-center gap-1.5 mt-0.5">
+                          {task.area_name && <Badge variant="secondary" className="text-xs">{task.area_name}</Badge>}
+                          {task.requires_quote && (
+                            <Badge variant="outline" className="text-xs text-amber-700 border-amber-400 bg-amber-50 dark:bg-amber-900/20">
+                              Cotización requerida
+                              {task.quoter_ids && task.quoter_ids.length > 0 && (
+                                <span className="ml-1">· {task.quoter_ids.length} externo(s)</span>
+                              )}
+                            </Badge>
+                          )}
+                          {task.isExtra && <Badge variant="outline" className="text-xs text-muted-foreground">Nueva</Badge>}
+                        </div>
                       </div>
-                      <div className="flex-shrink-0 flex items-center gap-1">
-                        <AssigneePicker
-                          task={task}
-                          users={users}
-                          onAssign={(userId, userName, atc) => {
-                            let name = userName;
-                            if (!userId) {
-                              if (atc === 1) name = createdByName || "Comercial del proyecto";
-                              else if (task.area_id) name = users.find(u => u.area_id === task.area_id && u.rol_id === 4 && u.is_internal === 1)?.name ?? null;
-                            }
-                            updateTask(task.id, { assigned_user_id: userId, assigned_user_name: name, assign_to_commercial: atc ?? task.assign_to_commercial });
-                          }}
-                        />
+                      <div className="flex-shrink-0 flex items-center gap-3">
+                        <div className="flex items-center gap-1.5">
+                          <label className="text-[10px] uppercase font-medium text-muted-foreground">Cotizar</label>
+                          <Switch
+                            checked={task.requires_quote}
+                            onCheckedChange={(checked) => updateTask(task.id, { 
+                              requires_quote: !!checked, 
+                              assigned_user_id: checked ? null : task.assigned_user_id,
+                              assigned_user_name: checked ? null : task.assigned_user_name,
+                              assign_mode: checked ? "auto" : task.assign_mode
+                            })}
+                          />
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 text-xs gap-1 px-2 text-muted-foreground border-dashed border"
+                          type="button"
+                          onClick={() => setTaskToEdit(task)}
+                        >
+                          <User className="h-3 w-3" />
+                          <span className="max-w-[100px] truncate">
+                            {task.assigned_user_name || (task.requires_quote ? "Por cotizar" : (task.area_name ? `Auto (${task.area_name})` : "Sin asignar"))}
+                          </span>
+                        </Button>
                         <Select value={task.task_type} onValueChange={v => updateTask(task.id, { task_type: v as "execution" | "validation" })}>
                           <SelectTrigger className="h-7 text-xs w-[100px] gap-1 px-2">
                             <SelectValue />
@@ -470,6 +503,20 @@ export function AdjustmentWizard({ open, onOpenChange, productId, createdByName,
           )}
         </div>
       </DialogContent>
+      <TaskSettingsDialog
+        open={!!taskToEdit}
+        onOpenChange={(open) => !open && setTaskToEdit(null)}
+        task={taskToEdit}
+        projectId={projectId}
+        onSave={(taskId, changes) => {
+          updateTask(taskId, changes);
+          if (taskToEdit?.id === taskId) {
+            setTaskToEdit((prev) => (prev ? { ...prev, ...changes } : null));
+          }
+        }}
+        users={users}
+        createdByName={createdByName}
+      />
     </Dialog>
   );
 }

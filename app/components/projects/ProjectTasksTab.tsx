@@ -618,7 +618,10 @@ export function ProjectTasksTab({
                               )}
                               {task.requires_quote === 1 && (
                                 <Badge variant="outline" className="text-xs text-amber-700 border-amber-400 bg-amber-50 dark:bg-amber-900/20">
-                                  Cotización
+                                  Cotización requerida
+                                  {task.quoter_ids && task.quoter_ids.length > 0 && (
+                                    <span className="ml-1">· {task.quoter_ids.length} externo(s)</span>
+                                  )}
                                 </Badge>
                               )}
                             </div>
@@ -650,7 +653,7 @@ export function ProjectTasksTab({
                             {/* Blocked reason */}
                             {isBlocked && needsQuote && (
                               <p className="text-xs text-destructive mt-1 font-medium">
-                                Esperando cotización de externo
+                                Esperando cotización de colaborador externo
                               </p>
                             )}
                             {isBlocked && !needsQuote && (
@@ -912,12 +915,12 @@ export function ProjectTasksTab({
                             }}
                           />
                         </FormControl>
-                        <div className="space-y-0.5 -mt-1">
+                        <div className="space-y-0.5 -mt-2">
                           <FormLabel className="text-sm font-medium cursor-pointer">
                             Requiere cotización de externo
                           </FormLabel>
                           <p className="text-xs text-muted-foreground">
-                            El flujo se bloqueará aquí hasta que un externo sea invitado a cotizar y la cotización sea aceptada.
+                            El flujo se bloqueará hasta que un externo presente su propuesta y sea aceptada.
                           </p>
                         </div>
                       </FormItem>

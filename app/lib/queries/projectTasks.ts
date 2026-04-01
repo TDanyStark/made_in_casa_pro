@@ -37,7 +37,7 @@ const TASK_SELECT = `
   pt.assigned_at,
   pt.completed_at,
   pt.adjustment_id,
-  (SELECT '[' || group_concat(user_id) || ']' FROM task_quote_invitations WHERE task_id = pt.id) AS quoter_ids,
+  (SELECT json_agg(user_id) FROM task_quote_invitations WHERE task_id = pt.id) AS quoter_ids,
   (SELECT COUNT(*) FROM task_quotes tq WHERE tq.task_id = pt.id) AS quote_count,
   (SELECT COUNT(*) FROM task_quotes tq WHERE tq.task_id = pt.id AND tq.status = 'pending') AS pending_quote_count
 `;
