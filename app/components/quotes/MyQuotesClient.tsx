@@ -204,6 +204,7 @@ export function MyQuotesClient() {
           projectName={selectedInvite.project_name}
           onSuccess={() => {
             queryClient.invalidateQueries({ queryKey: ["my-quotes"] });
+            queryClient.invalidateQueries({ queryKey: ["my-quotes-count"] });
             setSelectedInvite(null);
           }}
         />
@@ -219,6 +220,7 @@ export function MyQuotesClient() {
           initialData={selectedQuote}
           onSuccess={() => {
             queryClient.invalidateQueries({ queryKey: ["my-quotes"] });
+            queryClient.invalidateQueries({ queryKey: ["my-quotes-count"] });
             setSelectedQuote(null);
           }}
         />

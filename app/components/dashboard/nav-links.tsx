@@ -3,15 +3,35 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useQuery } from "@tanstack/react-query";
 import { ChevronDown } from "lucide-react";
 import { links, navSubLinks } from "@/lib/LinksData";
 import { useRole } from "../context/RoleContext";
+import { get } from "@/lib/services/apiService";
+import { UserRole } from "@/lib/definitions";
 import { cn } from "@/lib/utils";
+
+const MY_QUOTES_ROUTE = "/my-quotes";
 
 export default function NavLinks() {
   const pathname = usePathname();
   const role = useRole();
   const [openAccordionRoute, setOpenAccordionRoute] = useState<string | null>(null);
+
+  // Fetch pending quote invitations count — only for COLABORADOR role
+  const { data: countData } = useQuery<{ count: number }>({
+    queryKey: ["my-quotes-count"],
+    queryFn: async () => {
+      const res = await get<{ count: number }>("my-quotes/count");
+      if (!res.ok) return { count: 0 };
+      return res.data!;
+    },
+    enabled: role === UserRole.COLABORADOR,
+    refetchInterval: 60_000, // refresh every 60s
+    staleTime: 30_000,
+  });
+
+  const pendingCount = countData?.count ?? 0;
 
   useEffect(() => {
     const currentGroup = links
@@ -37,6 +57,10 @@ export default function NavLinks() {
           const isGroupActive = [link.route, ...subLinks.map((item) => item.route)].some((route) =>
             pathname.startsWith(route),
           );
+          const showBadge =
+            link.route === MY_QUOTES_ROUTE &&
+            role === UserRole.COLABORADOR &&
+            pendingCount > 0;
 
           if (hasSubLinks) {
             return (
@@ -122,7 +146,12 @@ export default function NavLinks() {
               )}
             >
               <LinkIcon strokeWidth={1.2} />
-              <p className="hidden md:block">{link.name}</p>
+              <p className="hidden md:block flex-1">{link.name}</p>
+              {showBadge && (
+                <span className="hidden md:flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-full bg-market-pink text-white text-xs font-semibold leading-none">
+                  {pendingCount > 99 ? "99+" : pendingCount}
+                </span>
+              )}
             </Link>
           );
         })}

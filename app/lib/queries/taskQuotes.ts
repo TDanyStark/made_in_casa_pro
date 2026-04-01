@@ -143,6 +143,7 @@ export async function getMyQuotes(userId: number): Promise<TaskQuoteType[]> {
 /**
  * Returns all pending quote invitations for a user (tasks they haven't quoted yet).
  * Used for external collaborator dashboard.
+ * Excludes invitations where the user has already submitted a quote.
  */
 export async function getPendingQuoteInvitations(userId: number): Promise<TaskQuoteInvitationType[]> {
   try {
@@ -167,6 +168,7 @@ export async function getPendingQuoteInvitations(userId: number): Promise<TaskQu
         LEFT JOIN users ib  ON tqi.invited_by = ib.id
         LEFT JOIN task_quotes tq ON tq.task_id = tqi.task_id AND tq.user_id = tqi.user_id
         WHERE tqi.user_id = $1
+          AND tq.id IS NULL
         ORDER BY tqi.invited_at DESC
       `,
       args: [userId],
@@ -175,6 +177,30 @@ export async function getPendingQuoteInvitations(userId: number): Promise<TaskQu
   } catch (error) {
     console.error("Error fetching pending quote invitations:", error);
     return [];
+  }
+}
+
+/**
+ * Returns the count of pending quote invitations for a user (tasks they haven't quoted yet).
+ * Used for sidebar notification badge.
+ */
+export async function getPendingQuoteInvitationsCount(userId: number): Promise<number> {
+  try {
+    const result = await db.execute({
+      sql: `
+        SELECT COUNT(*) AS count
+        FROM task_quote_invitations tqi
+        LEFT JOIN task_quotes tq ON tq.task_id = tqi.task_id AND tq.user_id = tqi.user_id
+        WHERE tqi.user_id = $1
+          AND tq.id IS NULL
+      `,
+      args: [userId],
+    });
+    const row = result.rows[0] as unknown as { count: number };
+    return Number(row?.count ?? 0);
+  } catch (error) {
+    console.error("Error fetching pending quote invitations count:", error);
+    return 0;
   }
 }
 
@@ -282,7 +308,7 @@ export async function acceptQuote(
     await transaction.execute({
       sql: `
         UPDATE project_tasks
-        SET assigned_user_id = $1, status = 'in_progress', updated_at = CURRENT_TIMESTAMP
+        SET assigned_user_id = $1, status = 'not_started', updated_at = CURRENT_TIMESTAMP
         WHERE id = $2
       `,
       args: [quote.user_id, quote.task_id],

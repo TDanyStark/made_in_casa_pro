@@ -6,6 +6,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
 import { post } from "@/lib/services/apiService";
 import { QuoteSubmissionSchema, TaskQuoteType } from "@/lib/definitions";
+import { minutesToDHM } from "@/lib/utils/time";
 import { z } from "zod";
 import {
   Dialog,
@@ -55,20 +56,26 @@ export function SubmitQuoteModal({
     resolver: zodResolver(QuoteSubmissionSchema),
     defaultValues: {
       price: initialData?.price || 0,
-      delivery_days: initialData?.delivery_days || 0,
-      delivery_hours: initialData?.delivery_hours || 0,
-      delivery_minutes: initialData?.delivery_minutes || 0,
+      delivery_days: 0,
+      delivery_hours: 0,
+      delivery_minutes: 0,
       notes: initialData?.notes || "",
     },
   });
 
   useEffect(() => {
     if (isOpen) {
+      // delivery_minutes in the DB stores the TOTAL minutes (days*1440 + hours*60 + mins).
+      // Decompose it back to DHM so the form fields show the correct individual values.
+      const dhm = initialData?.delivery_minutes
+        ? minutesToDHM(initialData.delivery_minutes)
+        : { days: 0, hours: 0, minutes: 0 };
+
       reset({
         price: initialData?.price || 0,
-        delivery_days: initialData?.delivery_days || 0,
-        delivery_hours: initialData?.delivery_hours || 0,
-        delivery_minutes: initialData?.delivery_minutes || 0,
+        delivery_days: dhm.days,
+        delivery_hours: dhm.hours,
+        delivery_minutes: dhm.minutes,
         notes: initialData?.notes || "",
       });
     }

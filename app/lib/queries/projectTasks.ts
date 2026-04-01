@@ -983,6 +983,7 @@ export async function instantiateTasksFromTemplates(
 // ─── My tasks (for collaborator dashboard) ────────────────────────────────────
 
 export async function getMyTasks(userId: number): Promise<ProjectTaskType[]> {
+  console.log(`Fetching tasks for user ${userId}`);
   try {
     const result = await db.execute({
       sql: `
