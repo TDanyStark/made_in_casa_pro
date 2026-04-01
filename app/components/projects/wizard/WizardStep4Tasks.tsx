@@ -4,229 +4,29 @@ import { useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { get } from "@/lib/services/apiService";
 import { ProductTaskTemplateType } from "@/lib/definitions";
-import { SortableList } from "@/components/ui/sortable-list";
-import { TaskAssignmentSelector, AssignMode } from "@/components/tasks/TaskAssignmentSelector";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Checkbox } from "@/components/ui/checkbox";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from "@/components/ui/dialog";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  Package,
-  Pencil,
-  Plus,
-  Trash2,
-  ChevronDown,
-  Clock,
-  ShieldCheck,
-  User,
-} from "lucide-react";
+import { ChevronDown, Package, Plus } from "lucide-react";
 import { WizardState, TaskOverride, ExtraTask } from "@/hooks/useProjectWizard";
+import {
+  ProjectTaskEditorList,
+  TaskSettingsDialog,
+  LocalTask,
+  UserOption,
+  deriveAssignMode,
+  resolveAssigneeName,
+} from "../shared/ProjectTaskEditor";
 
-// ─── Types ────────────────────────────────────────────────────────────────────
-
-interface UserOption {
-  id: number;
-  name: string;
-  rol_id: number;
-  is_internal: number;
-  area_id: number | null;
-  area_name: string | null;
-  active_task_count: number;
+interface Props {
+  state: WizardState;
+  onNext: (data: Partial<WizardState>) => void;
+  onBack: () => void;
+  update: (data: Partial<WizardState>) => void;
 }
-
-interface LocalTask {
-  id: number;           // for template tasks: template_id; for extra tasks: negative localId
-  template_id: number | null;  // null for extra tasks
-  isExtra: boolean;
-  title: string;
-  description: string;
-  area_id: number | null;
-  area_name: string | null;
-  assigned_user_id: number | null;
-  assigned_user_name: string | null;
-  assign_to_commercial: number;
-  assign_mode: AssignMode;
-  requires_quote: boolean;
-  quoter_ids: number[];
-  order_index: number;
-  task_type: "execution" | "validation";
-}
-
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
-function deriveAssignMode(task: Partial<LocalTask>): AssignMode {
-  if (task.assign_to_commercial === 1) return "commercial";
-  if (task.assigned_user_id !== null) return "specific";
-  return "auto";
-}
-
-// ─── Task Settings Dialog ─────────────────────────────────────────────────────
-
-interface TaskSettingsDialogProps {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  task: LocalTask | null;
-  onSave: (taskId: number, changes: Partial<LocalTask>) => void;
-  users: UserOption[];
-  createdByName?: string | null;
-}
-
-function TaskSettingsDialog({ open, onOpenChange, task, onSave, users, createdByName }: TaskSettingsDialogProps) {
-  const [draftTitle, setDraftTitle] = useState("");
-  const [draftDescription, setDraftDescription] = useState("");
-  const [draftType, setDraftType] = useState<"execution" | "validation">("execution");
-
-  useEffect(() => {
-    if (task) {
-      setDraftTitle(task.title);
-      setDraftDescription(task.description || "");
-      setDraftType(task.task_type);
-    }
-  }, [task, open]);
-
-  if (!task) return null;
-
-  const handleDone = () => {
-    onSave(task.id, {
-      title: draftTitle,
-      description: draftDescription,
-      task_type: draftType,
-    });
-    onOpenChange(false);
-  };
-
-  const resolveAndSave = (changes: Partial<LocalTask>) => {
-    const nextTask = { ...task, ...changes };
-    let resolvedName = nextTask.assigned_user_name;
-
-    if (changes.assign_mode || changes.area_id !== undefined || changes.assigned_user_id !== undefined || changes.requires_quote !== undefined) {
-      if (nextTask.requires_quote) {
-        resolvedName = null;
-      } else if (nextTask.assign_mode === "specific" && nextTask.assigned_user_id) {
-        resolvedName = users.find(u => u.id === nextTask.assigned_user_id)?.name ?? null;
-      } else if (nextTask.assign_mode === "commercial") {
-        resolvedName = createdByName || "Comercial del proyecto";
-      } else if (nextTask.assign_mode === "auto" && nextTask.area_id) {
-        const u = users.find(u => u.area_id === nextTask.area_id && u.rol_id === 4 && u.is_internal === 1);
-        resolvedName = u?.name ?? null;
-      } else {
-        resolvedName = null;
-      }
-    }
-
-    onSave(task.id, { ...changes, assigned_user_name: resolvedName });
-  };
-
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[540px] max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>Configurar tarea</DialogTitle>
-        </DialogHeader>
-        
-        <div className="space-y-4 pt-4">
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Título</label>
-            <Input
-              value={draftTitle}
-              onChange={(e) => setDraftTitle(e.target.value)}
-              placeholder="Título de la tarea"
-            />
-          </div>
-
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Descripción (opcional)</label>
-            <Input
-              value={draftDescription}
-              onChange={(e) => setDraftDescription(e.target.value)}
-              placeholder="Añade detalles sobre esta tarea..."
-            />
-          </div>
-
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Tipo de tarea</label>
-            <Select 
-              value={draftType} 
-              onValueChange={(v) => setDraftType(v as "execution" | "validation")}
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="execution">Ejecución</SelectItem>
-                <SelectItem value="validation">Validación</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="flex items-start gap-3 rounded-md border p-3">
-            <Checkbox
-              id="requires_quote"
-              checked={task.requires_quote}
-              onCheckedChange={(checked) => resolveAndSave({ 
-                requires_quote: !!checked, 
-                assigned_user_id: checked ? null : task.assigned_user_id,
-                assign_mode: checked ? "auto" : task.assign_mode
-              })}
-            />
-            <div className="space-y-1 -mt-1">
-              <label htmlFor="requires_quote" className="text-sm font-medium leading-none cursor-pointer">
-                Requiere cotización de externo
-              </label>
-              <p className="text-xs text-muted-foreground">
-                El flujo se bloqueará hasta que un externo presente su propuesta y sea aceptada.
-              </p>
-            </div>
-          </div>
-
-          <div className="space-y-1">
-            <TaskAssignmentSelector
-              assignMode={task.assign_mode}
-              onAssignModeChange={(mode) => resolveAndSave({ assign_mode: mode })}
-              areaId={task.area_id}
-              onAreaIdChange={(id) => resolveAndSave({ 
-                area_id: id, 
-                area_name: users.find(u => u.area_id === id)?.area_name ?? null 
-              })}
-              assignedUserId={task.assigned_user_id}
-              onAssignedUserIdChange={(id) => resolveAndSave({ assigned_user_id: id })}
-              quoterIds={task.quoter_ids}
-              onQuoterIdsChange={(ids) => resolveAndSave({ quoter_ids: ids })}
-              requiresQuote={task.requires_quote}
-            />
-          </div>
-        </div>
-
-        <DialogFooter className="mt-6">
-          <Button onClick={handleDone}>Listo</Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-
-// ─── Main component ───────────────────────────────────────────────────────────
 
 export function WizardStep4Tasks({ state, onNext, onBack, update }: Props) {
   const productId = state.product?.id ?? null;
 
-  // Fetch task templates
   const { data: templates = [], isLoading } = useQuery<ProductTaskTemplateType[]>({
     queryKey: ["product-task-templates", productId],
     queryFn: async () => {
@@ -238,7 +38,6 @@ export function WizardStep4Tasks({ state, onNext, onBack, update }: Props) {
     staleTime: 1000 * 60 * 5,
   });
 
-  // Fetch all users
   const { data: users = [] } = useQuery<UserOption[]>({
     queryKey: ["all-users-for-wizard-tasks"],
     queryFn: async () => {
@@ -269,21 +68,6 @@ export function WizardStep4Tasks({ state, onNext, onBack, update }: Props) {
     const removedIds = state.removed_template_ids ?? [];
     setRemovedTemplateIds(removedIds);
 
-    const getResolvedAssignee = (task: Partial<LocalTask>) => {
-      if (task.assigned_user_id) {
-        const u = users.find((u) => u.id === task.assigned_user_id);
-        return { id: u?.id ?? null, name: u?.name ?? null };
-      }
-      if (task.assign_to_commercial === 1) {
-        return { id: null, name: state.created_by_name || "Comercial del proyecto" };
-      }
-      if (task.area_id) {
-        const areaUser = users.find(u => u.area_id === task.area_id && u.rol_id === 4 && u.is_internal === 1);
-        return { id: areaUser?.id ?? null, name: areaUser?.name ?? null };
-      }
-      return { id: null, name: null };
-    };
-
     const templateTasks: LocalTask[] = templates
       .filter((t) => !removedIds.includes(t.id))
       .map((t) => {
@@ -291,11 +75,14 @@ export function WizardStep4Tasks({ state, onNext, onBack, update }: Props) {
         const resolvedUserId = existing?.assigned_user_id !== undefined ? existing.assigned_user_id : t.assigned_user_id;
         const assignToComm = existing?.assign_to_commercial !== undefined ? existing.assign_to_commercial : t.assign_to_commercial;
 
-        const { id: finalId, name: resolvedUserName } = getResolvedAssignee({
+        const partialTask = {
           assigned_user_id: resolvedUserId,
           assign_to_commercial: assignToComm,
-          area_id: t.area_id
-        });
+          area_id: t.area_id,
+          requires_quote: t.requires_quote === 1,
+        };
+
+        const resolvedUserName = resolveAssigneeName(partialTask, users, state.created_by_name);
 
         return {
           id: t.id,
@@ -305,10 +92,10 @@ export function WizardStep4Tasks({ state, onNext, onBack, update }: Props) {
           description: t.description || "",
           area_id: t.area_id,
           area_name: t.area_name,
-          assigned_user_id: finalId,
+          assigned_user_id: resolvedUserId,
           assigned_user_name: resolvedUserName,
           assign_to_commercial: assignToComm,
-          assign_mode: deriveAssignMode({ assigned_user_id: finalId, assign_to_commercial: assignToComm }),
+          assign_mode: deriveAssignMode(partialTask),
           requires_quote: t.requires_quote === 1,
           quoter_ids: t.quoters?.map(q => q.user_id) ?? [],
           order_index: existing?.order_index ?? t.order_index,
@@ -317,11 +104,14 @@ export function WizardStep4Tasks({ state, onNext, onBack, update }: Props) {
       });
 
     const extraRows: LocalTask[] = (state.extra_tasks ?? []).map((e) => {
-      const { id: finalId, name: resolvedUserName } = getResolvedAssignee({
+      const partialTask = {
         assigned_user_id: e.assigned_user_id,
         assign_to_commercial: e.assign_to_commercial,
-        area_id: e.area_id
-      });
+        area_id: e.area_id,
+        requires_quote: false,
+      };
+
+      const resolvedUserName = resolveAssigneeName(partialTask, users, state.created_by_name);
 
       return {
         id: e.localId,
@@ -331,10 +121,10 @@ export function WizardStep4Tasks({ state, onNext, onBack, update }: Props) {
         description: "",
         area_id: e.area_id,
         area_name: null,
-        assigned_user_id: finalId,
+        assigned_user_id: e.assigned_user_id,
         assigned_user_name: resolvedUserName,
         assign_to_commercial: e.assign_to_commercial ?? 0,
-        assign_mode: deriveAssignMode({ assigned_user_id: finalId, assign_to_commercial: e.assign_to_commercial }),
+        assign_mode: deriveAssignMode(partialTask),
         requires_quote: false,
         quoter_ids: [],
         order_index: e.order_index,
@@ -474,99 +264,12 @@ export function WizardStep4Tasks({ state, onNext, onBack, update }: Props) {
         </div>
 
         <div className="p-4 space-y-4">
-          {localTasks.length === 0 ? (
-            <div className="text-center py-8 border rounded-lg border-dashed">
-              <p className="text-sm text-muted-foreground">No hay tareas definidas.</p>
-            </div>
-          ) : (
-            <SortableList
-              items={localTasks}
-              onReorder={handleReorder}
-              renderItem={(task, dragHandle) => {
-                const isValidation = task.task_type === "validation";
-                return (
-                  <div className="flex items-start gap-3 rounded-md border bg-card p-3 shadow-sm hover:shadow-md transition-shadow">
-                    <div className="flex-shrink-0 pt-0.5">{dragHandle}</div>
-                    
-                    <div className="flex-shrink-0 pt-1 pl-1">
-                      <Clock className="h-4 w-4 text-muted-foreground/50" />
-                    </div>
-
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center flex-wrap gap-2 mb-0.5">
-                        <p className="font-semibold text-sm leading-snug">{task.title}</p>
-                        <span className="text-muted-foreground/40 text-xs select-none">·</span>
-                        <Badge variant="outline" className={`text-[10px] h-4 px-1.5 ${isValidation ? "bg-purple-50 text-purple-700 border-purple-200" : "bg-blue-50 text-blue-700 border-blue-200"}`}>
-                          {isValidation && <ShieldCheck className="h-2.5 w-2.5 mr-1" />}
-                          {isValidation ? "Validación" : "Ejecución"}
-                        </Badge>
-                        {task.requires_quote && (
-                          <Badge variant="outline" className="text-[10px] h-4 px-1.5 text-amber-700 border-amber-400 bg-amber-50">
-                            Cotización requerida
-                          </Badge>
-                        )}
-                        {task.isExtra && (
-                          <Badge variant="outline" className="text-[10px] h-4 px-1.5 text-emerald-700 border-emerald-400 bg-emerald-50">
-                            Nueva
-                          </Badge>
-                        )}
-                      </div>
-
-                      {task.description && (
-                        <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">{task.description}</p>
-                      )}
-
-                      <div className="flex flex-wrap items-center gap-1.5 mt-2">
-                        {task.area_name && (
-                          <>
-                            <Badge variant="secondary" className="text-[10px] h-4 px-1.5 uppercase font-semibold tracking-wider">
-                              {task.area_name}
-                            </Badge>
-                            <span className="text-muted-foreground/40 text-xs select-none">·</span>
-                          </>
-                        )}
-                        {task.assigned_user_name ? (
-                          <Badge variant="outline" className="text-[10px] h-4 px-1.5 flex items-center gap-1">
-                            <User className="h-2.5 w-2.5" />
-                            {task.assigned_user_name}
-                            {task.assign_mode === "auto" && <span className="text-[9px] opacity-60 ml-0.5 italic">(auto)</span>}
-                          </Badge>
-                        ) : (
-                          <Badge variant="outline" className="text-[10px] h-4 px-1.5 text-muted-foreground border-dashed">
-                             Sin asignar
-                          </Badge>
-                        )}
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-1 flex-shrink-0">
-                      <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium bg-muted text-muted-foreground">
-                        En espera
-                      </div>
-                      
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-7 w-7"
-                        onClick={() => setTaskToEdit(task)}
-                      >
-                        <Pencil className="h-3.5 w-3.5 text-muted-foreground" />
-                      </Button>
-
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-7 w-7 text-destructive hover:text-destructive"
-                        onClick={() => handleRemoveTask(task)}
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </Button>
-                    </div>
-                  </div>
-                );
-              }}
-            />
-          )}
+          <ProjectTaskEditorList 
+            tasks={localTasks}
+            onReorder={handleReorder}
+            onEdit={setTaskToEdit}
+            onRemove={handleRemoveTask}
+          />
         </div>
       </div>
 
@@ -585,11 +288,4 @@ export function WizardStep4Tasks({ state, onNext, onBack, update }: Props) {
       />
     </div>
   );
-}
-
-interface Props {
-  state: WizardState;
-  onNext: (data: Partial<WizardState>) => void;
-  onBack: () => void;
-  update: (data: Partial<WizardState>) => void;
 }
