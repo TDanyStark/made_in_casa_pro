@@ -325,15 +325,33 @@ export type TaskQuoteType = {
   price: number | null;
   delivery_days: number | null;
   delivery_hours: number | null;
+  delivery_minutes: number | null;
   notes: string | null;
   status: QuoteStatus;
   created_at: string;
   updated_at: string;
 };
 
+export const QuoteSubmissionSchema = z.object({
+  price: z.coerce.number().positive(),
+  delivery_days: z.coerce.number().int().nonnegative().optional().nullable(),
+  delivery_hours: z.coerce.number().int().nonnegative().optional().nullable(),
+  delivery_minutes: z.coerce.number().int().nonnegative().optional().nullable(),
+  notes: z.string().optional().nullable(),
+}).refine((data) => {
+  const total = (data.delivery_days || 0) + (data.delivery_hours || 0) + (data.delivery_minutes || 0);
+  return total > 0;
+}, {
+  message: "At least one time unit (days, hours, or minutes) must be provided and positive.",
+  path: ["delivery_days"],
+});
+
 export type TaskQuoteInvitationType = {
   id: number;
   task_id: number;
+  task_title?: string;
+  project_id?: number;
+  project_name?: string;
   user_id: number;
   user_name: string;
   invited_by: number | null;

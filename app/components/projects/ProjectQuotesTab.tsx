@@ -5,6 +5,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { get, post, patch, del } from "@/lib/services/apiService";
 import { ProjectTaskType, TaskQuoteType, TaskQuoteInvitationType } from "@/lib/definitions";
+import { formatDHM } from "@/lib/utils/time";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -53,7 +54,7 @@ import {
 interface CollaboratorOption {
   id: number;
   name: string;
-  is_internal: number;
+  is_internal: boolean;
   area_name?: string;
 }
 
@@ -101,7 +102,7 @@ export function ProjectQuotesTab({ projectId, canEdit }: Props) {
       const params = new URLSearchParams({ only_external: "1" });
       if (inviteDialogTask?.area_id) params.set("area_id", inviteDialogTask.area_id.toString());
       const res = await get<CollaboratorOption[]>(`collaborators?${params}`);
-      return res.ok ? (res.data ?? []) : [];
+      return res.ok ? (res.data?.map(u => ({ ...u, is_internal: Boolean(u.is_internal) })) ?? []) : [];
     },
     enabled: !!inviteDialogTask,
   });
@@ -459,16 +460,9 @@ function TaskQuoteCard({
                             ${Number(quote.price).toLocaleString("es-CO")}
                           </span>
                         )}
-                        {quote.delivery_days !== null && (
-                          <span className="text-muted-foreground">
-                            {quote.delivery_days} día(s)
-                          </span>
-                        )}
-                        {quote.delivery_hours !== null && (
-                          <span className="text-muted-foreground">
-                            {quote.delivery_hours} hora(s)
-                          </span>
-                        )}
+                        <span className="text-muted-foreground">
+                          Tiempo estimado: {formatDHM(quote.delivery_minutes)}
+                        </span>
                       </div>
 
                       {quote.notes && (

@@ -282,6 +282,7 @@
 | `/dashboard` | Panel principal personalizado por rol | Todos |
 | `/clients` | Lista de clientes + creación/edición | ADMIN, COMERCIAL, DIRECTIVO |
 | `/clients/[id]` | Detalle de cliente (managers, marcas) | ADMIN, COMERCIAL, DIRECTIVO |
+| `/my-quotes` | Dashboard para colaboradores (invitaciones y cotizaciones) | COLABORADOR, ADMIN, DIRECTIVO, COMERCIAL |
 | `/managers` | Lista de gerentes + creación/edición | ADMIN, COMERCIAL, DIRECTIVO |
 | `/managers/[id]` | Detalle de gerente | ADMIN, COMERCIAL, DIRECTIVO |
 | `/brands` | Lista de marcas + creación/edición | ADMIN, COMERCIAL, DIRECTIVO |
@@ -371,7 +372,7 @@ MARCAS → HISTORIAL DE CAMBIOS
 
 ## 🚀 Endpoints API Disponibles (Resumen)
 
-Total de endpoints implementados: **18+ rutas API**
+Total de endpoints implementados: **21+ rutas API**
 
 **Usuarios (Users):**
 - `GET/POST /api/users`
@@ -390,6 +391,11 @@ Total de endpoints implementados: **18+ rutas API**
 - `GET/POST /api/brands`
 - `PATCH /api/brands/[id]`
 - `GET /api/brands/history`
+
+**Cotizaciones (Quotes):**
+- `GET /api/my-quotes`
+- `POST /api/projects/[id]/tasks/[tid]/quotes/submit`
+- `PATCH /api/projects/[id]/tasks/[tid]/quotes/[qid]`
 
 **Catálogos:**
 - `GET/POST /api/skills`
@@ -625,6 +631,30 @@ Vista operativa para seguimiento transversal de tareas de proyectos con filtros 
 - `GET /api/users/assignable` — usuarios disponibles para filtro de asignación
 
 ---
+
+### 1️⃣2️⃣ Gestión de COTIZACIONES (Quotes)
+
+Módulo para la interacción entre creadores de proyectos y colaboradores externos.
+
+**¿Qué se puede hacer?**
+- ✅ **Dashboard de Colaborador**: Nueva vista dedicada `/my-quotes` para que colaboradores externos gestionen sus invitaciones.
+- ✅ **Invitaciones a Cotizar**: Los colaboradores ven tareas a las que han sido invitados por creadores de proyectos.
+- ✅ **Envío de Cotizaciones**: Los colaboradores pueden enviar propuestas con precio (COP) y tiempo de entrega detallado.
+- ✅ **Seguimiento de Estado**: Los colaboradores ven si sus cotizaciones están "Pendientes", "Aceptadas" o "Rechazadas".
+- ✅ **Granularidad de Tiempo**: Almacenamiento y visualización de tiempo de entrega en días, horas y minutos (guardado internamente en minutos).
+- ✅ **Aceptación Automática**: Al aceptar una cotización, el sistema asigna automáticamente al colaborador a la tarea y cambia el estado de la tarea a "En Progreso".
+
+**Permisos:**
+- Ver invitaciones y enviar cotizaciones: COLABORADOR
+- Gestionar invitaciones y aceptar cotizaciones: ADMIN, DIRECTIVO, COMERCIAL
+
+**Endpoints API:**
+- `GET /api/my-quotes` — Listar invitaciones y cotizaciones enviadas por el usuario actual
+- `POST /api/projects/[id]/tasks/[tid]/quotes/submit` — Enviar una cotización para una tarea
+- `PATCH /api/projects/[id]/tasks/[tid]/quotes/[qid]` — Aceptar/Rechazar cotización (solo creadores/admin)
+
+---
+
 
 **Última actualización:** 2026-03-31
 **Versión de Next.js:** 15.3.2

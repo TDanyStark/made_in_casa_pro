@@ -153,7 +153,15 @@ export function AdjustmentWizard({
   }, [step, templates, users, createdByName]);
 
   const updateTask = (taskId: number, changes: Partial<LocalTask>) =>
-    setLocalTasks(prev => prev.map(t => t.id === taskId ? { ...t, ...changes } : t));
+    setLocalTasks(prev => {
+      const exists = prev.find(t => t.id === taskId);
+      if (exists) {
+        return prev.map(t => t.id === taskId ? { ...t, ...changes } : t);
+      } else {
+        // New task confirmed
+        return [...prev, { ...(changes as LocalTask), order_index: prev.length }];
+      }
+    });
 
   const handleReorder = (reordered: LocalTask[]) =>
     setLocalTasks(reordered.map((t, i) => ({ ...t, order_index: i })));
@@ -168,7 +176,7 @@ export function AdjustmentWizard({
       requires_quote: false, quoter_ids: [],
       order_index: localTasks.length, task_type: "execution",
     };
-    setLocalTasks(prev => [...prev, task]);
+    // Note: NOT adding to localTasks yet
     setTaskToEdit(task);
   };
 

@@ -164,7 +164,14 @@ export function WizardStep4Tasks({ state, onNext, onBack, update }: Props) {
 
   const updateTask = (taskId: number, changes: Partial<LocalTask>) => {
     setLocalTasks((prev) => {
-      const updated = prev.map((t) => (t.id === taskId ? { ...t, ...changes } : t));
+      const exists = prev.find((t) => t.id === taskId);
+      let updated;
+      if (exists) {
+        updated = prev.map((t) => (t.id === taskId ? { ...t, ...changes } : t));
+      } else {
+        // It's a new task confirmed in the dialog
+        updated = [...prev, { ...(changes as LocalTask), order_index: prev.length }];
+      }
       syncWizardState(updated, removedTemplateIds);
       return updated;
     });
@@ -195,10 +202,8 @@ export function WizardStep4Tasks({ state, onNext, onBack, update }: Props) {
       order_index: localTasks.length,
       task_type: "execution",
     };
-    const updated = [...localTasks, newTask];
-    setLocalTasks(updated);
+    // Note: NOT adding to localTasks yet
     setTaskToEdit(newTask);
-    syncWizardState(updated, removedTemplateIds);
   };
 
   const handleRemoveTask = (task: LocalTask) => {

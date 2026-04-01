@@ -97,33 +97,30 @@ interface TaskSettingsDialogProps {
 }
 
 export function TaskSettingsDialog({ open, onOpenChange, task, projectId, onSave, users, createdByName }: TaskSettingsDialogProps) {
-  const [draftTitle, setDraftTitle] = useState("");
-  const [draftDescription, setDraftDescription] = useState("");
-  const [draftType, setDraftType] = useState<"execution" | "validation">("execution");
+  const [draft, setDraft] = useState<LocalTask | null>(null);
 
   useEffect(() => {
-    if (task) {
-      setDraftTitle(task.title);
-      setDraftDescription(task.description || "");
-      setDraftType(task.task_type);
+    if (task && open) {
+      setDraft({ ...task });
+    } else if (!open) {
+      setDraft(null);
     }
   }, [task, open]);
 
-  if (!task) return null;
+  if (!draft) return null;
 
   const handleDone = () => {
-    onSave(task.id, {
-      title: draftTitle,
-      description: draftDescription,
-      task_type: draftType,
-    });
+    onSave(draft.id, draft);
     onOpenChange(false);
   };
 
-  const resolveAndSave = (changes: Partial<LocalTask>) => {
-    const nextTask = { ...task, ...changes };
-    const resolvedName = resolveAssigneeName(nextTask, users, createdByName);
-    onSave(task.id, { ...changes, assigned_user_name: resolvedName });
+  const updateDraft = (changes: Partial<LocalTask>) => {
+    setDraft(prev => {
+      if (!prev) return null;
+      const next = { ...prev, ...changes };
+      const resolvedName = resolveAssigneeName(next, users, createdByName);
+      return { ...next, assigned_user_name: resolvedName };
+    });
   };
 
   return (
@@ -137,8 +134,8 @@ export function TaskSettingsDialog({ open, onOpenChange, task, projectId, onSave
           <div className="space-y-2">
             <label className="text-sm font-medium">Título</label>
             <Input
-              value={draftTitle}
-              onChange={(e) => setDraftTitle(e.target.value)}
+              value={draft.title}
+              onChange={(e) => updateDraft({ title: e.target.value })}
               placeholder="Título de la tarea"
             />
           </div>
@@ -146,8 +143,8 @@ export function TaskSettingsDialog({ open, onOpenChange, task, projectId, onSave
           <div className="space-y-2">
             <label className="text-sm font-medium">Descripción (opcional)</label>
             <Input
-              value={draftDescription}
-              onChange={(e) => setDraftDescription(e.target.value)}
+              value={draft.description}
+              onChange={(e) => updateDraft({ description: e.target.value })}
               placeholder="Añade detalles sobre esta tarea..."
             />
           </div>
@@ -155,8 +152,8 @@ export function TaskSettingsDialog({ open, onOpenChange, task, projectId, onSave
           <div className="space-y-2">
             <label className="text-sm font-medium">Tipo de tarea</label>
             <Select 
-              value={draftType} 
-              onValueChange={(v) => setDraftType(v as "execution" | "validation")}
+              value={draft.task_type} 
+              onValueChange={(v) => updateDraft({ task_type: v as "execution" | "validation" })}
             >
               <SelectTrigger>
                 <SelectValue />
@@ -171,11 +168,11 @@ export function TaskSettingsDialog({ open, onOpenChange, task, projectId, onSave
           <div className="flex items-start gap-3 rounded-md border p-3">
             <Checkbox
               id="requires_quote_shared"
-              checked={task.requires_quote}
-              onCheckedChange={(checked) => resolveAndSave({ 
+              checked={draft.requires_quote}
+              onCheckedChange={(checked) => updateDraft({ 
                 requires_quote: !!checked, 
-                assigned_user_id: checked ? null : task.assigned_user_id,
-                assign_mode: checked ? "auto" : task.assign_mode
+                assigned_user_id: checked ? null : draft.assigned_user_id,
+                assign_mode: checked ? "auto" : draft.assign_mode
               })}
             />
             <div className="space-y-1 -mt-1">
@@ -190,18 +187,18 @@ export function TaskSettingsDialog({ open, onOpenChange, task, projectId, onSave
 
           <div className="space-y-1">
             <TaskAssignmentSelector
-              assignMode={task.assign_mode}
-              onAssignModeChange={(mode) => resolveAndSave({ assign_mode: mode })}
-              areaId={task.area_id}
-              onAreaIdChange={(id) => resolveAndSave({ 
+              assignMode={draft.assign_mode}
+              onAssignModeChange={(mode) => updateDraft({ assign_mode: mode })}
+              areaId={draft.area_id}
+              onAreaIdChange={(id) => updateDraft({ 
                 area_id: id, 
                 area_name: users.find(u => u.area_id === id)?.area_name ?? null 
               })}
-              assignedUserId={task.assigned_user_id}
-              onAssignedUserIdChange={(id) => resolveAndSave({ assigned_user_id: id })}
-              quoterIds={task.quoter_ids}
-              onQuoterIdsChange={(ids) => resolveAndSave({ quoter_ids: ids })}
-              requiresQuote={task.requires_quote}
+              assignedUserId={draft.assigned_user_id}
+              onAssignedUserIdChange={(id) => updateDraft({ assigned_user_id: id })}
+              quoterIds={draft.quoter_ids}
+              onQuoterIdsChange={(ids) => updateDraft({ quoter_ids: ids })}
+              requiresQuote={draft.requires_quote}
               projectId={projectId}
             />
           </div>
@@ -214,6 +211,7 @@ export function TaskSettingsDialog({ open, onOpenChange, task, projectId, onSave
     </Dialog>
   );
 }
+
 
 // ─── Shared Task Card ─────────────────────────────────────────────────────────
 

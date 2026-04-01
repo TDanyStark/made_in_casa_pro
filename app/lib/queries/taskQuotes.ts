@@ -1,6 +1,7 @@
 import { db } from "../db";
 import { revalidatePath } from "next/cache";
 import { TaskQuoteType, TaskQuoteInvitationType } from "../definitions";
+import { dhmToMinutes } from "../utils/time";
 
 // ─── Invitations ──────────────────────────────────────────────────────────────
 
@@ -81,6 +82,7 @@ export async function getTaskQuotes(taskId: number): Promise<TaskQuoteType[]> {
           tq.price,
           tq.delivery_days,
           tq.delivery_hours,
+          tq.delivery_minutes,
           tq.notes,
           tq.status,
           tq.created_at,
@@ -118,6 +120,7 @@ export async function getMyQuotes(userId: number): Promise<TaskQuoteType[]> {
           tq.price,
           tq.delivery_days,
           tq.delivery_hours,
+          tq.delivery_minutes,
           tq.notes,
           tq.status,
           tq.created_at,
@@ -148,6 +151,9 @@ export async function getPendingQuoteInvitations(userId: number): Promise<TaskQu
         SELECT
           tqi.id,
           tqi.task_id,
+          pt.title        AS task_title,
+          pt.project_id,
+          p.title         AS project_name,
           tqi.user_id,
           u.name          AS user_name,
           tqi.invited_by,
@@ -156,6 +162,8 @@ export async function getPendingQuoteInvitations(userId: number): Promise<TaskQu
           tq.status       AS quote_status
         FROM task_quote_invitations tqi
         JOIN users u   ON tqi.user_id    = u.id
+        JOIN project_tasks pt ON tqi.task_id = pt.id
+        JOIN projects p ON pt.project_id = p.id
         LEFT JOIN users ib  ON tqi.invited_by = ib.id
         LEFT JOIN task_quotes tq ON tq.task_id = tqi.task_id AND tq.user_id = tqi.user_id
         WHERE tqi.user_id = $1
@@ -179,6 +187,7 @@ export async function submitQuote(data: {
   price?: number | null;
   delivery_days?: number | null;
   delivery_hours?: number | null;
+  delivery_minutes?: number | null;
   notes?: string | null;
 }): Promise<TaskQuoteType> {
   try {
@@ -191,14 +200,21 @@ export async function submitQuote(data: {
       throw new Error("No tienes invitación para cotizar esta tarea");
     }
 
+    const totalMinutes = dhmToMinutes({
+      days: data.delivery_days || 0,
+      hours: data.delivery_hours || 0,
+      minutes: data.delivery_minutes || 0,
+    });
+
     const result = await db.execute({
       sql: `
-        INSERT INTO task_quotes (task_id, user_id, price, delivery_days, delivery_hours, notes, status)
-        VALUES ($1, $2, $3, $4, $5, $6, 'pending')
+        INSERT INTO task_quotes (task_id, user_id, price, delivery_days, delivery_hours, delivery_minutes, notes, status)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, 'pending')
         ON CONFLICT (task_id, user_id) DO UPDATE SET
           price           = EXCLUDED.price,
           delivery_days   = EXCLUDED.delivery_days,
           delivery_hours  = EXCLUDED.delivery_hours,
+          delivery_minutes = EXCLUDED.delivery_minutes,
           notes           = EXCLUDED.notes,
           status          = 'pending',
           updated_at      = CURRENT_TIMESTAMP
@@ -210,6 +226,7 @@ export async function submitQuote(data: {
         data.price ?? null,
         data.delivery_days ?? null,
         data.delivery_hours ?? null,
+        totalMinutes,
         data.notes ?? null,
       ],
     });

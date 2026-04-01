@@ -1,17 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { z } from "zod";
 import { validateApiRole, validateHttpMethod } from "@/lib/services/api-auth";
-import { UserRole } from "@/lib/definitions";
+import { UserRole, QuoteSubmissionSchema } from "@/lib/definitions";
 import { submitQuote } from "@/lib/queries/taskQuotes";
 import { decrypt } from "@/lib/session";
 import { cookies } from "next/headers";
 
-const bodySchema = z.object({
-  price: z.coerce.number().positive().optional().nullable(),
-  delivery_days: z.coerce.number().int().positive().optional().nullable(),
-  delivery_hours: z.coerce.number().int().positive().optional().nullable(),
-  notes: z.string().optional().nullable(),
-});
+const bodySchema = QuoteSubmissionSchema;
 
 type Params = { params: Promise<{ id: string; tid: string }> };
 
