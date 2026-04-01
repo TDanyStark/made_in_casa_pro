@@ -135,4 +135,26 @@ describe("GET /api/my-tasks", () => {
     expect(data.error).toMatch(/inválidos/i);
     expect(mockGetMyTasks).not.toHaveBeenCalled();
   });
+
+  it("passes all selected statuses including completed", async () => {
+    mockGetMyTasks.mockResolvedValue({ tasks: [], total: 0 });
+
+    const req = new NextRequest(
+      "http://localhost/api/my-tasks?page=1&status=not_started&status=in_progress&status=blocked&status=waiting&status=completed"
+    );
+    const res = await callGet(req);
+
+    expect(res.status).toBe(200);
+    expect(mockGetMyTasks).toHaveBeenCalledWith(
+      expect.objectContaining({
+        statuses: [
+          "not_started",
+          "in_progress",
+          "blocked",
+          "waiting",
+          "completed",
+        ],
+      })
+    );
+  });
 });

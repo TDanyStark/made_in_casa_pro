@@ -251,10 +251,7 @@ export function MyTasksClient() {
     if (brandId) params.set("brandId", brandId);
     if (creatorUserId) params.set("creatorUserId", creatorUserId);
     if (q) params.set("q", q);
-    if (
-      selectedStatuses.length > 0 &&
-      selectedStatuses.length < STATUS_OPTIONS.length
-    ) {
+    if (!hasSameStatuses(selectedStatuses, DEFAULT_STATUS_SET)) {
       selectedStatuses.forEach((s) => params.append("status", s));
     }
     if (assignedFrom) params.set("assignedFrom", toStartOfDayIso(assignedFrom));
