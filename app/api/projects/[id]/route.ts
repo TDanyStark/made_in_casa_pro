@@ -7,6 +7,23 @@ import {
   PROJECT_EDIT_ROLES,
   PROJECT_VIEW_ROLES,
 } from "@/lib/role-groups";
+import {
+  isSupportedProjectDateTime,
+  normalizeOptionalProjectText,
+  normalizeProjectDateTime,
+} from "@/lib/utils/project-date-time";
+
+const projectDateTimeSchema = z
+  .string()
+  .trim()
+  .refine(isSupportedProjectDateTime, "Formato de fecha y hora inválido")
+  .transform(normalizeProjectDateTime);
+
+const nullableTextSchema = z
+  .string()
+  .optional()
+  .nullable()
+  .transform(normalizeOptionalProjectText);
 
 const patchSchema = z.object({
   title: z.string().min(1).max(300).optional(),
@@ -14,6 +31,9 @@ const patchSchema = z.object({
   drive_folder_id: z.string().nullable().optional(),
   drive_folder_url: z.string().url().nullable().optional(),
   notes: z.string().nullable().optional(),
+  ideal_delivery_at: projectDateTimeSchema.optional().nullable(),
+  oc: nullableTextSchema,
+  billing_closed_at: projectDateTimeSchema.optional().nullable(),
   status: z.enum(["active", "paused", "completed", "archived"]).optional(),
   progress: z.coerce.number().int().min(0).max(100).optional(),
 });

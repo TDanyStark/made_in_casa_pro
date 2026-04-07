@@ -6,6 +6,23 @@ import { ITEMS_PER_PAGE } from "@/config/constants";
 import { decrypt } from "@/lib/session";
 import { cookies } from "next/headers";
 import { PROJECT_EDIT_ROLES, PROJECT_VIEW_ROLES } from "@/lib/role-groups";
+import {
+  isSupportedProjectDateTime,
+  normalizeOptionalProjectText,
+  normalizeProjectDateTime,
+} from "@/lib/utils/project-date-time";
+
+const projectDateTimeSchema = z
+  .string()
+  .trim()
+  .refine(isSupportedProjectDateTime, "Formato de fecha y hora inválido")
+  .transform(normalizeProjectDateTime);
+
+const nullableTextSchema = z
+  .string()
+  .optional()
+  .nullable()
+  .transform(normalizeOptionalProjectText);
 
 const projectSchema = z.object({
   title: z.string().min(1, "El título es requerido").max(300),
@@ -16,6 +33,9 @@ const projectSchema = z.object({
   drive_folder_id: z.string().optional().nullable(),
   drive_folder_url: z.string().url().optional().nullable(),
   notes: z.string().optional().nullable(),
+  ideal_delivery_at: projectDateTimeSchema.optional().nullable(),
+  oc: nullableTextSchema,
+  billing_closed_at: projectDateTimeSchema.optional().nullable(),
   status: z.enum(["active", "paused", "completed", "archived"]).optional(),
 });
 

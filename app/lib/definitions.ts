@@ -213,6 +213,9 @@ export type ProjectType = {
   drive_folder_id: string | null;
   drive_folder_url: string | null;
   notes: string | null;
+  ideal_delivery_at: string | null;
+  oc: string | null;
+  billing_closed_at: string | null;
   status: ProjectStatus;
   progress: number;
   created_by: number | null;

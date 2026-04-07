@@ -27,12 +27,16 @@ const PROJECT_SELECT = `
   p.drive_folder_id,
   p.drive_folder_url,
   p.notes,
+  p.ideal_delivery_at,
+  p.oc,
+  p.billing_closed_at,
   p.status,
   p.progress,
   p.created_by,
   u.name           AS created_by_name,
   p.created_at,
-  p.updated_at
+  p.updated_at,
+  p.completed_at
 `;
 
 const PROJECT_JOINS = `
@@ -154,6 +158,9 @@ export async function createProject(data: {
   drive_folder_id?: string | null;
   drive_folder_url?: string | null;
   notes?: string | null;
+  ideal_delivery_at?: string | null;
+  oc?: string | null;
+  billing_closed_at?: string | null;
   status?: ProjectStatus;
   created_by?: number | null;
 }): Promise<ProjectType> {
@@ -161,8 +168,8 @@ export async function createProject(data: {
     const result = await db.execute({
       sql: `
         INSERT INTO projects
-          (title, brand_id, manager_id, product_id, campaign_id, drive_folder_id, drive_folder_url, notes, status, created_by)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+          (title, brand_id, manager_id, product_id, campaign_id, drive_folder_id, drive_folder_url, notes, ideal_delivery_at, oc, billing_closed_at, status, created_by)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
         RETURNING id
       `,
       args: [
@@ -174,6 +181,9 @@ export async function createProject(data: {
         data.drive_folder_id ?? null,
         data.drive_folder_url ?? null,
         data.notes ?? null,
+        data.ideal_delivery_at ?? null,
+        data.oc ?? null,
+        data.billing_closed_at ?? null,
         data.status ?? "active",
         data.created_by ?? null,
       ],
@@ -209,6 +219,9 @@ export async function updateProject(
     drive_folder_id: string | null;
     drive_folder_url: string | null;
     notes: string | null;
+    ideal_delivery_at: string | null;
+    oc: string | null;
+    billing_closed_at: string | null;
     status: ProjectStatus;
     progress: number;
   }>
@@ -230,6 +243,9 @@ export async function updateProject(
       ["drive_folder_id", data.drive_folder_id],
       ["drive_folder_url", data.drive_folder_url],
       ["notes", data.notes],
+      ["ideal_delivery_at", data.ideal_delivery_at],
+      ["oc", data.oc],
+      ["billing_closed_at", data.billing_closed_at],
       ["status", data.status],
       ["progress", data.progress],
     ];
