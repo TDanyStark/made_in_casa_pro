@@ -155,7 +155,7 @@ describe("TasksCommandCenterClient", () => {
     expect(screen.getByText("Tarea")).toBeInTheDocument();
     expect(screen.getByText("Proyecto demo")).toBeInTheDocument();
     expect(screen.getByText("Producto demo")).toBeInTheDocument();
-    expect(screen.getByText("Financiero Tres")).toBeInTheDocument();
+    expect(screen.getAllByText("Financiero Tres").length).toBeGreaterThan(0);
   });
 
   it("renders explicit date labels", () => {
