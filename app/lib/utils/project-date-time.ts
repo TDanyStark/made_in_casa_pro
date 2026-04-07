@@ -36,3 +36,39 @@ export function normalizeOptionalProjectText(value: string | null | undefined) {
   const trimmedValue = value.trim();
   return trimmedValue.length > 0 ? trimmedValue : null;
 }
+
+function pad(value: number) {
+  return value.toString().padStart(2, '0');
+}
+
+export function formatProjectDateTimeForInput(value: string | null | undefined) {
+  if (!value) return '';
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return '';
+  }
+
+  const bogotaDate = new Date(date.getTime() - 5 * 60 * 60 * 1000);
+
+  return `${bogotaDate.getUTCFullYear()}-${pad(bogotaDate.getUTCMonth() + 1)}-${pad(
+    bogotaDate.getUTCDate()
+  )}T${pad(bogotaDate.getUTCHours())}:${pad(bogotaDate.getUTCMinutes())}`;
+}
+
+export function formatProjectDateTimeForDisplay(value: string | null | undefined) {
+  if (!value) return null;
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return null;
+  }
+
+  return new Intl.DateTimeFormat('es-CO', {
+    dateStyle: 'long',
+    timeStyle: 'short',
+    timeZone: 'America/Bogota',
+  }).format(date);
+}

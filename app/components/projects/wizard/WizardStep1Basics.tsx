@@ -22,10 +22,20 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { User, Building2, Loader2 } from "lucide-react";
 import { WizardState } from "@/hooks/useProjectWizard";
+import { isSupportedProjectDateTime } from "@/lib/utils/project-date-time";
 
 const schema = z.object({
   title: z.string().min(1, "El título es requerido").max(300),
   brand_id: z.number({ required_error: "La marca es requerida" }).int().positive(),
+  ideal_delivery_at: z.string().trim().optional().refine(
+    (value) => !value || isSupportedProjectDateTime(value),
+    "Ingresa una fecha y hora válida"
+  ),
+  oc: z.string().optional(),
+  billing_closed_at: z.string().trim().optional().refine(
+    (value) => !value || isSupportedProjectDateTime(value),
+    "Ingresa una fecha y hora válida"
+  ),
 });
 
 type FormValues = z.infer<typeof schema>;
@@ -69,6 +79,9 @@ export function WizardStep1Basics({ state, onNext }: Props) {
     defaultValues: {
       title: state.title,
       brand_id: state.brand_id ?? undefined,
+      ideal_delivery_at: state.ideal_delivery_at,
+      oc: state.oc,
+      billing_closed_at: state.billing_closed_at,
     },
   });
 
@@ -123,6 +136,9 @@ export function WizardStep1Basics({ state, onNext }: Props) {
       manager_id: brandDetail.manager_id,
       manager_name: brandDetail.manager?.name ?? "",
       manager_email: brandDetail.manager?.email ?? "",
+      ideal_delivery_at: values.ideal_delivery_at ?? "",
+      oc: values.oc ?? "",
+      billing_closed_at: values.billing_closed_at ?? "",
     });
   };
 
@@ -183,6 +199,53 @@ export function WizardStep1Basics({ state, onNext }: Props) {
                   filterOption={() => true}
                 />
               </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        <div className="grid gap-4 md:grid-cols-2">
+          <FormField
+            control={form.control}
+            name="ideal_delivery_at"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Fecha ideal de entrega</FormLabel>
+                <FormControl>
+                  <Input type="datetime-local" {...field} value={field.value ?? ""} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <FormField
+            control={form.control}
+            name="oc"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>OC</FormLabel>
+                <FormControl>
+                  <Input placeholder="Opcional" {...field} value={field.value ?? ""} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </div>
+
+        <FormField
+          control={form.control}
+          name="billing_closed_at"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Cierre de facturación</FormLabel>
+              <FormControl>
+                <Input type="datetime-local" {...field} value={field.value ?? ""} />
+              </FormControl>
+              <p className="text-xs text-muted-foreground">
+                Este dato es administrativo y no reemplaza la fecha de finalización operativa.
+              </p>
               <FormMessage />
             </FormItem>
           )}

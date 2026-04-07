@@ -35,6 +35,9 @@ export interface WizardState {
   title: string;
   brand_id: number | null;
   brand_name: string;
+  ideal_delivery_at: string;
+  oc: string;
+  billing_closed_at: string;
   client_id: number | null;
   client_name: string;
   created_by: number | null;
@@ -72,6 +75,9 @@ const INITIAL_STATE: WizardState = {
   title: "",
   brand_id: null,
   brand_name: "",
+  ideal_delivery_at: "",
+  oc: "",
+  billing_closed_at: "",
   client_id: null,
   client_name: "",
   created_by: null,

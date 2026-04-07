@@ -10,6 +10,10 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Loader2 } from "lucide-react";
 import { WizardState } from "@/hooks/useProjectWizard";
 import { ProjectType, ProjectTaskType } from "@/lib/definitions";
+import {
+  normalizeOptionalProjectText,
+  normalizeProjectDateTime,
+} from "@/lib/utils/project-date-time";
 
 const RichTextEditor = dynamic(
   () => import("@/components/clients/RichTextEditor").then((m) => m.RichTextEditor),
@@ -74,6 +78,13 @@ export function WizardStep6Confirm({ state, onBack }: Props) {
         drive_folder_id: drive.projectFolderId,
         drive_folder_url: drive.projectFolderUrl,
         notes: notes || null,
+        ideal_delivery_at: state.ideal_delivery_at
+          ? normalizeProjectDateTime(state.ideal_delivery_at)
+          : null,
+        oc: normalizeOptionalProjectText(state.oc),
+        billing_closed_at: state.billing_closed_at
+          ? normalizeProjectDateTime(state.billing_closed_at)
+          : null,
       });
 
       if (!projectRes.ok || !projectRes.data) {
