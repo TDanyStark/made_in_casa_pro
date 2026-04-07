@@ -9,7 +9,12 @@ jest.mock('next/cache', () => ({
 }));
 
 import { db } from '@/lib/db';
-import { createProject, getProjectById, updateProject } from '@/lib/queries/projects';
+import {
+  createProject,
+  getProjectById,
+  recalculateProjectProgress,
+  updateProject,
+} from '@/lib/queries/projects';
 
 const mockExecute = db.execute as jest.MockedFunction<typeof db.execute>;
 
@@ -127,5 +132,28 @@ describe('project queries metadata fields', () => {
       })
     );
     expect((mockExecute.mock.calls[1]?.[0] as { sql: string }).sql).not.toContain('completed_at');
+  });
+
+  it('recalculateProjectProgress completes the project without overwriting billing closure metadata', async () => {
+    mockExecute
+      .mockResolvedValueOnce(makeResult([{ id: 33 }]))
+      .mockResolvedValueOnce(makeResult([{ total: '4', completed: '4' }]))
+      .mockResolvedValueOnce(makeResult([]))
+      .mockResolvedValueOnce(makeResult([]));
+
+    const progress = await recalculateProjectProgress(33);
+
+    expect(progress).toBe(100);
+    expect(mockExecute).toHaveBeenNthCalledWith(
+      4,
+      expect.objectContaining({
+        sql: expect.stringContaining("completed_at = COALESCE(completed_at, CURRENT_TIMESTAMP)"),
+        args: [100, 33],
+      })
+    );
+
+    const finalUpdateSql = (mockExecute.mock.calls[3]?.[0] as { sql: string }).sql;
+    expect(finalUpdateSql).toContain("completed_at = COALESCE(completed_at, CURRENT_TIMESTAMP)");
+    expect(finalUpdateSql).not.toContain('billing_closed_at');
   });
 });

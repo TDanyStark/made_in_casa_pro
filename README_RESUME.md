@@ -205,10 +205,11 @@
 
 | Rol | ID | Permisos Generales |
 |-----|----|--------------------|
-| **ADMIN** | 4 | Acceso completo a todas las funcionalidades, gestión de usuarios |
+| **ADMIN** | 1 | Acceso completo a todas las funcionalidades, gestión de usuarios |
 | **DIRECTIVO** | 2 | Gestión de clientes, managers, marcas, habilidades, visualización de datos |
-| **COMERCIAL** | 1 | Gestión de clientes, managers, marcas, visualización de datos |
-| **COLABORADOR** | 3 | Visualización de datos, gestión de habilidades propias |
+| **COMERCIAL** | 3 | Gestión de clientes, managers, marcas, visualización de datos |
+| **COLABORADOR** | 4 | Visualización de datos, gestión de habilidades propias |
+| **FINANCIERO** | 5 | Mismo alcance funcional que DIRECTIVO en navegación, listados, detalle y acciones autorizadas |
 
 **Endpoint API:**
 - `GET /api/roles` - Obtener lista de roles disponibles
@@ -300,18 +301,18 @@
 | Ruta | Descripción | Roles Permitidos |
 |------|-------------|------------------|
 | `/dashboard` | Panel principal personalizado por rol | Todos |
-| `/clients` | Lista de clientes + creación/edición | ADMIN, COMERCIAL, DIRECTIVO |
-| `/clients/[id]` | Detalle de cliente (managers, marcas) | ADMIN, COMERCIAL, DIRECTIVO |
-| `/my-quotes` | Dashboard para colaboradores (invitaciones y cotizaciones) | COLABORADOR, ADMIN, DIRECTIVO, COMERCIAL |
-| `/managers` | Lista de gerentes + creación/edición | ADMIN, COMERCIAL, DIRECTIVO |
-| `/managers/[id]` | Detalle de gerente | ADMIN, COMERCIAL, DIRECTIVO |
-| `/brands` | Lista de marcas + creación/edición | ADMIN, COMERCIAL, DIRECTIVO |
-| `/brands/[id]` | Detalle de marca + historial | ADMIN, COMERCIAL, DIRECTIVO |
+| `/clients` | Lista de clientes + creación/edición | ADMIN, COMERCIAL, DIRECTIVO, FINANCIERO |
+| `/clients/[id]` | Detalle de cliente (managers, marcas) | ADMIN, COMERCIAL, DIRECTIVO, FINANCIERO |
+| `/my-quotes` | Dashboard para colaboradores (invitaciones y cotizaciones) | COLABORADOR, ADMIN, DIRECTIVO, COMERCIAL, FINANCIERO |
+| `/managers` | Lista de gerentes + creación/edición | ADMIN, COMERCIAL, DIRECTIVO, FINANCIERO |
+| `/managers/[id]` | Detalle de gerente | ADMIN, COMERCIAL, DIRECTIVO, FINANCIERO |
+| `/brands` | Lista de marcas + creación/edición | ADMIN, COMERCIAL, DIRECTIVO, FINANCIERO |
+| `/brands/[id]` | Detalle de marca + historial | ADMIN, COMERCIAL, DIRECTIVO, FINANCIERO |
 | `/users` | Gestión de usuarios del sistema | Solo ADMIN |
 | `/users/[id]` | Editar usuario (datos, rol, habilidades) | Solo ADMIN |
-| `/projects` | Gestión de proyectos | ADMIN, COMERCIAL, DIRECTIVO |
-| `/tasks` | Gestión de tareas | ADMIN, COMERCIAL, DIRECTIVO |
-| `/products` | Gestión de productos | ADMIN, COMERCIAL, DIRECTIVO |
+| `/projects` | Gestión de proyectos | ADMIN, COMERCIAL, DIRECTIVO, FINANCIERO |
+| `/tasks` | Gestión de tareas | ADMIN, COMERCIAL, DIRECTIVO, FINANCIERO |
+| `/products` | Gestión de productos | ADMIN, COMERCIAL, DIRECTIVO, FINANCIERO |
 
 ---
 
@@ -559,23 +560,29 @@ El núcleo central de la aplicación. Organiza la ejecución de productos (servi
 - ✅ Asociar proyecto a una campaña (creatable inline con React Select async)
 - ✅ Crear carpetas en Google Drive con estructura: `Made In Casa/{cliente}/{marca}/{proyecto}/{producto}/`
 - ✅ Notas del proyecto con editor TipTap (Markdown enriquecido)
+- ✅ Capturar y mostrar en detalle la fecha ideal de entrega, OC opcional y cierre de facturación
 - ✅ Estados de proyecto: Activo, Pausado, Completado, Archivado
 - ✅ Progreso automático calculado como `tareas completadas / total`
 - ✅ Vista de tareas por producto (tabs), con cambio de estado inline y drag & drop para reordenar
 - ✅ Gestión de co-responsables desde la página de detalle
 - ✅ Filtros en lista: búsqueda, estado
 
+**Aclaración de negocio importante:**
+- `completed_at` = terminación operativa del proyecto
+- `billing_closed_at` = cierre administrativo / facturación
+- Ambos hitos permanecen separados y solo se exponen en el detalle del proyecto
+
 **Permisos:**
-- Crear/Editar proyecto: ADMIN, DIRECTIVO, COMERCIAL
+- Crear/Editar proyecto: ADMIN, DIRECTIVO, FINANCIERO, COMERCIAL
 - Ver lista y detalle: Todos los roles
 - Cambiar estado de tareas: Todos los roles
-- Eliminar proyecto: ADMIN, DIRECTIVO
+- Eliminar proyecto: ADMIN, DIRECTIVO, FINANCIERO
 
 **Endpoints API:**
 - `GET /api/projects` — lista paginada con filtros
 - `POST /api/projects` — crear proyecto
 - `GET /api/projects/[id]` — detalle completo (co-managers, productos, metadata)
-- `PATCH /api/projects/[id]` — editar (título, estado, notas, campaña, drive)
+- `PATCH /api/projects/[id]` — editar (título, estado, notas, campaña, drive y metadata de negocio)
 - `DELETE /api/projects/[id]` — eliminar
 - `POST /api/projects/[id]/managers` — agregar co-responsable
 - `DELETE /api/projects/[id]/managers` — quitar co-responsable
@@ -589,7 +596,7 @@ El núcleo central de la aplicación. Organiza la ejecución de productos (servi
 
 **Tablas de base de datos:**
 - `campaigns` — campañas (nombre, fecha)
-- `projects` — proyectos con FK a brand, manager, campaign, product; campos drive, notes, status, progress
+- `projects` — proyectos con FK a brand, manager, campaign, product; campos drive, notes, status, progress, `ideal_delivery_at`, `oc`, `billing_closed_at`
 - `project_managers` — join table de co-responsables
 - `project_tasks` — instancias de tareas (heredadas de templates o manuales)
 

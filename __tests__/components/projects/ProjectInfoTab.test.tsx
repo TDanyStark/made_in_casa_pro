@@ -1,7 +1,10 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { ProjectInfoTab } from '@/components/projects/ProjectInfoTab';
-import { normalizeProjectDateTime } from '@/lib/utils/project-date-time';
+import {
+  formatProjectDateTimeForDisplay,
+  normalizeProjectDateTime,
+} from '@/lib/utils/project-date-time';
 
 const mockPatch = jest.fn();
 const mockInvalidateQueries = jest.fn();
@@ -147,5 +150,56 @@ describe('ProjectInfoTab', () => {
     expect(screen.getByText('Sin definir')).toBeInTheDocument();
     expect(screen.getByText('Sin OC')).toBeInTheDocument();
     expect(screen.getByText('Sin cierre de facturación')).toBeInTheDocument();
+  });
+
+  it('shows project metadata in detail view with billing closure helper text', () => {
+    const expectedIdealDelivery = formatProjectDateTimeForDisplay('2026-04-07T14:30:00.000Z');
+    const expectedBillingClosure = formatProjectDateTimeForDisplay('2026-04-20T17:00:00.000Z');
+
+    render(
+      <ProjectInfoTab
+        canEdit={false}
+        project={{
+          id: 14,
+          title: 'Proyecto Tres',
+          brand_id: 1,
+          brand_name: 'Marca Tres',
+          manager_id: 2,
+          manager_name: 'Ana',
+          client_id: 3,
+          client_name: 'Cliente Tres',
+          campaign_id: null,
+          campaign_name: null,
+          product_id: 4,
+          product_name: 'Producto Tres',
+          product_category_name: null,
+          drive_folder_id: null,
+          drive_folder_url: null,
+          notes: null,
+          ideal_delivery_at: '2026-04-07T14:30:00.000Z',
+          oc: 'OC-777',
+          billing_closed_at: '2026-04-20T17:00:00.000Z',
+          status: 'active',
+          progress: 0,
+          created_by: null,
+          created_by_name: null,
+          created_at: '2026-04-01T10:00:00.000Z',
+          updated_at: '2026-04-02T12:00:00.000Z',
+          co_managers: [],
+        }}
+      />
+    );
+
+    expect(
+      screen.getByText((content) => content.replace(/\s/g, ' ') === expectedIdealDelivery?.replace(/\s/g, ' '))
+    ).toBeInTheDocument();
+    expect(screen.getByText('OC-777')).toBeInTheDocument();
+    expect(
+      screen.getByText((content) => content.replace(/\s/g, ' ') === expectedBillingClosure?.replace(/\s/g, ' '))
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/corresponde al cierre administrativo\/facturación, no a/i)
+    ).toBeInTheDocument();
+    expect(screen.getByText('completed_at')).toBeInTheDocument();
   });
 });
