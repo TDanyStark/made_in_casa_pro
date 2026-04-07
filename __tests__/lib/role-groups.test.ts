@@ -13,8 +13,9 @@ describe('role-groups', () => {
   it('preserves the current project view access matrix', () => {
     expect(PROJECT_VIEW_ROLES).toEqual([
       UserRole.ADMIN,
-      UserRole.COMERCIAL,
       UserRole.DIRECTIVO,
+      UserRole.FINANCIERO,
+      UserRole.COMERCIAL,
       UserRole.COLABORADOR,
     ]);
   });
@@ -23,19 +24,21 @@ describe('role-groups', () => {
     expect(PROJECT_EDIT_ROLES).toBe(OPERATIONS_ROLES);
     expect(PROJECT_EDIT_ROLES).toEqual([
       UserRole.ADMIN,
-      UserRole.COMERCIAL,
       UserRole.DIRECTIVO,
+      UserRole.FINANCIERO,
+      UserRole.COMERCIAL,
     ]);
   });
 
-  it('keeps directivo-only scope separate for later financial parity rollout', () => {
-    expect(DIRECTIVO_SCOPE_ROLES).toEqual([UserRole.DIRECTIVO]);
+  it('gives financiero the same directivo-scope permissions', () => {
+    expect(DIRECTIVO_SCOPE_ROLES).toEqual([UserRole.DIRECTIVO, UserRole.FINANCIERO]);
     expect(ADMIN_ONLY_ROLES).toEqual([UserRole.ADMIN]);
-    expect(LEADERSHIP_ROLES).toEqual([UserRole.ADMIN, UserRole.DIRECTIVO]);
+    expect(LEADERSHIP_ROLES).toEqual([UserRole.ADMIN, UserRole.DIRECTIVO, UserRole.FINANCIERO]);
   });
 
   it('hasAnyRole matches membership against readonly role groups', () => {
     expect(hasAnyRole(UserRole.ADMIN, PROJECT_EDIT_ROLES)).toBe(true);
+    expect(hasAnyRole(UserRole.FINANCIERO, PROJECT_EDIT_ROLES)).toBe(true);
     expect(hasAnyRole(UserRole.COLABORADOR, PROJECT_EDIT_ROLES)).toBe(false);
   });
 });

@@ -1,5 +1,5 @@
-import { UserRole } from "@/lib/definitions";
 import { getBrandManagerHistory } from "@/lib/queries/brands";
+import { OPERATIONS_ROLES } from "@/lib/role-groups";
 import { validateApiRole, validateHttpMethod } from "@/lib/services/api-auth";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -10,11 +10,7 @@ export async function GET(request: NextRequest) {
     return methodValidation.response;
   }
 
-  const roleValidation = await validateApiRole(request, [
-    UserRole.ADMIN,
-    UserRole.COMERCIAL,
-    UserRole.DIRECTIVO,
-  ]);
+  const roleValidation = await validateApiRole(request, OPERATIONS_ROLES);
   if (!roleValidation.isAuthorized) {
     return roleValidation.response;
   }

@@ -211,6 +211,30 @@ describe('POST /validate — reject action', () => {
 // ── 5.8: approve path works unchanged ────────────────────────────────────────
 
 describe('POST /validate — approve action', () => {
+  it('allows financiero to override validation the same as directivo', async () => {
+    mockValidateHttpMethod.mockReturnValue({ isValidMethod: true, response: undefined });
+    mockValidateApiRole.mockResolvedValue({
+      isAuthorized: true,
+      userRole: 5 as never,
+      response: undefined,
+    } as never);
+    mockCookies.mockResolvedValue({
+      get: jest.fn().mockReturnValue({ value: 'fake-cookie' }),
+    } as never);
+    mockDecrypt.mockResolvedValue({ id: 99 } as never);
+    mockRecalculate.mockResolvedValue(undefined as never);
+    mockGetProjectTaskById.mockResolvedValue(makeValidationTask({ assigned_user_id: 5 }) as never);
+    mockValidateTask.mockResolvedValue({
+      task: makeValidationTask({ status: 'completed' }) as never,
+      targetTask: null,
+    });
+
+    const res = await callPost(makeRequest({ action: 'approve' }), makeParams());
+
+    expect(res.status).toBe(200);
+    expect(mockValidateTask).toHaveBeenCalledWith(10, 99, 'approve', undefined, undefined);
+  });
+
   it('5.8 — returns 200 and calls validateTask with action=approve', async () => {
     setupAuthMocks();
     mockGetProjectTaskById.mockResolvedValue(makeValidationTask() as never);

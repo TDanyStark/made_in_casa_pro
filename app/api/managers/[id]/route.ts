@@ -3,7 +3,7 @@ import { z } from "zod";
 import { getManagerByEmail, getManagerById, updateManager } from "@/lib/queries/managers";
 import { revalidatePath } from "next/cache";
 import { validateApiRole, validateHttpMethod } from "@/lib/services/api-auth";
-import { UserRole } from "@/lib/definitions";
+import { OPERATIONS_ROLES } from "@/lib/role-groups";
 
 // Schema for validating manager update data
 const managerUpdateSchema = z.object({
@@ -24,11 +24,7 @@ export async function PATCH(
   }
 
   // Validate user role (only admins and commercial roles can update managers)
-  const roleValidation = await validateApiRole(request, [
-    UserRole.ADMIN,
-    UserRole.COMERCIAL,
-    UserRole.DIRECTIVO,
-  ]);
+  const roleValidation = await validateApiRole(request, OPERATIONS_ROLES);
   if (!roleValidation.isAuthorized) {
     return roleValidation.response;
   }
@@ -106,11 +102,7 @@ export async function GET(
   }
 
   // Validate user role (only admins and commercial roles can view managers)
-  const roleValidation = await validateApiRole(request, [
-    UserRole.ADMIN,
-    UserRole.COMERCIAL,
-    UserRole.DIRECTIVO,
-  ]);
+  const roleValidation = await validateApiRole(request, OPERATIONS_ROLES);
   if (!roleValidation.isAuthorized) {
     return roleValidation.response;
   }

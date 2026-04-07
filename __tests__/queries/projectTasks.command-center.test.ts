@@ -24,7 +24,7 @@ describe("getTasksCommandCenterWithPagination", () => {
     jest.clearAllMocks();
   });
 
-  it("always constrains creator role to admin/directivo/comercial", async () => {
+  it("always constrains creator role to admin/directivo/financiero/comercial", async () => {
     mockExecute
       .mockResolvedValueOnce(makeResult([{ count: 2 }]))
       .mockResolvedValueOnce(
@@ -54,7 +54,7 @@ describe("getTasksCommandCenterWithPagination", () => {
 
     const countCall = mockExecute.mock.calls[0][0] as { sql: string; args: unknown[] };
     expect(countCall.sql).toContain("creator.rol_id = ANY($");
-    expect(countCall.args).toContainEqual([1, 2, 3]);
+    expect(countCall.args).toContainEqual([1, 2, 5, 3]);
   });
 
   it("applies creatorUserId filter over project creator user", async () => {

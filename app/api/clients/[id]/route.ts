@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { getClientById, updateClient } from "@/lib/queries/clients";
 import { validateApiRole, validateHttpMethod } from "@/lib/services/api-auth";
-import { UserRole } from "@/lib/definitions";
+import { OPERATIONS_ROLES } from "@/lib/role-groups";
 
 // Schema para validar los datos de actualización del cliente
 const clientUpdateSchema = z.object({
@@ -22,11 +22,7 @@ export async function PATCH(
   }
 
   // Validar rol del usuario
-  const roleValidation = await validateApiRole(request, [
-    UserRole.ADMIN, 
-    UserRole.COMERCIAL, 
-    UserRole.DIRECTIVO
-  ]);
+  const roleValidation = await validateApiRole(request, OPERATIONS_ROLES);
   if (!roleValidation.isAuthorized) {
     return roleValidation.response;
   }

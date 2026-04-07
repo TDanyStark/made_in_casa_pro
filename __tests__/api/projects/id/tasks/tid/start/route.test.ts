@@ -161,6 +161,24 @@ describe('POST /start — success cases', () => {
       })
     );
   });
+
+  it('returns 200 when financiero user who is project creator starts a task', async () => {
+    setupAuthMocks(8, 5); // userId=8, role=FINANCIERO
+    mockGetProjectTaskById.mockResolvedValue(makeTask({ assigned_user_id: 99 }) as never);
+    mockDbExecute.mockResolvedValueOnce({
+      rows: [{ created_by: 8 }],
+      columns: [],
+      columnTypes: [],
+      rowsAffected: 1,
+      toJSON: () => ({}),
+    } as never);
+    mockStartTask.mockResolvedValue({ success: true });
+
+    const res = await callPost(makeRequest(), makeParams());
+
+    expect(res.status).toBe(200);
+    expect(mockStartTask).toHaveBeenCalledWith(10, 8);
+  });
 });
 
 describe('POST /start — error cases', () => {

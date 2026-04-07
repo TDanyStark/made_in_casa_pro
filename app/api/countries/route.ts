@@ -1,7 +1,7 @@
 import { createCountry, getCountries } from '@/lib/queries/countries';
 import { NextRequest, NextResponse } from 'next/server';
 import { validateApiRole, validateHttpMethod } from '@/lib/services/api-auth';
-import { UserRole } from '@/lib/definitions';
+import { ADMIN_ONLY_ROLES, AUTHENTICATED_ROLES } from '@/lib/role-groups';
 import { z } from 'zod';
 
 // Schema para validar los datos de países
@@ -18,12 +18,7 @@ export async function GET(request: NextRequest) {
   }
 
   // Validar rol del usuario (permitir a todos los usuarios autenticados ver países)
-  const roleValidation = await validateApiRole(request, [
-    UserRole.ADMIN, 
-    UserRole.COMERCIAL, 
-    UserRole.DIRECTIVO,
-    UserRole.COLABORADOR
-  ]);
+  const roleValidation = await validateApiRole(request, AUTHENTICATED_ROLES);
   if (!roleValidation.isAuthorized) {
     return roleValidation.response;
   }
@@ -51,9 +46,7 @@ export async function POST(request: NextRequest) {
   }
 
   // Validar rol del usuario (solo administradores pueden crear países)
-  const roleValidation = await validateApiRole(request, [
-    UserRole.ADMIN
-  ]);
+  const roleValidation = await validateApiRole(request, ADMIN_ONLY_ROLES);
   if (!roleValidation.isAuthorized) {
     return roleValidation.response;
   }

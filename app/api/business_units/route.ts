@@ -3,7 +3,7 @@ import { z } from "zod";
 import { createBusinessUnit, getBusinessUnitsWithPagination } from "@/lib/queries/businessUnits";
 import { ITEMS_PER_PAGE } from "@/config/constants";
 import { validateApiRole, validateHttpMethod } from "@/lib/services/api-auth";
-import { UserRole } from "@/lib/definitions";
+import { AUTHENTICATED_ROLES, OPERATIONS_ROLES } from "@/lib/role-groups";
 
 // Schema to validate business unit data
 const businessUnitSchema = z.object({
@@ -18,11 +18,7 @@ export async function POST(request: NextRequest) {
   }
 
   // Validate user role (only admins and managers can create business units)
-  const roleValidation = await validateApiRole(request, [
-    UserRole.ADMIN, 
-    UserRole.DIRECTIVO,
-    UserRole.COMERCIAL
-  ]);
+  const roleValidation = await validateApiRole(request, OPERATIONS_ROLES);
   if (!roleValidation.isAuthorized) {
     return roleValidation.response;
   }
@@ -63,12 +59,7 @@ export async function GET(request: NextRequest) {
   }
 
   // Validate user role (allow all authenticated users to view business units)
-  const roleValidation = await validateApiRole(request, [
-    UserRole.ADMIN, 
-    UserRole.COMERCIAL, 
-    UserRole.DIRECTIVO,
-    UserRole.COLABORADOR
-  ]);
+  const roleValidation = await validateApiRole(request, AUTHENTICATED_ROLES);
   if (!roleValidation.isAuthorized) {
     return roleValidation.response;
   }

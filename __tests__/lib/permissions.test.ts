@@ -4,15 +4,15 @@ import { ADMIN_ONLY_ROLES, DIRECTIVO_SCOPE_ROLES, PROJECT_EDIT_ROLES, PROJECT_VI
 // Mock LinksData to isolate from Lucide icon imports (ESM)
 jest.mock('@/lib/LinksData', () => ({
   links: [
-    { route: '/dashboard', roles: [1, 2, 3, 4] },
+    { route: '/dashboard', roles: [1, 2, 3, 4, 5] },
     { route: '/users', roles: [1] },
-    { route: '/projects', roles: [1, 2, 3] },
-    { route: '/clients', roles: [1, 2, 3] },
+    { route: '/projects', roles: [1, 2, 3, 5] },
+    { route: '/clients', roles: [1, 2, 3, 5] },
   ],
   linksNotVisible: [
-    { route: '/clients/[id]', roles: [1, 2, 3] },
+    { route: '/clients/[id]', roles: [1, 2, 3, 5] },
     { route: '/users/[id]', roles: [1] },
-    { route: '/projects/[id]/edit', roles: [1, 2, 3] },
+    { route: '/projects/[id]/edit', roles: [1, 2, 3, 5] },
   ],
 }));
 
@@ -31,7 +31,7 @@ describe('routePermissions', () => {
   });
 
   it('maps /dashboard to all roles', () => {
-    expect(routePermissions['/dashboard']).toEqual(expect.arrayContaining([1, 2, 3, 4]));
+    expect(routePermissions['/dashboard']).toEqual(expect.arrayContaining([1, 2, 3, 4, 5]));
   });
 
   it('maps /users to ADMIN role only', () => {
@@ -41,8 +41,9 @@ describe('routePermissions', () => {
   it('keeps grouped project view permissions equivalent to current behavior', () => {
     expect(PROJECT_VIEW_ROLES).toEqual([
       UserRole.ADMIN,
-      UserRole.COMERCIAL,
       UserRole.DIRECTIVO,
+      UserRole.FINANCIERO,
+      UserRole.COMERCIAL,
       UserRole.COLABORADOR,
     ]);
   });
@@ -50,14 +51,15 @@ describe('routePermissions', () => {
   it('keeps grouped project edit permissions equivalent to current behavior', () => {
     expect(PROJECT_EDIT_ROLES).toEqual([
       UserRole.ADMIN,
-      UserRole.COMERCIAL,
       UserRole.DIRECTIVO,
+      UserRole.FINANCIERO,
+      UserRole.COMERCIAL,
     ]);
   });
 
   it('preserves admin-only and directivo-scope groups for sensitive endpoints', () => {
     expect(ADMIN_ONLY_ROLES).toEqual([UserRole.ADMIN]);
-    expect(DIRECTIVO_SCOPE_ROLES).toEqual([UserRole.DIRECTIVO]);
+    expect(DIRECTIVO_SCOPE_ROLES).toEqual([UserRole.DIRECTIVO, UserRole.FINANCIERO]);
   });
 });
 
@@ -121,6 +123,11 @@ describe('checkRoutePermission()', () => {
 
     it('DIRECTIVO (2) can access /clients', () => {
       expect(checkRoutePermission('/clients', UserRole.DIRECTIVO)).toBe(true);
+    });
+
+    it('FINANCIERO (5) mirrors DIRECTIVO access on critical routes', () => {
+      expect(checkRoutePermission('/clients', UserRole.FINANCIERO)).toBe(true);
+      expect(checkRoutePermission('/projects/42/edit', UserRole.FINANCIERO)).toBe(true);
     });
   });
 });

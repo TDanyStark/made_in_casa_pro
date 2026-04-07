@@ -8,7 +8,7 @@ import {
   getTemplateQuoters,
 } from "@/lib/queries/productTaskTemplates";
 import { validateApiRole, validateHttpMethod } from "@/lib/services/api-auth";
-import { UserRole } from "@/lib/definitions";
+import { AUTHENTICATED_ROLES, OPERATIONS_ROLES } from "@/lib/role-groups";
 
 const taskSchema = z.object({
   title: z.string().min(1, "El título es requerido"),
@@ -28,12 +28,7 @@ export async function GET(
   const methodValidation = validateHttpMethod(request, ["GET"]);
   if (!methodValidation.isValidMethod) return methodValidation.response;
 
-  const roleValidation = await validateApiRole(request, [
-    UserRole.ADMIN,
-    UserRole.COMERCIAL,
-    UserRole.DIRECTIVO,
-    UserRole.COLABORADOR,
-  ]);
+  const roleValidation = await validateApiRole(request, AUTHENTICATED_ROLES);
   if (!roleValidation.isAuthorized) return roleValidation.response;
 
   try {
@@ -60,11 +55,7 @@ export async function POST(
   const methodValidation = validateHttpMethod(request, ["POST"]);
   if (!methodValidation.isValidMethod) return methodValidation.response;
 
-  const roleValidation = await validateApiRole(request, [
-    UserRole.ADMIN,
-    UserRole.COMERCIAL,
-    UserRole.DIRECTIVO,
-  ]);
+  const roleValidation = await validateApiRole(request, OPERATIONS_ROLES);
   if (!roleValidation.isAuthorized) return roleValidation.response;
 
   try {

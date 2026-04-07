@@ -51,6 +51,7 @@ jest.mock("@tanstack/react-query", () => ({
         data: [
           { id: 1, name: "Admin Uno", email: "admin@test.com", rol_id: 1 },
           { id: 2, name: "Directivo Dos", email: "directivo@test.com", rol_id: 2 },
+          { id: 3, name: "Financiero Tres", email: "financiero@test.com", rol_id: 5 },
           { id: 7, name: "Colaborador", email: "colab@test.com", rol_id: 4 },
         ],
       };
@@ -154,6 +155,7 @@ describe("TasksCommandCenterClient", () => {
     expect(screen.getByText("Tarea")).toBeInTheDocument();
     expect(screen.getByText("Proyecto demo")).toBeInTheDocument();
     expect(screen.getByText("Producto demo")).toBeInTheDocument();
+    expect(screen.getByText("Financiero Tres")).toBeInTheDocument();
   });
 
   it("renders explicit date labels", () => {

@@ -8,7 +8,7 @@ import {
   getTemplateQuoters,
 } from "@/lib/queries/productTaskTemplates";
 import { validateApiRole, validateHttpMethod } from "@/lib/services/api-auth";
-import { UserRole } from "@/lib/definitions";
+import { OPERATIONS_ROLES } from "@/lib/role-groups";
 
 const updateSchema = z.object({
   title: z.string().min(1).optional(),
@@ -28,11 +28,7 @@ export async function PATCH(
   const methodValidation = validateHttpMethod(request, ["PATCH"]);
   if (!methodValidation.isValidMethod) return methodValidation.response;
 
-  const roleValidation = await validateApiRole(request, [
-    UserRole.ADMIN,
-    UserRole.COMERCIAL,
-    UserRole.DIRECTIVO,
-  ]);
+  const roleValidation = await validateApiRole(request, OPERATIONS_ROLES);
   if (!roleValidation.isAuthorized) return roleValidation.response;
 
   try {
@@ -76,11 +72,7 @@ export async function DELETE(
   const methodValidation = validateHttpMethod(request, ["DELETE"]);
   if (!methodValidation.isValidMethod) return methodValidation.response;
 
-  const roleValidation = await validateApiRole(request, [
-    UserRole.ADMIN,
-    UserRole.COMERCIAL,
-    UserRole.DIRECTIVO,
-  ]);
+  const roleValidation = await validateApiRole(request, OPERATIONS_ROLES);
   if (!roleValidation.isAuthorized) return roleValidation.response;
 
   try {

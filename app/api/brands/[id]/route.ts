@@ -3,7 +3,7 @@ import { z } from "zod";
 import { getBrandById, updateBrand } from "@/lib/queries/brands";
 import { revalidatePath } from "next/cache";
 import { validateApiRole, validateHttpMethod } from "@/lib/services/api-auth";
-import { UserRole } from "@/lib/definitions";
+import { OPERATIONS_ROLES } from "@/lib/role-groups";
 
 // Schema for validating brand update data
 const brandUpdateSchema = z.object({
@@ -21,11 +21,7 @@ export async function GET(
     return methodValidation.response;
   }
 
-  const roleValidation = await validateApiRole(request, [
-    UserRole.ADMIN,
-    UserRole.COMERCIAL,
-    UserRole.DIRECTIVO,
-  ]);
+  const roleValidation = await validateApiRole(request, OPERATIONS_ROLES);
   if (!roleValidation.isAuthorized) {
     return roleValidation.response;
   }
@@ -61,11 +57,7 @@ export async function PATCH(
         return methodValidation.response;
       }
     
-      const roleValidation = await validateApiRole(request, [
-        UserRole.ADMIN, 
-        UserRole.COMERCIAL, 
-        UserRole.DIRECTIVO
-      ]);
+      const roleValidation = await validateApiRole(request, OPERATIONS_ROLES);
       if (!roleValidation.isAuthorized) {
         return roleValidation.response;
       }

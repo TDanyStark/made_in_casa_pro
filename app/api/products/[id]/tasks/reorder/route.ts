@@ -3,7 +3,7 @@ import { z } from "zod";
 import { getProductById } from "@/lib/queries/products";
 import { reorderTaskTemplates } from "@/lib/queries/productTaskTemplates";
 import { validateApiRole, validateHttpMethod } from "@/lib/services/api-auth";
-import { UserRole } from "@/lib/definitions";
+import { OPERATIONS_ROLES } from "@/lib/role-groups";
 
 const reorderSchema = z.object({
   orderedIds: z.array(z.number().int().positive()).min(1),
@@ -16,11 +16,7 @@ export async function POST(
   const methodValidation = validateHttpMethod(request, ["POST"]);
   if (!methodValidation.isValidMethod) return methodValidation.response;
 
-  const roleValidation = await validateApiRole(request, [
-    UserRole.ADMIN,
-    UserRole.COMERCIAL,
-    UserRole.DIRECTIVO,
-  ]);
+  const roleValidation = await validateApiRole(request, OPERATIONS_ROLES);
   if (!roleValidation.isAuthorized) return roleValidation.response;
 
   try {

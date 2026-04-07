@@ -85,6 +85,7 @@ jest.mock("@tanstack/react-query", () => ({
         data: [
           { id: 1, name: "Admin", email: "a@test.com", rol_id: 1 },
           { id: 2, name: "Directivo", email: "d@test.com", rol_id: 2 },
+          { id: 4, name: "Financiero", email: "f@test.com", rol_id: 5 },
           { id: 3, name: "Colab", email: "c@test.com", rol_id: 4 },
         ],
       };
@@ -235,6 +236,7 @@ describe("MyTasksClient", () => {
     expect(screen.getByLabelText("Buscar")).toBeInTheDocument();
     expect(screen.getByText("Rango de asignación")).toBeInTheDocument();
     expect(screen.getByText("Reporta tu avance de hoy")).toBeInTheDocument();
+    expect(screen.getByText("Financiero")).toBeInTheDocument();
   });
 
   it("updates URL when status filter changes", () => {
