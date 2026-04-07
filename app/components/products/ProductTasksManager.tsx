@@ -63,6 +63,7 @@ function deriveAssignMode(task: ProductTaskTemplateType): AssignMode {
 function rolLabel(rolId: number | null): string | null {
   if (rolId === 1) return "Admin";
   if (rolId === 2) return "Directivo";
+  if (rolId === 5) return "Financiero";
   if (rolId === 3) return "Comercial";
   return null;
 }

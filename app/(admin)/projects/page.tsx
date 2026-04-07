@@ -1,11 +1,11 @@
 import { Breadcrumbs } from "@/components/navigation/Breadcrumbs";
 import { ListProjectsClient } from "@/components/projects/ListProjectsClient";
+import { PROJECT_EDIT_ROLES } from "@/lib/role-groups";
 import { getUserRole } from "@/lib/session";
-import { UserRole } from "@/lib/definitions";
 
 export default async function ProjectsPage() {
   const role = await getUserRole();
-  const canCreate = role === UserRole.ADMIN || role === UserRole.DIRECTIVO || role === UserRole.COMERCIAL;
+  const canCreate = PROJECT_EDIT_ROLES.includes(role);
 
   return (
     <section className="container">

@@ -3,7 +3,7 @@ import { revalidatePath } from 'next/cache';
 import { NextRequest, NextResponse } from 'next/server';
 import { ITEMS_PER_PAGE } from '@/config/constants';
 import { validateApiRole, validateHttpMethod } from '@/lib/services/api-auth';
-import { UserRole } from '@/lib/definitions';
+import { AUTHENTICATED_ROLES, OPERATIONS_ROLES } from '@/lib/role-groups';
 import { z } from 'zod';
 
 // Schema para validar los datos del cliente
@@ -20,12 +20,7 @@ export async function GET(request: NextRequest) {
   }
 
   // Validar rol del usuario (permitir a todos los usuarios autenticados ver clientes)
-  const roleValidation = await validateApiRole(request, [
-    UserRole.ADMIN, 
-    UserRole.COMERCIAL, 
-    UserRole.DIRECTIVO,
-    UserRole.COLABORADOR
-  ]);
+  const roleValidation = await validateApiRole(request, AUTHENTICATED_ROLES);
   if (!roleValidation.isAuthorized) {
     return roleValidation.response;
   }
@@ -66,11 +61,7 @@ export async function POST(request: NextRequest) {
   }
 
   // Validar rol del usuario (solo administradores y comerciales pueden crear clientes)
-  const roleValidation = await validateApiRole(request, [
-    UserRole.ADMIN, 
-    UserRole.COMERCIAL, 
-    UserRole.DIRECTIVO
-  ]);
+  const roleValidation = await validateApiRole(request, OPERATIONS_ROLES);
   if (!roleValidation.isAuthorized) {
     return roleValidation.response;
   }

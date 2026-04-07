@@ -1,16 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { validateApiRole, validateHttpMethod } from "@/lib/services/api-auth";
-import { UserRole } from "@/lib/definitions";
 import { findLeastLoadedInternalCollaborator, resolveProjectTaskAssignment } from "@/lib/queries/projectTasks";
 import { db } from "@/lib/db";
+import { OPERATIONS_ROLES } from "@/lib/role-groups";
 
 export async function GET(request: NextRequest) {
   const methodValidation = validateHttpMethod(request, ["GET"]);
   if (!methodValidation.isValidMethod) return methodValidation.response;
 
-  const roleValidation = await validateApiRole(request, [
-    UserRole.ADMIN, UserRole.DIRECTIVO, UserRole.COMERCIAL,
-  ]);
+  const roleValidation = await validateApiRole(request, OPERATIONS_ROLES);
   if (!roleValidation.isAuthorized) return roleValidation.response;
 
   try {

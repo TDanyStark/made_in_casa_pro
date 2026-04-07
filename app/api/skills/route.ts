@@ -6,9 +6,10 @@ import {
   getSkillById,
   getSkillsWithPagination
 } from '@/lib/queries/skills';
-import { SkillType, UserRole } from '@/lib/definitions';
+import { SkillType } from '@/lib/definitions';
 import { validateApiRole, validateHttpMethod } from "@/lib/services/api-auth";
 import { ITEMS_PER_PAGE } from "@/config/constants";
+import { AUTHENTICATED_ROLES, LEADERSHIP_ROLES } from '@/lib/role-groups';
 
 // Schema for validating skill data
 const skillSchema = z.object({
@@ -23,12 +24,7 @@ export async function GET(request: NextRequest) {
   }
 
   // Validate user role (allow all authenticated users to view skills)
-  const roleValidation = await validateApiRole(request, [
-    UserRole.ADMIN, 
-    UserRole.COMERCIAL, 
-    UserRole.DIRECTIVO,
-    UserRole.COLABORADOR
-  ]);
+  const roleValidation = await validateApiRole(request, AUTHENTICATED_ROLES);
   if (!roleValidation.isAuthorized) {
     return roleValidation.response;
   }
@@ -94,10 +90,7 @@ export async function POST(request: NextRequest) {
   }
 
   // Validate user role (only admins and directors can create skills)
-  const roleValidation = await validateApiRole(request, [
-    UserRole.ADMIN, 
-    UserRole.DIRECTIVO
-  ]);
+  const roleValidation = await validateApiRole(request, LEADERSHIP_ROLES);
   if (!roleValidation.isAuthorized) {
     return roleValidation.response;
   }

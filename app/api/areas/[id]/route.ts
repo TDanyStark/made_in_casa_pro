@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { validateApiRole, validateHttpMethod } from "@/lib/services/api-auth";
-import { UserRole } from "@/lib/definitions";
 import { db } from "@/lib/db";
+import { ADMIN_ONLY_ROLES, AUTHENTICATED_ROLES } from "@/lib/role-groups";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -9,9 +9,7 @@ export async function GET(request: NextRequest, { params }: Params) {
   const methodValidation = validateHttpMethod(request, ["GET"]);
   if (!methodValidation.isValidMethod) return methodValidation.response;
 
-  const roleValidation = await validateApiRole(request, [
-    UserRole.ADMIN, UserRole.DIRECTIVO, UserRole.COMERCIAL, UserRole.COLABORADOR,
-  ]);
+  const roleValidation = await validateApiRole(request, AUTHENTICATED_ROLES);
   if (!roleValidation.isAuthorized) return roleValidation.response;
 
   try {
@@ -34,9 +32,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
   const methodValidation = validateHttpMethod(request, ["PATCH"]);
   if (!methodValidation.isValidMethod) return methodValidation.response;
 
-  const roleValidation = await validateApiRole(request, [
-    UserRole.ADMIN,
-  ]);
+  const roleValidation = await validateApiRole(request, ADMIN_ONLY_ROLES);
   if (!roleValidation.isAuthorized) return roleValidation.response;
 
   try {
@@ -65,9 +61,7 @@ export async function DELETE(request: NextRequest, { params }: Params) {
   const methodValidation = validateHttpMethod(request, ["DELETE"]);
   if (!methodValidation.isValidMethod) return methodValidation.response;
 
-  const roleValidation = await validateApiRole(request, [
-    UserRole.ADMIN,
-  ]);
+  const roleValidation = await validateApiRole(request, ADMIN_ONLY_ROLES);
   if (!roleValidation.isAuthorized) return roleValidation.response;
 
   try {

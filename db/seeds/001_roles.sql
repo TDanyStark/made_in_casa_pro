@@ -4,3 +4,4 @@ INSERT INTO roles (role) VALUES ('admin');
 INSERT INTO roles (role) VALUES ('directivo');
 INSERT INTO roles (role) VALUES ('comercial');
 INSERT INTO roles (role) VALUES ('colaborador');
+INSERT INTO roles (role) VALUES ('financiero');

@@ -1,15 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { validateApiRole, validateHttpMethod } from "@/lib/services/api-auth";
-import { UserRole } from "@/lib/definitions";
 import { getProjectById, recalculateProjectProgress } from "@/lib/queries/projects";
 import { createProjectAdjustment, getAdjustmentsByProject } from "@/lib/queries/adjustments";
 import { findLeastLoadedInternalCollaborator } from "@/lib/queries/projectTasks";
 import { createSubFolder } from "@/lib/services/googleDrive";
-import { getAdminAndDirectivoEmails } from "@/lib/queries/users";
+import { getAdminAndLeadershipEmails } from "@/lib/queries/users";
 import { decrypt } from "@/lib/session";
 import { cookies } from "next/headers";
 import { db } from "@/lib/db";
+import { AUTHENTICATED_ROLES, OPERATIONS_ROLES } from "@/lib/role-groups";
 
 // Each task in the final ordered list sent from the wizard
 const taskSchema = z.object({
@@ -35,9 +35,7 @@ export async function GET(
   const methodValidation = validateHttpMethod(request, ["GET"]);
   if (!methodValidation.isValidMethod) return methodValidation.response;
 
-  const roleValidation = await validateApiRole(request, [
-    UserRole.ADMIN, UserRole.DIRECTIVO, UserRole.COMERCIAL, UserRole.COLABORADOR,
-  ]);
+  const roleValidation = await validateApiRole(request, AUTHENTICATED_ROLES);
   if (!roleValidation.isAuthorized) return roleValidation.response;
 
   try {
@@ -61,9 +59,7 @@ export async function POST(
   const methodValidation = validateHttpMethod(request, ["POST"]);
   if (!methodValidation.isValidMethod) return methodValidation.response;
 
-  const roleValidation = await validateApiRole(request, [
-    UserRole.ADMIN, UserRole.DIRECTIVO, UserRole.COMERCIAL,
-  ]);
+  const roleValidation = await validateApiRole(request, OPERATIONS_ROLES);
   if (!roleValidation.isAuthorized) return roleValidation.response;
 
   try {
@@ -113,7 +109,7 @@ export async function POST(
     if (project.drive_folder_id) {
       try {
         const creatorEmail = session?.email ?? null;
-        const adminEmails = await getAdminAndDirectivoEmails();
+        const adminEmails = await getAdminAndLeadershipEmails();
         const allEmails = [...adminEmails, ...(creatorEmail ? [creatorEmail] : [])];
         const driveRes = await createSubFolder({
           parentFolderId: project.drive_folder_id,

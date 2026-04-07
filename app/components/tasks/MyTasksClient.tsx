@@ -46,6 +46,7 @@ import {
   PlayCircle,
   ShieldCheck,
 } from "lucide-react";
+import { CREATOR_FILTER_ROLES } from "@/lib/role-groups";
 import Link from "next/link";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
@@ -324,7 +325,7 @@ export function MyTasksClient() {
   });
   const brands = (brandsData || []).filter((brand) => brand.id && brand.name);
 
-  // Creator users (admin/directivo/comercial)
+  // Creator users (roles con alcance operativo)
   const { data: assignableUsers = [] } = useQuery({
     queryKey: ["assignable-users"],
     queryFn: async () => {
@@ -335,7 +336,7 @@ export function MyTasksClient() {
   const creatorUsers = useMemo(
     () =>
       assignableUsers.filter((u) =>
-        [UserRole.ADMIN, UserRole.DIRECTIVO, UserRole.COMERCIAL].includes(
+        CREATOR_FILTER_ROLES.includes(
           Number(u.rol_id) as UserRole
         )
       ),

@@ -29,7 +29,7 @@ export type UserType = {
   name: string;
   email: string;
   password?: string;
-  rol_id: UserRole; // 1: admin, 2: directivo, 3: comercial, 4: colaborador
+  rol_id: UserRole; // 1: admin, 2: directivo, 3: comercial, 4: colaborador, 5: financiero
   must_change_password?: boolean;
   last_login?: string;
   is_active?: boolean;
@@ -49,6 +49,7 @@ export enum UserRole {
   DIRECTIVO = 2,
   COMERCIAL = 3,
   COLABORADOR = 4,
+  FINANCIERO = 5,
   NO_AUTHENTICADO = 0
 }
 

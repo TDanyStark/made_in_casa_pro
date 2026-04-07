@@ -1,23 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import { validateApiRole, validateHttpMethod } from "@/lib/services/api-auth";
-import { UserRole } from "@/lib/definitions";
 import { getUsersWithPagination } from "@/lib/queries/users";
+import { AUTHENTICATED_ROLES } from "@/lib/role-groups";
 
 export async function GET(request: NextRequest) {
   const methodValidation = validateHttpMethod(request, ["GET"]);
   if (!methodValidation.isValidMethod) return methodValidation.response;
 
-  const roleValidation = await validateApiRole(request, [
-    UserRole.ADMIN,
-    UserRole.DIRECTIVO,
-    UserRole.COMERCIAL,
-    UserRole.COLABORADOR,
-  ]);
+  const roleValidation = await validateApiRole(request, AUTHENTICATED_ROLES);
   if (!roleValidation.isAuthorized) return roleValidation.response;
 
   try {
     const { users } = await getUsersWithPagination({
-      rolId: [UserRole.ADMIN, UserRole.DIRECTIVO, UserRole.COMERCIAL, UserRole.COLABORADOR],
+      rolId: [...AUTHENTICATED_ROLES],
       limit: 1000,
     });
 

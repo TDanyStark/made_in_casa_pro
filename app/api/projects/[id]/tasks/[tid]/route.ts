@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { validateApiRole, validateHttpMethod } from "@/lib/services/api-auth";
-import { UserRole } from "@/lib/definitions";
 import {
   getProjectTaskById,
   updateProjectTask,
@@ -12,6 +11,7 @@ import { recalculateProjectProgress } from "@/lib/queries/projects";
 import { db } from "@/lib/db";
 import { cookies } from "next/headers";
 import { decrypt } from "@/lib/session";
+import { AUTHENTICATED_ROLES, OPERATIONS_ROLES } from "@/lib/role-groups";
 
 const patchSchema = z.object({
   title: z.string().min(1).optional(),
@@ -32,9 +32,7 @@ export async function GET(request: NextRequest, { params }: Params) {
   const methodValidation = validateHttpMethod(request, ["GET"]);
   if (!methodValidation.isValidMethod) return methodValidation.response;
 
-  const roleValidation = await validateApiRole(request, [
-    UserRole.ADMIN, UserRole.DIRECTIVO, UserRole.COMERCIAL, UserRole.COLABORADOR,
-  ]);
+  const roleValidation = await validateApiRole(request, AUTHENTICATED_ROLES);
   if (!roleValidation.isAuthorized) return roleValidation.response;
 
   const { tid } = await params;
@@ -47,9 +45,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
   const methodValidation = validateHttpMethod(request, ["PATCH"]);
   if (!methodValidation.isValidMethod) return methodValidation.response;
 
-  const roleValidation = await validateApiRole(request, [
-    UserRole.ADMIN, UserRole.DIRECTIVO, UserRole.COMERCIAL, UserRole.COLABORADOR,
-  ]);
+  const roleValidation = await validateApiRole(request, AUTHENTICATED_ROLES);
   if (!roleValidation.isAuthorized) return roleValidation.response;
 
   try {
@@ -132,9 +128,7 @@ export async function DELETE(request: NextRequest, { params }: Params) {
   const methodValidation = validateHttpMethod(request, ["DELETE"]);
   if (!methodValidation.isValidMethod) return methodValidation.response;
 
-  const roleValidation = await validateApiRole(request, [
-    UserRole.ADMIN, UserRole.DIRECTIVO, UserRole.COMERCIAL,
-  ]);
+  const roleValidation = await validateApiRole(request, OPERATIONS_ROLES);
   if (!roleValidation.isAuthorized) return roleValidation.response;
 
   try {

@@ -28,6 +28,7 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
+import { CREATOR_FILTER_ROLES } from "@/lib/role-groups";
 import { Badge } from "@/components/ui/badge";
 import {
   Table,
@@ -174,9 +175,7 @@ export function TasksCommandCenterClient() {
 
   const creatorUsers = useMemo(
     () =>
-      assignableUsers.filter((user) =>
-        [UserRole.ADMIN, UserRole.DIRECTIVO, UserRole.COMERCIAL].includes(user.rol_id)
-      ),
+        assignableUsers.filter((user) => CREATOR_FILTER_ROLES.includes(user.rol_id)),
     [assignableUsers]
   );
 

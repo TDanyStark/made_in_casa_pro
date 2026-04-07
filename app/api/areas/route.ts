@@ -7,9 +7,10 @@ import {
   getAreasWithPagination,
   getAreasWithActiveInternals
 } from '@/lib/queries/areas';
-import { AreaType, UserRole } from '@/lib/definitions';
+import { AreaType } from '@/lib/definitions';
 import { validateApiRole, validateHttpMethod } from "@/lib/services/api-auth";
 import { ITEMS_PER_PAGE } from "@/config/constants";
+import { AUTHENTICATED_ROLES, LEADERSHIP_ROLES } from '@/lib/role-groups';
 
 // Schema para validar los datos de un área
 const areaSchema = z.object({
@@ -24,12 +25,7 @@ export async function GET(request: NextRequest) {
   }
 
   // Validar rol del usuario (permitir a todos los usuarios autenticados ver áreas)
-  const roleValidation = await validateApiRole(request, [
-    UserRole.ADMIN, 
-    UserRole.COMERCIAL, 
-    UserRole.DIRECTIVO,
-    UserRole.COLABORADOR
-  ]);
+  const roleValidation = await validateApiRole(request, AUTHENTICATED_ROLES);
   if (!roleValidation.isAuthorized) {
     return roleValidation.response;
   }
@@ -102,10 +98,7 @@ export async function POST(request: NextRequest) {
   }
 
   // Validar rol del usuario (solo administradores y directivos pueden crear áreas)
-  const roleValidation = await validateApiRole(request, [
-    UserRole.ADMIN, 
-    UserRole.DIRECTIVO
-  ]);
+  const roleValidation = await validateApiRole(request, LEADERSHIP_ROLES);
   if (!roleValidation.isAuthorized) {
     return roleValidation.response;
   }

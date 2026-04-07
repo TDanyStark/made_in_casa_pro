@@ -1,25 +1,23 @@
 import { NextRequest, NextResponse } from "next/server";
 import { validateApiRole, validateHttpMethod } from "@/lib/services/api-auth";
-import { UserRole } from "@/lib/definitions";
 import { getProjectTaskById, startTask } from "@/lib/queries/projectTasks";
 import { db } from "@/lib/db";
 import { decrypt } from "@/lib/session";
 import { cookies } from "next/headers";
+import { AUTHENTICATED_ROLES, CREATOR_FILTER_ROLES } from "@/lib/role-groups";
 
 type Params = { params: Promise<{ id: string; tid: string }> };
 
 /**
  * POST /api/projects/[id]/tasks/[tid]/start
  * Transitions a task from 'not_started' to 'in_progress'.
- * Allowed for: assigned user, or admin/directivo/comercial who is the project creator.
+ * Allowed for: assigned user, or an operations-scope creator for the project.
  */
 export async function POST(request: NextRequest, { params }: Params) {
   const methodValidation = validateHttpMethod(request, ["POST"]);
   if (!methodValidation.isValidMethod) return methodValidation.response;
 
-  const roleValidation = await validateApiRole(request, [
-    UserRole.ADMIN, UserRole.DIRECTIVO, UserRole.COMERCIAL, UserRole.COLABORADOR,
-  ]);
+  const roleValidation = await validateApiRole(request, AUTHENTICATED_ROLES);
   if (!roleValidation.isAuthorized) return roleValidation.response;
 
   try {
@@ -44,12 +42,9 @@ export async function POST(request: NextRequest, { params }: Params) {
 
     // Permission check:
     // - The assigned user can always start their own task
-    // - Admin/Directivo/Comercial can start if they are the project creator
+    // - Operations-scope users can start if they are the project creator
     const isAssigned = task.assigned_user_id === userId;
-    const isManagerRole =
-      userRole === UserRole.ADMIN ||
-      userRole === UserRole.DIRECTIVO ||
-      userRole === UserRole.COMERCIAL;
+    const isManagerRole = CREATOR_FILTER_ROLES.includes(userRole);
 
     let canStart = isAssigned;
 

@@ -14,6 +14,7 @@ import {
 } from "../definitions";
 import { buildPaginationArgs, buildWhereClause, parseTotal } from "../db/query-helpers";
 import { ITEMS_PER_PAGE } from "@/config/constants";
+import { CREATOR_FILTER_ROLES } from "@/lib/role-groups";
 
 // ─── Shared SELECT fragments ──────────────────────────────────────────────────
 
@@ -1354,7 +1355,7 @@ export async function getTasksCommandCenterWithPagination({
     const restrictByStatuses = !hasAllStatuses;
 
     const conditions: Array<{ sql: string; value: unknown }> = [
-      { sql: "creator.rol_id = ANY($)", value: [UserRole.ADMIN, UserRole.DIRECTIVO, UserRole.COMERCIAL] },
+      { sql: "creator.rol_id = ANY($)", value: CREATOR_FILTER_ROLES },
       { sql: "p.created_by = $", value: creatorUserId },
       { sql: "pt.area_id = $", value: areaId },
       { sql: "pt.assigned_user_id = $", value: assignedUserId },

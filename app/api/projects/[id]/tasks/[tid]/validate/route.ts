@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { validateApiRole, validateHttpMethod } from "@/lib/services/api-auth";
-import { UserRole } from "@/lib/definitions";
 import { getProjectTaskById, validateTask } from "@/lib/queries/projectTasks";
 import { recalculateProjectProgress } from "@/lib/queries/projects";
 import { decrypt } from "@/lib/session";
 import { cookies } from "next/headers";
+import { AUTHENTICATED_ROLES, TASK_OVERRIDE_ROLES } from "@/lib/role-groups";
 
 const bodySchema = z.object({
   action: z.enum(["approve", "reject"]),
@@ -27,9 +27,7 @@ export async function POST(request: NextRequest, { params }: Params) {
   const methodValidation = validateHttpMethod(request, ["POST"]);
   if (!methodValidation.isValidMethod) return methodValidation.response;
 
-  const roleValidation = await validateApiRole(request, [
-    UserRole.ADMIN, UserRole.DIRECTIVO, UserRole.COMERCIAL, UserRole.COLABORADOR,
-  ]);
+  const roleValidation = await validateApiRole(request, AUTHENTICATED_ROLES);
   if (!roleValidation.isAuthorized) return roleValidation.response;
 
   try {
@@ -54,9 +52,9 @@ export async function POST(request: NextRequest, { params }: Params) {
       return NextResponse.json({ error: "Esta tarea no es de tipo validación" }, { status: 400 });
     }
 
-    // Only assigned user can validate; admins/directivos can override
+    // Only assigned user can validate; leadership can override
     const isAssigned = task.assigned_user_id === userId;
-    const canOverride = userRole === UserRole.ADMIN || userRole === UserRole.DIRECTIVO;
+    const canOverride = TASK_OVERRIDE_ROLES.includes(userRole);
     if (!isAssigned && !canOverride) {
       return NextResponse.json(
         { error: "Solo el colaborador asignado puede validar esta tarea" },

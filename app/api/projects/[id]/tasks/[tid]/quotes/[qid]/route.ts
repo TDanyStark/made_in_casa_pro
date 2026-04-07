@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { validateApiRole, validateHttpMethod } from "@/lib/services/api-auth";
-import { UserRole } from "@/lib/definitions";
+import { OPERATIONS_ROLES } from "@/lib/role-groups";
 import { acceptQuote, rejectQuote } from "@/lib/queries/taskQuotes";
 import { recalculateProjectProgress } from "@/lib/queries/projects";
 import { decrypt } from "@/lib/session";
@@ -24,9 +24,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
   const methodValidation = validateHttpMethod(request, ["PATCH"]);
   if (!methodValidation.isValidMethod) return methodValidation.response;
 
-  const roleValidation = await validateApiRole(request, [
-    UserRole.ADMIN, UserRole.DIRECTIVO, UserRole.COMERCIAL,
-  ]);
+  const roleValidation = await validateApiRole(request, OPERATIONS_ROLES);
   if (!roleValidation.isAuthorized) return roleValidation.response;
 
   try {

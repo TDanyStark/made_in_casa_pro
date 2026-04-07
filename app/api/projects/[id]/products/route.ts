@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { validateApiRole, validateHttpMethod } from "@/lib/services/api-auth";
-import { UserRole } from "@/lib/definitions";
 import {
   getProjectDetail,
   updateProject,
@@ -11,6 +10,7 @@ import { getAdjustmentsByProject } from "@/lib/queries/adjustments";
 import { instantiateTasksFromTemplates } from "@/lib/queries/projectTasks";
 import { cookies } from "next/headers";
 import { decrypt } from "@/lib/session";
+import { OPERATIONS_ROLES } from "@/lib/role-groups";
 
 const bodySchema = z.object({
   product_id: z.coerce.number().int().positive(),
@@ -22,9 +22,7 @@ export async function POST(request: NextRequest, { params }: Params) {
   const methodValidation = validateHttpMethod(request, ["POST"]);
   if (!methodValidation.isValidMethod) return methodValidation.response;
 
-  const roleValidation = await validateApiRole(request, [
-    UserRole.ADMIN, UserRole.DIRECTIVO, UserRole.COMERCIAL,
-  ]);
+  const roleValidation = await validateApiRole(request, OPERATIONS_ROLES);
   if (!roleValidation.isAuthorized) return roleValidation.response;
 
   try {

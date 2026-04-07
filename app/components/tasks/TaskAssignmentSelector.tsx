@@ -42,6 +42,7 @@ export type AssignMode = "auto" | "commercial" | "specific";
 const ROL_LABELS: Record<number, string> = {
   [UserRole.ADMIN]: "Admin",
   [UserRole.DIRECTIVO]: "Directivo",
+  [UserRole.FINANCIERO]: "Financiero",
   [UserRole.COMERCIAL]: "Comercial",
   [UserRole.COLABORADOR]: "Colaborador",
 };
@@ -49,6 +50,7 @@ const ROL_LABELS: Record<number, string> = {
 const ROL_BADGE_CLASS: Record<number, string> = {
   [UserRole.ADMIN]: "bg-red-100 text-red-700 border-red-200 dark:bg-red-900/20 dark:text-red-400",
   [UserRole.DIRECTIVO]: "bg-purple-100 text-purple-700 border-purple-200 dark:bg-purple-900/20 dark:text-purple-400",
+  [UserRole.FINANCIERO]: "bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-900/20 dark:text-emerald-400",
   [UserRole.COMERCIAL]: "bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-900/20 dark:text-blue-400",
   [UserRole.COLABORADOR]: "bg-green-100 text-green-700 border-green-200 dark:bg-green-900/20 dark:text-green-400",
 };
@@ -177,6 +179,7 @@ export function TaskAssignmentSelector({
   // Group users by role for the dropdown
   const admins = allUsers.filter((u) => u.rol_id === UserRole.ADMIN);
   const directivos = allUsers.filter((u) => u.rol_id === UserRole.DIRECTIVO);
+  const financieros = allUsers.filter((u) => u.rol_id === UserRole.FINANCIERO);
   const comerciales = allUsers.filter((u) => u.rol_id === UserRole.COMERCIAL);
   const internals = allUsers.filter((u) => u.rol_id === UserRole.COLABORADOR && u.is_internal === 1);
   const externals = allUsers.filter((u) => u.rol_id === UserRole.COLABORADOR && u.is_internal === 0);
@@ -374,9 +377,23 @@ export function TaskAssignmentSelector({
                 </>
               )}
 
-              {comerciales.length > 0 && (
+              {financieros.length > 0 && (
                 <>
                   {(admins.length > 0 || directivos.length > 0) && <SelectSeparator />}
+                  <SelectGroup>
+                    <SelectLabel>
+                      <Badge variant="outline" className={`text-xs ${ROL_BADGE_CLASS[UserRole.FINANCIERO]}`}>
+                        {ROL_LABELS[UserRole.FINANCIERO]}
+                      </Badge>
+                    </SelectLabel>
+                    {financieros.map(renderUserItem)}
+                  </SelectGroup>
+                </>
+              )}
+
+              {comerciales.length > 0 && (
+                <>
+                  {(admins.length > 0 || directivos.length > 0 || financieros.length > 0) && <SelectSeparator />}
                   <SelectGroup>
                     <SelectLabel>
                       <Badge variant="outline" className={`text-xs ${ROL_BADGE_CLASS[UserRole.COMERCIAL]}`}>

@@ -1,6 +1,7 @@
 import {db} from '../db';
 import { UserRole, UserType } from '../definitions';
 import { ITEMS_PER_PAGE } from "@/config/constants";
+import { LEADERSHIP_ROLES } from '@/lib/role-groups';
 
 export interface GetUsersParams {
   page?: number;
@@ -306,18 +307,19 @@ export async function updateUser(userId: string, data: {
 }
 
 /**
- * Returns the emails of all active users with role ADMIN or DIRECTIVO.
+ * Returns the emails of all active leadership users (admin, directivo, financiero).
  * Used to auto-share Drive folders when a project is created.
  */
-export async function getAdminAndDirectivoEmails(): Promise<string[]> {
+export async function getAdminAndLeadershipEmails(): Promise<string[]> {
   try {
+    const rolePlaceholders = LEADERSHIP_ROLES.map((_, index) => `$${index + 1}`).join(', ');
     const result = await db.execute({
-      sql: `SELECT email FROM users WHERE rol_id IN (1, 2) AND is_active = 1 AND email IS NOT NULL ORDER BY name ASC`,
-      args: [],
+      sql: `SELECT email FROM users WHERE rol_id IN (${rolePlaceholders}) AND is_active = 1 AND email IS NOT NULL ORDER BY name ASC`,
+      args: [...LEADERSHIP_ROLES],
     });
     return result.rows.map((r) => r.email as string).filter(Boolean);
   } catch (error) {
-    console.error("Error fetching admin/directivo emails:", error);
+    console.error("Error fetching leadership emails:", error);
     return [];
   }
 }

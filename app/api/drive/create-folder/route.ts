@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { validateApiRole, validateHttpMethod } from "@/lib/services/api-auth";
-import { UserRole } from "@/lib/definitions";
 import { createProjectFolders } from "@/lib/services/googleDrive";
-import { getAdminAndDirectivoEmails } from "@/lib/queries/users";
+import { getAdminAndLeadershipEmails } from "@/lib/queries/users";
 import { decrypt } from "@/lib/session";
 import { cookies } from "next/headers";
+import { OPERATIONS_ROLES } from "@/lib/role-groups";
 
 const schema = z.object({
   clientName: z.string().min(1),
@@ -19,9 +19,7 @@ export async function POST(request: NextRequest) {
   const methodValidation = validateHttpMethod(request, ["POST"]);
   if (!methodValidation.isValidMethod) return methodValidation.response;
 
-  const roleValidation = await validateApiRole(request, [
-    UserRole.ADMIN, UserRole.DIRECTIVO, UserRole.COMERCIAL,
-  ]);
+  const roleValidation = await validateApiRole(request, OPERATIONS_ROLES);
   if (!roleValidation.isAuthorized) return roleValidation.response;
 
   try {
@@ -41,8 +39,8 @@ export async function POST(request: NextRequest) {
     const session = cookie ? await decrypt(cookie) : null;
     const creatorEmail = session?.email ?? null;
 
-    // Collect admin/directivo emails from DB
-    const adminEmails = await getAdminAndDirectivoEmails();
+    // Collect leadership emails from DB
+    const adminEmails = await getAdminAndLeadershipEmails();
 
     // Merge all emails: admins + creator + manager + co-managers
     const allEmails = [

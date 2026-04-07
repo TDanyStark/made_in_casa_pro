@@ -3,6 +3,7 @@ import { z } from "zod";
 import { getUserSkills, addUserSkill, removeUserSkill } from '@/lib/queries/userSkills';
 import { UserRole } from '@/lib/definitions';
 import { validateApiRole, validateHttpMethod } from "@/lib/services/api-auth";
+import { AUTHENTICATED_ROLES, DIRECTIVO_SCOPE_ROLES } from '@/lib/role-groups';
 
 // Schema for validating user skill data
 const userSkillSchema = z.object({
@@ -21,12 +22,7 @@ export async function GET(
   }
 
   // Validate user role (allow all authenticated users to view user skills)
-  const roleValidation = await validateApiRole(request, [
-    UserRole.ADMIN, 
-    UserRole.COMERCIAL, 
-    UserRole.DIRECTIVO,
-    UserRole.COLABORADOR
-  ]);
+  const roleValidation = await validateApiRole(request, AUTHENTICATED_ROLES);
   if (!roleValidation.isAuthorized) {
     return roleValidation.response;
   }
@@ -59,9 +55,9 @@ export async function POST(
 
   // Validate user role (only admins and directors can add user skills)
   const roleValidation = await validateApiRole(request, [
-    UserRole.ADMIN, 
-    UserRole.DIRECTIVO,
-    UserRole.COLABORADOR // Allow colaboradores to update their own skills
+    UserRole.ADMIN,
+    ...DIRECTIVO_SCOPE_ROLES,
+    UserRole.COLABORADOR,
   ]);
   if (!roleValidation.isAuthorized) {
     return roleValidation.response;
@@ -111,9 +107,9 @@ export async function DELETE(
 
   // Validate user role (only admins, directors, and the user themselves can remove skills)
   const roleValidation = await validateApiRole(request, [
-    UserRole.ADMIN, 
-    UserRole.DIRECTIVO,
-    UserRole.COLABORADOR
+    UserRole.ADMIN,
+    ...DIRECTIVO_SCOPE_ROLES,
+    UserRole.COLABORADOR,
   ]);
   if (!roleValidation.isAuthorized) {
     return roleValidation.response;

@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { validateApiRole, validateHttpMethod } from "@/lib/services/api-auth";
-import { UserRole } from "@/lib/definitions";
 import { getProjectTaskById, completeTask } from "@/lib/queries/projectTasks";
 import { recalculateProjectProgress } from "@/lib/queries/projects";
 import { decrypt } from "@/lib/session";
 import { cookies } from "next/headers";
+import { AUTHENTICATED_ROLES, TASK_OVERRIDE_ROLES } from "@/lib/role-groups";
 
 const bodySchema = z.object({
   notes: z.string().optional().nullable(),
@@ -19,15 +19,13 @@ type Params = { params: Promise<{ id: string; tid: string }> };
 /**
  * POST /api/projects/[id]/tasks/[tid]/complete
  * Marks an execution task as completed and auto-activates the next task in order.
- * Only the assigned user can complete the task (admin/directivo can override).
+ * Only the assigned user can complete the task (leadership can override).
  */
 export async function POST(request: NextRequest, { params }: Params) {
   const methodValidation = validateHttpMethod(request, ["POST"]);
   if (!methodValidation.isValidMethod) return methodValidation.response;
 
-  const roleValidation = await validateApiRole(request, [
-    UserRole.ADMIN, UserRole.DIRECTIVO, UserRole.COMERCIAL, UserRole.COLABORADOR,
-  ]);
+  const roleValidation = await validateApiRole(request, AUTHENTICATED_ROLES);
   if (!roleValidation.isAuthorized) return roleValidation.response;
 
   try {
@@ -50,9 +48,9 @@ export async function POST(request: NextRequest, { params }: Params) {
       return NextResponse.json({ error: "Tarea no pertenece al proyecto" }, { status: 400 });
     }
 
-    // Only assigned user can complete; admins/directivos can override
+    // Only assigned user can complete; leadership can override
     const isAssigned = task.assigned_user_id === userId;
-    const canOverride = userRole === UserRole.ADMIN || userRole === UserRole.DIRECTIVO;
+    const canOverride = TASK_OVERRIDE_ROLES.includes(userRole);
     if (!isAssigned && !canOverride) {
       return NextResponse.json(
         { error: "Solo el colaborador asignado puede completar esta tarea" },
