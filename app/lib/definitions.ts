@@ -56,7 +56,7 @@ export type LinksType = {
   name?: string;
   route: string;
   icon?: ForwardRefExoticComponent<Omit<LucideProps, "ref"> & RefAttributes<SVGSVGElement>>;
-  roles: UserRole[];
+  roles: readonly UserRole[];
 }
 
 export type ClientType = {

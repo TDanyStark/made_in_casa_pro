@@ -13,7 +13,7 @@ import { decrypt, SessionData } from "../session";
  */
 export async function validateApiRole(
   request: NextRequest,
-  allowedRoles: UserRole[]
+  allowedRoles: readonly UserRole[]
 ) {
   const cookie = (await cookies()).get("session")?.value;
 

@@ -1,17 +1,18 @@
 import { UserRole } from '@/lib/definitions';
+import { ADMIN_ONLY_ROLES, DIRECTIVO_SCOPE_ROLES, PROJECT_EDIT_ROLES, PROJECT_VIEW_ROLES } from '@/lib/role-groups';
 
 // Mock LinksData to isolate from Lucide icon imports (ESM)
 jest.mock('@/lib/LinksData', () => ({
   links: [
     { route: '/dashboard', roles: [1, 2, 3, 4] },
-    { route: '/users', roles: [4] },
-    { route: '/projects', roles: [1, 2, 4] },
-    { route: '/clients', roles: [1, 2, 4] },
+    { route: '/users', roles: [1] },
+    { route: '/projects', roles: [1, 2, 3] },
+    { route: '/clients', roles: [1, 2, 3] },
   ],
   linksNotVisible: [
-    { route: '/clients/[id]', roles: [1, 2, 4] },
-    { route: '/users/[id]', roles: [4] },
-    { route: '/projects/[id]/edit', roles: [1, 2, 4] },
+    { route: '/clients/[id]', roles: [1, 2, 3] },
+    { route: '/users/[id]', roles: [1] },
+    { route: '/projects/[id]/edit', roles: [1, 2, 3] },
   ],
 }));
 
@@ -34,7 +35,29 @@ describe('routePermissions', () => {
   });
 
   it('maps /users to ADMIN role only', () => {
-    expect(routePermissions['/users']).toEqual([4]);
+    expect(routePermissions['/users']).toEqual([1]);
+  });
+
+  it('keeps grouped project view permissions equivalent to current behavior', () => {
+    expect(PROJECT_VIEW_ROLES).toEqual([
+      UserRole.ADMIN,
+      UserRole.COMERCIAL,
+      UserRole.DIRECTIVO,
+      UserRole.COLABORADOR,
+    ]);
+  });
+
+  it('keeps grouped project edit permissions equivalent to current behavior', () => {
+    expect(PROJECT_EDIT_ROLES).toEqual([
+      UserRole.ADMIN,
+      UserRole.COMERCIAL,
+      UserRole.DIRECTIVO,
+    ]);
+  });
+
+  it('preserves admin-only and directivo-scope groups for sensitive endpoints', () => {
+    expect(ADMIN_ONLY_ROLES).toEqual([UserRole.ADMIN]);
+    expect(DIRECTIVO_SCOPE_ROLES).toEqual([UserRole.DIRECTIVO]);
   });
 });
 
@@ -84,11 +107,11 @@ describe('checkRoutePermission()', () => {
   });
 
   describe('role boundary tests', () => {
-    it('ADMIN (4) can access /projects', () => {
+    it('ADMIN (1) can access /projects', () => {
       expect(checkRoutePermission('/projects', UserRole.ADMIN)).toBe(true);
     });
 
-    it('COLABORADOR (3) cannot access /projects (not in allowed roles)', () => {
+    it('COLABORADOR (4) cannot access /projects (not in allowed roles)', () => {
       expect(checkRoutePermission('/projects', UserRole.COLABORADOR)).toBe(false);
     });
 

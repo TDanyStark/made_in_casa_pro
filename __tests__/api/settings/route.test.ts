@@ -16,6 +16,7 @@ import { NextRequest } from "next/server";
 import { GET, PATCH } from "@/api/settings/route";
 import { validateApiRole, validateHttpMethod } from "@/lib/services/api-auth";
 import { getAppSettings, upsertSettings } from "@/lib/queries/settings";
+import { ADMIN_ONLY_ROLES } from "@/lib/role-groups";
 
 const mockValidateHttpMethod = validateHttpMethod as jest.MockedFunction<typeof validateHttpMethod>;
 const mockValidateApiRole = validateApiRole as jest.MockedFunction<typeof validateApiRole>;
@@ -60,6 +61,7 @@ describe("/api/settings", () => {
     expect(res.status).toBe(200);
     expect(data.daily_report_time).toBe("17:45");
     expect(data.google_oauth_client_secret).toBe("***configured***");
+    expect(mockValidateApiRole).toHaveBeenCalledWith(expect.anything(), ADMIN_ONLY_ROLES);
   });
 
   it("PATCH accepts daily_report_time in HH:MM format", async () => {
@@ -75,5 +77,6 @@ describe("/api/settings", () => {
     expect(res.status).toBe(200);
     expect(data.ok).toBe(true);
     expect(mockUpsertSettings).toHaveBeenCalledWith({ daily_report_time: "19:30" });
+    expect(mockValidateApiRole).toHaveBeenCalledWith(req, ADMIN_ONLY_ROLES);
   });
 });

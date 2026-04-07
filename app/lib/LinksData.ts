@@ -1,5 +1,6 @@
 import { House, Folder, LayoutList, BookUser, LibraryBig, Users, Settings, CheckSquare, Receipt } from 'lucide-react';
 import { LinksType, UserRole } from './definitions';
+import { ADMIN_ONLY_ROLES, OPERATIONS_ROLES, PROJECT_EDIT_ROLES, PROJECT_VIEW_ROLES } from './role-groups';
 
 export type NavSubLink = {
   name: string;
@@ -19,19 +20,19 @@ export const links: LinksType[] = [
     name: 'Inicio', 
     route: '/dashboard', 
     icon: House,
-    roles: [UserRole.COMERCIAL, UserRole.DIRECTIVO, UserRole.COLABORADOR, UserRole.ADMIN]
+    roles: PROJECT_VIEW_ROLES
   },
   {
     name: 'Proyectos',
     route: '/projects',
     icon: Folder,
-    roles: [UserRole.ADMIN, UserRole.COMERCIAL, UserRole.DIRECTIVO, UserRole.COLABORADOR]
+    roles: PROJECT_VIEW_ROLES
   },
   {
     name: 'Mis Tareas',
     route: '/my-tasks',
     icon: CheckSquare,
-    roles: [UserRole.ADMIN, UserRole.COMERCIAL, UserRole.DIRECTIVO, UserRole.COLABORADOR]
+    roles: PROJECT_VIEW_ROLES
   },
   {
     name: 'Mis Cotizaciones',
@@ -43,97 +44,97 @@ export const links: LinksType[] = [
     name: 'Tareas', 
     route: '/tasks', 
     icon: LayoutList,
-    roles: [UserRole.ADMIN, UserRole.COMERCIAL, UserRole.DIRECTIVO]
+    roles: OPERATIONS_ROLES
   },
   { 
     name: 'Productos', 
     route: '/products', 
     icon: LibraryBig,
-    roles: [UserRole.ADMIN, UserRole.COMERCIAL, UserRole.DIRECTIVO]
+    roles: OPERATIONS_ROLES
   },
   { 
     name: 'Clientes', 
     route: '/clients', 
     icon: BookUser,
-    roles: [UserRole.ADMIN, UserRole.COMERCIAL, UserRole.DIRECTIVO]
+    roles: OPERATIONS_ROLES
   },
   { 
     name: 'Usuarios', 
     route: '/users', 
     icon: Users,
-    roles: [UserRole.ADMIN]
+    roles: ADMIN_ONLY_ROLES
   },
   {
     name: 'Configuración',
     route: '/settings',
     icon: Settings,
-    roles: [UserRole.ADMIN]
+    roles: ADMIN_ONLY_ROLES
   },
 ];
 
 export const linksNotVisible: LinksType[] = [
   {
     route: '/my-tasks',
-    roles: [UserRole.ADMIN, UserRole.COMERCIAL, UserRole.DIRECTIVO, UserRole.COLABORADOR]
+    roles: PROJECT_VIEW_ROLES
   },
   {
     route: '/clients',
-    roles: [UserRole.ADMIN, UserRole.COMERCIAL, UserRole.DIRECTIVO]
+    roles: OPERATIONS_ROLES
   },
   {
     route: '/clients/[id]',
-    roles: [UserRole.ADMIN, UserRole.COMERCIAL, UserRole.DIRECTIVO]
+    roles: OPERATIONS_ROLES
   },
   {
     route: '/brands',
-    roles: [UserRole.ADMIN, UserRole.COMERCIAL, UserRole.DIRECTIVO]
+    roles: OPERATIONS_ROLES
   },
   {
     route: '/brands/[id]',
-    roles: [UserRole.ADMIN, UserRole.COMERCIAL, UserRole.DIRECTIVO]
+    roles: OPERATIONS_ROLES
   },
   {
     route: '/managers',
-    roles: [UserRole.ADMIN, UserRole.COMERCIAL, UserRole.DIRECTIVO]
+    roles: OPERATIONS_ROLES
   },
   {
     route: '/managers/[id]',
-    roles: [UserRole.ADMIN, UserRole.COMERCIAL, UserRole.DIRECTIVO]
+    roles: OPERATIONS_ROLES
   },
   {
     route: '/products/[id]',
-    roles: [UserRole.ADMIN, UserRole.COMERCIAL, UserRole.DIRECTIVO]
+    roles: OPERATIONS_ROLES
   },
   {
     route: '/products/create',
-    roles: [UserRole.ADMIN, UserRole.COMERCIAL, UserRole.DIRECTIVO]
+    roles: OPERATIONS_ROLES
   },
   {
     route: '/products/[id]/edit',
-    roles: [UserRole.ADMIN, UserRole.COMERCIAL, UserRole.DIRECTIVO]
+    roles: OPERATIONS_ROLES
   },
   {
     route: '/projects/[id]',
-    roles: [UserRole.ADMIN, UserRole.COMERCIAL, UserRole.DIRECTIVO, UserRole.COLABORADOR]
+    roles: PROJECT_VIEW_ROLES
   },
   {
     route: '/projects/create',
-    roles: [UserRole.ADMIN, UserRole.COMERCIAL, UserRole.DIRECTIVO]
+    roles: PROJECT_EDIT_ROLES
   },
   {
     route: '/projects/[id]/edit',
-    roles: [UserRole.ADMIN, UserRole.COMERCIAL, UserRole.DIRECTIVO]
+    roles: PROJECT_EDIT_ROLES
   },
   {
     route: '/tasks/create',
-    roles: [UserRole.ADMIN, UserRole.COMERCIAL, UserRole.DIRECTIVO]
+    roles: OPERATIONS_ROLES
   },
   {
     route: '/tasks/[id]/edit',
-    roles: [UserRole.ADMIN, UserRole.COMERCIAL, UserRole.DIRECTIVO]
+    roles: OPERATIONS_ROLES
   },
   {
     route: '/users/[id]',
-    roles: [UserRole.ADMIN]
+    roles: ADMIN_ONLY_ROLES
   },
 ]

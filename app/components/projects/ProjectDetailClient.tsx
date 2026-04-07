@@ -13,6 +13,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
+import { PROJECT_EDIT_ROLES } from "@/lib/role-groups";
 
 interface Props {
   projectId: number;
@@ -21,10 +22,7 @@ interface Props {
 }
 
 export function ProjectDetailClient({ projectId, userRole, currentUserId }: Props) {
-  const canEdit =
-    userRole === UserRole.ADMIN ||
-    userRole === UserRole.DIRECTIVO ||
-    userRole === UserRole.COMERCIAL;
+  const canEdit = PROJECT_EDIT_ROLES.includes(userRole);
 
   const { data: project, isLoading, isError } = useQuery({
     queryKey: ["project", projectId],

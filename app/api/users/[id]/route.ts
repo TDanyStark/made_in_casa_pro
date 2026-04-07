@@ -3,8 +3,9 @@ import { z } from "zod";
 import { getUserById, getUserByEmail, updateUser } from "@/lib/queries/users";
 import { revalidatePath } from "next/cache";
 import { validateApiRole, validateHttpMethod } from "@/lib/services/api-auth";
-import { ColaboradorType, UserRole } from "@/lib/definitions";
+import { ColaboradorType } from "@/lib/definitions";
 import bcrypt from "bcrypt";
+import { ADMIN_ONLY_ROLES } from "@/lib/role-groups";
 
 // Schema para validar los datos de actualización de usuario
 const userUpdateSchema = z.object({
@@ -30,7 +31,7 @@ export async function PATCH(
   }
 
   // Validar rol del usuario (solo administradores pueden actualizar usuarios)
-  const roleValidation = await validateApiRole(request, [UserRole.ADMIN]);
+  const roleValidation = await validateApiRole(request, ADMIN_ONLY_ROLES);
 
   if (!roleValidation.isAuthorized) {
     return roleValidation.response;
@@ -128,7 +129,7 @@ export async function GET(
   }
 
   // Validar rol del usuario (solo administradores pueden ver detalles de usuarios)
-  const roleValidation = await validateApiRole(request, [UserRole.ADMIN]);
+  const roleValidation = await validateApiRole(request, ADMIN_ONLY_ROLES);
   if (!roleValidation.isAuthorized) {
     return roleValidation.response;
   }

@@ -3,7 +3,7 @@ import { createUser, getUsersWithPagination } from "@/lib/queries/users";
 import bcrypt from "bcrypt";
 import { ITEMS_PER_PAGE } from "@/config/constants";
 import { validateApiRole, validateHttpMethod } from "@/lib/services/api-auth";
-import { UserRole } from "@/lib/definitions";
+import { ADMIN_ONLY_ROLES } from "@/lib/role-groups";
 
 export async function GET(request: NextRequest) {
   // Validar método HTTP
@@ -13,9 +13,7 @@ export async function GET(request: NextRequest) {
   }
 
   // Validar rol del usuario (permitir a todos los usuarios autenticados ver usuarios)
-  const roleValidation = await validateApiRole(request, [
-    UserRole.ADMIN
-  ]);
+  const roleValidation = await validateApiRole(request, ADMIN_ONLY_ROLES);
   if (!roleValidation.isAuthorized) {
     return roleValidation.response;
   }
@@ -60,9 +58,7 @@ export async function POST(request: NextRequest) {
   }
 
   // Validar rol del usuario (solo administradores pueden crear usuarios)
-  const roleValidation = await validateApiRole(request, [
-    UserRole.ADMIN
-  ]);
+  const roleValidation = await validateApiRole(request, ADMIN_ONLY_ROLES);
   if (!roleValidation.isAuthorized) {
     return roleValidation.response;
   }
