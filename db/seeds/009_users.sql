@@ -39,7 +39,7 @@ VALUES (
   'Josue Amado',
   'josue.amado@market-support.com',
   '$2b$10$aEyIpIyBNuZxmLTk0ditj.Lq/ZJW6Zz4vgVcaXcUhwlmE2GtnV2j6',
-  (SELECT id FROM roles WHERE role = 'directivo'),
+  (SELECT id FROM roles WHERE role = 'financiero'),
   NULL,
   1, 1, 0, 11500000
 );
