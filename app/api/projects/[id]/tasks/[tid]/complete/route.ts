@@ -9,6 +9,9 @@ import { cookies } from "next/headers";
 
 const bodySchema = z.object({
   notes: z.string().optional().nullable(),
+  progress_minutes: z.number().int().min(0),
+  delivery_url: z.string().url().optional().nullable(),
+  completion_cost: z.number().min(0).optional().nullable(),
 });
 
 type Params = { params: Promise<{ id: string; tid: string }> };
@@ -57,7 +60,7 @@ export async function POST(request: NextRequest, { params }: Params) {
       );
     }
 
-    let body: { notes?: string | null } = {};
+    let body: { notes?: string | null; progress_minutes?: number; delivery_url?: string | null; completion_cost?: number | null } = { progress_minutes: 0 };
     try {
       const raw = await request.json();
       const parsed = bodySchema.safeParse(raw);
@@ -66,7 +69,11 @@ export async function POST(request: NextRequest, { params }: Params) {
       // body is optional
     }
 
-    const result = await completeTask(taskId, userId, body.notes);
+    const result = await completeTask(taskId, userId, body.notes, {
+      progress_minutes: body.progress_minutes,
+      delivery_url: body.delivery_url,
+      completion_cost: body.completion_cost,
+    });
     await recalculateProjectProgress(projectId);
 
     return NextResponse.json({

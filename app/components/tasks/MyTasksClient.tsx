@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { get } from "@/lib/services/apiService";
+import { get, post } from "@/lib/services/apiService";
 import {
   ApiResponseWithPagination,
   BrandType,
@@ -34,13 +34,16 @@ import Pagination from "@/components/pagination/Pagination";
 import { TaskValidationDialog } from "./TaskValidationDialog";
 import { TaskCompleteDialog } from "./TaskCompleteDialog";
 import { TaskHistoryDialog } from "./TaskHistoryDialog";
+import { TaskProgressReportModal } from "./TaskProgressReportModal";
 import {
   AlertTriangle,
+  BellRing,
   CalendarIcon,
   CheckCircle,
   Clock,
   ExternalLink,
   History as HistoryIcon,
+  PlayCircle,
   ShieldCheck,
 } from "lucide-react";
 import Link from "next/link";
@@ -53,6 +56,11 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
+import {
+  formatProgressMinutes,
+  getDailySessionStorageKey,
+  isAfterDailyReportTime,
+} from "@/lib/task-progress";
 import type { DateRange } from "react-day-picker";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -159,6 +167,26 @@ function toDateParam(value: Date) {
   return format(value, "yyyy-MM-dd");
 }
 
+interface MyTasksResponse extends ApiResponseWithPagination<MyTaskRowPaginated[]> {
+  dailyReportTime?: string;
+}
+
+interface DailyReportSessionState {
+  dismissed: boolean;
+  viewedTaskIds: number[];
+  reportedTaskIds: number[];
+}
+
+const DAILY_REPORT_STORAGE_PREFIX = "my-tasks-daily-report";
+
+function createEmptyReportState(): DailyReportSessionState {
+  return {
+    dismissed: false,
+    viewedTaskIds: [],
+    reportedTaskIds: [],
+  };
+}
+
 // ─── Dialog state ─────────────────────────────────────────────────────────────
 
 interface ValidateDialogState {
@@ -180,7 +208,11 @@ export function MyTasksClient() {
   const [taskToComplete, setTaskToComplete] = useState<MyTaskRowPaginated | null>(null);
   const [historyDialogOpen, setHistoryDialogOpen] = useState(false);
   const [taskForHistory, setTaskForHistory] = useState<MyTaskRowPaginated | null>(null);
+  const [reportDialogOpen, setReportDialogOpen] = useState(false);
+  const [reportInitialTaskId, setReportInitialTaskId] = useState<number | null>(null);
+  const [startingTaskId, setStartingTaskId] = useState<number | null>(null);
   const [searchInput, setSearchInput] = useState("");
+  const [reportState, setReportState] = useState<DailyReportSessionState>(createEmptyReportState);
   const [validateDialog, setValidateDialog] = useState<ValidateDialogState>({
     open: false,
     task: null,
@@ -194,6 +226,7 @@ export function MyTasksClient() {
   const assignedFrom = searchParams.get("assignedFrom") || "";
   const assignedTo = searchParams.get("assignedTo") || "";
   const q = searchParams.get("q") || "";
+  const reportFlag = searchParams.get("report") === "1";
 
   useEffect(() => {
     setSearchInput(q);
@@ -263,7 +296,7 @@ export function MyTasksClient() {
   const { data, isLoading, isError } = useQuery({
     queryKey: ["my-tasks", queryString],
     queryFn: async () => {
-      const res = await get<ApiResponseWithPagination<MyTaskRowPaginated[]>>(
+      const res = await get<MyTasksResponse>(
         `my-tasks?${queryString}`
       );
       if (!res.ok) throw new Error(res.error || "Error al obtener tareas");
@@ -349,6 +382,7 @@ export function MyTasksClient() {
   const currentPage = data?.currentPage || 1;
   const pageCount = data?.pageCount || 1;
   const total = data?.total || 0;
+  const dailyReportTime = data?.dailyReportTime || "18:00";
 
   const isFiltered =
     selectedStatuses.length !== DEFAULT_STATUS_OPTIONS.length ||
@@ -362,8 +396,47 @@ export function MyTasksClient() {
   const activeTasks = tasks.filter(
     (t) => t.status === "in_progress" || t.status === "not_started"
   );
+  const inProgressTasks = tasks.filter((t) => t.status === "in_progress");
   const blockedTasks = tasks.filter((t) => t.status === "blocked");
   const waitingTasks = tasks.filter((t) => t.status === "waiting");
+  const shouldShowDailyReportBanner =
+    inProgressTasks.length > 0 &&
+    !reportState.dismissed &&
+    isAfterDailyReportTime(dailyReportTime);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const storageKey = getDailySessionStorageKey(DAILY_REPORT_STORAGE_PREFIX);
+    try {
+      const raw = window.sessionStorage.getItem(storageKey);
+      if (!raw) {
+        setReportState(createEmptyReportState());
+        return;
+      }
+
+      const parsed = JSON.parse(raw) as Partial<DailyReportSessionState>;
+      setReportState({
+        dismissed: Boolean(parsed.dismissed),
+        viewedTaskIds: Array.isArray(parsed.viewedTaskIds) ? parsed.viewedTaskIds : [],
+        reportedTaskIds: Array.isArray(parsed.reportedTaskIds) ? parsed.reportedTaskIds : [],
+      });
+    } catch {
+      setReportState(createEmptyReportState());
+    }
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const storageKey = getDailySessionStorageKey(DAILY_REPORT_STORAGE_PREFIX);
+    window.sessionStorage.setItem(storageKey, JSON.stringify(reportState));
+  }, [reportState]);
+
+  useEffect(() => {
+    if (reportFlag && inProgressTasks.length > 0) {
+      setReportDialogOpen(true);
+    }
+  }, [reportFlag, inProgressTasks.length]);
 
   // ─── Dialog handlers ──────────────────────────────────────────────────────
   const openCompleteDialog = (task: MyTaskRowPaginated) => {
@@ -374,6 +447,60 @@ export function MyTasksClient() {
   const openHistoryDialog = (task: MyTaskRowPaginated) => {
     setTaskForHistory(task);
     setHistoryDialogOpen(true);
+  };
+
+  const markTaskViewed = (taskId: number) => {
+    setReportState((prev) => ({
+      ...prev,
+      viewedTaskIds: prev.viewedTaskIds.includes(taskId)
+        ? prev.viewedTaskIds
+        : [...prev.viewedTaskIds, taskId],
+    }));
+  };
+
+  const markTaskReported = (task: MyTaskRowPaginated) => {
+    setReportState((prev) => ({
+      ...prev,
+      viewedTaskIds: prev.viewedTaskIds.includes(task.id)
+        ? prev.viewedTaskIds
+        : [...prev.viewedTaskIds, task.id],
+      reportedTaskIds: prev.reportedTaskIds.includes(task.id)
+        ? prev.reportedTaskIds
+        : [...prev.reportedTaskIds, task.id],
+    }));
+
+    queryClient.setQueryData<MyTasksResponse | undefined>(["my-tasks", queryString], (current) => {
+      if (!current) return current;
+      return {
+        ...current,
+        data: current.data.map((row) => (row.id === task.id ? task : row)),
+      };
+    });
+    queryClient.invalidateQueries({ queryKey: ["my-tasks"] });
+  };
+
+  const openReportFlow = (taskId?: number) => {
+    const sp = new URLSearchParams(searchParams.toString());
+    sp.set("page", "1");
+    sp.set("report", "1");
+    sp.delete("status");
+    sp.append("status", "in_progress");
+    replace(`${pathname}?${sp.toString()}`);
+    setReportInitialTaskId(taskId ?? null);
+    setReportDialogOpen(true);
+    if (taskId) markTaskViewed(taskId);
+  };
+
+  const closeReportFlow = () => {
+    const sp = new URLSearchParams(searchParams.toString());
+    sp.delete("report");
+    replace(`${pathname}?${sp.toString()}`);
+    setReportDialogOpen(false);
+    setReportInitialTaskId(null);
+  };
+
+  const dismissDailyReportBanner = () => {
+    setReportState((prev) => ({ ...prev, dismissed: true }));
   };
 
   const openValidate = async (task: MyTaskRowPaginated) => {
@@ -389,21 +516,48 @@ export function MyTasksClient() {
     }
   };
 
+  const handleStartTask = async (task: MyTaskRowPaginated) => {
+    setStartingTaskId(task.id);
+    try {
+      const res = await post(`projects/${task.project_id}/tasks/${task.id}/start`, {});
+      if (!res.ok) throw new Error(res.error || "Error al iniciar tarea");
+      toast.success("Tarea iniciada correctamente");
+      queryClient.invalidateQueries({ queryKey: ["my-tasks"] });
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Error al iniciar tarea");
+    } finally {
+      setStartingTaskId(null);
+    }
+  };
+
   // ─── Task card renderer ───────────────────────────────────────────────────
   const renderTask = (task: MyTaskRowPaginated) => {
     const taskType = task.task_type ?? "execution";
     const taskFlag = task.task_flag ?? "new";
     const isValidation = taskType === "validation";
-    const isInProgress =
-      task.status === "in_progress" || task.status === "not_started";
+    const isNotStarted = task.status === "not_started";
+    const isInProgress = task.status === "in_progress";
     const canAct = isInProgress;
+    const isReportedThisSession = reportState.reportedTaskIds.includes(task.id);
+    const isViewedThisSession = reportState.viewedTaskIds.includes(task.id);
+    const highlightForDailyReport =
+      reportFlag &&
+      isInProgress &&
+      !isReportedThisSession &&
+      !isViewedThisSession;
 
     return (
       <div
         key={task.id}
         className={`rounded-lg border bg-card p-4 space-y-3 ${
           task.status === "blocked" ? "border-destructive/40 bg-destructive/5" : ""
-        } ${task.status === "waiting" ? "opacity-60" : ""}`}
+        } ${task.status === "waiting" ? "opacity-60" : ""} ${
+          highlightForDailyReport
+            ? "border-primary/60 bg-primary/5 shadow-sm"
+            : isReportedThisSession
+              ? "border-emerald-300 bg-emerald-50/60 dark:border-emerald-800 dark:bg-emerald-950/20"
+              : ""
+        }`}
       >
         <div className="flex items-start justify-between gap-3">
           <div className="flex-1 min-w-0">
@@ -473,6 +627,19 @@ export function MyTasksClient() {
                 <span className="text-muted-foreground/70">· {task.brand_name}</span>
               )}
             </div>
+
+            {isInProgress && (
+              <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                <span>Avance: {task.progress_percent ?? 0}%</span>
+                <span>· Tiempo: {formatProgressMinutes(task.progress_minutes ?? 0)}</span>
+                {isReportedThisSession && (
+                  <span className="font-medium text-emerald-600">· Reportada hoy</span>
+                )}
+                {highlightForDailyReport && (
+                  <span className="font-medium text-primary">· Pendiente por reportar</span>
+                )}
+              </div>
+            )}
           </div>
 
           <div className="flex flex-col items-end gap-2">
@@ -499,15 +666,39 @@ export function MyTasksClient() {
               </span>
             </div>
 
-            {canAct && !isValidation && (
+            {isNotStarted && (
               <Button
                 size="sm"
+                variant="secondary"
                 className="h-7 text-xs gap-1"
-                onClick={() => openCompleteDialog(task)}
+                onClick={() => handleStartTask(task)}
+                disabled={startingTaskId === task.id}
               >
-                <CheckCircle className="h-3.5 w-3.5" />
-                Completar
+                <PlayCircle className="h-3.5 w-3.5" />
+                Tomar tarea
               </Button>
+            )}
+
+            {canAct && !isValidation && (
+              <>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-7 text-xs gap-1"
+                  onClick={() => openReportFlow(task.id)}
+                >
+                  <BellRing className="h-3.5 w-3.5" />
+                  Reportar avance
+                </Button>
+                <Button
+                  size="sm"
+                  className="h-7 text-xs gap-1"
+                  onClick={() => openCompleteDialog(task)}
+                >
+                  <CheckCircle className="h-3.5 w-3.5" />
+                  Completar
+                </Button>
+              </>
             )}
 
             {canAct && isValidation && (
@@ -689,6 +880,29 @@ export function MyTasksClient() {
         </div>
       </div>
 
+      {shouldShowDailyReportBanner && (
+        <div className="flex flex-col gap-3 rounded-xl border border-primary/30 bg-primary/5 p-4 md:flex-row md:items-center md:justify-between">
+          <div className="space-y-1">
+            <p className="flex items-center gap-2 text-sm font-semibold text-primary">
+              <BellRing className="h-4 w-4" />
+              Reporta tu avance de hoy
+            </p>
+            <p className="text-sm text-muted-foreground">
+              Ya pasó la hora configurada ({dailyReportTime}) y tienes {inProgressTasks.length} tarea(s) en progreso.
+            </p>
+          </div>
+
+          <div className="flex gap-2">
+            <Button type="button" variant="outline" onClick={dismissDailyReportBanner}>
+              Ocultar por hoy
+            </Button>
+            <Button type="button" onClick={() => openReportFlow()}>
+              Abrir reporte diario
+            </Button>
+          </div>
+        </div>
+      )}
+
       {/* Task list */}
       {isLoading ? (
         <div className="space-y-3">
@@ -789,6 +1003,22 @@ export function MyTasksClient() {
         onSuccess={() => {
           queryClient.invalidateQueries({ queryKey: ["my-tasks"] });
         }}
+      />
+
+      <TaskProgressReportModal
+        open={reportDialogOpen}
+        onOpenChange={(open) => {
+          if (!open) {
+            closeReportFlow();
+            return;
+          }
+          setReportDialogOpen(true);
+        }}
+        tasks={inProgressTasks}
+        initialTaskId={reportInitialTaskId}
+        reportedTaskIds={reportState.reportedTaskIds}
+        onTaskReported={markTaskReported}
+        onTaskViewed={markTaskViewed}
       />
 
       {/* History Dialog */}

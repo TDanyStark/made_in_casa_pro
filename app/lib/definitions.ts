@@ -252,6 +252,7 @@ export type ProjectTaskType = {
   assigned_user_id: number | null;
   assigned_user_name: string | null;
   assigned_user_rol_id: number | null;
+  assigned_user_is_internal?: number | null; // 0 | 1 | null
   status: ProjectTaskStatus;
   task_type: TaskType;
   task_flag: TaskFlag;
@@ -264,6 +265,11 @@ export type ProjectTaskType = {
   assigned_at?: string;
   completed_at?: string;
   quoter_ids?: number[];
+  // completion fields
+  delivery_url: string | null;
+  completion_cost: number | null;
+  progress_percent: number;
+  progress_minutes: number;
   // aggregates
   quote_count?: number;
   pending_quote_count?: number;
@@ -309,6 +315,7 @@ export type MyTaskRowPaginated = {
   assigned_user_id: number | null;
   assigned_user_name: string | null;
   assigned_user_rol_id: number | null;
+  assigned_user_is_internal?: number | null; // 0 | 1 | null
   status: ProjectTaskStatus;
   task_type: TaskType;
   task_flag: TaskFlag;
@@ -324,6 +331,11 @@ export type MyTaskRowPaginated = {
   quoter_ids?: number[];
   quote_count?: number;
   pending_quote_count?: number;
+  // completion fields
+  delivery_url: string | null;
+  completion_cost: number | null;
+  progress_percent: number;
+  progress_minutes: number;
   // Joined fields
   project_title: string;
   product_name: string | null;

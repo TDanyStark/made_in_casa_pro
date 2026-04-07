@@ -4,6 +4,7 @@ import { ITEMS_PER_PAGE } from "@/config/constants";
 import { validateApiRole, validateHttpMethod } from "@/lib/services/api-auth";
 import { UserRole } from "@/lib/definitions";
 import { getMyTasksWithPagination } from "@/lib/queries/projectTasks";
+import { getAppSettings } from "@/lib/queries/settings";
 import { decrypt } from "@/lib/session";
 import { cookies } from "next/headers";
 
@@ -70,7 +71,8 @@ export async function GET(request: NextRequest) {
     const query = parsed.data;
     const limit = ITEMS_PER_PAGE;
 
-    const { tasks, total } = await getMyTasksWithPagination({
+    const [{ tasks, total }, settings] = await Promise.all([
+      getMyTasksWithPagination({
       userId: session.id,
       page: query.page,
       limit,
@@ -80,7 +82,9 @@ export async function GET(request: NextRequest) {
       assignedFrom: query.assignedFrom ? new Date(query.assignedFrom) : undefined,
       assignedTo: query.assignedTo ? new Date(query.assignedTo) : undefined,
       q: query.q,
-    });
+      }),
+      getAppSettings(),
+    ]);
 
     const pageCount = Math.ceil(total / limit);
 
@@ -89,6 +93,7 @@ export async function GET(request: NextRequest) {
       pageCount,
       currentPage: query.page,
       total,
+      dailyReportTime: settings.daily_report_time,
     });
   } catch (error) {
     console.error("Error fetching my tasks:", error);

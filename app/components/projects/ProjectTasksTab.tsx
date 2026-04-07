@@ -63,6 +63,7 @@ import {
   Loader2,
   Plus,
   Pencil,
+  PlayCircle,
   Trash2,
   Package,
   CheckCircle,
@@ -266,6 +267,7 @@ export function ProjectTasksTab({
   const [submitting, setSubmitting] = useState(false);
   const [reordering, setReordering] = useState(false);
   const [completingTaskId] = useState<number | null>(null);
+  const [startingTaskId, setStartingTaskId] = useState<number | null>(null);
   const [completeDialogOpen, setCompleteDialogOpen] = useState(false);
   const [taskToComplete, setTaskToComplete] = useState<ProjectTaskType | null>(null);
   const [historyDialogOpen, setHistoryDialogOpen] = useState(false);
@@ -448,6 +450,20 @@ export function ProjectTasksTab({
     }
   };
 
+  const handleStartTask = async (task: ProjectTaskType) => {
+    setStartingTaskId(task.id);
+    try {
+      const res = await post(`projects/${projectId}/tasks/${task.id}/start`, {});
+      if (!res.ok) throw new Error(res.error || "Error al iniciar tarea");
+      toast.success("Tarea iniciada correctamente");
+      invalidateAll();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Error al iniciar tarea");
+    } finally {
+      setStartingTaskId(null);
+    }
+  };
+
   const handleReorder = async (reordered: ProjectTaskType[]) => {
     // Business Rule: Completed tasks cannot be reordered
     // Check if any task that was completed moved or if a new task took its place
@@ -558,8 +574,9 @@ export function ProjectTasksTab({
               const isNotStarted = task.status === "not_started";
               const isCompleted = task.status === "completed";
               const isValidation = taskType === "validation";
-                      const canComplete = (isInProgress || isNotStarted) && !isValidation && (isMyTask(task) || isAdmin);
-                      const canValidate = (isInProgress || isNotStarted) && isValidation && (isMyTask(task) || isAdmin);
+                      const canStart = isNotStarted && (isMyTask(task) || isAdmin);
+                      const canComplete = isInProgress && !isValidation && (isMyTask(task) || isAdmin);
+                      const canValidate = isInProgress && isValidation && (isMyTask(task) || isAdmin);
                       const needsQuote = task.requires_quote === 1 && isBlocked;
 
                       return (
@@ -727,6 +744,23 @@ export function ProjectTasksTab({
                             >
                                <HistoryIcon className="h-3.5 w-3.5" />
                             </Button>
+
+                            {canStart && (
+                              <Button
+                                size="sm"
+                                variant="secondary"
+                                className="h-7 text-xs gap-1"
+                                onClick={() => handleStartTask(task)}
+                                disabled={startingTaskId === task.id}
+                              >
+                                {startingTaskId === task.id ? (
+                                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                ) : (
+                                  <PlayCircle className="h-3.5 w-3.5" />
+                                )}
+                                Tomar tarea
+                              </Button>
+                            )}
 
                             {canComplete && (
                               <Button

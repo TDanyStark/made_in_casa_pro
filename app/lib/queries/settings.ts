@@ -5,6 +5,7 @@ export interface AppSettings {
   google_oauth_client_secret: string | null;
   google_oauth_refresh_token: string | null;
   google_oauth_connected_email: string | null;
+  daily_report_time: string;
 }
 
 const KEYS: (keyof AppSettings)[] = [
@@ -12,6 +13,7 @@ const KEYS: (keyof AppSettings)[] = [
   "google_oauth_client_secret",
   "google_oauth_refresh_token",
   "google_oauth_connected_email",
+  "daily_report_time",
 ];
 
 export async function getAppSettings(): Promise<AppSettings> {
@@ -31,6 +33,7 @@ export async function getAppSettings(): Promise<AppSettings> {
     google_oauth_client_secret: map["google_oauth_client_secret"] ?? null,
     google_oauth_refresh_token: map["google_oauth_refresh_token"] ?? null,
     google_oauth_connected_email: map["google_oauth_connected_email"] ?? null,
+    daily_report_time: map["daily_report_time"] ?? "18:00",
   };
 }
 

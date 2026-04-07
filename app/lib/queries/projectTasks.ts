@@ -28,6 +28,7 @@ const TASK_SELECT = `
   pt.assigned_user_id,
   u.name            AS assigned_user_name,
   u.rol_id          AS assigned_user_rol_id,
+  u.is_internal     AS assigned_user_is_internal,
   pt.status,
   pt.task_type,
   pt.task_flag,
@@ -39,6 +40,10 @@ const TASK_SELECT = `
   pt.assigned_at,
   pt.completed_at,
   pt.adjustment_id,
+  pt.delivery_url,
+  pt.completion_cost,
+  pt.progress_percent,
+  pt.progress_minutes,
   (SELECT json_agg(user_id) FROM task_quote_invitations WHERE task_id = pt.id) AS quoter_ids,
   (SELECT COUNT(*) FROM task_quotes tq WHERE tq.task_id = pt.id) AS quote_count,
   (SELECT COUNT(*) FROM task_quotes tq WHERE tq.task_id = pt.id AND tq.status = 'pending') AS pending_quote_count
@@ -404,6 +409,57 @@ async function logTransition(
   });
 }
 
+// ─── Start task (not_started → in_progress) ──────────────────────────────────
+
+/**
+ * Transitions a task from 'not_started' to 'in_progress'.
+ * Only callable when the task is in 'not_started' status.
+ */
+export async function startTask(
+  taskId: number,
+  movedByUserId: number
+): Promise<{ success: boolean; error?: string }> {
+  const result = await db.execute({
+    sql: `SELECT id, status, assigned_user_id, project_id FROM project_tasks WHERE id = $1`,
+    args: [taskId],
+  });
+
+  if (result.rows.length === 0) {
+    return { success: false, error: "Tarea no encontrada" };
+  }
+
+  const task = result.rows[0] as unknown as {
+    id: number;
+    status: ProjectTaskStatus;
+    assigned_user_id: number | null;
+    project_id: number;
+  };
+
+  if (task.status !== "not_started") {
+    return {
+      success: false,
+      error: 'La tarea debe estar en estado "sin iniciar" para poder tomarla',
+    };
+  }
+
+  await db.execute({
+    sql: `UPDATE project_tasks SET status = 'in_progress', updated_at = NOW() WHERE id = $1`,
+    args: [taskId],
+  });
+
+  await db.execute({
+    sql: `
+      INSERT INTO task_transitions (task_id, project_id, from_status, to_status, from_flag, to_flag, moved_by, notes)
+      SELECT $1, project_id, 'not_started', 'in_progress', task_flag, task_flag, $2, ''
+      FROM project_tasks WHERE id = $1
+    `,
+    args: [taskId, movedByUserId],
+  });
+
+  revalidatePath(`/projects/${task.project_id}`);
+  return { success: true };
+}
+
 // ─── Complete task (execution flow) ──────────────────────────────────────────
 
 /**
@@ -413,7 +469,12 @@ async function logTransition(
 export async function completeTask(
   taskId: number,
   userId: number,
-  notes?: string | null
+  notes?: string | null,
+  options?: {
+    progress_minutes?: number;
+    delivery_url?: string | null;
+    completion_cost?: number | null;
+  }
 ): Promise<{ task: ProjectTaskType; nextTask: ProjectTaskType | null; blockedReason?: string }> {
   const task = await getProjectTaskById(taskId);
   if (!task) throw new Error("Tarea no encontrada");
@@ -422,16 +483,29 @@ export async function completeTask(
   if (task.task_type !== "execution" && task.task_type !== "validation") {
     throw new Error("Tipo de tarea no válido para completar");
   }
-  if (task.status !== "in_progress" && task.status !== "not_started") {
-    throw new Error("La tarea no está en un estado que permita completarla");
+  if (task.status !== "in_progress") {
+    throw new Error("Solo se pueden completar tareas en progreso");
   }
 
   const transaction = await db.transaction("write");
   try {
-    // 1. Mark current task as completed
+    // 1. Mark current task as completed (with optional enrichment fields)
     await transaction.execute({
-      sql: `UPDATE project_tasks SET status = 'completed', completed_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id = $1`,
-      args: [taskId],
+      sql: `UPDATE project_tasks
+            SET status = 'completed',
+                completed_at = CURRENT_TIMESTAMP,
+                updated_at = CURRENT_TIMESTAMP,
+                progress_minutes = $2,
+                delivery_url = $3,
+                completion_cost = $4,
+                progress_percent = 100
+            WHERE id = $1`,
+      args: [
+        taskId,
+        options?.progress_minutes ?? 0,
+        options?.delivery_url ?? null,
+        options?.completion_cost ?? null,
+      ],
     });
 
     // 2. Log transition
@@ -699,7 +773,7 @@ export async function validateTask(
   if (!task) throw new Error("Tarea no encontrada");
   if (task.status === "completed") throw new Error("Esta tarea ya está completada y no puede modificarse");
   if (task.task_type !== "validation") throw new Error("Solo se pueden validar tareas de tipo validación");
-  if (task.status !== "in_progress" && task.status !== "not_started") {
+  if (task.status !== "in_progress") {
     throw new Error("La tarea de validación no está en un estado que permita validarla");
   }
 
@@ -1000,6 +1074,7 @@ export async function getMyTasks(userId: number): Promise<ProjectTaskType[]> {
           pt.assigned_user_id,
           u.name            AS assigned_user_name,
           u.rol_id          AS assigned_user_rol_id,
+          u.is_internal     AS assigned_user_is_internal,
           pt.status,
           pt.task_type,
           pt.task_flag,
@@ -1008,6 +1083,10 @@ export async function getMyTasks(userId: number): Promise<ProjectTaskType[]> {
           pt.order_index,
           pt.created_at,
           pt.updated_at,
+          pt.delivery_url,
+          pt.completion_cost,
+          pt.progress_percent,
+          pt.progress_minutes,
           p.title           AS project_title,
           pr.name           AS product_name,
           0                 AS quote_count,
@@ -1145,6 +1224,7 @@ export async function getMyTasksWithPagination(
           pt.assigned_user_id,
           u.name               AS assigned_user_name,
           u.rol_id             AS assigned_user_rol_id,
+          u.is_internal        AS assigned_user_is_internal,
           pt.area_id,
           a.name               AS area_name,
           pt.status,
@@ -1159,6 +1239,10 @@ export async function getMyTasksWithPagination(
           pt.completed_at,
           pt.created_at,
           pt.updated_at,
+          pt.delivery_url,
+          pt.completion_cost,
+          pt.progress_percent,
+          pt.progress_minutes,
           (SELECT json_agg(user_id) FROM task_quote_invitations WHERE task_id = pt.id) AS quoter_ids,
           (SELECT COUNT(*) FROM task_quotes tq WHERE tq.task_id = pt.id)               AS quote_count,
           (SELECT COUNT(*) FROM task_quotes tq WHERE tq.task_id = pt.id AND tq.status = 'pending') AS pending_quote_count
@@ -1209,6 +1293,40 @@ export async function getMyTasksWithPagination(
     console.error("Error fetching my tasks with pagination:", error);
     return { tasks: [], total: 0 };
   }
+}
+
+// ─── Progress update ──────────────────────────────────────────────────────────
+
+/**
+ * Updates task progress: sets progress_percent and accumulates additional_minutes.
+ * Validation (e.g. status check) is handled at the API layer.
+ */
+export async function updateTaskProgress(
+  taskId: number,
+  data: { progress_percent: number; additional_minutes: number }
+): Promise<ProjectTaskType> {
+  const currentTask = await getProjectTaskById(taskId);
+  if (!currentTask) {
+    throw new Error("Tarea no encontrada");
+  }
+
+  await db.execute({
+    sql: `UPDATE project_tasks
+          SET progress_percent = $1,
+              progress_minutes = progress_minutes + $2,
+              updated_at = CURRENT_TIMESTAMP
+          WHERE id = $3`,
+    args: [data.progress_percent, data.additional_minutes, taskId],
+  });
+
+  revalidatePath(`/projects/${currentTask.project_id}`);
+  const updatedTask = await getProjectTaskById(taskId);
+
+  if (!updatedTask) {
+    throw new Error("No fue posible obtener la tarea actualizada");
+  }
+
+  return updatedTask;
 }
 
 export async function getTasksCommandCenterWithPagination({

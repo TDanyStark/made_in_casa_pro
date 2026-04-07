@@ -52,6 +52,10 @@ jest.mock("@tanstack/react-query", () => ({
               completed_at: null,
               created_at: "2026-01-01",
               updated_at: "2026-01-01",
+              delivery_url: null,
+              completion_cost: null,
+              progress_percent: 25,
+              progress_minutes: 45,
               quoter_ids: [],
               quote_count: 0,
               pending_quote_count: 0,
@@ -60,6 +64,7 @@ jest.mock("@tanstack/react-query", () => ({
           pageCount: 1,
           currentPage: 1,
           total: 1,
+          dailyReportTime: "18:00",
         },
         isLoading: false,
         isError: false,
@@ -106,6 +111,10 @@ jest.mock("@/components/tasks/TaskCompleteDialog", () => ({
 
 jest.mock("@/components/tasks/TaskHistoryDialog", () => ({
   TaskHistoryDialog: () => null,
+}));
+
+jest.mock("@/components/tasks/TaskProgressReportModal", () => ({
+  TaskProgressReportModal: () => null,
 }));
 
 jest.mock("@/components/ui/select", () => {
@@ -193,6 +202,7 @@ jest.mock("lucide-react", () => ({
   Clock: () => null,
   ExternalLink: () => null,
   History: () => null,
+  BellRing: () => null,
   ShieldCheck: () => null,
 }));
 
@@ -207,6 +217,8 @@ describe("MyTasksClient", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     jest.useFakeTimers();
+    jest.setSystemTime(new Date("2026-04-07T19:00:00"));
+    window.sessionStorage.clear();
     currentSearch = "page=1";
   });
 
@@ -222,8 +234,7 @@ describe("MyTasksClient", () => {
     expect(screen.getByText("Limpiar filtros")).toBeInTheDocument();
     expect(screen.getByLabelText("Buscar")).toBeInTheDocument();
     expect(screen.getByText("Rango de asignación")).toBeInTheDocument();
-    expect(screen.getByLabelText("Desde")).toBeInTheDocument();
-    expect(screen.getByLabelText("Hasta")).toBeInTheDocument();
+    expect(screen.getByText("Reporta tu avance de hoy")).toBeInTheDocument();
   });
 
   it("updates URL when status filter changes", () => {
@@ -253,21 +264,14 @@ describe("MyTasksClient", () => {
     expect(lastCall).toContain("status=completed");
   });
 
-  it("updates URL when date range changes", () => {
+  it("opens report flow with URL flag when notification CTA is clicked", () => {
     render(<MyTasksClient />);
 
-    const from = screen.getByLabelText("Desde") as HTMLInputElement;
-    const to = screen.getByLabelText("Hasta") as HTMLInputElement;
+    fireEvent.click(screen.getByText("Abrir reporte diario"));
 
-    fireEvent.change(from, { target: { value: "2026-03-01" } });
-    let lastCall = mockReplace.mock.calls[mockReplace.mock.calls.length - 1][0] as string;
-    expect(lastCall).toContain("assignedFrom=2026-03-01");
-    expect(lastCall).toContain("page=1");
-
-    fireEvent.change(to, { target: { value: "2026-03-31" } });
-    lastCall = mockReplace.mock.calls[mockReplace.mock.calls.length - 1][0] as string;
-    expect(lastCall).toContain("assignedTo=2026-03-31");
-    expect(lastCall).toContain("page=1");
+    const lastCall = mockReplace.mock.calls[mockReplace.mock.calls.length - 1][0] as string;
+    expect(lastCall).toContain("report=1");
+    expect(lastCall).toContain("status=in_progress");
   });
 
   it("clear filters resets URL params to defaults", () => {

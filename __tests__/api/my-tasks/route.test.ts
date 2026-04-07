@@ -11,6 +11,10 @@ jest.mock("@/lib/queries/projectTasks", () => ({
   getMyTasksWithPagination: jest.fn(),
 }));
 
+jest.mock("@/lib/queries/settings", () => ({
+  getAppSettings: jest.fn(),
+}));
+
 jest.mock("@/lib/session", () => ({
   decrypt: jest.fn(),
 }));
@@ -23,12 +27,14 @@ import { NextRequest } from "next/server";
 import { GET } from "@/api/my-tasks/route";
 import { validateApiRole, validateHttpMethod } from "@/lib/services/api-auth";
 import { getMyTasksWithPagination } from "@/lib/queries/projectTasks";
+import { getAppSettings } from "@/lib/queries/settings";
 import { decrypt } from "@/lib/session";
 import { cookies } from "next/headers";
 
 const mockValidateHttpMethod = validateHttpMethod as jest.MockedFunction<typeof validateHttpMethod>;
 const mockValidateApiRole = validateApiRole as jest.MockedFunction<typeof validateApiRole>;
 const mockGetMyTasks = getMyTasksWithPagination as jest.MockedFunction<typeof getMyTasksWithPagination>;
+const mockGetAppSettings = getAppSettings as jest.MockedFunction<typeof getAppSettings>;
 const mockDecrypt = decrypt as jest.MockedFunction<typeof decrypt>;
 const mockCookies = cookies as jest.MockedFunction<typeof cookies>;
 
@@ -51,6 +57,13 @@ describe("GET /api/my-tasks", () => {
       get: jest.fn().mockReturnValue({ value: "fake-cookie" }),
     } as never);
     mockDecrypt.mockResolvedValue({ id: 9 } as never);
+    mockGetAppSettings.mockResolvedValue({
+      google_oauth_client_id: null,
+      google_oauth_client_secret: null,
+      google_oauth_refresh_token: null,
+      google_oauth_connected_email: null,
+      daily_report_time: "18:00",
+    });
   });
 
   it("returns 200 with paginated payload for valid params", async () => {
@@ -80,13 +93,17 @@ describe("GET /api/my-tasks", () => {
           requires_quote: 0,
           assign_to_commercial: 0,
           order_index: 1,
-          assigned_at: null,
-          completed_at: null,
-          created_at: "2026-01-01",
-          updated_at: "2026-01-01",
-          quoter_ids: [],
-          quote_count: 0,
-          pending_quote_count: 0,
+           assigned_at: null,
+           completed_at: null,
+           created_at: "2026-01-01",
+           updated_at: "2026-01-01",
+           delivery_url: null,
+           completion_cost: null,
+           progress_percent: 10,
+           progress_minutes: 35,
+           quoter_ids: [],
+           quote_count: 0,
+           pending_quote_count: 0,
         },
       ],
       total: 1,
@@ -104,6 +121,7 @@ describe("GET /api/my-tasks", () => {
         currentPage: 1,
         total: 1,
         pageCount: 1,
+        dailyReportTime: "18:00",
       })
     );
     expect(mockGetMyTasks).toHaveBeenCalledWith(

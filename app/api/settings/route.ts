@@ -9,6 +9,10 @@ const patchSchema = z.object({
   google_oauth_client_secret: z.string().min(1).optional(),
   google_oauth_refresh_token: z.string().nullable().optional(),
   google_oauth_connected_email: z.string().nullable().optional(),
+  daily_report_time: z
+    .string()
+    .regex(/^([01]\d|2[0-3]):([0-5]\d)$/, "Formato inválido. Usa HH:MM")
+    .optional(),
 });
 
 export async function GET(request: NextRequest) {
@@ -28,6 +32,7 @@ export async function GET(request: NextRequest) {
         : null,
       google_oauth_connected_email: settings.google_oauth_connected_email,
       google_oauth_connected: !!settings.google_oauth_refresh_token,
+      daily_report_time: settings.daily_report_time,
     });
   } catch (error) {
     console.error("Error fetching settings:", error);

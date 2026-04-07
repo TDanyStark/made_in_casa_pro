@@ -229,6 +229,26 @@
 
 ---
 
+### 1️⃣1️⃣ Gestión de TAREAS y Reporte Diario
+
+**¿Qué se puede hacer?**
+- ✅ Tomar tareas para moverlas de `not_started` a `in_progress`
+- ✅ Completar tareas usando el tiempo acumulado real (`progress_minutes`) como fuente única
+- ✅ Reportar avance diario por tarea con porcentaje y tiempo adicional acumulativo
+- ✅ Recibir recordatorio diario en `/my-tasks` después de la hora configurada por administración
+- ✅ Abrir el flujo guiado de reporte con `?report=1` para identificar tareas en progreso pendientes del día
+
+**Configuración:**
+- Solo ADMIN puede definir la hora de notificación diaria desde Configuración (`daily_report_time`)
+- Si no existe una hora guardada, el sistema usa `18:00`
+
+**Endpoint API:**
+- `POST /api/projects/[id]/tasks/[tid]/start` - Tomar tarea
+- `POST /api/projects/[id]/tasks/[tid]/progress` - Reportar avance diario
+- `POST /api/projects/[id]/tasks/[tid]/complete` - Completar tarea con tiempo acumulado
+
+---
+
 ## 🔒 Seguridad Implementada
 
 - ✅ **Autenticación JWT** con encriptación usando jose
