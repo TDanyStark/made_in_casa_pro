@@ -10,7 +10,6 @@ import {
   TaskCommandCenterRow,
   MyTaskRowPaginated,
   MyTasksFilters,
-  UserRole,
 } from "../definitions";
 import { buildPaginationArgs, buildWhereClause, parseTotal } from "../db/query-helpers";
 import { ITEMS_PER_PAGE } from "@/config/constants";
@@ -42,6 +41,14 @@ const TASK_SELECT = `
   pt.completed_at,
   pt.adjustment_id,
   pt.delivery_url,
+  (
+    SELECT tt.notes
+    FROM task_transitions tt
+    WHERE tt.task_id = pt.id
+      AND tt.to_status = 'completed'
+    ORDER BY tt.transitioned_at DESC, tt.id DESC
+    LIMIT 1
+  )                 AS delivery_notes,
   pt.completion_cost,
   pt.progress_percent,
   pt.progress_minutes,
@@ -56,6 +63,24 @@ const TASK_JOINS = `
   LEFT JOIN users u ON pt.assigned_user_id = u.id
 `;
 
+type TaskWithRawQuoterIds = ProjectTaskType & {
+  quoter_ids?: number[] | string | null;
+};
+
+function normalizeTaskQuoterIds(task: TaskWithRawQuoterIds): ProjectTaskType {
+  if (typeof task.quoter_ids === "string") {
+    try {
+      task.quoter_ids = JSON.parse(task.quoter_ids) as number[];
+    } catch {
+      task.quoter_ids = [];
+    }
+  } else if (!task.quoter_ids) {
+    task.quoter_ids = [];
+  }
+
+  return task;
+}
+
 // ─── Read ─────────────────────────────────────────────────────────────────────
 
 export async function getProjectTaskById(id: number): Promise<ProjectTaskType | null> {
@@ -65,17 +90,8 @@ export async function getProjectTaskById(id: number): Promise<ProjectTaskType | 
       args: [id],
     });
     if (result.rows.length === 0) return null;
-    const task = result.rows[0] as unknown as ProjectTaskType;
-    if (typeof (task as any).quoter_ids === "string") {
-      try {
-        task.quoter_ids = JSON.parse((task as any).quoter_ids);
-      } catch {
-        task.quoter_ids = [];
-      }
-    } else if (!(task as any).quoter_ids) {
-      task.quoter_ids = [];
-    }
-    return task;
+    const task = result.rows[0] as unknown as TaskWithRawQuoterIds;
+    return normalizeTaskQuoterIds(task);
   } catch (error) {
     console.error("Error fetching project task by ID:", error);
     return null;
@@ -104,19 +120,8 @@ export async function getTasksByProject(projectId: number, adjustmentId?: number
       `,
       args,
     });
-    const tasks = result.rows as unknown as ProjectTaskType[];
-    for (const task of tasks) {
-      if (typeof (task as any).quoter_ids === "string") {
-        try {
-          task.quoter_ids = JSON.parse((task as any).quoter_ids);
-        } catch {
-          task.quoter_ids = [];
-        }
-      } else if (!(task as any).quoter_ids) {
-        task.quoter_ids = [];
-      }
-    }
-    return tasks;
+    const tasks = result.rows as unknown as TaskWithRawQuoterIds[];
+    return tasks.map(normalizeTaskQuoterIds);
   } catch (error) {
     console.error("Error fetching tasks by project:", error);
     return [];

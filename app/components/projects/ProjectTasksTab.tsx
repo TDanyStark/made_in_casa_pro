@@ -23,6 +23,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { TaskValidationDialog } from "@/components/tasks/TaskValidationDialog";
 import { TaskCompleteDialog } from "@/components/tasks/TaskCompleteDialog";
 import { TaskHistoryDialog } from "@/components/tasks/TaskHistoryDialog";
+import { TaskDeliverableDialog } from "@/components/tasks/TaskDeliverableDialog";
 import {
   Dialog,
   DialogContent,
@@ -73,6 +74,7 @@ import {
   ShieldCheck,
   RotateCcw,
   History as HistoryIcon,
+  Eye,
 } from "lucide-react";
 import {
   Tooltip,
@@ -273,6 +275,8 @@ export function ProjectTasksTab({
   const [taskToComplete, setTaskToComplete] = useState<ProjectTaskType | null>(null);
   const [historyDialogOpen, setHistoryDialogOpen] = useState(false);
   const [taskForHistory, setTaskForHistory] = useState<ProjectTaskType | null>(null);
+  const [deliverableDialogOpen, setDeliverableDialogOpen] = useState(false);
+  const [taskForDeliverable, setTaskForDeliverable] = useState<ProjectTaskType | null>(null);
   const [validateDialog, setValidateDialog] = useState<ValidateDialogState>({
     open: false,
     task: null,
@@ -436,6 +440,11 @@ export function ProjectTasksTab({
   const openHistoryDialog = (task: ProjectTaskType) => {
     setTaskForHistory(task);
     setHistoryDialogOpen(true);
+  };
+
+  const openDeliverableDialog = (task: ProjectTaskType) => {
+    setTaskForDeliverable(task);
+    setDeliverableDialogOpen(true);
   };
 
   const handleDeleteTask = async (taskId: number) => {
@@ -735,6 +744,17 @@ export function ProjectTasksTab({
                                   : TASK_STATUS_CONFIG[task.status]?.label}
                               </TooltipContent>
                             </Tooltip>
+
+                            <Button
+                               variant="ghost"
+                               size="icon"
+                               className="h-7 w-7 text-muted-foreground"
+                               onClick={() => openDeliverableDialog(task)}
+                               title="Ver entregable"
+                               aria-label={`Ver entregable de ${task.title}`}
+                            >
+                               <Eye className="h-3.5 w-3.5" />
+                            </Button>
 
                             <Button
                                variant="ghost"
@@ -1068,6 +1088,12 @@ export function ProjectTasksTab({
           onOpenChange={setHistoryDialogOpen}
           taskId={taskForHistory?.id ?? null}
           taskTitle={taskForHistory?.title ?? ""}
+        />
+
+        <TaskDeliverableDialog
+          open={deliverableDialogOpen}
+          onOpenChange={setDeliverableDialogOpen}
+          task={taskForDeliverable}
         />
       </>
     </TooltipProvider>

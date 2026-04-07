@@ -271,6 +271,7 @@ export type ProjectTaskType = {
   quoter_ids?: number[];
   // completion fields
   delivery_url: string | null;
+  delivery_notes?: string | null;
   completion_cost: number | null;
   progress_percent: number;
   progress_minutes: number;
