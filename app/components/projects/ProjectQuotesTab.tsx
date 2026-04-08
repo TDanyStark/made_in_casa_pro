@@ -91,9 +91,11 @@ export function ProjectQuotesTab({ projectId, canEdit }: Props) {
     staleTime: 1000 * 60,
   });
 
-  const quoteTasks = allTasks.filter(
-    (t) => t.requires_quote === 1 || (t.status === "blocked" && Number(t.pending_quote_count ?? 0) > 0)
-  );
+  const quoteTasks = allTasks
+    .filter(
+      (t) => t.requires_quote === 1 || (t.status === "blocked" && Number(t.pending_quote_count ?? 0) > 0)
+    )
+    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
   // External collaborators for invite select
   const { data: externals = [] } = useQuery<CollaboratorOption[]>({

@@ -29,6 +29,20 @@ async function getDriveClient() {
     refresh_token: settings.google_oauth_refresh_token,
   });
 
+  try {
+    await oauth2Client.getAccessToken();
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+
+    if (message.includes("invalid_grant")) {
+      throw new Error(
+        "La autorización de Google Drive ha expirado o fue revocada. Reconecta Google Drive en Configuración."
+      );
+    }
+
+    throw error;
+  }
+
   return google.drive({ version: "v3", auth: oauth2Client });
 }
 
