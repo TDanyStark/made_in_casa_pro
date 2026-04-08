@@ -64,7 +64,7 @@ export function TaskHistoryDialog({
           ) : (
             <div className="h-[50vh] pr-4 mt-4 overflow-y-auto custom-scrollbar">
               <div className="space-y-6 relative before:absolute before:inset-0 before:left-2 before:w-0.5 before:bg-muted before:h-full">
-                {transitions.map((transition, idx) => (
+                {transitions.map((transition) => (
                   <div key={transition.id} className="relative pl-8 pb-2">
                     {/* Dot */}
                     <div className="absolute left-0 top-1.5 h-4 w-4 rounded-full border-2 border-background bg-muted flex items-center justify-center">

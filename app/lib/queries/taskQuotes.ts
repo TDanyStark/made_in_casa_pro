@@ -3,6 +3,17 @@ import { revalidatePath } from "next/cache";
 import { TaskQuoteType, TaskQuoteInvitationType } from "../definitions";
 import { dhmToMinutes } from "../utils/time";
 
+/**
+ * Normalizes rich-text HTML input, converting empty/invalid HTML to null.
+ * Handles outputs from Tiptap and similar rich-text editors.
+ */
+function normalizeHtmlContent(html: string | null | undefined): string | null {
+  if (!html) return null;
+  // Strip tags and check if empty after trimming
+  const stripped = html.replace(/<[^>]*>/g, "").trim();
+  return stripped.length > 0 ? html : null;
+}
+
 // ─── Invitations ──────────────────────────────────────────────────────────────
 
 export async function getTaskQuoteInvitations(taskId: number): Promise<TaskQuoteInvitationType[]> {
@@ -232,6 +243,9 @@ export async function submitQuote(data: {
       minutes: data.delivery_minutes || 0,
     });
 
+    // Normalize HTML notes content
+    const normalizedNotes = normalizeHtmlContent(data.notes ?? null);
+
     const result = await db.execute({
       sql: `
         INSERT INTO task_quotes (task_id, user_id, price, delivery_days, delivery_hours, delivery_minutes, notes, status)
@@ -253,7 +267,7 @@ export async function submitQuote(data: {
         data.delivery_days ?? null,
         data.delivery_hours ?? null,
         totalMinutes,
-        data.notes ?? null,
+        normalizedNotes,
       ],
     });
 
@@ -344,5 +358,42 @@ export async function rejectQuote(quoteId: number): Promise<void> {
   } catch (error) {
     console.error("Error rejecting quote:", error);
     throw error;
+  }
+}
+
+/**
+ * Returns all quotes submitted by a user for tasks in a specific project.
+ */
+export async function getTaskQuotesForCollaborator(projectId: number, userId: number): Promise<TaskQuoteType[]> {
+  try {
+    const result = await db.execute({
+      sql: `
+        SELECT
+          tq.id,
+          tq.task_id,
+          pt.title        AS task_title,
+          pt.project_id,
+          tq.user_id,
+          u.name          AS user_name,
+          tq.price,
+          tq.delivery_days,
+          tq.delivery_hours,
+          tq.delivery_minutes,
+          tq.notes,
+          tq.status,
+          tq.created_at,
+          tq.updated_at
+        FROM task_quotes tq
+        JOIN users u         ON tq.user_id = u.id
+        JOIN project_tasks pt ON tq.task_id = pt.id
+        WHERE pt.project_id = $1 AND tq.user_id = $2
+        ORDER BY tq.created_at ASC
+      `,
+      args: [projectId, userId],
+    });
+    return result.rows as unknown as TaskQuoteType[];
+  } catch (error) {
+    console.error("Error fetching collaborator quotes for project:", error);
+    return [];
   }
 }

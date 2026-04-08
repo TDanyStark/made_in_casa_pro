@@ -20,8 +20,10 @@ import {
   Info, 
   PlusCircle, 
   History,
-  AlertCircle
+  AlertCircle,
+  FolderOpen
 } from "lucide-react";
+import Link from "next/link";
 
 interface MyQuotesData {
   quotes: TaskQuoteType[];
@@ -128,6 +130,16 @@ export function MyQuotesClient() {
                     >
                       Cotizar ahora
                     </Button>
+                    <Button 
+                      variant="outline" 
+                      className="w-full mt-2" 
+                      asChild
+                    >
+                      <Link href={`/my-quotes/projects/${inv.project_id}`}>
+                        <FolderOpen className="h-4 w-4 mr-2" />
+                        Ver proyecto
+                      </Link>
+                    </Button>
                   </CardContent>
                 </Card>
               ))}
@@ -172,9 +184,10 @@ export function MyQuotesClient() {
                       Tiempo estimado: {formatDHM(quote.delivery_minutes)}
                     </div>
                     {quote.notes && (
-                      <div className="text-sm text-muted-foreground italic border-t pt-2 line-clamp-2">
-                        "{quote.notes}"
-                      </div>
+                      <div 
+                        className="text-sm text-muted-foreground italic border-t pt-2 line-clamp-2"
+                        dangerouslySetInnerHTML={{ __html: quote.notes }}
+                      />
                     )}
                     {quote.status === "pending" && (
                       <Button 

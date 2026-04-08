@@ -18,15 +18,19 @@ interface Props {
   projectId: number;
   initialContent: string;
   canEdit?: boolean;
+  readOnly?: boolean;
 }
 
-export function ProjectNotesEditor({ projectId, initialContent, canEdit = true }: Props) {
+export function ProjectNotesEditor({ projectId, initialContent, canEdit = true, readOnly = false }: Props) {
   const queryClient = useQueryClient();
   const [content, setContent] = useState(initialContent);
   const [originalContent, setOriginalContent] = useState(initialContent);
   const [isChanged, setIsChanged] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
+
+  // Determine if editing is allowed: either canEdit is true (default) OR readOnly is false
+  const canEditProject = canEdit && !readOnly;
 
   useEffect(() => {
     setIsChanged(content !== originalContent);
@@ -55,7 +59,7 @@ export function ProjectNotesEditor({ projectId, initialContent, canEdit = true }
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h3 className="text-lg font-semibold">Notas del proyecto</h3>
-        {isChanged && (
+        {canEditProject && isChanged && (
           <Button onClick={handleSave} disabled={isSubmitting} size="sm" className="gap-2">
             {isSubmitting ? (
               <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -66,7 +70,7 @@ export function ProjectNotesEditor({ projectId, initialContent, canEdit = true }
           </Button>
         )}
       </div>
-      {canEdit ? (
+      {canEditProject ? (
         <RichTextEditor
           value={content}
           onChange={setContent}

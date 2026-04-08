@@ -110,7 +110,7 @@ export async function POST(request: NextRequest, { params }: Params) {
       description: validation.data.description ?? null,
       area_id: validation.data.area_id ?? null,
       assigned_user_id: resolvedAssignedUserId,
-      status: initialStatus as any,
+      status: initialStatus,
       task_type: validation.data.task_type ?? "execution",
       task_flag: validation.data.task_flag ?? "new",
       requires_quote: validation.data.requires_quote ?? 0,

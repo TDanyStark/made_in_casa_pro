@@ -11,6 +11,18 @@ import { cookies } from "next/headers";
 import { db } from "@/lib/db";
 import { AUTHENTICATED_ROLES, OPERATIONS_ROLES } from "@/lib/role-groups";
 
+// Task template row type
+interface TaskTemplateRow {
+  template_id: number;
+  title: string;
+  area_id: number | null;
+  assigned_user_id: number | null;
+  assign_to_commercial: number;
+  task_type: "execution" | "validation";
+  requires_quote: number;
+  quoter_ids: number[];
+}
+
 // Each task in the final ordered list sent from the wizard
 const taskSchema = z.object({
   template_id: z.number().int().positive().optional().nullable(),
@@ -132,7 +144,7 @@ export async function POST(
 
     // ── Build and insert tasks ────────────────────────────────────────────────
     // If wizard sent an explicit task list, use it. Otherwise fall back to templates.
-    let taskList = tasks as any[];
+    let taskList: TaskTemplateRow[] = tasks as TaskTemplateRow[];
 
     if (taskList.length === 0 && project.product_id) {
       // No wizard tasks sent — load from templates as-is
@@ -142,6 +154,7 @@ export async function POST(
         args: [project.product_id],
       });
       
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const tplTasks = tplResult.rows as any[];
       for (const t of tplTasks) {
         if (Number(t.requires_quote) === 1) {

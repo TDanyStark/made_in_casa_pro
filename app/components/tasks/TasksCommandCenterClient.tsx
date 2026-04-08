@@ -15,7 +15,6 @@ import {
   TaskType,
   UserType,
   AreaType,
-  UserRole,
 } from "@/lib/definitions";
 import { ITEMS_PER_PAGE } from "@/config/constants";
 import {

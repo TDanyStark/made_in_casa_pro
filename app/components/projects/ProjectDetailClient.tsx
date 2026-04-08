@@ -100,6 +100,7 @@ export function ProjectDetailClient({ projectId, userRole, currentUserId }: Prop
           <ProjectNotesEditor
             projectId={projectId}
             initialContent={project.notes ?? ""}
+            canEdit={canEdit}
           />
         </TabsContent>
 

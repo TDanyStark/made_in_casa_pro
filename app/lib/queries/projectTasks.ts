@@ -1436,3 +1436,27 @@ export async function getTasksCommandCenterWithPagination({
     return { tasks: [], total: 0 };
   }
 }
+
+// ─── Quote View ───────────────────────────────────────────────────────────────
+
+/**
+ * Returns tasks in a project that the given user has been invited to quote.
+ * Used for collaborator quote view authorization.
+ */
+export async function getTasksForQuoteView(projectId: number, userId: number): Promise<ProjectTaskType[]> {
+  try {
+    const result = await db.execute({
+      sql: `
+        SELECT ${TASK_SELECT} ${TASK_JOINS}
+        JOIN task_quote_invitations tqi ON tqi.task_id = pt.id
+        WHERE pt.project_id = $1 AND tqi.user_id = $2
+        ORDER BY pt.order_index ASC
+      `,
+      args: [projectId, userId],
+    });
+    return (result.rows as unknown as TaskWithRawQuoterIds[]).map(normalizeTaskQuoterIds);
+  } catch (error) {
+    console.error("Error fetching tasks for quote view:", error);
+    return [];
+  }
+}

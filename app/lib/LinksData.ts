@@ -74,6 +74,14 @@ export const links: LinksType[] = [
 
 export const linksNotVisible: LinksType[] = [
   {
+    route: '/my-quotes',
+    roles: [UserRole.COLABORADOR]
+  },
+  {
+    route: '/my-quotes/projects/[id]',
+    roles: [UserRole.COLABORADOR]
+  },
+  {
     route: '/my-tasks',
     roles: PROJECT_VIEW_ROLES
   },

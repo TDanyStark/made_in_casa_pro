@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
+import dynamic from "next/dynamic";
 import { toast } from "sonner";
 import { post } from "@/lib/services/apiService";
 import { QuoteSubmissionSchema, TaskQuoteType } from "@/lib/definitions";
@@ -19,8 +20,12 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { Loader2, Clock, DollarSign } from "lucide-react";
+
+const RichTextEditor = dynamic(
+  () => import("@/components/clients/RichTextEditor").then((mod) => mod.RichTextEditor),
+  { ssr: false }
+);
 
 type QuoteFormValues = z.infer<typeof QuoteSubmissionSchema>;
 
@@ -46,6 +51,7 @@ export function SubmitQuoteModal({
   onSuccess,
 }: Props) {
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [notes, setNotes] = useState("");
 
   const {
     register,
@@ -59,7 +65,7 @@ export function SubmitQuoteModal({
       delivery_days: 0,
       delivery_hours: 0,
       delivery_minutes: 0,
-      notes: initialData?.notes || "",
+      notes: "",
     },
   });
 
@@ -71,22 +77,26 @@ export function SubmitQuoteModal({
         ? minutesToDHM(initialData.delivery_minutes)
         : { days: 0, hours: 0, minutes: 0 };
 
+      setNotes(initialData?.notes ?? "");
       reset({
         price: initialData?.price || 0,
         delivery_days: dhm.days,
         delivery_hours: dhm.hours,
         delivery_minutes: dhm.minutes,
-        notes: initialData?.notes || "",
+        notes: "",
       });
     }
   }, [isOpen, initialData, reset]);
 
-  const onSubmit = async (values: QuoteFormValues) => {
+  const onSubmit = async (formValues: QuoteFormValues) => {
     setIsSubmitting(true);
     try {
       const res = await post<TaskQuoteType>(
         `projects/${projectId}/tasks/${taskId}/quotes/submit`,
-        values
+        {
+          ...formValues,
+          notes: notes || null,
+        }
       );
 
       if (!res.ok) {
@@ -176,12 +186,14 @@ export function SubmitQuoteModal({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="notes">Notas adicionales (opcional)</Label>
-            <Textarea
-              id="notes"
+            <Label>Notas adicionales (opcional)</Label>
+            <RichTextEditor
+              value={notes}
+              onChange={setNotes}
               placeholder="Detalles sobre tu propuesta, requerimientos, etc."
-              className="resize-none"
-              {...register("notes")}
+              noBorder={true}
+              expandable={false}
+              title="Notas de la cotización"
             />
           </div>
 

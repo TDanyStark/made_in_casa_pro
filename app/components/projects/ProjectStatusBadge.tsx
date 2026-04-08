@@ -23,6 +23,10 @@ const STATUS_CONFIG: Record<
     label: "Archivado",
     className: "bg-gray-100 text-gray-600 dark:bg-gray-900/30 dark:text-gray-400 border-gray-200",
   },
+  in_adjustments: {
+    label: "En ajustes",
+    className: "bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400 border-orange-200",
+  },
 };
 
 interface Props {

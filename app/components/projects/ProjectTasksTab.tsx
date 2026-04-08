@@ -14,6 +14,7 @@ import {
   ProjectTaskStatus,
   TaskType,
   TaskFlag,
+  UserRole,
 } from "@/lib/definitions";
 import { TaskAssignmentSelector, AssignMode } from "@/components/tasks/TaskAssignmentSelector";
 import { SortableList } from "@/components/ui/sortable-list";
@@ -341,6 +342,11 @@ export function ProjectTasksTab({
     currentUserId !== undefined && task.assigned_user_id === currentUserId;
 
   const isAdmin = currentUserRole === 1 || currentUserRole === 2;
+
+  // Convert numeric role to enum for comparison
+  const userRole = currentUserRole !== undefined 
+    ? (currentUserRole as UserRole) 
+    : UserRole.NO_AUTHENTICADO;
 
   // ─────────────────────────────────────────────────────────────────────────────
   // Handlers
@@ -745,16 +751,19 @@ export function ProjectTasksTab({
                               </TooltipContent>
                             </Tooltip>
 
-                            <Button
-                               variant="ghost"
-                               size="icon"
-                               className="h-7 w-7 text-muted-foreground"
-                               onClick={() => openDeliverableDialog(task)}
-                               title="Ver entregable"
-                               aria-label={`Ver entregable de ${task.title}`}
-                            >
-                               <Eye className="h-3.5 w-3.5" />
-                            </Button>
+                            {/* Eye button: collaborators see only completed tasks; everyone else always */}
+                            {(userRole !== UserRole.COLABORADOR || isCompleted) && (
+                              <Button
+                                 variant="ghost"
+                                 size="icon"
+                                 className="h-7 w-7 text-muted-foreground"
+                                 onClick={() => openDeliverableDialog(task)}
+                                 title="Ver entregable"
+                                 aria-label={`Ver entregable de ${task.title}`}
+                              >
+                                 <Eye className="h-3.5 w-3.5" />
+                              </Button>
+                            )}
 
                             <Button
                                variant="ghost"

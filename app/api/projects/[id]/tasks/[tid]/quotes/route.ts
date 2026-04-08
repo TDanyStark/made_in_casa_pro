@@ -10,6 +10,7 @@ import {
 } from "@/lib/queries/taskQuotes";
 import { decrypt } from "@/lib/session";
 import { cookies } from "next/headers";
+import { UserRole } from "@/lib/definitions";
 
 const inviteSchema = z.object({
   user_id: z.coerce.number().int().positive(),
@@ -24,7 +25,7 @@ type Params = { params: Promise<{ id: string; tid: string }> };
 /**
  * GET /api/projects/[id]/tasks/[tid]/quotes
  * Returns quotes and invitations for a task.
- * ADMIN, DIRECTIVO, COMERCIAL can see all; COLABORADOR sees only their own.
+ * ADMIN, DIRECTIVO, COMERCIAL can see all; COLABORADOR sees only their own invitations/quotes.
  */
 export async function GET(request: NextRequest, { params }: Params) {
   const methodValidation = validateHttpMethod(request, ["GET"]);
@@ -37,12 +38,33 @@ export async function GET(request: NextRequest, { params }: Params) {
     const { tid } = await params;
     const taskId = parseInt(tid);
 
+    const userRole = roleValidation.userRole;
+    const isCollaborator = userRole === UserRole.COLABORADOR;
+
+    // Get current user ID if collaborator
+    let currentUserId: number | null = null;
+    if (isCollaborator) {
+      const cookie = (await cookies()).get("session")?.value;
+      const session = cookie ? await decrypt(cookie) : null;
+      currentUserId = session?.id ?? null;
+    }
+
     const [quotes, invitations] = await Promise.all([
       getTaskQuotes(taskId),
       getTaskQuoteInvitations(taskId),
     ]);
 
-    return NextResponse.json({ quotes, invitations });
+    // Filter quotes for collaborators: only return their own quotes
+    const filteredQuotes = isCollaborator && currentUserId
+      ? quotes.filter(q => q.user_id === currentUserId)
+      : quotes;
+
+    // Filter invitations for collaborators: only return their own invitation
+    const filteredInvitations = isCollaborator && currentUserId
+      ? invitations.filter(inv => inv.user_id === currentUserId)
+      : invitations;
+
+    return NextResponse.json({ quotes: filteredQuotes, invitations: filteredInvitations });
   } catch (error) {
     console.error("Error fetching quotes:", error);
     return NextResponse.json({ error: "Error al obtener cotizaciones" }, { status: 500 });

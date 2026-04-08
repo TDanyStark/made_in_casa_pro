@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ProductTaskTemplateType } from "@/lib/definitions";
 import { SortableList } from "@/components/ui/sortable-list";
 import { TaskAssignmentSelector, AssignMode } from "@/components/tasks/TaskAssignmentSelector";
 import { Button } from "@/components/ui/button";
