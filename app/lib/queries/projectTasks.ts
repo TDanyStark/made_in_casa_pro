@@ -1441,7 +1441,8 @@ export async function getTasksCommandCenterWithPagination({
 
 /**
  * Returns tasks in a project that the given user has been invited to quote.
- * Used for collaborator quote view authorization.
+ * Used for collaborator quote view authorization (includes historical invitations).
+ * Does NOT filter by task status — a user who was ever invited retains access to view the project.
  */
 export async function getTasksForQuoteView(projectId: number, userId: number): Promise<ProjectTaskType[]> {
   try {
@@ -1457,6 +1458,45 @@ export async function getTasksForQuoteView(projectId: number, userId: number): P
     return (result.rows as unknown as TaskWithRawQuoterIds[]).map(normalizeTaskQuoterIds);
   } catch (error) {
     console.error("Error fetching tasks for quote view:", error);
+    return [];
+  }
+}
+
+/**
+ * Returns the IDs of tasks in a project that are still open for quoting by the given user.
+ * A task is open for quoting if:
+ *   - The user was invited
+ *   - The task still requires a quote (requires_quote = 1)
+ *   - The task is still blocked (no one assigned yet)
+ *   - No other quote has been accepted for this task
+ *   - The user has not yet submitted a quote for this task
+ */
+export async function getOpenQuoteTaskIds(projectId: number, userId: number): Promise<number[]> {
+  try {
+    const result = await db.execute({
+      sql: `
+        SELECT pt.id
+        FROM project_tasks pt
+        JOIN task_quote_invitations tqi ON tqi.task_id = pt.id
+        WHERE pt.project_id = $1
+          AND tqi.user_id = $2
+          AND pt.requires_quote = 1
+          AND pt.status = 'blocked'
+          AND pt.assigned_user_id IS NULL
+          AND NOT EXISTS (
+            SELECT 1 FROM task_quotes tq2
+            WHERE tq2.task_id = pt.id AND tq2.status = 'accepted'
+          )
+          AND NOT EXISTS (
+            SELECT 1 FROM task_quotes tq3
+            WHERE tq3.task_id = pt.id AND tq3.user_id = $2
+          )
+      `,
+      args: [projectId, userId],
+    });
+    return result.rows.map((r) => Number((r as unknown as { id: number }).id));
+  } catch (error) {
+    console.error("Error fetching open quote task ids:", error);
     return [];
   }
 }

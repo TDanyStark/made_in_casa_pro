@@ -60,12 +60,12 @@ function makeTask(overrides: Record<string, unknown> = {}) {
 }
 
 describe("CollaboratorTasksList", () => {
-  it("shows all project tasks but only enables quote action for invited pending tasks", () => {
+  it("only shows quote action for invited tasks that are still open", () => {
     render(
       <CollaboratorTasksList
         tasks={[
-          makeTask({ id: 11, title: "Invitada", status: "in_progress" }),
-          makeTask({ id: 12, title: "Solo contexto", status: "waiting" }),
+          makeTask({ id: 11, title: "Abierta", status: "blocked" }),
+          makeTask({ id: 12, title: "Asignada", status: "not_started", assigned_user_id: 44 }),
           makeTask({ id: 13, title: "Completada", status: "completed" }),
         ]}
         invitedTaskIds={[11]}
@@ -74,12 +74,12 @@ describe("CollaboratorTasksList", () => {
       />
     );
 
-    expect(screen.getByText("Invitada")).toBeInTheDocument();
-    expect(screen.getByText("Solo contexto")).toBeInTheDocument();
+    expect(screen.getByText("Abierta")).toBeInTheDocument();
+    expect(screen.getByText("Asignada")).toBeInTheDocument();
     expect(screen.getByText("Completada")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /enviar cotización/i })).toBeInTheDocument();
-    expect(screen.getByText(/visible solo como contexto del proyecto/i)).toBeInTheDocument();
-    expect(screen.getByText(/tarea completada - no puedes enviar cotización/i)).toBeInTheDocument();
     expect(screen.getByTitle(/ver entregable/i)).toBeInTheDocument();
+    expect(screen.queryByText(/tarea completada - no puedes enviar cotización/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/visible solo como contexto del proyecto/i)).not.toBeInTheDocument();
   });
 });

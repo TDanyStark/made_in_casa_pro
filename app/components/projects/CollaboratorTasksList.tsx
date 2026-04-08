@@ -5,7 +5,6 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { 
-  CheckCircle, 
   Clock, 
   DollarSign, 
   FileText, 
@@ -58,7 +57,8 @@ export function CollaboratorTasksList({ tasks, invitedTaskIds, submittedQuotes, 
       {tasks.map((task) => {
         const quote = getQuoteForTask(task.id);
         const isCompleted = task.status === "completed";
-        const canQuoteTask = invitedTaskIds.includes(task.id) && !isCompleted;
+        const isQuoteOpen = task.requires_quote === 1 && task.status === "blocked" && !task.assigned_user_id;
+        const canQuoteTask = invitedTaskIds.includes(task.id) && isQuoteOpen && !quote;
         const statusLabel = TASK_STATUS_LABELS[task.status] || task.status;
         const statusVariant = STATUS_VARIANT[task.status] || "outline";
 
@@ -80,7 +80,6 @@ export function CollaboratorTasksList({ tasks, invitedTaskIds, submittedQuotes, 
                   )}
                 </div>
                 
-                {/* Eye button - only for completed tasks */}
                 {isCompleted && (
                   <Button
                     variant="ghost"
@@ -111,9 +110,9 @@ export function CollaboratorTasksList({ tasks, invitedTaskIds, submittedQuotes, 
                 )}
               </div>
 
-              {/* Quote status or action */}
-              <div className="mt-4 pt-4 border-t">
-                {quote ? (
+              {(quote || canQuoteTask) && (
+                <div className="mt-4 pt-4 border-t">
+                  {quote ? (
                   <div className="flex items-center justify-between bg-muted/30 rounded-lg p-3">
                     <div className="flex items-center gap-4">
                       <div className="flex items-center gap-1.5">
@@ -142,26 +141,18 @@ export function CollaboratorTasksList({ tasks, invitedTaskIds, submittedQuotes, 
                       </span>
                     )}
                   </div>
-                ) : isCompleted ? (
-                  <div className="text-center py-2 text-muted-foreground text-sm">
-                    <CheckCircle className="h-4 w-4 inline mr-1" />
-                    Tarea completada - No puedes enviar cotización
-                  </div>
-                ) : canQuoteTask ? (
-                  <Button 
-                    onClick={() => onQuoteTask(task)}
-                    className="w-full"
-                    variant="default"
-                  >
-                    <Send className="h-4 w-4 mr-2" />
-                    Enviar Cotización
-                  </Button>
-                ) : (
-                  <div className="text-center py-2 text-muted-foreground text-sm">
-                    Visible solo como contexto del proyecto
-                  </div>
-                )}
-              </div>
+                  ) : (
+                    <Button 
+                      onClick={() => onQuoteTask(task)}
+                      className="w-full"
+                      variant="default"
+                    >
+                      <Send className="h-4 w-4 mr-2" />
+                      Enviar Cotización
+                    </Button>
+                  )}
+                </div>
+              )}
             </CardContent>
           </Card>
         );

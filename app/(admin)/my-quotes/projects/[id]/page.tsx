@@ -3,7 +3,7 @@ import { Breadcrumbs } from "@/components/navigation/Breadcrumbs";
 import { CollaboratorProjectView } from "@/components/projects/CollaboratorProjectView";
 import { getUserRole, decrypt } from "@/lib/session";
 import { getProjectDetail } from "@/lib/queries/projects";
-import { getTasksByProject, getTasksForQuoteView } from "@/lib/queries/projectTasks";
+import { getTasksByProject, getTasksForQuoteView, getOpenQuoteTaskIds } from "@/lib/queries/projectTasks";
 import { cookies } from "next/headers";
 
 type Props = {
@@ -35,16 +35,17 @@ export default async function CollaboratorProjectPage({ params }: Props) {
     );
   }
 
-  const [project, userRole, tasks] = await Promise.all([
+  const [project, userRole, tasks, openQuoteTaskIds] = await Promise.all([
     getProjectDetail(projectId),
     getUserRole(),
     getTasksByProject(projectId),
+    getOpenQuoteTaskIds(projectId, session?.id ?? 0),
   ]);
 
   if (!project) notFound();
 
-  // Get task IDs that collaborator was invited to quote
-  const invitedTaskIds = invitedTasks.map(t => t.id);
+  // Only include task IDs that are still open for quoting (not yet assigned to someone else)
+  const invitedTaskIds = openQuoteTaskIds;
 
   return (
     <section className="container pb-12">

@@ -3,6 +3,18 @@ import { revalidatePath } from "next/cache";
 import { TaskQuoteType, TaskQuoteInvitationType } from "../definitions";
 import { dhmToMinutes } from "../utils/time";
 
+const OPEN_QUOTE_TASK_FILTER = `
+  pt.requires_quote = 1
+  AND pt.status = 'blocked'
+  AND pt.assigned_user_id IS NULL
+  AND NOT EXISTS (
+    SELECT 1
+    FROM task_quotes tq2
+    WHERE tq2.task_id = pt.id
+      AND tq2.status = 'accepted'
+  )
+`;
+
 /**
  * Normalizes rich-text HTML input, converting empty/invalid HTML to null.
  * Handles outputs from Tiptap and similar rich-text editors.
@@ -180,6 +192,7 @@ export async function getPendingQuoteInvitations(userId: number): Promise<TaskQu
         LEFT JOIN task_quotes tq ON tq.task_id = tqi.task_id AND tq.user_id = tqi.user_id
         WHERE tqi.user_id = $1
           AND tq.id IS NULL
+          AND ${OPEN_QUOTE_TASK_FILTER}
         ORDER BY tqi.invited_at DESC
       `,
       args: [userId],
@@ -201,9 +214,11 @@ export async function getPendingQuoteInvitationsCount(userId: number): Promise<n
       sql: `
         SELECT COUNT(*) AS count
         FROM task_quote_invitations tqi
+        JOIN project_tasks pt ON tqi.task_id = pt.id
         LEFT JOIN task_quotes tq ON tq.task_id = tqi.task_id AND tq.user_id = tqi.user_id
         WHERE tqi.user_id = $1
           AND tq.id IS NULL
+          AND ${OPEN_QUOTE_TASK_FILTER}
       `,
       args: [userId],
     });
