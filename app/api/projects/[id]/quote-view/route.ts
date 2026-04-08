@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { validateApiRole, validateHttpMethod } from "@/lib/services/api-auth";
 import { AUTHENTICATED_ROLES } from "@/lib/role-groups";
 import { getProjectDetail } from "@/lib/queries/projects";
-import { getTasksForQuoteView } from "@/lib/queries/projectTasks";
+import { getTasksByProject, getTasksForQuoteView } from "@/lib/queries/projectTasks";
 import { decrypt } from "@/lib/session";
 import { cookies } from "next/headers";
 
@@ -43,19 +43,23 @@ export async function GET(request: NextRequest, { params }: Params) {
       }, { status: 403 });
     }
 
-    // Return the full project detail (without tasks - they'll be fetched separately)
-    const fullProject = await getProjectDetail(projectId);
-    if (!fullProject) {
-      return NextResponse.json({ error: "Proyecto no encontrado" }, { status: 404 });
-    }
+     // Return the full project detail and all project tasks once invitation access is confirmed.
+     const [fullProject, tasks] = await Promise.all([
+       getProjectDetail(projectId),
+       getTasksByProject(projectId),
+     ]);
+     if (!fullProject) {
+       return NextResponse.json({ error: "Proyecto no encontrado" }, { status: 404 });
+     }
 
     // Return just the invited task IDs
     const invitedTaskIds = invitedTasks.map(t => t.id);
 
-    return NextResponse.json({
-      ...fullProject,
-      invited_task_ids: invitedTaskIds,
-    });
+     return NextResponse.json({
+       ...fullProject,
+       tasks,
+       invited_task_ids: invitedTaskIds,
+     });
   } catch (error) {
     console.error("Error fetching quote view project:", error);
     return NextResponse.json({ error: "Error al obtener el proyecto" }, { status: 500 });

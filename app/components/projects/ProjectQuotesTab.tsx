@@ -466,7 +466,10 @@ function TaskQuoteCard({
                       </div>
 
                       {quote.notes && (
-                        <p className="text-sm text-muted-foreground">{quote.notes}</p>
+                        <div
+                          className="prose prose-sm dark:prose-invert max-w-none text-sm text-muted-foreground"
+                          dangerouslySetInnerHTML={{ __html: quote.notes }}
+                        />
                       )}
                     </div>
                   ))}

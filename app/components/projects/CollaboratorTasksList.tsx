@@ -16,6 +16,7 @@ import { useState } from "react";
 
 interface Props {
   tasks: ProjectTaskType[];
+  invitedTaskIds: number[];
   submittedQuotes: TaskQuoteType[];
   onQuoteTask: (task: ProjectTaskType) => void;
 }
@@ -37,7 +38,7 @@ const STATUS_VARIANT: Record<string, "default" | "secondary" | "outline" | "dest
   blocked: "destructive",
 };
 
-export function CollaboratorTasksList({ tasks, submittedQuotes, onQuoteTask }: Props) {
+export function CollaboratorTasksList({ tasks, invitedTaskIds, submittedQuotes, onQuoteTask }: Props) {
   const [deliverableDialogTask, setDeliverableDialogTask] = useState<ProjectTaskType | null>(null);
 
   const getQuoteForTask = (taskId: number) => {
@@ -57,6 +58,7 @@ export function CollaboratorTasksList({ tasks, submittedQuotes, onQuoteTask }: P
       {tasks.map((task) => {
         const quote = getQuoteForTask(task.id);
         const isCompleted = task.status === "completed";
+        const canQuoteTask = invitedTaskIds.includes(task.id) && !isCompleted;
         const statusLabel = TASK_STATUS_LABELS[task.status] || task.status;
         const statusVariant = STATUS_VARIANT[task.status] || "outline";
 
@@ -145,7 +147,7 @@ export function CollaboratorTasksList({ tasks, submittedQuotes, onQuoteTask }: P
                     <CheckCircle className="h-4 w-4 inline mr-1" />
                     Tarea completada - No puedes enviar cotización
                   </div>
-                ) : (
+                ) : canQuoteTask ? (
                   <Button 
                     onClick={() => onQuoteTask(task)}
                     className="w-full"
@@ -154,6 +156,10 @@ export function CollaboratorTasksList({ tasks, submittedQuotes, onQuoteTask }: P
                     <Send className="h-4 w-4 mr-2" />
                     Enviar Cotización
                   </Button>
+                ) : (
+                  <div className="text-center py-2 text-muted-foreground text-sm">
+                    Visible solo como contexto del proyecto
+                  </div>
                 )}
               </div>
             </CardContent>

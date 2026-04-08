@@ -3,7 +3,7 @@ import { Breadcrumbs } from "@/components/navigation/Breadcrumbs";
 import { CollaboratorProjectView } from "@/components/projects/CollaboratorProjectView";
 import { getUserRole, decrypt } from "@/lib/session";
 import { getProjectDetail } from "@/lib/queries/projects";
-import { getTasksForQuoteView } from "@/lib/queries/projectTasks";
+import { getTasksByProject, getTasksForQuoteView } from "@/lib/queries/projectTasks";
 import { cookies } from "next/headers";
 
 type Props = {
@@ -35,9 +35,10 @@ export default async function CollaboratorProjectPage({ params }: Props) {
     );
   }
 
-  const [project, userRole] = await Promise.all([
+  const [project, userRole, tasks] = await Promise.all([
     getProjectDetail(projectId),
     getUserRole(),
+    getTasksByProject(projectId),
   ]);
 
   if (!project) notFound();
@@ -57,6 +58,7 @@ export default async function CollaboratorProjectPage({ params }: Props) {
         <CollaboratorProjectView
           projectId={projectId}
           project={project}
+          tasks={tasks}
           invitedTaskIds={invitedTaskIds}
           userRole={userRole}
           currentUserId={session?.id}

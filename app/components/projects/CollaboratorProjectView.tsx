@@ -15,37 +15,21 @@ import { Skeleton } from "@/components/ui/skeleton";
 interface Props {
   projectId: number;
   project: ProjectDetailType;
+  tasks: ProjectTaskType[];
   invitedTaskIds: number[];
   userRole: UserRole;
   currentUserId?: number;
 }
 
-interface TasksResponse {
-  tasks: ProjectTaskType[];
-  total: number;
-}
-
 export function CollaboratorProjectView({
   projectId,
   project,
+  tasks,
   invitedTaskIds,
   currentUserId,
 }: Props) {
   const [quoteModalOpen, setQuoteModalOpen] = useState(false);
   const [selectedTask, setSelectedTask] = useState<ProjectTaskType | null>(null);
-
-  const { data: tasksData, isLoading: tasksLoading } = useQuery({
-    queryKey: ["project-tasks", projectId],
-    queryFn: async () => {
-      const res = await get<TasksResponse>(`projects/${projectId}/tasks`);
-      return res.ok ? res.data : null;
-    },
-    staleTime: 1000 * 60,
-  });
-
-  // Filter tasks to only show invited ones
-  const allTasks = tasksData?.tasks ?? [];
-  const invitedTasks = allTasks.filter(t => invitedTaskIds.includes(t.id));
 
   const { data: quoteData, isLoading: quotesLoading } = useQuery({
     queryKey: ["collaborator-project-quotes", projectId, currentUserId],
@@ -58,7 +42,7 @@ export function CollaboratorProjectView({
 
   const submittedQuotes = quoteData?.quotes ?? [];
 
-  const isLoading = tasksLoading || quotesLoading;
+  const isLoading = quotesLoading;
 
   const handleOpenQuoteModal = (task: ProjectTaskType) => {
     setSelectedTask(task);
@@ -86,7 +70,7 @@ export function CollaboratorProjectView({
       <Tabs defaultValue="tasks">
         <TabsList>
           <TabsTrigger value="tasks">
-            Tareas ({invitedTasks.length})
+            Tareas ({tasks.length})
           </TabsTrigger>
           <TabsTrigger value="notes">Notas</TabsTrigger>
           <TabsTrigger value="info">Información</TabsTrigger>
@@ -94,7 +78,8 @@ export function CollaboratorProjectView({
 
         <TabsContent value="tasks" className="mt-6">
           <CollaboratorTasksList
-            tasks={invitedTasks}
+            tasks={tasks}
+            invitedTaskIds={invitedTaskIds}
             submittedQuotes={submittedQuotes}
             onQuoteTask={handleOpenQuoteModal}
           />

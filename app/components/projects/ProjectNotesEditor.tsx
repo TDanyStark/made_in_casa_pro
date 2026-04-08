@@ -80,9 +80,16 @@ export function ProjectNotesEditor({ projectId, initialContent, canEdit = true, 
           title="Notas del proyecto"
         />
       ) : (
-        <div className="p-4 rounded-md border bg-muted/20 text-sm whitespace-pre-wrap">
-          {content || <span className="text-muted-foreground italic">Sin notas</span>}
-        </div>
+        content ? (
+          <div
+            className="prose prose-sm dark:prose-invert max-w-none rounded-md border bg-muted/20 p-4 text-sm"
+            dangerouslySetInnerHTML={{ __html: content }}
+          />
+        ) : (
+          <div className="p-4 rounded-md border bg-muted/20 text-sm">
+            <span className="text-muted-foreground italic">Sin notas</span>
+          </div>
+        )
       )}
     </div>
   );
