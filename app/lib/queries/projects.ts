@@ -319,23 +319,9 @@ export async function recalculateProjectProgress(projectId: number): Promise<num
 
     const progress = total === 0 ? 0 : Math.round((completed / total) * 100);
     
-    const updates = ["progress = $1", "updated_at = CURRENT_TIMESTAMP"];
-    const updateArgs: unknown[] = [progress, projectId];
-
-    if (progress === 100 && total > 0) {
-      updates.push("status = 'completed'");
-      updates.push("completed_at = COALESCE(completed_at, CURRENT_TIMESTAMP)");
-      
-      // Mark the active adjustment as completed too
-      await db.execute({
-        sql: `UPDATE project_adjustments SET status = 'completed', completed_at = CURRENT_TIMESTAMP WHERE project_id = $1 AND status = 'active'`,
-        args: [projectId],
-      });
-    }
-
     await db.execute({
-      sql: `UPDATE projects SET ${updates.join(", ")} WHERE id = $${updateArgs.length}`,
-      args: updateArgs,
+      sql: `UPDATE projects SET progress = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2`,
+      args: [progress, projectId],
     });
 
     revalidatePath(`/projects/${projectId}`);
@@ -343,6 +329,34 @@ export async function recalculateProjectProgress(projectId: number): Promise<num
     return progress;
   } catch (error) {
     console.error("Error recalculating project progress:", error);
+    throw error;
+  }
+}
+
+// ─── Manual completion ───────────────────────────────────────────────────────
+
+export async function completeProject(projectId: number): Promise<void> {
+  try {
+    const project = await getProjectById(projectId);
+    if (!project) throw new Error("Proyecto no encontrado");
+    if (project.status === "completed") throw new Error("El proyecto ya está completado");
+    if (project.progress < 100) throw new Error("El proyecto no tiene todas las tareas completadas");
+
+    await db.execute({
+      sql: `UPDATE projects SET status = 'completed', completed_at = COALESCE(completed_at, CURRENT_TIMESTAMP), updated_at = CURRENT_TIMESTAMP WHERE id = $1`,
+      args: [projectId],
+    });
+
+    // Mark the active adjustment as completed too
+    await db.execute({
+      sql: `UPDATE project_adjustments SET status = 'completed', completed_at = CURRENT_TIMESTAMP WHERE project_id = $1 AND status = 'active'`,
+      args: [projectId],
+    });
+
+    revalidatePath(`/projects/${projectId}`);
+    revalidatePath("/projects");
+  } catch (error) {
+    console.error("Error completing project:", error);
     throw error;
   }
 }

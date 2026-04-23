@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { ExternalLink, HardDrive, User } from "lucide-react";
+import { CheckCircle, ExternalLink, HardDrive, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
@@ -14,9 +14,20 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { ProjectDetailType, ProjectStatus } from "@/lib/definitions";
 import { ProjectProgressBar } from "./ProjectProgressBar";
-import { patch } from "@/lib/services/apiService";
+import { patch, post } from "@/lib/services/apiService";
 import EditableText from "@/components/input/EditableText";
 
 const STATUS_OPTIONS: { value: ProjectStatus; label: string }[] = [
@@ -34,6 +45,7 @@ interface Props {
 export function ProjectHeader({ project }: Props) {
   const queryClient = useQueryClient();
   const [status, setStatus] = useState<ProjectStatus>(project.status);
+  const [completing, setCompleting] = useState(false);
 
   const handleStatusChange = async (newStatus: ProjectStatus) => {
     try {
@@ -47,6 +59,26 @@ export function ProjectHeader({ project }: Props) {
       toast.error("Error al actualizar el estado");
     }
   };
+
+  const handleComplete = async () => {
+    setCompleting(true);
+    try {
+      const res = await post(`projects/${project.id}/complete`, {});
+      if (!res.ok) throw new Error(res.error);
+      setStatus("completed");
+      queryClient.invalidateQueries({ queryKey: ["project", project.id] });
+      queryClient.invalidateQueries({ queryKey: ["projects"] });
+      toast.success("Proyecto completado");
+    } catch {
+      toast.error("Error al completar el proyecto");
+    } finally {
+      setCompleting(false);
+    }
+  };
+
+  const canComplete =
+    project.progress === 100 &&
+    (status === "active" || status === "in_adjustments");
 
   return (
     <div className="space-y-4">
@@ -77,6 +109,33 @@ export function ProjectHeader({ project }: Props) {
                 <ExternalLink className="h-3 w-3 ml-1 opacity-60" />
               </a>
             </Button>
+          )}
+
+          {canComplete && (
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button size="sm" className="h-8 text-xs gap-1.5" disabled={completing}>
+                  <CheckCircle className="h-3.5 w-3.5" />
+                  Completar
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Completar proyecto</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Todas las tareas han sido completadas. Al confirmar, el proyecto quedara
+                    marcado como completado y podras iniciar versiones de ajuste si es necesario.
+                    Esta accion no se puede deshacer directamente.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                  <AlertDialogAction onClick={handleComplete} disabled={completing}>
+                    {completing ? "Completando..." : "Completar proyecto"}
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
           )}
 
           <Select value={status} onValueChange={(v) => handleStatusChange(v as ProjectStatus)}>
