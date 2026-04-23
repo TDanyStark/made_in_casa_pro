@@ -100,7 +100,9 @@ export function ProjectAdjustmentsTab({
               key={adj.id}
               adjustment={adj}
               isInitiallyExpanded={index === 0}
+              isLatest={index === 0}
               projectId={projectId}
+              projectStatus={projectStatus}
               productName={productName}
               canEdit={canEdit}
               currentUserId={currentUserId}
@@ -127,7 +129,9 @@ export function ProjectAdjustmentsTab({
 function VersionAccordion({
   adjustment,
   isInitiallyExpanded,
+  isLatest,
   projectId,
+  projectStatus,
   productName,
   canEdit,
   currentUserId,
@@ -135,7 +139,9 @@ function VersionAccordion({
 }: {
   adjustment: ProjectAdjustmentType;
   isInitiallyExpanded: boolean;
+  isLatest: boolean;
   projectId: number;
+  projectStatus: string;
   productName: string | null;
   canEdit: boolean;
   currentUserId?: number;
@@ -144,6 +150,11 @@ function VersionAccordion({
   const [expanded, setExpanded] = useState(isInitiallyExpanded);
 
   const isCompleted = adjustment.status === "completed";
+  // Allow editing the latest version when the project is active/in_adjustments,
+  // even if that adjustment was previously marked completed (e.g. after a manual
+  // status rollback). Older versions are always read-only.
+  const projectIsEditable = projectStatus === "active" || projectStatus === "in_adjustments";
+  const versionCanEdit = isLatest && projectIsEditable ? true : !isCompleted;
   const label = adjustment.version_number === 1 ? "Versión 1 (Original)" : `Versión ${adjustment.version_number}`;
 
   return (
@@ -202,7 +213,7 @@ function VersionAccordion({
             <ProjectTasksTab
               projectId={projectId}
               productName={productName}
-              canEdit={canEdit && !isCompleted}
+              canEdit={canEdit && versionCanEdit}
               currentUserId={currentUserId}
               currentUserRole={currentUserRole}
               adjustmentId={adjustment.id}

@@ -93,9 +93,25 @@ export async function POST(request: NextRequest, { params }: Params) {
       area_id: validation.data.area_id,
       assign_to_commercial: validation.data.assign_to_commercial,
     });
-    
-    // 4. Determine status based on requires_quote
-    let initialStatus = validation.data.status ?? (nextOrder === 0 ? "not_started" : "waiting");
+
+    // 4. Determine initial status
+    // Use not_started when: it's the first task, or all existing tasks are done
+    // (no task in an active state is blocking the queue). Otherwise waiting.
+    let defaultStatus: "not_started" | "waiting" = "waiting";
+    if (nextOrder === 0) {
+      defaultStatus = "not_started";
+    } else {
+      const activeResult = await db.execute({
+        sql: `SELECT COUNT(*) AS cnt FROM project_tasks
+              WHERE project_id = $1 AND adjustment_id = $2
+                AND status IN ('not_started', 'in_progress', 'waiting')`,
+        args: [projectId, adjustmentId],
+      });
+      const activeCount = Number((activeResult.rows[0] as unknown as { cnt: string }).cnt);
+      if (activeCount === 0) defaultStatus = "not_started";
+    }
+
+    let initialStatus = validation.data.status ?? defaultStatus;
     const isBlockedByQuote = (initialStatus === "not_started" || initialStatus === "in_progress") && 
                              Number(validation.data.requires_quote) === 1 && 
                              !resolvedAssignedUserId;

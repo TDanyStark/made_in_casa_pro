@@ -116,6 +116,21 @@ export function TaskCompleteDialog({
 
   // ── Submit ────────────────────────────────────────────────────────────────
   const handleConfirm = async () => {
+    // If there's unsaved time in the inputs, block and warn
+    const pendingH = hoursInput.trim();
+    const pendingM = minutesInput.trim();
+    if (pendingH !== "" || pendingM !== "") {
+      toast.error(
+        'Tienes tiempo sin agregar. Presiona "Agregar tiempo" antes de completar.'
+      );
+      return;
+    }
+
+    if (accumulatedMinutes === 0) {
+      toast.error("Debes registrar cuánto tiempo tardaste en esta tarea.");
+      return;
+    }
+
     if (isHtmlEmpty(notes)) {
       toast.error(
         "Por favor, agrega una nota de los entregables antes de completar."
@@ -351,7 +366,7 @@ export function TaskCompleteDialog({
           </Button>
           <Button
             onClick={handleConfirm}
-            disabled={isLoading || isHtmlEmpty(notes)}
+            disabled={isLoading || isHtmlEmpty(notes) || accumulatedMinutes === 0}
             className="min-w-[140px] gap-2 bg-green-600 hover:bg-green-700 text-white"
           >
             {isLoading ? (
