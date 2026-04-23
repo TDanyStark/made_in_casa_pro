@@ -1416,12 +1416,14 @@ export async function getTasksCommandCenterWithPagination({
           pt.status,
           pt.requires_quote,
           pt.assigned_at,
-          pt.completed_at
+          pt.completed_at,
+          pa.version_number
         FROM project_tasks pt
         INNER JOIN projects p ON p.id = pt.project_id
         LEFT JOIN users creator ON creator.id = p.created_by
         LEFT JOIN users assignee ON assignee.id = pt.assigned_user_id
         LEFT JOIN products pr ON pr.id = p.product_id
+        LEFT JOIN project_adjustments pa ON pa.id = pt.adjustment_id
         ${whereSQL}
         ORDER BY COALESCE(pt.assigned_at, pt.created_at) DESC, pt.id DESC
         LIMIT ${limitPH} OFFSET ${offsetPH}

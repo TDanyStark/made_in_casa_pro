@@ -663,6 +663,9 @@ export function MyTasksClient() {
                 {task.status === "blocked" && (
                   <AlertTriangle className="h-3 w-3" />
                 )}
+                {task.status === "in_progress" && (
+                  <span className="size-1.5 rounded-full bg-blue-500 animate-pulse shrink-0" />
+                )}
                 {STATUS_CONFIG[task.status]?.label}
               </span>
             </div>

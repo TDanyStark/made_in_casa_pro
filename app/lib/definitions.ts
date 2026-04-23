@@ -378,6 +378,7 @@ export type TaskCommandCenterRow = {
   requires_quote: number; // 0 | 1
   assigned_at: string | null;
   completed_at: string | null;
+  version_number: number | null;
 };
 
 export type QuoteStatus = 'pending' | 'accepted' | 'rejected';

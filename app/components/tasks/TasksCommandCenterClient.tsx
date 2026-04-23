@@ -27,7 +27,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { SearchableSelect } from "@/components/ui/searchable-select";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
@@ -56,15 +55,42 @@ const STATUS_LABELS: Record<ProjectTaskStatus, string> = {
   blocked: "Bloqueada",
 };
 
+const STATUS_STYLES: Record<ProjectTaskStatus, string> = {
+  not_started: "bg-slate-100 text-slate-700 border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700",
+  waiting:     "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950 dark:text-amber-400 dark:border-amber-800",
+  in_progress: "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950 dark:text-blue-400 dark:border-blue-800",
+  completed:   "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950 dark:text-emerald-400 dark:border-emerald-800",
+  blocked:     "bg-red-50 text-red-700 border-red-200 dark:bg-red-950 dark:text-red-400 dark:border-red-800",
+};
+
+const STATUS_DOT: Record<ProjectTaskStatus, string> = {
+  not_started: "bg-slate-400",
+  waiting:     "bg-amber-400",
+  in_progress: "bg-blue-500 animate-pulse",
+  completed:   "bg-emerald-500",
+  blocked:     "bg-red-500",
+};
+
 const TYPE_LABELS: Record<TaskType, string> = {
   execution: "Ejecución",
   validation: "Validación",
+};
+
+const TYPE_STYLES: Record<TaskType, string> = {
+  execution:  "bg-violet-50 text-violet-700 border-violet-200 dark:bg-violet-950 dark:text-violet-400 dark:border-violet-800",
+  validation: "bg-cyan-50 text-cyan-700 border-cyan-200 dark:bg-cyan-950 dark:text-cyan-400 dark:border-cyan-800",
 };
 
 const FLAG_LABELS: Record<TaskFlag, string> = {
   new: "Nueva",
   correction: "Corrección",
   adjustment: "Ajuste",
+};
+
+const FLAG_STYLES: Record<TaskFlag, string> = {
+  new:        "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950 dark:text-emerald-400 dark:border-emerald-800",
+  correction: "bg-orange-50 text-orange-700 border-orange-200 dark:bg-orange-950 dark:text-orange-400 dark:border-orange-800",
+  adjustment: "bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-950 dark:text-purple-400 dark:border-purple-800",
 };
 
 const STATUS_OPTIONS: ProjectTaskStatus[] = [
@@ -353,23 +379,28 @@ export function TasksCommandCenterClient({ userRole }: TasksCommandCenterClientP
 
       <div className="space-y-2">
         <p className="text-sm font-medium">Estado</p>
-        <div className="flex flex-wrap gap-4">
+        <div className="flex flex-wrap gap-2">
           {STATUS_OPTIONS.map((taskStatus) => {
             const isChecked = selectedStatuses.includes(taskStatus);
             return (
-              <div key={taskStatus} className="flex items-center gap-2">
-                <Checkbox
-                  id={`status-${taskStatus}`}
-                  checked={isChecked}
-                  onCheckedChange={(checked) => {
-                    const nextStatuses = checked
-                      ? Array.from(new Set([...selectedStatuses, taskStatus]))
-                      : selectedStatuses.filter((statusValue) => statusValue !== taskStatus);
-                    replace(`${pathname}?${createQueryStringWithStatuses(nextStatuses)}`);
-                  }}
-                />
-                <Label htmlFor={`status-${taskStatus}`}>{STATUS_LABELS[taskStatus]}</Label>
-              </div>
+              <button
+                key={taskStatus}
+                type="button"
+                onClick={() => {
+                  const nextStatuses = isChecked
+                    ? selectedStatuses.filter((s) => s !== taskStatus)
+                    : Array.from(new Set([...selectedStatuses, taskStatus]));
+                  replace(`${pathname}?${createQueryStringWithStatuses(nextStatuses)}`);
+                }}
+                className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition-all ${
+                  isChecked
+                    ? STATUS_STYLES[taskStatus]
+                    : "border-border bg-muted/40 text-muted-foreground opacity-50"
+                }`}
+              >
+                <span className={`size-1.5 rounded-full shrink-0 ${isChecked ? STATUS_DOT[taskStatus] : "bg-muted-foreground"}`} />
+                {STATUS_LABELS[taskStatus]}
+              </button>
             );
           })}
         </div>
@@ -433,6 +464,7 @@ export function TasksCommandCenterClient({ userRole }: TasksCommandCenterClientP
               <TableHead>Bandera</TableHead>
               <TableHead>Tipo</TableHead>
               <TableHead>Estado</TableHead>
+              <TableHead>Versión</TableHead>
               <TableHead>Asignada</TableHead>
               <TableHead>Completada</TableHead>
             </TableRow>
@@ -448,19 +480,20 @@ export function TasksCommandCenterClient({ userRole }: TasksCommandCenterClientP
                   <TableCell><Skeleton className="h-6 w-20" /></TableCell>
                   <TableCell><Skeleton className="h-6 w-20" /></TableCell>
                   <TableCell><Skeleton className="h-6 w-20" /></TableCell>
+                  <TableCell><Skeleton className="h-6 w-10" /></TableCell>
                   <TableCell><Skeleton className="h-6 w-24" /></TableCell>
                   <TableCell><Skeleton className="h-6 w-24" /></TableCell>
                 </TableRow>
               ))
             ) : isError ? (
               <TableRow>
-                <TableCell colSpan={9} className="text-center text-destructive h-20">
+                <TableCell colSpan={10} className="text-center text-destructive h-20">
                   Error al cargar tareas.
                 </TableCell>
               </TableRow>
             ) : rows.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={9} className="text-center text-muted-foreground h-20">
+                <TableCell colSpan={10} className="text-center text-muted-foreground h-20">
                   No se encontraron tareas con los filtros seleccionados.
                 </TableCell>
               </TableRow>
@@ -559,13 +592,29 @@ export function TasksCommandCenterClient({ userRole }: TasksCommandCenterClientP
                     )}
                   </TableCell>
                   <TableCell>
-                    <Badge variant="outline">{FLAG_LABELS[task.task_flag]}</Badge>
+                    <Badge className={`border font-medium ${FLAG_STYLES[task.task_flag]}`}>
+                      {FLAG_LABELS[task.task_flag]}
+                    </Badge>
                   </TableCell>
                   <TableCell>
-                    <Badge variant="secondary">{TYPE_LABELS[task.task_type]}</Badge>
+                    <Badge className={`border font-medium ${TYPE_STYLES[task.task_type]}`}>
+                      {TYPE_LABELS[task.task_type]}
+                    </Badge>
                   </TableCell>
                   <TableCell>
-                    <Badge variant="outline">{STATUS_LABELS[task.status]}</Badge>
+                    <Badge className={`inline-flex items-center gap-1.5 border font-medium ${STATUS_STYLES[task.status]}`}>
+                      <span className={`size-1.5 rounded-full shrink-0 ${STATUS_DOT[task.status]}`} />
+                      {STATUS_LABELS[task.status]}
+                    </Badge>
+                  </TableCell>
+                  <TableCell>
+                    {task.version_number != null ? (
+                      <Badge variant="outline" className="font-mono text-xs">
+                        v{task.version_number}
+                      </Badge>
+                    ) : (
+                      <span className="text-muted-foreground text-xs">—</span>
+                    )}
                   </TableCell>
                   <TableCell>
                     {task.assigned_at

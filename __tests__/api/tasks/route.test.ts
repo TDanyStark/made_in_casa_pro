@@ -57,6 +57,7 @@ describe("GET /api/tasks", () => {
           requires_quote: 0,
           assigned_at: null,
           completed_at: null,
+          version_number: null,
         },
       ],
       total: 1,
