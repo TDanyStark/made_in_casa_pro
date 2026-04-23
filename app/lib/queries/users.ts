@@ -14,6 +14,7 @@ interface PaginationParams {
   limit?: number;
   search?: string;
   rolId?: number | number[];
+  withTaskCount?: boolean;
 }
 
 export async function getUsers(params?: GetUsersParams) {
@@ -142,10 +143,14 @@ export async function getUsersWithPagination({
   page = 1, 
   limit = ITEMS_PER_PAGE, 
   search,
-  rolId
+  rolId,
+  withTaskCount = false,
 }: PaginationParams) {
   try {
-    let sql = "SELECT id, name, email, rol_id, area_id, is_internal, must_change_password, last_login, is_active FROM users";
+    const taskCountSelect = withTaskCount
+      ? `, (SELECT COUNT(*) FROM project_tasks pt WHERE pt.assigned_user_id = users.id AND pt.status != 'completed') AS pending_tasks_count`
+      : "";
+    let sql = `SELECT id, name, email, rol_id, area_id, is_internal, must_change_password, last_login, is_active${taskCountSelect} FROM users`;
     const filterArgs: Array<string | number> = [];
     const conditions: string[] = [];
 

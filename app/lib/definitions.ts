@@ -30,6 +30,8 @@ export type UserType = {
   email: string;
   password?: string;
   rol_id: UserRole; // 1: admin, 2: directivo, 3: comercial, 4: colaborador, 5: financiero
+  is_internal?: boolean | null; // relevant for colaboradores externos
+  pending_tasks_count?: number | null;
   must_change_password?: boolean;
   last_login?: string;
   is_active?: boolean;
@@ -369,9 +371,11 @@ export type TaskCommandCenterRow = {
   product_name: string | null;
   assigned_user_id: number | null;
   assigned_user_name: string | null;
+  assigned_user_is_internal: boolean | null;
   task_flag: TaskFlag;
   task_type: TaskType;
   status: ProjectTaskStatus;
+  requires_quote: number; // 0 | 1
   assigned_at: string | null;
   completed_at: string | null;
 };

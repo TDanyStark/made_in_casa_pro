@@ -1,6 +1,7 @@
 import React from "react";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { TasksCommandCenterClient } from "@/components/tasks/TasksCommandCenterClient";
+import { UserRole } from "@/lib/definitions";
 
 const mockReplace = jest.fn();
 const mockGet = jest.fn();
@@ -12,6 +13,8 @@ jest.mock("next/navigation", () => ({
 }));
 
 jest.mock("@tanstack/react-query", () => ({
+  useQueryClient: () => ({ invalidateQueries: jest.fn() }),
+  useMutation: () => ({ mutate: jest.fn(), isPending: false }),
   useQuery: ({ queryKey }: { queryKey: unknown[] }) => {
     const key = String(queryKey[0]);
     if (key === "tasks-command-center") {
@@ -26,9 +29,11 @@ jest.mock("@tanstack/react-query", () => ({
               product_name: "Producto demo",
               assigned_user_id: null,
               assigned_user_name: null,
+              assigned_user_is_internal: null,
               task_flag: "new",
               task_type: "execution",
               status: "not_started",
+              requires_quote: 0,
               assigned_at: null,
               completed_at: null,
             },
@@ -63,6 +68,27 @@ jest.mock("@tanstack/react-query", () => ({
 
 jest.mock("@/lib/services/apiService", () => ({
   get: (...args: unknown[]) => mockGet(...args),
+  patch: jest.fn(),
+}));
+
+jest.mock("@/components/ui/popover", () => ({
+  Popover: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  PopoverTrigger: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  PopoverContent: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+}));
+
+jest.mock("@/components/ui/switch", () => ({
+  Switch: ({ checked, onCheckedChange, id }: { checked?: boolean; onCheckedChange?: (v: boolean) => void; id?: string }) => (
+    <input id={id} type="checkbox" checked={checked} onChange={(e) => onCheckedChange?.(e.target.checked)} />
+  ),
+}));
+
+jest.mock("@/components/ui/searchable-select", () => ({
+  SearchableSelect: ({ placeholder }: { placeholder?: string }) => <div>{placeholder}</div>,
+}));
+
+jest.mock("sonner", () => ({
+  toast: { success: jest.fn(), error: jest.fn() },
 }));
 
 jest.mock("@/components/ui/select", () => {
@@ -150,7 +176,7 @@ describe("TasksCommandCenterClient", () => {
   });
 
   it("renders main columns and one row", () => {
-    render(<TasksCommandCenterClient />);
+    render(<TasksCommandCenterClient userRole={1 as UserRole} />);
 
     expect(screen.getByText("Tarea")).toBeInTheDocument();
     expect(screen.getByText("Proyecto demo")).toBeInTheDocument();
@@ -159,7 +185,7 @@ describe("TasksCommandCenterClient", () => {
   });
 
   it("renders explicit date labels", () => {
-    render(<TasksCommandCenterClient />);
+    render(<TasksCommandCenterClient userRole={1 as UserRole} />);
 
     expect(screen.getByLabelText("Asignada desde")).toBeInTheDocument();
     expect(screen.getByLabelText("Asignada hasta")).toBeInTheDocument();
@@ -168,7 +194,7 @@ describe("TasksCommandCenterClient", () => {
   });
 
   it("shows status checkboxes selected by default and updates URL when toggled", () => {
-    render(<TasksCommandCenterClient />);
+    render(<TasksCommandCenterClient userRole={1 as UserRole} />);
 
     const statusCompleted = screen.getByTestId("status-completed") as HTMLInputElement;
     expect(statusCompleted.checked).toBe(true);

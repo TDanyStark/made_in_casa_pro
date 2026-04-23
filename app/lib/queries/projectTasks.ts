@@ -1410,9 +1410,11 @@ export async function getTasksCommandCenterWithPagination({
           pr.name AS product_name,
           pt.assigned_user_id,
           assignee.name AS assigned_user_name,
+          assignee.is_internal AS assigned_user_is_internal,
           pt.task_flag,
           pt.task_type,
           pt.status,
+          pt.requires_quote,
           pt.assigned_at,
           pt.completed_at
         FROM project_tasks pt

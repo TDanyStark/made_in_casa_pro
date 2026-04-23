@@ -14,6 +14,7 @@ export async function GET(request: NextRequest) {
     const { users } = await getUsersWithPagination({
       rolId: [...AUTHENTICATED_ROLES],
       limit: 1000,
+      withTaskCount: true,
     });
 
     return NextResponse.json({ data: users });

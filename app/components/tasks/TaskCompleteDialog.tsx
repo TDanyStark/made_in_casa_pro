@@ -140,6 +140,15 @@ export function TaskCompleteDialog({
 
     if (!task) return;
 
+    // External collaborator must declare their cost (unless it's fixed by quote)
+    if (isExternalCollaborator && !isReadOnlyCost) {
+      const parsed = parseFloat(completionCost);
+      if (!completionCost || isNaN(parsed) || parsed <= 0) {
+        toast.error("Debes ingresar el costo del trabajo antes de completar.");
+        return;
+      }
+    }
+
     // Validate delivery_url if provided
     if (deliveryUrl && deliveryUrl.trim()) {
       try {
@@ -326,7 +335,7 @@ export function TaskCompleteDialog({
           {isExternalCollaborator && (
             <div className="space-y-2 rounded-md border p-4 bg-amber-50/50 dark:bg-amber-900/10">
               <Label className="text-sm font-semibold">
-                Costo del trabajo
+                Costo del trabajo{!isReadOnlyCost && <span className="text-destructive ml-1">*</span>}
               </Label>
 
               {isReadOnlyCost ? (

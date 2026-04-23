@@ -1,18 +1,20 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import { get } from "@/lib/services/apiService";
+import { UserPenIcon } from "lucide-react";
+import { get, patch } from "@/lib/services/apiService";
 import {
   ApiResponseWithPagination,
   ProjectTaskStatus,
   TaskCommandCenterRow,
   TaskFlag,
   TaskType,
+  UserRole,
   UserType,
   AreaType,
 } from "@/lib/definitions";
@@ -24,10 +26,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { CREATOR_FILTER_ROLES } from "@/lib/role-groups";
+import { Switch } from "@/components/ui/switch";
+import { CREATOR_FILTER_ROLES, LEADERSHIP_ROLES } from "@/lib/role-groups";
+import { hasAnyRole } from "@/lib/role-groups";
 import { Badge } from "@/components/ui/badge";
 import {
   Table,
@@ -39,7 +44,9 @@ import {
 } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import Pagination from "@/components/pagination/Pagination";
+import { toast } from "sonner";
 
 const STATUS_LABELS: Record<ProjectTaskStatus, string> = {
   not_started: "Sin iniciar",
@@ -76,10 +83,22 @@ function toEndOfDayIso(value: string) {
   return new Date(`${value}T23:59:59.999Z`).toISOString();
 }
 
-export function TasksCommandCenterClient() {
+interface TasksCommandCenterClientProps {
+  userRole: UserRole;
+}
+
+export function TasksCommandCenterClient({ userRole }: TasksCommandCenterClientProps) {
   const searchParams = useSearchParams();
   const pathname = usePathname();
   const { replace } = useRouter();
+  const queryClient = useQueryClient();
+
+  const canEditAssignee = hasAnyRole(userRole, LEADERSHIP_ROLES);
+
+  // State for the inline assignee editor popover
+  const [editingTaskId, setEditingTaskId] = useState<number | null>(null);
+  const [pendingUserId, setPendingUserId] = useState<string>("none");
+  const [pendingRequiresQuote, setPendingRequiresQuote] = useState<boolean>(false);
 
   const page = searchParams.get("page") || "1";
   const creatorUserId = searchParams.get("creatorUserId") || "";
@@ -178,15 +197,56 @@ export function TasksCommandCenterClient() {
     [assignableUsers]
   );
 
+  const updateAssigneeMutation = useMutation({
+    mutationFn: async ({
+      task,
+      newUserId,
+      requiresQuote,
+    }: {
+      task: TaskCommandCenterRow;
+      newUserId: string;
+      requiresQuote: boolean;
+    }) => {
+      const body: Record<string, unknown> = {
+        requires_quote: requiresQuote ? 1 : 0,
+        assigned_user_id: newUserId === "none" ? null : Number(newUserId),
+      };
+      const res = await patch(`projects/${task.project_id}/tasks/${task.id}`, body);
+      if (!res.ok) throw new Error(res.error || "Error al actualizar");
+      return res.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["tasks-command-center"] });
+      setEditingTaskId(null);
+      toast.success("Tarea actualizada");
+    },
+    onError: (err: Error) => {
+      toast.error(err.message || "Error al actualizar la tarea");
+    },
+  });
+
   const rows = data?.data || [];
   const currentPage = data?.currentPage || 1;
   const pageCount = data?.pageCount || 1;
   const total = data?.total || 0;
 
+  function openEditPopover(task: TaskCommandCenterRow) {
+    setEditingTaskId(task.id);
+    setPendingUserId(task.assigned_user_id ? String(task.assigned_user_id) : "none");
+    setPendingRequiresQuote(Number(task.requires_quote) === 1);
+  }
+
+  const selectedTask = rows.find((r) => r.id === editingTaskId) ?? null;
+  const pendingUser = pendingUserId !== "none"
+    ? assignableUsers.find((u) => String(u.id) === pendingUserId)
+    : undefined;
+  // is_internal puede llegar como boolean, 0/1 o null según la capa de datos
+  const isExternalUser = pendingUser !== undefined && !pendingUser.is_internal;
+
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
-        <Select
+        <SearchableSelect
           value={creatorUserId || "all"}
           onValueChange={(value) =>
             replace(
@@ -196,59 +256,44 @@ export function TasksCommandCenterClient() {
               })}`
             )
           }
-        >
-          <SelectTrigger>
-            <SelectValue placeholder="Usuario creador" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Usuario creador: todos</SelectItem>
-            {creatorUsers.map((user) => (
-              <SelectItem key={user.id} value={String(user.id)}>
-                {user.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+          options={[
+            { value: "all", label: "Usuario creador: todos" },
+            ...creatorUsers.map((user) => ({ value: String(user.id), label: user.name })),
+          ]}
+          placeholder="Usuario creador"
+          searchPlaceholder="Buscar usuario..."
+          emptyMessage="Sin usuarios."
+        />
 
-        <Select
+        <SearchableSelect
           value={areaId || "all"}
           onValueChange={(value) =>
             replace(`${pathname}?${createQueryString({ page: "1", areaId: value === "all" ? null : value })}`)
           }
-        >
-          <SelectTrigger>
-            <SelectValue placeholder="Área" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Área: todas</SelectItem>
-            {areas.map((area) => (
-              <SelectItem key={area.id} value={String(area.id)}>
-                {area.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+          options={[
+            { value: "all", label: "Área: todas" },
+            ...areas.map((area) => ({ value: String(area.id), label: area.name })),
+          ]}
+          placeholder="Área"
+          searchPlaceholder="Buscar área..."
+          emptyMessage="Sin áreas."
+        />
 
-        <Select
+        <SearchableSelect
           value={assignedUserId || "all"}
           onValueChange={(value) =>
             replace(
               `${pathname}?${createQueryString({ page: "1", assignedUserId: value === "all" ? null : value })}`
             )
           }
-        >
-          <SelectTrigger>
-            <SelectValue placeholder="Asignado a" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Asignado a: todos</SelectItem>
-            {assignableUsers.map((user) => (
-              <SelectItem key={user.id} value={String(user.id)}>
-                {user.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+          options={[
+            { value: "all", label: "Asignado a: todos" },
+            ...assignableUsers.map((user) => ({ value: String(user.id), label: user.name })),
+          ]}
+          placeholder="Asignado a"
+          searchPlaceholder="Buscar usuario..."
+          emptyMessage="Sin usuarios."
+        />
 
         <Select
           value={taskType || "all"}
@@ -429,7 +474,90 @@ export function TasksCommandCenterClient() {
                     </Link>
                   </TableCell>
                   <TableCell>{task.product_name || "—"}</TableCell>
-                  <TableCell>{task.assigned_user_name || "Sin asignar"}</TableCell>
+                  <TableCell>
+                    {canEditAssignee ? (
+                      <Popover
+                        open={editingTaskId === task.id}
+                        onOpenChange={(open) => {
+                          if (open) openEditPopover(task);
+                          else setEditingTaskId(null);
+                        }}
+                      >
+                        <PopoverTrigger asChild>
+                          <button
+                            className="flex items-center gap-1.5 text-left hover:text-primary transition-colors group"
+                            aria-label="Cambiar responsable"
+                          >
+                            <span className="text-sm">
+                              {task.assigned_user_name || "Sin asignar"}
+                            </span>
+                            <UserPenIcon className="size-3.5 shrink-0 opacity-0 group-hover:opacity-60 transition-opacity" />
+                          </button>
+                        </PopoverTrigger>
+                        <PopoverContent
+                          className="w-72 p-4 space-y-4"
+                          align="start"
+                          onInteractOutside={(e) => e.preventDefault()}
+                          onEscapeKeyDown={() => setEditingTaskId(null)}
+                        >
+                          <p className="text-sm font-medium leading-none">Cambiar responsable</p>
+                          <SearchableSelect
+                            value={editingTaskId === task.id ? pendingUserId : (task.assigned_user_id ? String(task.assigned_user_id) : "none")}
+                            onValueChange={setPendingUserId}
+                            options={[
+                              { value: "none", label: "Sin asignar" },
+                              ...assignableUsers.map((u) => ({
+                                value: String(u.id),
+                                label: u.name,
+                                badge: u.pending_tasks_count ?? null,
+                              })),
+                            ]}
+                            placeholder="Seleccionar usuario"
+                            searchPlaceholder="Buscar usuario..."
+                            emptyMessage="Sin usuarios."
+                          />
+                          {isExternalUser && (
+                            <div className="flex items-center justify-between gap-2">
+                              <Label htmlFor={`requires-quote-${task.id}`} className="text-sm">
+                                Requiere cotización
+                              </Label>
+                              <Switch
+                                id={`requires-quote-${task.id}`}
+                                checked={pendingRequiresQuote}
+                                onCheckedChange={setPendingRequiresQuote}
+                              />
+                            </div>
+                          )}
+                          <div className="flex gap-2 pt-1">
+                            <Button
+                              size="sm"
+                              className="flex-1"
+                              disabled={updateAssigneeMutation.isPending}
+                              onClick={() => {
+                                if (!selectedTask) return;
+                                updateAssigneeMutation.mutate({
+                                  task: selectedTask,
+                                  newUserId: pendingUserId,
+                                  requiresQuote: isExternalUser ? pendingRequiresQuote : false,
+                                });
+                              }}
+                            >
+                              {updateAssigneeMutation.isPending ? "Guardando..." : "Guardar"}
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => setEditingTaskId(null)}
+                            >
+                              Cancelar
+                            </Button>
+                          </div>
+                        </PopoverContent>
+                      </Popover>
+                    ) : (
+                      <span className="text-sm">{task.assigned_user_name || "Sin asignar"}</span>
+                    )}
+                  </TableCell>
                   <TableCell>
                     <Badge variant="outline">{FLAG_LABELS[task.task_flag]}</Badge>
                   </TableCell>
