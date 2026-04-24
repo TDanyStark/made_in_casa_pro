@@ -16,6 +16,19 @@ export type NotificationDeliveryType = {
   message_id: string | null;
   sent_at: string | null;
   created_at: string;
+  retry_count: number;
+  last_attempt_at: string | null;
+};
+
+export type NotificationDeliveryDetailType = NotificationDeliveryType & {
+  event_type: string | null;
+  project_id: number | null;
+  project_title: string | null;
+  task_id: number | null;
+  task_title: string | null;
+  adjustment_id: number | null;
+  actor_user_id: number | null;
+  actor_name: string | null;
 };
 
 export async function createNotificationDelivery(data: {
@@ -30,7 +43,7 @@ export async function createNotificationDelivery(data: {
       sql: `
         INSERT INTO notification_deliveries (event_id, recipient_user_id, recipient_email, sender_user_id, provider, status)
         VALUES ($1, $2, $3, $4, $5, 'pending')
-        RETURNING id, event_id, recipient_user_id, recipient_email, sender_user_id, provider, status, error, gmail_thread_id, message_id, sent_at, created_at
+        RETURNING id, event_id, recipient_user_id, recipient_email, sender_user_id, provider, status, error, gmail_thread_id, message_id, sent_at, created_at, retry_count, last_attempt_at
       `,
       args: [
         data.event_id,
@@ -78,7 +91,8 @@ export async function markDeliveryFailed(
     await db.execute({
       sql: `
         UPDATE notification_deliveries
-        SET status = 'failed', error = $2
+        SET status = 'failed', error = $2,
+            retry_count = retry_count + 1, last_attempt_at = CURRENT_TIMESTAMP
         WHERE id = $1
       `,
       args: [deliveryId, errorMessage],
@@ -149,5 +163,121 @@ export async function getDeliveriesByUser(
   } catch (error) {
     console.error("Error fetching user deliveries:", error);
     return [];
+  }
+}
+
+export async function getFailedDeliveries(
+  limit = 100
+): Promise<NotificationDeliveryDetailType[]> {
+  try {
+    const result = await db.execute({
+      sql: `
+        SELECT
+          nd.id, nd.event_id, nd.recipient_user_id, nd.recipient_email, nd.sender_user_id,
+          nd.provider, nd.status, nd.error, nd.gmail_thread_id, nd.message_id, nd.sent_at,
+          nd.created_at, nd.retry_count, nd.last_attempt_at,
+          ne.event_type,
+          ne.project_id, p.title AS project_title,
+          ne.task_id, pt.title AS task_title,
+          ne.adjustment_id,
+          ne.actor_user_id,
+          u.name AS actor_name
+        FROM notification_deliveries nd
+        JOIN notification_events ne ON ne.id = nd.event_id
+        LEFT JOIN projects p ON p.id = ne.project_id
+        LEFT JOIN project_tasks pt ON pt.id = ne.task_id
+        LEFT JOIN users u ON u.id = ne.actor_user_id
+        WHERE nd.status = 'failed'
+        ORDER BY nd.created_at DESC
+        LIMIT $1
+      `,
+      args: [limit],
+    });
+    return result.rows as unknown as NotificationDeliveryDetailType[];
+  } catch (error) {
+    console.error("Error fetching failed deliveries:", error);
+    return [];
+  }
+}
+
+export async function getRecentDeliveries(
+  limit = 50
+): Promise<NotificationDeliveryDetailType[]> {
+  try {
+    const result = await db.execute({
+      sql: `
+        SELECT
+          nd.id, nd.event_id, nd.recipient_user_id, nd.recipient_email, nd.sender_user_id,
+          nd.provider, nd.status, nd.error, nd.gmail_thread_id, nd.message_id, nd.sent_at,
+          nd.created_at, nd.retry_count, nd.last_attempt_at,
+          ne.event_type,
+          ne.project_id, p.title AS project_title,
+          ne.task_id, pt.title AS task_title,
+          ne.adjustment_id,
+          ne.actor_user_id,
+          u.name AS actor_name
+        FROM notification_deliveries nd
+        JOIN notification_events ne ON ne.id = nd.event_id
+        LEFT JOIN projects p ON p.id = ne.project_id
+        LEFT JOIN project_tasks pt ON pt.id = ne.task_id
+        LEFT JOIN users u ON u.id = ne.actor_user_id
+        ORDER BY nd.created_at DESC
+        LIMIT $1
+      `,
+      args: [limit],
+    });
+    return result.rows as unknown as NotificationDeliveryDetailType[];
+  } catch (error) {
+    console.error("Error fetching recent deliveries:", error);
+    return [];
+  }
+}
+
+export async function getDeliveryById(
+  deliveryId: number
+): Promise<NotificationDeliveryDetailType | null> {
+  try {
+    const result = await db.execute({
+      sql: `
+        SELECT
+          nd.id, nd.event_id, nd.recipient_user_id, nd.recipient_email, nd.sender_user_id,
+          nd.provider, nd.status, nd.error, nd.gmail_thread_id, nd.message_id, nd.sent_at,
+          nd.created_at, nd.retry_count, nd.last_attempt_at,
+          ne.event_type,
+          ne.project_id, p.title AS project_title,
+          ne.task_id, pt.title AS task_title,
+          ne.adjustment_id,
+          ne.actor_user_id,
+          u.name AS actor_name
+        FROM notification_deliveries nd
+        JOIN notification_events ne ON ne.id = nd.event_id
+        LEFT JOIN projects p ON p.id = ne.project_id
+        LEFT JOIN project_tasks pt ON pt.id = ne.task_id
+        LEFT JOIN users u ON u.id = ne.actor_user_id
+        WHERE nd.id = $1
+      `,
+      args: [deliveryId],
+    });
+    if (result.rows.length === 0) return null;
+    return result.rows[0] as unknown as NotificationDeliveryDetailType;
+  } catch (error) {
+    console.error("Error fetching delivery by id:", error);
+    return null;
+  }
+}
+
+export async function resetDeliveryForRetry(deliveryId: number): Promise<void> {
+  try {
+    await db.execute({
+      sql: `
+        UPDATE notification_deliveries
+        SET status = 'pending', error = NULL
+        WHERE id = $1 AND status = 'failed'
+      `,
+      args: [deliveryId],
+    });
+  } catch (error) {
+    console.error("Error resetting delivery for retry:", error);
+    throw error;
   }
 }
