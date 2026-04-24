@@ -382,6 +382,8 @@ app/lib/email/templates/
 
 ## Fase 6: Motor de notificaciones
 
+Estado: implementada.
+
 ### Objetivo
 
 Crear una capa que reciba eventos del dominio y resuelva destinatarios, plantilla, sender e hilo.
@@ -434,6 +436,8 @@ dispatchNotification({
 
 ## Fase 7: Hilos por version de proyecto
 
+Estado: implementada.
+
 ### Objetivo
 
 Garantizar que cada version/ajuste del proyecto tenga su propio hilo.
@@ -443,14 +447,14 @@ Garantizar que cada version/ajuste del proyecto tenga su propio hilo.
 Formato sugerido:
 
 ```txt
-project:{projectId}:version:{adjustmentId || "base"}
+project:{projectId}:version:v{versionNumber}
 ```
 
 Ejemplos:
 
 ```txt
-project:15:version:base
-project:15:version:adjustment-3
+project:15:version:v1
+project:15:version:v2
 ```
 
 ### Comportamiento

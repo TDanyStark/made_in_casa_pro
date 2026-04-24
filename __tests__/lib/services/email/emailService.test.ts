@@ -128,7 +128,7 @@ describe("sendEmail()", () => {
     const GmailMock = GmailEmailProvider as jest.MockedClass<typeof GmailEmailProvider>;
     GmailMock.mockImplementationOnce(() => ({
       send: jest.fn().mockRejectedValue(new Error("SMTP timeout")),
-    }));
+    } as never));
 
     await expect(
       sendEmail({ senderUserId: 7, message: baseMessage, eventId: 10 })

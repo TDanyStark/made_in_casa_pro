@@ -58,7 +58,7 @@ export class SystemEmailProvider implements EmailProvider {
 
     const mailOptions: Parameters<typeof transport.sendMail>[0] = {
       from: `"${from.name}" <${from.email}>`,
-      to: message.name
+      to: message.to.name
         ? `"${message.to.name}" <${message.to.email}>`
         : message.to.email,
       subject: message.subject,
