@@ -175,6 +175,8 @@ Campos sugeridos:
 
 ## Fase 2: Conexion Gmail por usuario
 
+Estado: implementada.
+
 ### Objetivo
 
 Permitir que cada usuario conecte su Gmail y guardar tokens necesarios para enviar correos desde su cuenta.
@@ -218,6 +220,8 @@ Preferencia inicial:
 - Test de deteccion de token invalido.
 
 ## Fase 3: Bloqueo de app si Gmail no esta conectado
+
+Estado: implementada.
 
 ### Objetivo
 

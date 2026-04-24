@@ -6,6 +6,7 @@ import { deleteSession } from '@/lib/session'
 import { redirect } from "next/navigation";
 import bcrypt from "bcrypt";
 import { getUserByEmail } from "../queries/users";
+import { getUserConnectedEmailStatus } from "../queries/userEmailConnections";
 
 
 export async function login(state: FormState, formData: FormData) {
@@ -71,6 +72,12 @@ export async function login(state: FormState, formData: FormData) {
   }
   // 3. Create a session
   await createSession({name: user.name, email: user.email, id: user.id, rol_id: user.rol_id });
+  const hasConnectedGmail = await getUserConnectedEmailStatus(user.id);
+
+  if (!hasConnectedGmail) {
+    redirect('/connect-email');
+  }
+
   // 4. Redirect to the dashboard
   redirect('/dashboard');
 }

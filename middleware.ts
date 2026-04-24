@@ -6,9 +6,16 @@ import { checkRoutePermission, publicRoutes } from "@/lib/permissions";
 
 // Changed publicRoute from a single route to an array of public routes
 
+function nextWithPath(req: NextRequest) {
+  const requestHeaders = new Headers(req.headers);
+  requestHeaders.set("x-current-path", req.nextUrl.pathname);
+  return NextResponse.next({ request: { headers: requestHeaders } });
+}
+
 export default async function middleware(req: NextRequest) {
   const path = req.nextUrl.pathname;
   const isPublicRoute = publicRoutes.includes(path);
+  const isEmailConnectionRoute = path === "/connect-email";
   const isApiRoute = path.startsWith('/api/');
 
   const cookie = (await cookies()).get("session")?.value;
@@ -33,6 +40,13 @@ export default async function middleware(req: NextRequest) {
     return NextResponse.redirect(new URL("/dashboard", req.nextUrl));
   }
 
+  if (isEmailConnectionRoute) {
+    if (!session?.id) {
+      return NextResponse.redirect(new URL("/", req.nextUrl));
+    }
+    return nextWithPath(req);
+  }
+
   // 2. Si el usuario no está autenticado y la ruta no es pública
   if (!session?.id && !isPublicRoute) {    // Para rutas API, devolver 401 Unauthorized en lugar de redirigir
     if (isApiRoute) {
@@ -52,7 +66,7 @@ export default async function middleware(req: NextRequest) {
     }
   }
   // 4. Permitir el acceso si pasa todas las validaciones
-  return NextResponse.next();
+  return nextWithPath(req);
 }
 
 // 🔹 Incluir las rutas API en el matcher del middleware

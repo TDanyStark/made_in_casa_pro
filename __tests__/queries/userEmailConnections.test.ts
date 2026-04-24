@@ -8,6 +8,7 @@ import { db } from '@/lib/db';
 import {
   getUserEmailConnection,
   getUserConnectedEmailStatus,
+  isGmailConnectionRequired,
   createUserEmailConnection,
   updateUserEmailConnectionTokens,
   markEmailConnectionInvalid,
@@ -28,6 +29,18 @@ function makeResult(rows: Record<string, unknown>[]) {
 
 beforeEach(() => {
   jest.clearAllMocks();
+  delete process.env.REQUIRE_GMAIL_CONNECTION;
+});
+
+describe('isGmailConnectionRequired()', () => {
+  it('is enabled by default', () => {
+    expect(isGmailConnectionRequired()).toBe(true);
+  });
+
+  it('can be disabled with REQUIRE_GMAIL_CONNECTION=false', () => {
+    process.env.REQUIRE_GMAIL_CONNECTION = 'false';
+    expect(isGmailConnectionRequired()).toBe(false);
+  });
 });
 
 describe('getUserEmailConnection()', () => {
@@ -55,6 +68,15 @@ describe('getUserEmailConnection()', () => {
 });
 
 describe('getUserConnectedEmailStatus()', () => {
+  it('returns true without querying DB when Gmail requirement is disabled', async () => {
+    process.env.REQUIRE_GMAIL_CONNECTION = 'false';
+
+    const result = await getUserConnectedEmailStatus(5);
+
+    expect(result).toBe(true);
+    expect(mockExecute).not.toHaveBeenCalled();
+  });
+
   it('returns true when user has valid connected gmail', async () => {
     mockExecute.mockResolvedValueOnce(makeResult([{ '1': 1 }]));
     const result = await getUserConnectedEmailStatus(5);

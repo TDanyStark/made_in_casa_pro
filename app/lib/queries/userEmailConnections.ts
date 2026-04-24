@@ -18,6 +18,10 @@ export type UserEmailConnectionType = {
   updated_at: string;
 };
 
+export function isGmailConnectionRequired() {
+  return process.env.REQUIRE_GMAIL_CONNECTION !== "false";
+}
+
 export async function getUserEmailConnection(
   userId: number,
   provider: EmailProvider = "gmail"
@@ -43,6 +47,8 @@ export async function getUserEmailConnection(
 export async function getUserConnectedEmailStatus(
   userId: number
 ): Promise<boolean> {
+  if (!isGmailConnectionRequired()) return true;
+
   try {
     const result = await db.execute({
       sql: `
@@ -62,9 +68,9 @@ export async function getUserConnectedEmailStatus(
 export async function createUserEmailConnection(data: {
   user_id: number;
   email: string;
-  access_token: string;
-  refresh_token: string;
-  expires_at: Date;
+  access_token?: string | null;
+  refresh_token?: string | null;
+  expires_at?: Date | string | null;
   scopes?: string;
 }): Promise<UserEmailConnectionType> {
   try {
@@ -75,7 +81,7 @@ export async function createUserEmailConnection(data: {
         ON CONFLICT (user_id, provider) DO UPDATE SET
           email = EXCLUDED.email,
           access_token = EXCLUDED.access_token,
-          refresh_token = EXCLUDED.refresh_token,
+          refresh_token = COALESCE(EXCLUDED.refresh_token, user_email_connections.refresh_token),
           expires_at = EXCLUDED.expires_at,
           scopes = EXCLUDED.scopes,
           status = 'connected',
@@ -87,9 +93,9 @@ export async function createUserEmailConnection(data: {
       args: [
         data.user_id,
         data.email,
-        data.access_token,
-        data.refresh_token,
-        data.expires_at,
+        data.access_token ?? null,
+        data.refresh_token ?? null,
+        data.expires_at ?? null,
         data.scopes ?? null,
       ],
     });
@@ -104,15 +110,20 @@ export async function updateUserEmailConnectionTokens(
   userId: number,
   data: {
     access_token: string;
-    refresh_token: string;
-    expires_at: Date;
+    refresh_token?: string | null;
+    expires_at: Date | string | null;
   }
 ): Promise<void> {
   try {
     await db.execute({
       sql: `
         UPDATE user_email_connections
-        SET access_token = $2, refresh_token = $3, expires_at = $4, status = 'connected', updated_at = CURRENT_TIMESTAMP
+        SET access_token = $2,
+            refresh_token = COALESCE($3, refresh_token),
+            expires_at = $4,
+            status = 'connected',
+            last_error = NULL,
+            updated_at = CURRENT_TIMESTAMP
         WHERE user_id = $1 AND provider = 'gmail'
       `,
       args: [userId, data.access_token, data.refresh_token, data.expires_at],

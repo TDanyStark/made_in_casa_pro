@@ -2,12 +2,26 @@ import { RoleProvider } from "@/components/context/RoleContext";
 import SideNav from "@/components/dashboard/sidenav";
 import { ModeToggle } from "@/components/ModeToggle";
 import { getUserRole } from "@/lib/session";
+import { getCurrentSession } from "@/lib/services/api-session";
+import { getUserConnectedEmailStatus } from "@/lib/queries/userEmailConnections";
+import { redirect } from "next/navigation";
+import { headers } from "next/headers";
 
 export default async function Layout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const path = (await headers()).get("x-current-path") ?? "";
+  const canConfigureEmail = path.startsWith("/settings");
+  const session = await getCurrentSession();
+  if (session?.id && !canConfigureEmail) {
+    const hasConnectedGmail = await getUserConnectedEmailStatus(session.id);
+    if (!hasConnectedGmail) {
+      redirect("/connect-email");
+    }
+  }
+
   const role = await getUserRole();
 
   return (

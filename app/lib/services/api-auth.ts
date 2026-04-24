@@ -2,6 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { UserRole } from "@/lib/definitions";
 import { cookies } from "next/headers";
 import { decrypt, SessionData } from "../session";
+import { getUserConnectedEmailStatus, isGmailConnectionRequired } from "@/lib/queries/userEmailConnections";
+
+function canSkipGmailConnection(request: NextRequest) {
+  const path = request.nextUrl.pathname;
+  return path.startsWith("/api/user-email/") || path.startsWith("/api/settings");
+}
 
 /**
  * Verifica si el usuario tiene uno de los roles permitidos para acceder a un endpoint API.
@@ -63,6 +69,20 @@ export async function validateApiRole(
         { status: 403 }
       ),
     };
+  }
+
+  if (isGmailConnectionRequired() && !canSkipGmailConnection(request)) {
+    const hasConnectedGmail = await getUserConnectedEmailStatus(session.id);
+    if (!hasConnectedGmail) {
+      return {
+        isAuthorized: false,
+        userRole,
+        response: NextResponse.json(
+          { error: "Debes conectar Gmail para continuar" },
+          { status: 428 }
+        ),
+      };
+    }
   }
 
   // El usuario tiene autorización
