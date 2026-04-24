@@ -428,3 +428,67 @@ export type TaskQuoteInvitationType = {
   // joined from task_quotes
   quote_status?: QuoteStatus | null;
 };
+
+// ─── Notification System Types ───────────────────────────────────────────────
+
+export type EmailConnectionStatus = "connected" | "invalid" | "disconnected";
+export type EmailProvider = "gmail";
+
+export type UserEmailConnectionType = {
+  id: number;
+  user_id: number;
+  provider: EmailProvider;
+  email: string;
+  access_token: string | null;
+  refresh_token: string | null;
+  expires_at: string | null;
+  scopes: string | null;
+  status: EmailConnectionStatus;
+  last_error: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type NotificationEventType = {
+  id: number;
+  event_type: string;
+  project_id: number | null;
+  task_id: number | null;
+  adjustment_id: number | null;
+  actor_user_id: number | null;
+  metadata: Record<string, unknown> | null;
+  created_at: string;
+};
+
+export type DeliveryStatus = "pending" | "sent" | "failed" | "skipped";
+export type DeliveryProvider = "gmail" | "smtp" | "resend";
+
+export type NotificationDeliveryType = {
+  id: number;
+  event_id: number;
+  recipient_user_id: number | null;
+  recipient_email: string;
+  sender_user_id: number | null;
+  provider: DeliveryProvider;
+  status: DeliveryStatus;
+  error: string | null;
+  gmail_thread_id: string | null;
+  message_id: string | null;
+  sent_at: string | null;
+  created_at: string;
+};
+
+export type ThreadProvider = "gmail" | "smtp" | "resend";
+
+export type ProjectEmailThreadType = {
+  id: number;
+  project_id: number;
+  adjustment_id: number | null;
+  thread_key: string;
+  provider: ThreadProvider;
+  gmail_thread_id: string | null;
+  root_message_id: string | null;
+  created_by_user_id: number | null;
+  created_at: string;
+  updated_at: string;
+};
