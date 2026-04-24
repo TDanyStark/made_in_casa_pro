@@ -284,6 +284,8 @@ REQUIRE_GMAIL_CONNECTION=true
 
 ## Fase 4: Servicio de email
 
+Estado: implementada.
+
 ### Objetivo
 
 Crear una interfaz unica para enviar emails desde Gmail del usuario o desde el correo del sistema.
@@ -330,6 +332,8 @@ sendEmail({
 - Test de registro de delivery fallido.
 
 ## Fase 5: Plantillas HTML en codigo
+
+Estado: implementada.
 
 ### Objetivo
 
