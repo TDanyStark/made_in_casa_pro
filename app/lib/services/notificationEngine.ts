@@ -27,6 +27,7 @@ import {
   getQuoteReceivedRecipient,
   getAcceptedQuoteCollaborator,
   getActorName,
+  getUserNotificationRecipient,
   type NotificationRecipient,
 } from "@/lib/queries/notificationRecipients";
 import { getProjectById } from "@/lib/queries/projects";
@@ -34,6 +35,7 @@ import { getProjectTaskById } from "@/lib/queries/projectTasks";
 import { sendEmail } from "@/lib/services/email/emailService";
 
 import { taskAssigned } from "@/lib/email/templates/taskAssigned";
+import { taskReassigned } from "@/lib/email/templates/taskReassigned";
 import { taskCompleted } from "@/lib/email/templates/taskCompleted";
 import { quoteRequested } from "@/lib/email/templates/quoteRequested";
 import { quoteReceived } from "@/lib/email/templates/quoteReceived";
@@ -45,6 +47,7 @@ import { projectCompleted } from "@/lib/email/templates/projectCompleted";
 
 export const NOTIFICATION_EVENTS = {
   TASK_ASSIGNED: "task.assigned",
+  TASK_REASSIGNED: "task.reassigned",
   TASK_COMPLETED: "task.completed",
   QUOTE_REQUESTED: "quote.requested",
   QUOTE_RECEIVED: "quote.received",
@@ -67,6 +70,14 @@ export interface TaskAssignedInput extends BaseInput {
   eventType: "task.assigned";
   taskId: number;
   projectId: number;
+}
+
+export interface TaskReassignedInput extends BaseInput {
+  eventType: "task.reassigned";
+  taskId: number;
+  projectId: number;
+  previousUserId: number;
+  newUserId?: number | null;
 }
 
 export interface TaskCompletedInput extends BaseInput {
@@ -116,6 +127,7 @@ export interface ProjectCompletedInput extends BaseInput {
 
 export type DispatchInput =
   | TaskAssignedInput
+  | TaskReassignedInput
   | TaskCompletedInput
   | QuoteRequestedInput
   | QuoteReceivedInput
@@ -238,6 +250,101 @@ export async function dispatchNotification(input: DispatchInput): Promise<void> 
           }),
           { projectId: input.projectId, adjustmentId: task.adjustment_id ?? null, threadKey }
         );
+        break;
+      }
+
+      // ── task.reassigned ────────────────────────────────────────────────
+      case "task.reassigned": {
+        const [task, project, previousRecipient, newRecipient] = await Promise.all([
+          getProjectTaskById(input.taskId),
+          getProjectById(input.projectId),
+          getUserNotificationRecipient(input.previousUserId),
+          input.newUserId ? getUserNotificationRecipient(input.newUserId) : Promise.resolve(null),
+        ]);
+        if (!task || !project || !previousRecipient) break;
+
+        const threadKey = await resolveProjectVersionThreadKey(input.projectId, task.adjustment_id ?? null);
+        const changedByName = await getActorName(input.actorUserId);
+
+        await sendToRecipients(
+          [previousRecipient],
+          input.actorUserId,
+          eventId,
+          (r) => ({
+            subject: taskReassigned.subject({
+              recipientName: r.name,
+              changedByName,
+              taskTitle: task.title,
+              projectTitle: project.title,
+              projectId: project.id,
+              taskId: task.id,
+              newAssigneeName: newRecipient?.name ?? null,
+            }),
+            html: taskReassigned.html({
+              recipientName: r.name,
+              changedByName,
+              taskTitle: task.title,
+              projectTitle: project.title,
+              projectId: project.id,
+              taskId: task.id,
+              newAssigneeName: newRecipient?.name ?? null,
+            }),
+            text: taskReassigned.text({
+              recipientName: r.name,
+              changedByName,
+              taskTitle: task.title,
+              projectTitle: project.title,
+              projectId: project.id,
+              taskId: task.id,
+              newAssigneeName: newRecipient?.name ?? null,
+            }),
+          }),
+          { projectId: input.projectId, adjustmentId: task.adjustment_id ?? null, threadKey }
+        );
+
+        if (newRecipient) {
+          const assignedByName = changedByName;
+          await sendToRecipients(
+            [newRecipient],
+            input.actorUserId,
+            eventId,
+            (r) => ({
+              subject: taskAssigned.subject({
+                recipientName: r.name,
+                assignedByName,
+                taskTitle: task.title,
+                taskType: task.task_type,
+                taskFlag: task.task_flag,
+                projectTitle: project.title,
+                projectId: project.id,
+                taskId: task.id,
+              }),
+              html: taskAssigned.html({
+                recipientName: r.name,
+                assignedByName,
+                taskTitle: task.title,
+                taskType: task.task_type,
+                taskFlag: task.task_flag,
+                projectTitle: project.title,
+                projectId: project.id,
+                taskId: task.id,
+                dueDate: project.ideal_delivery_at ? formatDate(project.ideal_delivery_at) : null,
+                deliveryDays: null,
+              }),
+              text: taskAssigned.text({
+                recipientName: r.name,
+                assignedByName,
+                taskTitle: task.title,
+                taskType: task.task_type,
+                taskFlag: task.task_flag,
+                projectTitle: project.title,
+                projectId: project.id,
+                taskId: task.id,
+              }),
+            }),
+            { projectId: input.projectId, adjustmentId: task.adjustment_id ?? null, threadKey }
+          );
+        }
         break;
       }
 

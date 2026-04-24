@@ -19,6 +19,7 @@ jest.mock("@/lib/queries/notificationRecipients", () => ({
   getQuoteInvitee: jest.fn(),
   getQuoteReceivedRecipient: jest.fn(),
   getAcceptedQuoteCollaborator: jest.fn(),
+  getUserNotificationRecipient: jest.fn(),
   getActorName: jest.fn().mockResolvedValue("Daniel Amado"),
 }));
 
@@ -42,6 +43,7 @@ import {
   getQuoteInvitee,
   getQuoteReceivedRecipient,
   getAcceptedQuoteCollaborator,
+  getUserNotificationRecipient,
   getProjectStakeholders,
 } from "@/lib/queries/notificationRecipients";
 import { getProjectById } from "@/lib/queries/projects";
@@ -54,6 +56,7 @@ const mockGetTaskProjectCreator = getTaskProjectCreator as jest.Mock;
 const mockGetQuoteInvitee = getQuoteInvitee as jest.Mock;
 const mockGetQuoteReceivedRecipient = getQuoteReceivedRecipient as jest.Mock;
 const mockGetAcceptedQuoteCollaborator = getAcceptedQuoteCollaborator as jest.Mock;
+const mockGetUserNotificationRecipient = getUserNotificationRecipient as jest.Mock;
 const mockGetProjectStakeholders = getProjectStakeholders as jest.Mock;
 const mockGetProjectById = getProjectById as jest.Mock;
 const mockGetProjectTaskById = getProjectTaskById as jest.Mock;
@@ -63,6 +66,7 @@ const project = { id: 1, title: "Campaña Q2", brand_name: "Acme", client_name: 
 const task = { id: 10, title: "Diseño de banner", task_type: "execution", task_flag: "new", description: null, adjustment_id: null, completed_at: null, delivery_notes: null };
 const assignee = { userId: 5, email: "ana@test.com", name: "Ana García" };
 const creator = { userId: 3, email: "daniel@test.com", name: "Daniel Amado" };
+const previousAssignee = { userId: 4, email: "old@test.com", name: "Responsable Anterior" };
 
 describe("dispatchNotification()", () => {
   beforeEach(() => {
@@ -72,6 +76,11 @@ describe("dispatchNotification()", () => {
     mockGetProjectTaskById.mockResolvedValue(task);
     mockGetTaskAssignee.mockResolvedValue(assignee);
     mockGetTaskProjectCreator.mockResolvedValue(creator);
+    mockGetUserNotificationRecipient.mockImplementation((userId: number) => {
+      if (userId === 4) return Promise.resolve(previousAssignee);
+      if (userId === 5) return Promise.resolve(assignee);
+      return Promise.resolve(null);
+    });
     mockSendEmail.mockResolvedValue({ deliveryId: 1, provider: "gmail" });
     process.env.NEXT_PUBLIC_APP_URL = "https://app.madeincasa.com";
   });
@@ -110,6 +119,47 @@ describe("dispatchNotification()", () => {
     });
 
     expect(mockSendEmail).not.toHaveBeenCalled();
+  });
+
+  it("task.reassigned: notifies previous assignee and new assignee", async () => {
+    await dispatchNotification({
+      eventType: NOTIFICATION_EVENTS.TASK_REASSIGNED,
+      actorUserId: 3,
+      taskId: 10,
+      projectId: 1,
+      previousUserId: 4,
+      newUserId: 5,
+    });
+
+    expect(mockCreateEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ event_type: "task.reassigned", project_id: 1, task_id: 10 })
+    );
+    expect(mockSendEmail).toHaveBeenCalledTimes(2);
+    expect(mockSendEmail).toHaveBeenNthCalledWith(1, expect.objectContaining({
+      message: expect.objectContaining({
+        to: { email: "old@test.com", name: "Responsable Anterior" },
+        subject: expect.stringContaining("Ya no eres responsable"),
+      }),
+      recipientUserId: 4,
+    }));
+    expect(mockSendEmail).toHaveBeenNthCalledWith(2, expect.objectContaining({
+      message: expect.objectContaining({ to: { email: "ana@test.com", name: "Ana García" } }),
+      recipientUserId: 5,
+    }));
+  });
+
+  it("task.reassigned: only notifies previous assignee when task is unassigned", async () => {
+    await dispatchNotification({
+      eventType: NOTIFICATION_EVENTS.TASK_REASSIGNED,
+      actorUserId: 3,
+      taskId: 10,
+      projectId: 1,
+      previousUserId: 4,
+      newUserId: null,
+    });
+
+    expect(mockSendEmail).toHaveBeenCalledTimes(1);
+    expect(mockSendEmail).toHaveBeenCalledWith(expect.objectContaining({ recipientUserId: 4 }));
   });
 
   // ── task.completed ───────────────────────────────────────────────────────

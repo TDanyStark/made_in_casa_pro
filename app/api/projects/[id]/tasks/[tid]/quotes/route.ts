@@ -11,6 +11,7 @@ import {
 import { decrypt } from "@/lib/session";
 import { cookies } from "next/headers";
 import { UserRole } from "@/lib/definitions";
+import { dispatchNotification, NOTIFICATION_EVENTS } from "@/lib/services/notificationEngine";
 
 const inviteSchema = z.object({
   user_id: z.coerce.number().int().positive(),
@@ -84,7 +85,8 @@ export async function POST(request: NextRequest, { params }: Params) {
   if (!roleValidation.isAuthorized) return roleValidation.response;
 
   try {
-    const { tid } = await params;
+    const { id, tid } = await params;
+    const projectId = parseInt(id);
     const taskId = parseInt(tid);
 
     const cookie = (await cookies()).get("session")?.value;
@@ -100,6 +102,14 @@ export async function POST(request: NextRequest, { params }: Params) {
     }
 
     await inviteExternalToQuote(taskId, validation.data.user_id, session.id);
+
+    await dispatchNotification({
+      eventType: NOTIFICATION_EVENTS.QUOTE_REQUESTED,
+      actorUserId: session.id,
+      projectId,
+      taskId,
+      inviteeUserId: validation.data.user_id,
+    });
 
     const invitations = await getTaskQuoteInvitations(taskId);
     return NextResponse.json({ invitations }, { status: 201 });

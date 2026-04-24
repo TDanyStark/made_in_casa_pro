@@ -12,6 +12,7 @@ import { db } from "@/lib/db";
 import { cookies } from "next/headers";
 import { decrypt } from "@/lib/session";
 import { AUTHENTICATED_ROLES, OPERATIONS_ROLES } from "@/lib/role-groups";
+import { dispatchNotification, NOTIFICATION_EVENTS } from "@/lib/services/notificationEngine";
 
 const patchSchema = z.object({
   title: z.string().min(1).optional(),
@@ -87,12 +88,12 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     const updated = await updateProjectTask(taskId, updateData);
     if (!updated) return NextResponse.json({ error: "Tarea no encontrada" }, { status: 404 });
 
+    const cookie = (await cookies()).get("session")?.value;
+    const session = cookie ? await decrypt(cookie) : null;
+    const currentUserId = session?.id ? Number(session.id) : null;
+
     // Handle quoter invitations sync
     if (validation.data.quoter_ids !== undefined) {
-      const cookie = (await cookies()).get("session")?.value;
-      const session = cookie ? await decrypt(cookie) : null;
-      const currentUserId = session?.id ? Number(session.id) : null;
-
       const transaction = await db.transaction("write");
       try {
         await transaction.execute({
@@ -115,6 +116,39 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     // Recalculate progress when status changes
     if (validation.data.status !== undefined) {
       await recalculateProjectProgress(projectId);
+    }
+
+    if (currentUserId) {
+      const assignmentChanged = updated.assigned_user_id !== existingTask.assigned_user_id;
+      if (assignmentChanged && existingTask.assigned_user_id) {
+        await dispatchNotification({
+          eventType: NOTIFICATION_EVENTS.TASK_REASSIGNED,
+          actorUserId: currentUserId,
+          projectId,
+          taskId,
+          previousUserId: existingTask.assigned_user_id,
+          newUserId: updated.assigned_user_id ?? null,
+        });
+      } else if (assignmentChanged && updated.assigned_user_id) {
+        await dispatchNotification({
+          eventType: NOTIFICATION_EVENTS.TASK_ASSIGNED,
+          actorUserId: currentUserId,
+          projectId,
+          taskId,
+        });
+      }
+
+      if (validation.data.quoter_ids !== undefined) {
+        for (const quoterId of validation.data.quoter_ids) {
+          await dispatchNotification({
+            eventType: NOTIFICATION_EVENTS.QUOTE_REQUESTED,
+            actorUserId: currentUserId,
+            projectId,
+            taskId,
+            inviteeUserId: quoterId,
+          });
+        }
+      }
     }
 
     return NextResponse.json(updated);

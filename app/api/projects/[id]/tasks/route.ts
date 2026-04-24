@@ -7,6 +7,7 @@ import { db } from "@/lib/db";
 import { cookies } from "next/headers";
 import { decrypt } from "@/lib/session";
 import { AUTHENTICATED_ROLES, OPERATIONS_ROLES } from "@/lib/role-groups";
+import { dispatchNotification, NOTIFICATION_EVENTS } from "@/lib/services/notificationEngine";
 
 const taskSchema = z.object({
   title: z.string().min(1, "El título es requerido"),
@@ -167,6 +168,28 @@ export async function POST(request: NextRequest, { params }: Params) {
     }
 
     await recalculateProjectProgress(projectId);
+
+    if (currentUserId) {
+      if (task.assigned_user_id) {
+        await dispatchNotification({
+          eventType: NOTIFICATION_EVENTS.TASK_ASSIGNED,
+          actorUserId: currentUserId,
+          projectId,
+          taskId: task.id,
+        });
+      }
+
+      for (const quoterId of validation.data.quoter_ids) {
+        await dispatchNotification({
+          eventType: NOTIFICATION_EVENTS.QUOTE_REQUESTED,
+          actorUserId: currentUserId,
+          projectId,
+          taskId: task.id,
+          inviteeUserId: quoterId,
+        });
+      }
+    }
+
     return NextResponse.json(task, { status: 201 });
   } catch (error) {
     console.error("Error creating project task:", error);

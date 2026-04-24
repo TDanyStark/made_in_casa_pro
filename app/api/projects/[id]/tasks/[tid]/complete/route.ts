@@ -6,6 +6,7 @@ import { recalculateProjectProgress } from "@/lib/queries/projects";
 import { decrypt } from "@/lib/session";
 import { cookies } from "next/headers";
 import { AUTHENTICATED_ROLES, TASK_OVERRIDE_ROLES } from "@/lib/role-groups";
+import { dispatchNotification, NOTIFICATION_EVENTS } from "@/lib/services/notificationEngine";
 
 const bodySchema = z.object({
   notes: z.string().optional().nullable(),
@@ -73,6 +74,13 @@ export async function POST(request: NextRequest, { params }: Params) {
       completion_cost: body.completion_cost,
     });
     await recalculateProjectProgress(projectId);
+
+    await dispatchNotification({
+      eventType: NOTIFICATION_EVENTS.TASK_COMPLETED,
+      actorUserId: userId,
+      projectId,
+      taskId,
+    });
 
     return NextResponse.json({
       task: result.task,

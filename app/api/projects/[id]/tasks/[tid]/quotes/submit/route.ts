@@ -5,6 +5,7 @@ import { AUTHENTICATED_ROLES } from "@/lib/role-groups";
 import { submitQuote } from "@/lib/queries/taskQuotes";
 import { decrypt } from "@/lib/session";
 import { cookies } from "next/headers";
+import { dispatchNotification, NOTIFICATION_EVENTS } from "@/lib/services/notificationEngine";
 
 const bodySchema = QuoteSubmissionSchema;
 
@@ -23,7 +24,8 @@ export async function POST(request: NextRequest, { params }: Params) {
   if (!roleValidation.isAuthorized) return roleValidation.response;
 
   try {
-    const { tid } = await params;
+    const { id, tid } = await params;
+    const projectId = parseInt(id);
     const taskId = parseInt(tid);
 
     const cookie = (await cookies()).get("session")?.value;
@@ -42,6 +44,16 @@ export async function POST(request: NextRequest, { params }: Params) {
       task_id: taskId,
       user_id: session.id,
       ...validation.data,
+    });
+
+    await dispatchNotification({
+      eventType: NOTIFICATION_EVENTS.QUOTE_RECEIVED,
+      actorUserId: session.id,
+      projectId,
+      taskId,
+      price: quote.price ?? validation.data.price ?? 0,
+      deliveryDays: quote.delivery_days ?? validation.data.delivery_days ?? 0,
+      notes: quote.notes ?? validation.data.notes ?? null,
     });
 
     return NextResponse.json(quote, { status: 201 });

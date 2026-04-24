@@ -472,6 +472,8 @@ project:15:version:v2
 
 ## Fase 8: Integracion con flujos existentes
 
+Estado: implementada.
+
 ### Objetivo
 
 Disparar notificaciones en acciones importantes.

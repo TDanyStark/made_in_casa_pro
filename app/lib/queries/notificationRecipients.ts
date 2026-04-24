@@ -69,6 +69,23 @@ export async function getTaskAssignee(
   return result.rows[0] as unknown as NotificationRecipient;
 }
 
+export async function getUserNotificationRecipient(
+  userId: number
+): Promise<NotificationRecipient | null> {
+  const result = await db.execute({
+    sql: `
+      SELECT id AS "userId", email, name
+      FROM users
+      WHERE id = $1
+        AND email IS NOT NULL
+        AND is_active = 1
+    `,
+    args: [userId],
+  });
+  if (result.rows.length === 0) return null;
+  return result.rows[0] as unknown as NotificationRecipient;
+}
+
 /**
  * Devuelve el creador del proyecto al que pertenece la tarea.
  * Usado para: task.completed (avisa al creador)

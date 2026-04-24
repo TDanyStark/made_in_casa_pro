@@ -10,6 +10,7 @@ import { decrypt } from "@/lib/session";
 import { cookies } from "next/headers";
 import { db } from "@/lib/db";
 import { AUTHENTICATED_ROLES, OPERATIONS_ROLES } from "@/lib/role-groups";
+import { dispatchNotification, NOTIFICATION_EVENTS } from "@/lib/services/notificationEngine";
 
 // Task template row type
 interface TaskTemplateRow {
@@ -170,6 +171,12 @@ export async function POST(
       taskList = tplTasks;
     }
 
+    const createdNotifications: Array<{
+      taskId: number;
+      assignedTo: number | null;
+      quoterIds: number[];
+    }> = [];
+
     if (taskList.length > 0) {
       const transaction = await db.transaction("write");
       try {
@@ -225,6 +232,11 @@ export async function POST(
           });
 
           const taskId = Number(insertResult.rows[0]?.id);
+          createdNotifications.push({
+            taskId,
+            assignedTo,
+            quoterIds: t.quoter_ids ?? [],
+          });
 
           // Insert invitations
           if (t.quoter_ids && t.quoter_ids.length > 0) {
@@ -253,6 +265,39 @@ export async function POST(
     }
 
     await recalculateProjectProgress(projectId);
+
+    if (currentUserId) {
+      await dispatchNotification({
+        eventType: NOTIFICATION_EVENTS.PROJECT_ADJUSTMENT_CREATED,
+        actorUserId: currentUserId,
+        projectId,
+        adjustmentId: adjustment.id,
+        versionNumber: adjustment.version_number,
+        notes: adjustment.notes,
+        taskCount: createdNotifications.length,
+      });
+
+      for (const created of createdNotifications) {
+        if (created.assignedTo) {
+          await dispatchNotification({
+            eventType: NOTIFICATION_EVENTS.TASK_ASSIGNED,
+            actorUserId: currentUserId,
+            projectId,
+            taskId: created.taskId,
+          });
+        }
+
+        for (const quoterId of created.quoterIds) {
+          await dispatchNotification({
+            eventType: NOTIFICATION_EVENTS.QUOTE_REQUESTED,
+            actorUserId: currentUserId,
+            projectId,
+            taskId: created.taskId,
+            inviteeUserId: quoterId,
+          });
+        }
+      }
+    }
 
     return NextResponse.json(adjustment, { status: 201 });
   } catch (error) {

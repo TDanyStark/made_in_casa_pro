@@ -3,9 +3,11 @@ import { z } from "zod";
 import { validateApiRole, validateHttpMethod } from "@/lib/services/api-auth";
 import { OPERATIONS_ROLES } from "@/lib/role-groups";
 import { acceptQuote, rejectQuote } from "@/lib/queries/taskQuotes";
+import { getTaskQuotes } from "@/lib/queries/taskQuotes";
 import { recalculateProjectProgress } from "@/lib/queries/projects";
 import { decrypt } from "@/lib/session";
 import { cookies } from "next/headers";
+import { dispatchNotification, NOTIFICATION_EVENTS } from "@/lib/services/notificationEngine";
 
 const bodySchema = z.object({
   action: z.enum(["accept", "reject"]),
@@ -28,8 +30,9 @@ export async function PATCH(request: NextRequest, { params }: Params) {
   if (!roleValidation.isAuthorized) return roleValidation.response;
 
   try {
-    const { id, qid } = await params;
+    const { id, tid, qid } = await params;
     const projectId = parseInt(id);
+    const taskId = parseInt(tid);
     const quoteId = parseInt(qid);
 
     const cookie = (await cookies()).get("session")?.value;
@@ -45,8 +48,20 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     }
 
     if (validation.data.action === "accept") {
+      const quote = (await getTaskQuotes(taskId)).find((q) => q.id === quoteId);
       await acceptQuote(quoteId, session.id);
       await recalculateProjectProgress(projectId);
+      await dispatchNotification({
+        eventType: NOTIFICATION_EVENTS.QUOTE_ACCEPTED,
+        actorUserId: session.id,
+        projectId,
+        taskId,
+        quoteId,
+        metadata: {
+          price: quote?.price ?? 0,
+          delivery_days: quote?.delivery_days ?? 0,
+        },
+      });
       return NextResponse.json({ success: true, action: "accepted" });
     } else {
       await rejectQuote(quoteId);

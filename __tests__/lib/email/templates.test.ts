@@ -3,6 +3,7 @@
  */
 
 import { taskAssigned } from "@/lib/email/templates/taskAssigned";
+import { taskReassigned } from "@/lib/email/templates/taskReassigned";
 import { taskCompleted } from "@/lib/email/templates/taskCompleted";
 import { quoteRequested } from "@/lib/email/templates/quoteRequested";
 import { quoteReceived } from "@/lib/email/templates/quoteReceived";
@@ -76,6 +77,39 @@ describe("taskAssigned template", () => {
     expect(text).toContain("Diseño de banner");
     expect(text).toContain("Campaña Q2");
     expect(text).toContain("https://app.madeincasa.com/projects/15");
+  });
+});
+
+// ── taskReassigned ─────────────────────────────────────────────────────────
+
+describe("taskReassigned template", () => {
+  const ctx = {
+    recipientName: "Ana García",
+    changedByName: "Daniel Amado",
+    taskTitle: "Diseño de banner",
+    projectTitle: "Campaña Q2",
+    projectId: 15,
+    taskId: 3,
+    newAssigneeName: "Luis Pérez",
+  };
+
+  it("subject tells previous assignee they are no longer responsible", () => {
+    const subject = taskReassigned.subject(ctx);
+    expect(subject).toContain("Ya no eres responsable");
+    expect(subject).toContain("Diseño de banner");
+  });
+
+  it("html includes new assignee and stop-work instruction", () => {
+    const html = taskReassigned.html(ctx);
+    assertValidHtml(html);
+    assertNoUndefined(html);
+    expect(html).toContain("Luis Pérez");
+    expect(html).toContain("No continúes trabajando");
+  });
+
+  it("text includes the new assignee when provided", () => {
+    const text = taskReassigned.text(ctx);
+    expect(text).toContain("Nuevo responsable: Luis Pérez");
   });
 });
 
