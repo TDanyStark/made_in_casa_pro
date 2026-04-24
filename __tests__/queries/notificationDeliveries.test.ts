@@ -12,6 +12,7 @@ import {
   markDeliverySkipped,
   getDeliveriesByEvent,
   getDeliveriesByUser,
+  getDeliveriesByProject,
 } from '@/lib/queries/notificationDeliveries';
 
 const mockExecute = db.execute as jest.MockedFunction<typeof db.execute>;
@@ -146,6 +147,43 @@ describe('getDeliveriesByUser()', () => {
   it('returns empty array on error', async () => {
     mockExecute.mockRejectedValueOnce(new Error('DB error'));
     const result = await getDeliveriesByUser(5);
+    expect(result).toEqual([]);
+  });
+});
+
+describe('getDeliveriesByProject()', () => {
+  it('queries deliveries by project_id ordered DESC', async () => {
+    const rows = [
+      {
+        id: 1, event_id: 10, recipient_user_id: 5, recipient_email: 'to@example.com',
+        sender_user_id: 3, provider: 'gmail', status: 'sent', error: null,
+        gmail_thread_id: null, message_id: null, sent_at: '2026-01-01', created_at: '2026-01-01',
+        retry_count: 0, last_attempt_at: null, event_type: 'task.completed',
+        project_id: 15, project_title: 'Project X', task_id: null, task_title: null,
+        adjustment_id: null, actor_user_id: 3, actor_name: 'Alice',
+      },
+    ];
+    mockExecute.mockResolvedValueOnce(makeResult(rows));
+
+    const result = await getDeliveriesByProject(15);
+    expect(result).toHaveLength(1);
+    expect(mockExecute).toHaveBeenCalledWith(expect.objectContaining({
+      sql: expect.stringContaining('WHERE ne.project_id = $1'),
+      args: [15, 50],
+    }));
+  });
+
+  it('uses custom limit when provided', async () => {
+    mockExecute.mockResolvedValueOnce(makeResult([]));
+    await getDeliveriesByProject(15, 20);
+    expect(mockExecute).toHaveBeenCalledWith(expect.objectContaining({
+      args: [15, 20],
+    }));
+  });
+
+  it('returns empty array on DB error', async () => {
+    mockExecute.mockRejectedValueOnce(new Error('DB error'));
+    const result = await getDeliveriesByProject(15);
     expect(result).toEqual([]);
   });
 });

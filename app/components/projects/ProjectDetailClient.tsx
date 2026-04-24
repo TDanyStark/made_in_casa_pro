@@ -14,6 +14,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { PROJECT_EDIT_ROLES } from "@/lib/role-groups";
+import { EmailHistoryTable } from "@/components/notifications/EmailHistoryTable";
 
 interface Props {
   projectId: number;
@@ -75,6 +76,9 @@ export function ProjectDetailClient({ projectId, userRole, currentUserId }: Prop
             )}
           </TabsTrigger>
           <TabsTrigger value="info">Información</TabsTrigger>
+          {canEdit && (
+            <TabsTrigger value="notifications">Notificaciones</TabsTrigger>
+          )}
         </TabsList>
 
         <TabsContent value="tasks" className="mt-6">
@@ -116,6 +120,17 @@ export function ProjectDetailClient({ projectId, userRole, currentUserId }: Prop
         <TabsContent value="info" className="mt-6">
           <ProjectInfoTab project={project} canEdit={canEdit && project.status !== 'completed'} />
         </TabsContent>
+
+        {canEdit && (
+          <TabsContent value="notifications" className="mt-6">
+            <div className="space-y-2">
+              <p className="text-sm text-muted-foreground">
+                Historial de emails enviados para este proyecto.
+              </p>
+              <EmailHistoryTable projectId={projectId} />
+            </div>
+          </TabsContent>
+        )}
       </Tabs>
     </div>
   );

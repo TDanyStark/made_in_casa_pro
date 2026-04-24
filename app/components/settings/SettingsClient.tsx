@@ -21,6 +21,7 @@ import {
 } from "@/components/ui/form";
 import { HardDrive, CheckCircle2, XCircle, ExternalLink, Loader2, Settings, Clock } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { GmailStatusCard } from "@/components/settings/GmailStatusCard";
 
 interface SettingsData {
   google_oauth_client_id: string | null;
@@ -319,6 +320,8 @@ export function SettingsClient() {
           </Form>
         </CardContent>
       </Card>
+
+      <GmailStatusCard />
 
       {isAdmin && (
         <Card>

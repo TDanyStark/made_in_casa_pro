@@ -266,6 +266,41 @@ export async function getDeliveryById(
   }
 }
 
+export async function getDeliveriesByProject(
+  projectId: number,
+  limit = 50
+): Promise<NotificationDeliveryDetailType[]> {
+  try {
+    const result = await db.execute({
+      sql: `
+        SELECT
+          nd.id, nd.event_id, nd.recipient_user_id, nd.recipient_email, nd.sender_user_id,
+          nd.provider, nd.status, nd.error, nd.gmail_thread_id, nd.message_id, nd.sent_at,
+          nd.created_at, nd.retry_count, nd.last_attempt_at,
+          ne.event_type,
+          ne.project_id, p.title AS project_title,
+          ne.task_id, pt.title AS task_title,
+          ne.adjustment_id,
+          ne.actor_user_id,
+          u.name AS actor_name
+        FROM notification_deliveries nd
+        JOIN notification_events ne ON ne.id = nd.event_id
+        LEFT JOIN projects p ON p.id = ne.project_id
+        LEFT JOIN project_tasks pt ON pt.id = ne.task_id
+        LEFT JOIN users u ON u.id = ne.actor_user_id
+        WHERE ne.project_id = $1
+        ORDER BY nd.created_at DESC
+        LIMIT $2
+      `,
+      args: [projectId, limit],
+    });
+    return result.rows as unknown as NotificationDeliveryDetailType[];
+  } catch (error) {
+    console.error("Error fetching project deliveries:", error);
+    return [];
+  }
+}
+
 export async function resetDeliveryForRetry(deliveryId: number): Promise<void> {
   try {
     await db.execute({
