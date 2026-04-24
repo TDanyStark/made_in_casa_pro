@@ -14,7 +14,7 @@
 INSERT INTO users (name, email, password, rol_id, area_id, is_internal, is_active, must_change_password)
 VALUES (
   'Admin Sistema',
-  'admin@market-support.com',
+  'info@market-support.com',
   '$2b$10$aEyIpIyBNuZxmLTk0ditj.Lq/ZJW6Zz4vgVcaXcUhwlmE2GtnV2j6',
   (SELECT id FROM roles WHERE role = 'admin'),
   NULL,

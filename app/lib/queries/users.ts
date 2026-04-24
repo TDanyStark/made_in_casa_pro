@@ -123,6 +123,10 @@ export async function createUser(name: string, email: string, password: string, 
     });
   } catch (error) {
     console.error('Error al crear el usuario:', error);
+    const msg = error instanceof Error ? error.message : '';
+    if (msg.includes('uq_users_email') || msg.includes('unique') || msg.includes('duplicate')) {
+      throw new Error('Ya existe un usuario con ese correo electrónico');
+    }
     throw new Error('No se pudo crear el usuario');
   }
 }
