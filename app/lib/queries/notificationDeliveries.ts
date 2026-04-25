@@ -31,6 +31,38 @@ export type NotificationDeliveryDetailType = NotificationDeliveryType & {
   actor_name: string | null;
 };
 
+/**
+ * Maximum number of send attempts allowed before a delivery is considered permanently failed.
+ */
+export const MAX_RETRY_COUNT = 3;
+
+/**
+ * Returns the number of non-skipped deliveries already recorded for a given
+ * (event_id, recipient_email) pair. Used to enforce idempotency — prevents
+ * sending the same notification twice if dispatchNotification is called more
+ * than once for the same event.
+ */
+export async function getDeliveryCountByEventAndRecipient(
+  eventId: number,
+  recipientEmail: string
+): Promise<number> {
+  try {
+    const result = await db.execute({
+      sql: `
+        SELECT COUNT(*) AS cnt
+        FROM notification_deliveries
+        WHERE event_id = $1 AND recipient_email = $2 AND status != 'skipped'
+      `,
+      args: [eventId, recipientEmail],
+    });
+    const row = result.rows[0] as unknown as { cnt: number | string };
+    return Number(row?.cnt ?? 0);
+  } catch (error) {
+    console.error("Error checking delivery idempotency:", error);
+    return 0;
+  }
+}
+
 export async function createNotificationDelivery(data: {
   event_id: number;
   recipient_user_id?: number | null;

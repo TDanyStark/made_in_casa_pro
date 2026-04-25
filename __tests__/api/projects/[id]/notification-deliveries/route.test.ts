@@ -60,16 +60,17 @@ describe("GET /api/projects/[id]/notification-deliveries", () => {
     mockGetDeliveriesByProject.mockResolvedValue(deliveries as never);
 
     const res = await callGet("7");
-    const body = await res.json();
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+    const body = await res!.json();
 
-    expect(res.status).toBe(200);
+    expect(res!.status).toBe(200);
     expect(body).toEqual({ data: deliveries });
     expect(mockGetDeliveriesByProject).toHaveBeenCalledWith(7, 50);
   });
 
   it("returns 400 for non-numeric project id", async () => {
     const res = await callGet("abc");
-    expect(res.status).toBe(400);
+    expect(res!.status).toBe(400);
   });
 
   it("respects custom limit (max 200)", async () => {
@@ -84,12 +85,12 @@ describe("GET /api/projects/[id]/notification-deliveries", () => {
   it("returns 403 when not authorized", async () => {
     mockValidateApiRole.mockResolvedValue(FORBIDDEN);
     const res = await callGet("7");
-    expect(res.status).toBe(403);
+    expect(res!.status).toBe(403);
   });
 
   it("returns 500 on unexpected DB error", async () => {
     mockGetDeliveriesByProject.mockRejectedValue(new Error("DB error"));
     const res = await callGet("7");
-    expect(res.status).toBe(500);
+    expect(res!.status).toBe(500);
   });
 });

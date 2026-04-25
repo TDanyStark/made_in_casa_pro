@@ -22,6 +22,7 @@ import {
 import { HardDrive, CheckCircle2, XCircle, ExternalLink, Loader2, Settings, Clock } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { GmailStatusCard } from "@/components/settings/GmailStatusCard";
+import { FailedDeliveriesPanel } from "@/components/notifications/FailedDeliveriesPanel";
 
 interface SettingsData {
   google_oauth_client_id: string | null;
@@ -322,6 +323,8 @@ export function SettingsClient() {
       </Card>
 
       <GmailStatusCard />
+
+      {isAdmin && <FailedDeliveriesPanel />}
 
       {isAdmin && (
         <Card>

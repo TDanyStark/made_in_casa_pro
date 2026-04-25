@@ -13,6 +13,9 @@ import {
   getDeliveriesByEvent,
   getDeliveriesByUser,
   getDeliveriesByProject,
+  getDeliveryCountByEventAndRecipient,
+  resetDeliveryForRetry,
+  MAX_RETRY_COUNT,
 } from '@/lib/queries/notificationDeliveries';
 
 const mockExecute = db.execute as jest.MockedFunction<typeof db.execute>;
@@ -185,5 +188,67 @@ describe('getDeliveriesByProject()', () => {
     mockExecute.mockRejectedValueOnce(new Error('DB error'));
     const result = await getDeliveriesByProject(15);
     expect(result).toEqual([]);
+  });
+});
+
+describe('getDeliveryCountByEventAndRecipient() — idempotency', () => {
+  it('returns count of non-skipped deliveries for the event+recipient pair', async () => {
+    mockExecute.mockResolvedValueOnce(makeResult([{ cnt: 1 }]));
+    const count = await getDeliveryCountByEventAndRecipient(10, 'to@example.com');
+    expect(count).toBe(1);
+    expect(mockExecute).toHaveBeenCalledWith(expect.objectContaining({
+      sql: expect.stringContaining("WHERE event_id = $1 AND recipient_email = $2"),
+      args: [10, 'to@example.com'],
+    }));
+  });
+
+  it('returns 0 when no deliveries exist', async () => {
+    mockExecute.mockResolvedValueOnce(makeResult([{ cnt: 0 }]));
+    const count = await getDeliveryCountByEventAndRecipient(99, 'nobody@test.com');
+    expect(count).toBe(0);
+  });
+
+  it('returns 0 on DB error (safe fallback)', async () => {
+    mockExecute.mockRejectedValueOnce(new Error('DB error'));
+    const count = await getDeliveryCountByEventAndRecipient(10, 'to@example.com');
+    expect(count).toBe(0);
+  });
+
+  it('excludes skipped deliveries from count', async () => {
+    mockExecute.mockResolvedValueOnce(makeResult([{ cnt: 0 }]));
+    await getDeliveryCountByEventAndRecipient(10, 'to@example.com');
+    expect(mockExecute).toHaveBeenCalledWith(expect.objectContaining({
+      sql: expect.stringContaining("status != 'skipped'"),
+    }));
+  });
+});
+
+describe('resetDeliveryForRetry()', () => {
+  it('resets status to pending and clears error for a failed delivery', async () => {
+    mockExecute.mockResolvedValueOnce(makeResult([]));
+    await resetDeliveryForRetry(42);
+    expect(mockExecute).toHaveBeenCalledWith(expect.objectContaining({
+      sql: expect.stringContaining("SET status = 'pending'"),
+      args: [42],
+    }));
+  });
+
+  it('only resets if status is failed', async () => {
+    mockExecute.mockResolvedValueOnce(makeResult([]));
+    await resetDeliveryForRetry(42);
+    expect(mockExecute).toHaveBeenCalledWith(expect.objectContaining({
+      sql: expect.stringContaining("AND status = 'failed'"),
+    }));
+  });
+
+  it('throws on DB error', async () => {
+    mockExecute.mockRejectedValueOnce(new Error('DB error'));
+    await expect(resetDeliveryForRetry(42)).rejects.toThrow('DB error');
+  });
+});
+
+describe('MAX_RETRY_COUNT constant', () => {
+  it('is defined and equals 3', () => {
+    expect(MAX_RETRY_COUNT).toBe(3);
   });
 });

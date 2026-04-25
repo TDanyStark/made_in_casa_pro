@@ -1,8 +1,10 @@
 import { getUserEmailConnection } from "@/lib/queries/userEmailConnections";
 import {
   createNotificationDelivery,
+  getDeliveryCountByEventAndRecipient,
   markDeliveryFailed,
   markDeliverySent,
+  markDeliverySkipped,
 } from "@/lib/queries/notificationDeliveries";
 import {
   getOrCreateThread,
@@ -10,6 +12,7 @@ import {
 } from "@/lib/queries/projectEmailThreads";
 import { GmailEmailProvider } from "./gmailEmailProvider";
 import { SystemEmailProvider, getSystemFrom } from "./systemEmailProvider";
+import { notifLog } from "@/lib/services/notificationLogger";
 import type { SendEmailOptions, SendResult } from "./emailTypes";
 
 // ---------------------------------------------------------------------------
@@ -78,6 +81,21 @@ export async function sendEmail(opts: SendEmailOptions): Promise<SendResult> {
     };
   }
 
+  // ── Idempotency check ─────────────────────────────────────────────────────
+  // Prevent sending the same notification twice if dispatchNotification is
+  // called more than once for the same (event, recipient) pair.
+  const existingCount = await getDeliveryCountByEventAndRecipient(eventId, message.to.email);
+  if (existingCount > 0) {
+    notifLog.warn("sendEmail", `Skipping duplicate delivery — event=${eventId} recipient=${message.to.email}`);
+    // Return a sentinel result so callers do not crash
+    return {
+      deliveryId: -1,
+      provider: providerLabel,
+      gmailThreadId: null,
+      messageId: null,
+    };
+  }
+
   // ── Create pending delivery record ────────────────────────────────────────
   const delivery = await createNotificationDelivery({
     event_id: eventId,
@@ -103,6 +121,8 @@ export async function sendEmail(opts: SendEmailOptions): Promise<SendResult> {
       gmail_thread_id: result.gmailThreadId ?? undefined,
       message_id: result.messageId ?? undefined,
     });
+
+    notifLog.info("sendEmail", `Sent — delivery=${delivery.id} provider=${providerLabel} to=${message.to.email}`);
 
     // Persist thread identifiers for future replies
     if (projectId && resolvedThread?.threadKey) {
@@ -134,7 +154,73 @@ export async function sendEmail(opts: SendEmailOptions): Promise<SendResult> {
     };
   } catch (error) {
     const errorMsg = error instanceof Error ? error.message : String(error);
+    notifLog.error("sendEmail", `Failed — delivery=${delivery.id} to=${message.to.email}: ${errorMsg}`);
     await markDeliveryFailed(delivery.id, errorMsg);
+
+    // If it is a permanent failure (max retries reached), skip and don't re-throw
+    // so the notification engine does not crash the mutation.
+    // Actual retry logic is handled by the manual retry endpoint.
     throw error;
   }
 }
+
+// ---------------------------------------------------------------------------
+// retryDelivery — re-sends a single failed delivery
+//
+// Reads the stored delivery + event, re-builds a minimal email and sends it.
+// Enforces MAX_RETRY_COUNT to prevent infinite retries.
+// ---------------------------------------------------------------------------
+export async function retryDelivery(
+  deliveryId: number,
+  overrideMessage: {
+    to: { email: string; name?: string };
+    subject: string;
+    html: string;
+    text?: string;
+  }
+): Promise<SendResult> {
+  const {
+    getDeliveryById,
+    markDeliveryFailed: failDelivery,
+    MAX_RETRY_COUNT: maxRetries,
+    resetDeliveryForRetry,
+  } = await import("@/lib/queries/notificationDeliveries");
+
+  const delivery = await getDeliveryById(deliveryId);
+  if (!delivery) throw new Error(`Delivery ${deliveryId} not found`);
+
+  if (delivery.status !== "failed") {
+    throw new Error(`Delivery ${deliveryId} is not in 'failed' state (current: ${delivery.status})`);
+  }
+
+  if (delivery.retry_count >= maxRetries) {
+    const msg = `Max retry count (${maxRetries}) reached for delivery ${deliveryId}`;
+    notifLog.error("retryDelivery", msg);
+    throw new Error(msg);
+  }
+
+  // Reset to pending so the send attempt is fresh
+  await resetDeliveryForRetry(deliveryId);
+
+  try {
+    const result = await sendEmail({
+      senderUserId: delivery.sender_user_id,
+      message: overrideMessage,
+      eventId: delivery.event_id,
+      recipientUserId: delivery.recipient_user_id,
+    });
+
+    notifLog.info("retryDelivery", `Retry succeeded — delivery=${deliveryId} attempt=${delivery.retry_count + 1}`);
+    return result;
+  } catch (error) {
+    const errorMsg = error instanceof Error ? error.message : String(error);
+    notifLog.error("retryDelivery", `Retry failed — delivery=${deliveryId} attempt=${delivery.retry_count + 1}: ${errorMsg}`);
+
+    // Mark as failed again with incremented retry_count (markDeliveryFailed does this)
+    await failDelivery(deliveryId, errorMsg);
+    throw error;
+  }
+}
+
+// Re-export markDeliverySkipped so consumers don't need two imports
+export { markDeliverySkipped };

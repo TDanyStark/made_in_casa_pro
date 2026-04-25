@@ -18,6 +18,7 @@
 // ---------------------------------------------------------------------------
 
 import { createNotificationEvent } from "@/lib/queries/notificationEvents";
+import { notifLog } from "@/lib/services/notificationLogger";
 import { resolveProjectVersionThreadKey } from "@/lib/queries/projectEmailThreads";
 import {
   getProjectStakeholders,
@@ -513,6 +514,7 @@ export async function dispatchNotification(input: DispatchInput): Promise<void> 
     }
   } catch (error) {
     // El motor no rompe la mutación principal — solo registra el error
-    console.error(`[notificationEngine] Error dispatching ${input.eventType}:`, error);
+    const msg = error instanceof Error ? error.message : String(error);
+    notifLog.error("engine", `Error dispatching ${input.eventType}: ${msg}`);
   }
 }

@@ -250,6 +250,48 @@
 
 ---
 
+### 1️⃣2️⃣ Sistema de NOTIFICACIONES por Email
+
+**¿Qué se puede hacer?**
+- ✅ Conectar, reconectar y desconectar Gmail personal por usuario
+- ✅ Ver estado de conexión Gmail en la página de Configuración
+- ✅ Bloqueo de la app si Gmail no está conectado (configurable con `REQUIRE_GMAIL_CONNECTION`)
+- ✅ Envio automático de emails en eventos importantes del proyecto:
+  - Tarea asignada, completada
+  - Cotización solicitada, recibida, aceptada
+  - Ajuste de proyecto creado
+  - Proyecto completado
+- ✅ Cada versión/ajuste de proyecto mantiene su propio hilo de email
+- ✅ Registro de todos los intentos de envío con estado (`sent`, `failed`, `skipped`, `pending`)
+- ✅ Historial de emails enviados visible por proyecto (pestaña "Notificaciones")
+- ✅ Panel de emails fallidos con botón de reintento (admin, Settings)
+- ✅ Idempotencia: no se envía el mismo email dos veces para el mismo evento+destinatario
+- ✅ Reintentos manuales con límite máximo (3 intentos), sin reenvíos infinitos
+- ✅ Logging estructurado de errores (`[notif:scope]`) para diagnóstico en producción
+
+**Permisos:**
+- Conectar/ver estado Gmail: Todos los usuarios autenticados
+- Ver historial por proyecto: ADMIN, COMERCIAL, DIRECTIVO, FINANCIERO
+- Ver historial global reciente: Solo ADMIN
+
+**Configuración requerida:**
+```env
+REQUIRE_GMAIL_CONNECTION=true      # habilitar bloqueo por Gmail
+GOOGLE_CLIENT_ID=...               # para OAuth de Gmail por usuario
+GOOGLE_CLIENT_SECRET=...
+```
+
+**Endpoints API:**
+- `GET /api/user-email/status` - Estado de conexión Gmail del usuario actual
+- `GET /api/user-email/google` - Iniciar flujo OAuth Gmail
+- `GET /api/user-email/google/callback` - Callback OAuth Google
+- `POST /api/user-email/google/disconnect` - Desconectar Gmail
+- `GET /api/projects/[id]/notification-deliveries` - Historial de emails del proyecto
+- `GET /api/notification-deliveries` - Historial global reciente (admin)
+- `POST /api/notification-deliveries/[id]/retry` - Reintentar un email fallido (admin, máx. 3 intentos)
+
+---
+
 ## 🔒 Seguridad Implementada
 
 - ✅ **Autenticación JWT** con encriptación usando jose

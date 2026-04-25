@@ -55,9 +55,10 @@ describe("GET /api/notification-deliveries", () => {
     mockGetRecentDeliveries.mockResolvedValue(deliveries as never);
 
     const res = await GET(makeRequest());
-    const body = await res.json();
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+    const body = await res!.json();
 
-    expect(res.status).toBe(200);
+    expect(res!.status).toBe(200);
     expect(body).toEqual({ data: deliveries });
     expect(mockGetRecentDeliveries).toHaveBeenCalledWith(50);
   });
@@ -72,12 +73,12 @@ describe("GET /api/notification-deliveries", () => {
   it("returns 403 when role is not admin", async () => {
     mockValidateApiRole.mockResolvedValue(FORBIDDEN_ROLE);
     const res = await GET(makeRequest());
-    expect(res.status).toBe(403);
+    expect(res!.status).toBe(403);
   });
 
   it("returns 500 on unexpected error", async () => {
     mockGetRecentDeliveries.mockRejectedValue(new Error("DB error"));
     const res = await GET(makeRequest());
-    expect(res.status).toBe(500);
+    expect(res!.status).toBe(500);
   });
 });

@@ -42,6 +42,26 @@ export async function createNotificationEvent(data: {
   }
 }
 
+export async function getNotificationEventById(
+  eventId: number
+): Promise<NotificationEventType | null> {
+  try {
+    const result = await db.execute({
+      sql: `
+        SELECT id, event_type, project_id, task_id, adjustment_id, actor_user_id, metadata, created_at
+        FROM notification_events
+        WHERE id = $1
+      `,
+      args: [eventId],
+    });
+    if (result.rows.length === 0) return null;
+    return result.rows[0] as unknown as NotificationEventType;
+  } catch (error) {
+    console.error("Error fetching notification event by id:", error);
+    return null;
+  }
+}
+
 export async function getNotificationEventsByProject(
   projectId: number,
   limit = 50

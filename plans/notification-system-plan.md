@@ -506,6 +506,8 @@ No deben romper datos ya guardados salvo cuando Gmail sea obligatorio para compl
 
 ## Fase 9: UI de estado e historial
 
+Estado: implementada.
+
 ### Objetivo
 
 Dar visibilidad minima al usuario sobre su conexion Gmail y los correos enviados.
@@ -529,11 +531,35 @@ Agregar en proyecto/tarea, si aplica:
 
 ### Validaciones
 
-- Test de render de estado conectado.
-- Test de render de estado invalido.
-- Test de boton reconectar.
+- [x] Test de render de estado conectado.
+- [x] Test de render de estado invalido.
+- [x] Test de boton reconectar.
+
+## Fase 9: COMPLETADA ✅
+
+**Fecha:** 2026-04-24
+
+**Archivos creados:**
+- `app/lib/queries/notificationDeliveries.ts` — agregada `getDeliveriesByProject()`
+- `app/api/notification-deliveries/route.ts` — GET historial reciente (solo admin)
+- `app/api/projects/[id]/notification-deliveries/route.ts` — GET historial por proyecto
+- `app/components/settings/GmailStatusCard.tsx` — card con estado Gmail + conectar/desconectar/reconectar
+- `app/components/notifications/EmailHistoryTable.tsx` — tabla reutilizable de historial de emails
+- `app/components/settings/SettingsClient.tsx` — agregada `<GmailStatusCard />`
+- `app/components/projects/ProjectDetailClient.tsx` — agregada pestaña "Notificaciones"
+- `__tests__/api/notification-deliveries/route.test.ts`
+- `__tests__/api/projects/[id]/notification-deliveries/route.test.ts`
+- `__tests__/queries/notificationDeliveries.test.ts` — agregados tests de `getDeliveriesByProject()`
+
+**Decisiones:**
+- `GmailStatusCard` es un componente standalone que se agrega a la página de Settings.
+- `EmailHistoryTable` acepta `projectId` opcional; sin él, llama al endpoint global (admin only).
+- La pestaña "Notificaciones" en proyectos solo es visible para roles con permiso de edición.
+- Límite máximo de 200 registros por request para evitar payloads excesivos.
 
 ## Fase 10: Robustez y monitoreo
+
+Estado: implementada.
 
 ### Objetivo
 
@@ -549,9 +575,35 @@ Mejorar confiabilidad antes de considerar el sistema completo.
 
 ### Validaciones
 
-- Test de idempotencia.
-- Test de reintento.
-- Test de error permanente.
+- [x] Test de idempotencia.
+- [x] Test de reintento.
+- [x] Test de error permanente.
+
+## Fase 10: COMPLETADA ✅
+
+**Fecha:** 2026-04-24
+
+**Archivos creados:**
+- `app/lib/services/notificationLogger.ts` — logging estructurado con prefijo `[notif:scope]`
+- `app/api/notification-deliveries/[id]/retry/route.ts` — POST reintento de delivery fallido (solo admin)
+- `app/components/notifications/FailedDeliveriesPanel.tsx` — panel admin con tabla de emails fallidos + botón reintentar
+- `__tests__/api/notification-deliveries/[id]/retry/route.test.ts`
+
+**Archivos modificados:**
+- `app/lib/queries/notificationDeliveries.ts` — agregados `MAX_RETRY_COUNT`, `getDeliveryCountByEventAndRecipient()`
+- `app/lib/queries/notificationEvents.ts` — agregado `getNotificationEventById()`
+- `app/lib/services/email/emailService.ts` — idempotencia pre-send + logging + re-export `markDeliverySkipped`
+- `app/lib/services/notificationEngine.ts` — logging de errores con `notifLog`
+- `app/components/settings/SettingsClient.tsx` — `<FailedDeliveriesPanel />` para admins
+- `__tests__/queries/notificationDeliveries.test.ts` — tests de idempotencia y reset
+- `__tests__/queries/notificationEvents.test.ts` — tests de `getNotificationEventById`
+
+**Decisiones:**
+- Idempotencia: `sendEmail` verifica si ya existe un delivery no-skipped para `(event_id, recipient_email)` antes de crear uno nuevo.
+- Reintento: el endpoint resetea a `pending` y re-despacha vía `dispatchNotification` (crea nuevo event row para auditoría completa).
+- Límite de reintentos: `MAX_RETRY_COUNT = 3`, el endpoint devuelve 422 si se supera.
+- Token inválido: ya manejado en `GmailEmailProvider` desde Fase 4 — auto-marca `invalid` en la conexión.
+- Logging: todas las líneas usan formato `[notif:scope] LEVEL: mensaje` para grep en producción.
 
 ## Orden recomendado de ejecucion
 

@@ -9,6 +9,7 @@ import {
   createNotificationEvent,
   getNotificationEventsByProject,
   getNotificationEventsByTask,
+  getNotificationEventById,
 } from '@/lib/queries/notificationEvents';
 
 const mockExecute = db.execute as jest.MockedFunction<typeof db.execute>;
@@ -128,5 +129,42 @@ describe('getNotificationEventsByTask()', () => {
     mockExecute.mockRejectedValueOnce(new Error('DB error'));
     const result = await getNotificationEventsByTask(5);
     expect(result).toEqual([]);
+  });
+});
+
+describe('getNotificationEventById()', () => {
+  const eventRow = {
+    id: 10,
+    event_type: 'task.assigned',
+    project_id: 7,
+    task_id: 9,
+    adjustment_id: null,
+    actor_user_id: 3,
+    metadata: null,
+    created_at: '2026-01-01',
+  };
+
+  it('returns the event when found', async () => {
+    mockExecute.mockResolvedValueOnce(makeResult([eventRow]));
+    const result = await getNotificationEventById(10);
+    expect(result).not.toBeNull();
+    expect(result!.id).toBe(10);
+    expect(result!.event_type).toBe('task.assigned');
+    expect(mockExecute).toHaveBeenCalledWith(expect.objectContaining({
+      sql: expect.stringContaining('WHERE id = $1'),
+      args: [10],
+    }));
+  });
+
+  it('returns null when event is not found', async () => {
+    mockExecute.mockResolvedValueOnce(makeResult([]));
+    const result = await getNotificationEventById(999);
+    expect(result).toBeNull();
+  });
+
+  it('returns null on DB error', async () => {
+    mockExecute.mockRejectedValueOnce(new Error('DB error'));
+    const result = await getNotificationEventById(10);
+    expect(result).toBeNull();
   });
 });
