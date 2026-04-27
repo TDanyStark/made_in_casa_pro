@@ -3,9 +3,9 @@
 
 -- Admin Sistema → Desarrollo web, Creación de apps
 INSERT INTO user_skills (user_id, skill_id)
-VALUES ((SELECT id FROM users WHERE email = 'admin@market-support.com'), (SELECT id FROM skills WHERE name = 'Desarrollo web'));
+VALUES ((SELECT id FROM users WHERE email = 'info@market-support.com'), (SELECT id FROM skills WHERE name = 'Desarrollo web'));
 INSERT INTO user_skills (user_id, skill_id)
-VALUES ((SELECT id FROM users WHERE email = 'admin@market-support.com'), (SELECT id FROM skills WHERE name = 'Creación de apps'));
+VALUES ((SELECT id FROM users WHERE email = 'info@market-support.com'), (SELECT id FROM skills WHERE name = 'Creación de apps'));
 
 -- Sandy Baron (directiva) → Liderazgo, Gestión de proyectos, Comunicación
 INSERT INTO user_skills (user_id, skill_id)
