@@ -4,9 +4,20 @@ import { cookies } from "next/headers";
 import { decrypt, SessionData } from "../session";
 import { getUserConnectedEmailStatus, isGmailConnectionRequired } from "@/lib/queries/userEmailConnections";
 
+/**
+ * Rutas que pueden operar sin Gmail conectado.
+ * Incluye las rutas de conexión OAuth, settings (para que el admin pueda
+ * configurar credenciales), /me (necesario para cargar el rol del usuario
+ * en la UI antes de redirigir), y logout.
+ */
 function canSkipGmailConnection(request: NextRequest) {
   const path = request.nextUrl.pathname;
-  return path.startsWith("/api/user-email/") || path.startsWith("/api/settings");
+  return (
+    path.startsWith("/api/user-email/") ||
+    path.startsWith("/api/settings") ||
+    path === "/api/me" ||
+    path === "/api/auth/logout"
+  );
 }
 
 /**
@@ -71,7 +82,11 @@ export async function validateApiRole(
     };
   }
 
-  if (isGmailConnectionRequired() && !canSkipGmailConnection(request)) {
+  // Admin siempre puede acceder — necesita poder configurar el sistema
+  // incluso cuando Gmail no está conectado.
+  const isAdminRole = userRole === UserRole.ADMIN;
+
+  if (isGmailConnectionRequired() && !canSkipGmailConnection(request) && !isAdminRole) {
     const hasConnectedGmail = await getUserConnectedEmailStatus(session.id);
     if (!hasConnectedGmail) {
       return {
