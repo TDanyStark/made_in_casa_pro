@@ -18,6 +18,20 @@ function stripHtml(html: string): string {
   return html.replace(/<[^>]+>/g, " ").replace(/\s{2,}/g, " ").trim();
 }
 
+/**
+ * Encodes a header value using RFC 2047 encoded-word format (Base64, UTF-8).
+ * Required for any header field (Subject, From display name, etc.) that contains
+ * non-ASCII characters such as accented letters (á, é, ó, ñ) or emoji.
+ *
+ * Output format: =?UTF-8?B?<base64>?=
+ */
+function encodeRfc2047(value: string): string {
+  // If the string is pure ASCII, no encoding is needed
+  if (!/[^\x00-\x7F]/.test(value)) return value;
+  const encoded = Buffer.from(value, "utf8").toString("base64");
+  return `=?UTF-8?B?${encoded}?=`;
+}
+
 function buildRfc822Message({
   from,
   to,
@@ -42,7 +56,7 @@ function buildRfc822Message({
   const lines: string[] = [
     `From: ${from}`,
     `To: ${to}`,
-    `Subject: ${subject}`,
+    `Subject: ${encodeRfc2047(subject)}`,
     `MIME-Version: 1.0`,
     `Content-Type: multipart/alternative; boundary="${boundary}"`,
   ];
