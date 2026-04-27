@@ -2,16 +2,26 @@
 
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { get, post } from "@/lib/services/apiService";
+import { del, get, post } from "@/lib/services/apiService";
 import { ProjectAdjustmentType, UserRole } from "@/lib/definitions";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
-import { Plus, ExternalLink, HardDrive, ChevronDown, ChevronUp } from "lucide-react";
+import { Plus, ExternalLink, HardDrive, ChevronDown, ChevronUp, Trash2 } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { ProjectTasksTab } from "./ProjectTasksTab";
 import { AdjustmentWizard } from "./AdjustmentWizard";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 interface Props {
   projectId: number;
@@ -147,17 +157,36 @@ function VersionAccordion({
   currentUserId?: number;
   currentUserRole: UserRole;
 }) {
+  const queryClient = useQueryClient();
   const [expanded, setExpanded] = useState(isInitiallyExpanded);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const isCompleted = adjustment.status === "completed";
-  // Allow editing the latest version when the project is active/in_adjustments,
-  // even if that adjustment was previously marked completed (e.g. after a manual
-  // status rollback). Older versions are always read-only.
+  const hasNoTasks = (adjustment.task_count ?? 0) === 0;
   const projectIsEditable = projectStatus === "active" || projectStatus === "in_adjustments";
   const versionCanEdit = isLatest && projectIsEditable ? true : !isCompleted;
   const label = adjustment.version_number === 1 ? "Versión 1 (Original)" : `Versión ${adjustment.version_number}`;
 
+  const canDelete = canEdit && !isCompleted && hasNoTasks;
+
+  const handleDelete = async () => {
+    setIsDeleting(true);
+    try {
+      const res = await del(`projects/${projectId}/adjustments/${adjustment.id}`);
+      if (!res.ok) throw new Error(res.error || "Error al eliminar ajuste");
+      toast.success("Versión eliminada correctamente");
+      queryClient.invalidateQueries({ queryKey: ["project-adjustments", projectId], refetchType: "all" });
+      setDeleteDialogOpen(false);
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : "Error al eliminar ajuste");
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   return (
+    <>
     <div className="border rounded-lg bg-card overflow-hidden">
       <div
         className="flex items-center justify-between p-4 cursor-pointer hover:bg-muted/50 transition-colors"
@@ -188,6 +217,19 @@ function VersionAccordion({
                 Drive
                 <ExternalLink className="h-3 w-3 ml-1 opacity-60" />
               </a>
+            </Button>
+          )}
+          {canDelete && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-muted-foreground hover:text-destructive"
+              onClick={e => {
+                e.stopPropagation();
+                setDeleteDialogOpen(true);
+              }}
+            >
+              <Trash2 className="h-4 w-4" />
             </Button>
           )}
           <div className="p-1 text-muted-foreground">
@@ -222,5 +264,23 @@ function VersionAccordion({
         </div>
       )}
     </div>
+
+    <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Eliminar versión</AlertDialogTitle>
+          <AlertDialogDescription>
+            ¿Estás seguro de que deseas eliminar &quot;{label}&quot;? Esta acción no se puede deshacer.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Cancelar</AlertDialogCancel>
+          <AlertDialogAction onClick={handleDelete} disabled={isDeleting}>
+            {isDeleting ? "Eliminando..." : "Eliminar"}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  </>
   );
 }

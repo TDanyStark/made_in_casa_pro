@@ -243,6 +243,7 @@ export type ProjectAdjustmentType = {
   notes: string | null;
   created_at: string;
   completed_at?: string;
+  task_count?: number;
 };
 
 export type ProjectTaskStatus = 'not_started' | 'waiting' | 'in_progress' | 'completed' | 'blocked';

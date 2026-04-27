@@ -6,10 +6,15 @@ export async function getAdjustmentsByProject(projectId: number): Promise<Projec
   try {
     const result = await db.execute({
       sql: `
-        SELECT id, project_id, version_number, drive_folder_id, drive_folder_url, status, notes, created_at, completed_at
-        FROM project_adjustments
-        WHERE project_id = $1
-        ORDER BY version_number ASC
+        SELECT 
+          pa.id, pa.project_id, pa.version_number, pa.drive_folder_id, 
+          pa.drive_folder_url, pa.status, pa.notes, pa.created_at, pa.completed_at,
+          COUNT(pt.id) as task_count
+        FROM project_adjustments pa
+        LEFT JOIN project_tasks pt ON pt.adjustment_id = pa.id
+        WHERE pa.project_id = $1
+        GROUP BY pa.id
+        ORDER BY pa.version_number ASC
       `,
       args: [projectId],
     });
@@ -82,6 +87,44 @@ export async function markAdjustmentAsCompleted(adjustmentId: number, projectId:
   } catch (error) {
     await transaction.rollback();
     console.error("Error completing project adjustment:", error);
+    throw error;
+  }
+}
+
+export async function deleteProjectAdjustment(adjustmentId: number, projectId: number): Promise<void> {
+  const transaction = await db.transaction("write");
+  try {
+    const adjCheck = await transaction.execute({
+      sql: `SELECT status FROM project_adjustments WHERE id = $1`,
+      args: [adjustmentId],
+    });
+    const adjustment = adjCheck.rows[0] as unknown as { status: string } | undefined;
+    if (!adjustment) {
+      throw new Error("Ajuste no encontrado");
+    }
+    if (adjustment.status === "completed") {
+      throw new Error("No se puede eliminar una versión completada.");
+    }
+
+    const taskCheck = await transaction.execute({
+      sql: `SELECT COUNT(*) as count FROM project_tasks WHERE adjustment_id = $1`,
+      args: [adjustmentId],
+    });
+    const taskCount = Number((taskCheck.rows[0] as unknown as { count: number }).count);
+    if (taskCount > 0) {
+      throw new Error("No se puede eliminar un ajuste que tiene tareas. Elimina las tareas primero.");
+    }
+
+    await transaction.execute({
+      sql: `DELETE FROM project_adjustments WHERE id = $1`,
+      args: [adjustmentId],
+    });
+
+    await transaction.commit();
+    revalidatePath(`/projects/${projectId}`);
+  } catch (error) {
+    await transaction.rollback();
+    console.error("Error deleting project adjustment:", error);
     throw error;
   }
 }
