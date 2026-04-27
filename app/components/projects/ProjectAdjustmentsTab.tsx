@@ -163,7 +163,8 @@ function VersionAccordion({
   const [isDeleting, setIsDeleting] = useState(false);
 
   const isCompleted = adjustment.status === "completed";
-  const hasNoTasks = (adjustment.task_count ?? 0) === 0;
+  const taskCount = Number(adjustment.task_count ?? 0);
+  const hasNoTasks = taskCount === 0;
   const projectIsEditable = projectStatus === "active" || projectStatus === "in_adjustments";
   const versionCanEdit = isLatest && projectIsEditable ? true : !isCompleted;
   const label = adjustment.version_number === 1 ? "Versión 1 (Original)" : `Versión ${adjustment.version_number}`;
