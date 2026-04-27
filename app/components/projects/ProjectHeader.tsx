@@ -44,14 +44,15 @@ interface Props {
 
 export function ProjectHeader({ project }: Props) {
   const queryClient = useQueryClient();
-  const [status, setStatus] = useState<ProjectStatus>(project.status);
   const [completing, setCompleting] = useState(false);
 
   const handleStatusChange = async (newStatus: ProjectStatus) => {
     try {
       const res = await patch(`projects/${project.id}`, { status: newStatus });
       if (!res.ok) throw new Error(res.error);
-      setStatus(newStatus);
+      queryClient.setQueryData<ProjectDetailType>(["project", project.id], (current) =>
+        current ? { ...current, status: newStatus } : current
+      );
       queryClient.invalidateQueries({ queryKey: ["project", project.id] });
       queryClient.invalidateQueries({ queryKey: ["projects"] });
       toast.success("Estado actualizado");
@@ -65,8 +66,17 @@ export function ProjectHeader({ project }: Props) {
     try {
       const res = await post(`projects/${project.id}/complete`, {});
       if (!res.ok) throw new Error(res.error);
-      setStatus("completed");
+      queryClient.setQueryData<ProjectDetailType>(["project", project.id], (current) =>
+        current
+          ? {
+              ...current,
+              status: "completed",
+              completed_at: current.completed_at ?? new Date().toISOString(),
+            }
+          : current
+      );
       queryClient.invalidateQueries({ queryKey: ["project", project.id] });
+      queryClient.invalidateQueries({ queryKey: ["project-adjustments", project.id] });
       queryClient.invalidateQueries({ queryKey: ["projects"] });
       toast.success("Proyecto completado");
     } catch {
@@ -78,7 +88,7 @@ export function ProjectHeader({ project }: Props) {
 
   const canComplete =
     project.progress === 100 &&
-    (status === "active" || status === "in_adjustments");
+    (project.status === "active" || project.status === "in_adjustments");
 
   return (
     <div className="space-y-4">
@@ -138,7 +148,7 @@ export function ProjectHeader({ project }: Props) {
             </AlertDialog>
           )}
 
-          <Select value={status} onValueChange={(v) => handleStatusChange(v as ProjectStatus)}>
+          <Select value={project.status} onValueChange={(v) => handleStatusChange(v as ProjectStatus)}>
             <SelectTrigger className="w-36 h-8 text-xs">
               <SelectValue />
             </SelectTrigger>

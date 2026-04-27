@@ -83,6 +83,21 @@ describe('PATCH /api/projects/[id]', () => {
     });
   });
 
+  it('accepts in-adjustments status updates', async () => {
+    mockUpdateProject.mockResolvedValue({ id: 10 } as never);
+
+    const req = new NextRequest('http://localhost/api/projects/10', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: 'in_adjustments' }),
+    });
+
+    const res = await callPatch(req);
+
+    expect(res.status).toBe(200);
+    expect(mockUpdateProject).toHaveBeenCalledWith(10, { status: 'in_adjustments' });
+  });
+
   it('rejects invalid project metadata datetime values', async () => {
     const req = new NextRequest('http://localhost/api/projects/10', {
       method: 'PATCH',

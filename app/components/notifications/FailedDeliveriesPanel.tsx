@@ -55,8 +55,9 @@ interface RetryResponse {
 export function FailedDeliveriesPanel() {
   const queryClient = useQueryClient();
   const [retryingIds, setRetryingIds] = useState<Set<number>>(new Set());
+  const [retryingAll, setRetryingAll] = useState(false);
 
-  const { data, isLoading, isError, refetch } = useQuery({
+  const { data, isLoading, isError, refetch, isFetching } = useQuery({
     queryKey: ["failed-deliveries"],
     queryFn: async () => {
       const res = await get<{ data: NotificationDeliveryDetailType[] }>(
@@ -82,31 +83,58 @@ export function FailedDeliveriesPanel() {
     onMutate: (deliveryId) => {
       setRetryingIds((prev) => new Set(prev).add(deliveryId));
     },
-    onSuccess: (_, deliveryId) => {
-      toast.success("Reintento iniciado");
+    onSettled: (_, __, deliveryId) => {
       setRetryingIds((prev) => {
         const next = new Set(prev);
         next.delete(deliveryId);
         return next;
       });
-      // Refresh after a brief delay to show updated status
+    },
+    onSuccess: () => {
+      toast.success("Reintento iniciado");
       setTimeout(() => {
         queryClient.invalidateQueries({ queryKey: ["failed-deliveries"] });
         queryClient.invalidateQueries({ queryKey: ["email-history"] });
       }, 2000);
     },
-    onError: (error, deliveryId) => {
+    onError: (error) => {
       const msg = error instanceof Error ? error.message : "Error desconocido";
       toast.error(msg);
-      setRetryingIds((prev) => {
-        const next = new Set(prev);
-        next.delete(deliveryId);
-        return next;
-      });
     },
   });
 
+  const retryableDeliveries = (data ?? []).filter(
+    (d) => d.retry_count < MAX_RETRY_COUNT
+  );
+
+  const handleRetryAll = async () => {
+    if (retryableDeliveries.length === 0) return;
+    setRetryingAll(true);
+    let succeeded = 0;
+    let failed = 0;
+    for (const delivery of retryableDeliveries) {
+      try {
+        const res = await post<RetryResponse>(
+          `notification-deliveries/${delivery.id}/retry`,
+          {}
+        );
+        if (res.ok) succeeded++;
+        else failed++;
+      } catch {
+        failed++;
+      }
+    }
+    setRetryingAll(false);
+    if (succeeded > 0) toast.success(`${succeeded} reintento${succeeded > 1 ? "s" : ""} iniciado${succeeded > 1 ? "s" : ""}`);
+    if (failed > 0) toast.error(`${failed} no pudieron reintentarse`);
+    setTimeout(() => {
+      queryClient.invalidateQueries({ queryKey: ["failed-deliveries"] });
+      queryClient.invalidateQueries({ queryKey: ["email-history"] });
+    }, 2000);
+  };
+
   const failedCount = data?.length ?? 0;
+  const isBusy = retryingAll || retryMutation.isPending;
 
   return (
     <Card>
@@ -141,16 +169,41 @@ export function FailedDeliveriesPanel() {
           </div>
         ) : (
           <div className="space-y-3">
-            <div className="flex justify-end">
+            {/* Action bar */}
+            <div className="flex items-center justify-between gap-2">
               <Button
                 variant="outline"
                 size="sm"
                 onClick={() => refetch()}
+                disabled={isFetching}
               >
-                <RefreshCw className="h-3.5 w-3.5 mr-1.5" />
-                Actualizar
+                {isFetching ? (
+                  <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+                ) : (
+                  <RefreshCw className="h-3.5 w-3.5 mr-1.5" />
+                )}
+                {isFetching ? "Actualizando..." : "Actualizar"}
               </Button>
+
+              {retryableDeliveries.length > 1 && (
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  onClick={handleRetryAll}
+                  disabled={isBusy}
+                >
+                  {retryingAll ? (
+                    <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+                  ) : (
+                    <RefreshCw className="h-3.5 w-3.5 mr-1.5" />
+                  )}
+                  {retryingAll
+                    ? "Reintentando..."
+                    : `Reintentar todos (${retryableDeliveries.length})`}
+                </Button>
+              )}
             </div>
+
             <div className="rounded-md border overflow-x-auto">
               <Table>
                 <TableHeader>
@@ -161,7 +214,7 @@ export function FailedDeliveriesPanel() {
                     <TableHead>Intentos</TableHead>
                     <TableHead>Error</TableHead>
                     <TableHead>Fecha</TableHead>
-                    <TableHead className="w-[100px]" />
+                    <TableHead className="w-[110px]" />
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -215,7 +268,7 @@ export function FailedDeliveriesPanel() {
                             <Button
                               size="sm"
                               variant="outline"
-                              disabled={isRetrying}
+                              disabled={isRetrying || isBusy}
                               onClick={() => retryMutation.mutate(delivery.id)}
                             >
                               {isRetrying ? (

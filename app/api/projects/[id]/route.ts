@@ -34,7 +34,7 @@ const patchSchema = z.object({
   ideal_delivery_at: projectDateTimeSchema.optional().nullable(),
   oc: nullableTextSchema,
   billing_closed_at: projectDateTimeSchema.optional().nullable(),
-  status: z.enum(["active", "paused", "completed", "archived"]).optional(),
+  status: z.enum(["active", "paused", "completed", "archived", "in_adjustments"]).optional(),
   progress: z.coerce.number().int().min(0).max(100).optional(),
 });
 

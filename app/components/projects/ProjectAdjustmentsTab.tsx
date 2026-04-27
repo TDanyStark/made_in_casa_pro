@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { del, get, post } from "@/lib/services/apiService";
-import { ProjectAdjustmentType, UserRole } from "@/lib/definitions";
+import { ProjectAdjustmentType, ProjectDetailType, UserRole } from "@/lib/definitions";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
@@ -72,6 +72,9 @@ export function ProjectAdjustmentsTab({
       if (!res.ok) throw new Error(res.error || "Error al crear ajuste");
       toast.success("Ajuste creado correctamente");
       setWizardOpen(false);
+      queryClient.setQueryData<ProjectDetailType>(["project", projectId], (current) =>
+        current ? { ...current, status: "in_adjustments" } : current
+      );
       queryClient.invalidateQueries({ queryKey: ["project-adjustments", projectId], refetchType: "all" });
       queryClient.invalidateQueries({ queryKey: ["project", projectId], refetchType: "all" });
     } catch (e: unknown) {
@@ -166,7 +169,7 @@ function VersionAccordion({
   const taskCount = Number(adjustment.task_count ?? 0);
   const hasNoTasks = taskCount === 0;
   const projectIsEditable = projectStatus === "active" || projectStatus === "in_adjustments";
-  const versionCanEdit = isLatest && projectIsEditable ? true : !isCompleted;
+  const versionCanEdit = isLatest && projectIsEditable && !isCompleted;
   const label = adjustment.version_number === 1 ? "Versión 1 (Original)" : `Versión ${adjustment.version_number}`;
 
   const canDelete = canEdit && !isCompleted && hasNoTasks;
