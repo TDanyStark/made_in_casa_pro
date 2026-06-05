@@ -1,5 +1,14 @@
 import '@testing-library/jest-dom';
 
+// jsdom no implementa ResizeObserver, requerido por componentes Radix (Switch, etc.)
+if (typeof globalThis.ResizeObserver === 'undefined') {
+  globalThis.ResizeObserver = class {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  } as unknown as typeof ResizeObserver;
+}
+
 // Mock next/navigation — not available in Jest's jsdom environment
 jest.mock('next/navigation', () => ({
   useRouter: jest.fn(() => ({

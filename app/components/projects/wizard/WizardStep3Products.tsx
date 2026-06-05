@@ -3,12 +3,13 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { debounce } from "lodash";
-import Select from "react-select";
+import CreatableSelect from "react-select/creatable";
 import { get } from "@/lib/services/apiService";
 import { ProductType, ApiResponseWithPagination } from "@/lib/definitions";
 import { Button } from "@/components/ui/button";
 import { X, Package } from "lucide-react";
 import { WizardState } from "@/hooks/useProjectWizard";
+import CreateProductModal from "@/components/products/CreateProductModal";
 
 interface ProductOption {
   value: number;
@@ -27,6 +28,8 @@ export function WizardStep3Products({ state, onNext, onBack }: Props) {
   const [search, setSearch] = useState("");
   const [product, setProduct] = useState<ProductType | null>(state.product);
   const [error, setError] = useState("");
+  const [isCreatingProduct, setIsCreatingProduct] = useState(false);
+  const [newProductName, setNewProductName] = useState("");
 
   const { data: productOptions = [], isLoading } = useQuery({
     queryKey: ["products-search", search],
@@ -57,6 +60,19 @@ export function WizardStep3Products({ state, onNext, onBack }: Props) {
 
   const clearProduct = () => setProduct(null);
 
+  // Abre el modal de creación con el nombre escrito en el select.
+  const handleCreateProduct = (inputValue: string) => {
+    setNewProductName(inputValue);
+    setIsCreatingProduct(true);
+  };
+
+  // El producto recién creado se selecciona automáticamente.
+  const handleProductCreated = (newProduct: ProductType) => {
+    setProduct(newProduct);
+    setError("");
+    setIsCreatingProduct(false);
+  };
+
   const handleNext = () => {
     if (!product) {
       setError("Selecciona un producto para el proyecto");
@@ -69,14 +85,16 @@ export function WizardStep3Products({ state, onNext, onBack }: Props) {
     <div className="space-y-6">
       <div className="space-y-2">
         <label className="text-sm font-medium">Producto del proyecto *</label>
-        <Select<ProductOption>
+        <CreatableSelect<ProductOption>
           instanceId="wizard-products-select"
           options={productOptions}
           value={null}
           onChange={(opt) => selectProduct(opt as ProductOption | null)}
           onInputChange={(v) => debouncedSearch(v)}
+          onCreateOption={handleCreateProduct}
+          formatCreateLabel={(inputValue) => `Crear producto "${inputValue}"`}
           isLoading={isLoading}
-          placeholder="Buscar producto..."
+          placeholder="Buscar o crear producto..."
           noOptionsMessage={({ inputValue }) =>
             inputValue ? "Sin resultados" : "Escribe para buscar"
           }
@@ -131,6 +149,13 @@ export function WizardStep3Products({ state, onNext, onBack }: Props) {
           Siguiente
         </Button>
       </div>
+
+      <CreateProductModal
+        openModal={isCreatingProduct}
+        handleModal={setIsCreatingProduct}
+        initialName={newProductName}
+        onSuccess={handleProductCreated}
+      />
     </div>
   );
 }

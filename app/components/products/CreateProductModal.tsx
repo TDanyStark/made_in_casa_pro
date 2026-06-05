@@ -29,6 +29,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { post } from "@/lib/services/apiService";
+import { ProductType } from "@/lib/definitions";
 import CategorySelect from "./CategorySelect";
 
 const formSchema = z.object({
@@ -43,9 +44,21 @@ type FormValues = z.infer<typeof formSchema>;
 interface Props {
   openModal?: boolean;
   handleModal?: (open: boolean) => void;
+  /** Nombre inicial (cuando se crea inline desde un CreatableSelect). */
+  initialName?: string;
+  /**
+   * Callback con el producto recién creado. Si se provee, se usa el flujo
+   * inline (devolver el producto al padre) en lugar de router.refresh().
+   */
+  onSuccess?: (product: ProductType) => void;
 }
 
-export default function CreateProductModal({ openModal, handleModal }: Props) {
+export default function CreateProductModal({
+  openModal,
+  handleModal,
+  initialName = "",
+  onSuccess,
+}: Props) {
   const [submitting, setSubmitting] = useState(false);
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -55,17 +68,21 @@ export default function CreateProductModal({ openModal, handleModal }: Props) {
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
-    defaultValues: { name: "", description: "", category_id: null, is_active: true },
+    defaultValues: { name: initialName, description: "", category_id: null, is_active: true },
   });
 
   useEffect(() => {
-    if (!isOpen) form.reset();
-  }, [isOpen, form]);
+    if (!isOpen) {
+      form.reset({ name: initialName, description: "", category_id: null, is_active: true });
+    } else if (initialName) {
+      form.setValue("name", initialName);
+    }
+  }, [isOpen, initialName, form]);
 
   const onSubmit = async (values: FormValues) => {
     setSubmitting(true);
     try {
-      const res = await post("products", {
+      const res = await post<ProductType>("products", {
         ...values,
         is_active: values.is_active ? 1 : 0,
       });
@@ -73,7 +90,12 @@ export default function CreateProductModal({ openModal, handleModal }: Props) {
         toast.success("Producto creado exitosamente");
         queryClient.invalidateQueries({ queryKey: ["products"] });
         setIsOpen(false);
-        router.refresh();
+        if (onSuccess && res.data) {
+          // Flujo inline: devolvemos el producto creado al padre.
+          onSuccess(res.data as ProductType);
+        } else {
+          router.refresh();
+        }
       } else {
         toast.error(res.error || "Error al crear el producto");
       }
