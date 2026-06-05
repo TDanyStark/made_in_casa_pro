@@ -162,7 +162,7 @@ export async function createManager(managerData: Omit<ManagerType, "id">) {
         managerData.client_id,
         managerData.name,
         managerData.email,
-        managerData.phone,
+        managerData.phone || "", // El teléfono es opcional
         managerData.biography || "", // Asegurarnos de que nunca sea undefined
       ],
     });

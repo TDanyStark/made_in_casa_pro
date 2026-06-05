@@ -1,7 +1,7 @@
 /* eslint-disable @next/next/no-img-element */
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import CreatableSelect from "react-select/creatable";
 import { debounce } from "lodash";
 import { useGetEndpointQueryClient } from "@/hooks/useGetEndpointQueryClient";
@@ -57,6 +57,9 @@ export function ClientSelect({
   const [clientOptions, setClientOptions] = useState<ClientOption[]>([]);
   const [isCreatingClient, setIsCreatingClient] = useState(false);
   const [newClientName, setNewClientName] = useState("");
+  // Referencia al onChange del field del formulario para poder escribir el
+  // cliente recién creado aunque el consumidor no pase un onChange propio.
+  const fieldOnChangeRef = useRef<((value: number | undefined) => void) | null>(null);
 
   const { data, isLoading: isLoadingClients } = useGetEndpointQueryClient<ClientType>({
     search: searchTerm,
@@ -111,7 +114,14 @@ export function ClientSelect({
 
     setClientOptions((prev) => [...prev, newOption]);
 
-    // Select the newly created client and notify parent
+    // Seleccionar el cliente recién creado en el campo del formulario.
+    // Antes solo se notificaba al padre (onChange) y, como CreateManagerModal
+    // no lo pasaba, el cliente nuevo nunca quedaba seleccionado en el panel.
+    if (fieldOnChangeRef.current) {
+      fieldOnChangeRef.current(newClient.id);
+    }
+
+    // Notify parent if provided
     if (onChange) {
       onChange(newClient.id);
     }
@@ -143,7 +153,10 @@ export function ClientSelect({
       <FormField
         control={control}
         name={name}
-        render={({ field }) => (
+        render={({ field }) => {
+          // Guardamos la referencia al onChange del field para usarla al crear.
+          fieldOnChangeRef.current = field.onChange;
+          return (
           <FormItem>
             <FormLabel>{label}</FormLabel>
             <FormControl>
@@ -179,7 +192,8 @@ export function ClientSelect({
             </FormControl>
             <FormMessage />
           </FormItem>
-        )}
+          );
+        }}
       />
 
       <CreateClientModal

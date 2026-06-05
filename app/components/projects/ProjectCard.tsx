@@ -5,13 +5,14 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { ProjectType } from "@/lib/definitions";
 import { ProjectStatusBadge } from "./ProjectStatusBadge";
 import { ProjectProgressBar } from "./ProjectProgressBar";
-import { User, Package, HardDrive, Tag } from "lucide-react";
+import { User, Package, HardDrive, Tag, UserPlus } from "lucide-react";
 
 interface Props {
   project: ProjectType;
+  showCreator?: boolean;
 }
 
-export function ProjectCard({ project }: Props) {
+export function ProjectCard({ project, showCreator = false }: Props) {
   return (
     <Link href={`/projects/${project.id}`} className="block group">
       <Card className="h-full hover:border-primary/50 hover:shadow-md transition-all duration-200">
@@ -50,6 +51,13 @@ export function ProjectCard({ project }: Props) {
               <span className="flex items-center gap-1">
                 <Tag className="h-3 w-3" />
                 {project.campaign_name}
+              </span>
+            )}
+
+            {showCreator && project.created_by_name && (
+              <span className="flex items-center gap-1" title="Creado por">
+                <UserPlus className="h-3 w-3" />
+                {project.created_by_name}
               </span>
             )}
 

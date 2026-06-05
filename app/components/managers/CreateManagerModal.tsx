@@ -42,7 +42,7 @@ const formSchema = z.object({
     .string()
     .email("Correo electrónico inválido")
     .nonempty("El correo electrónico es obligatorio"),
-  phone: z.string().nonempty("El teléfono es obligatorio"),
+  phone: z.string().optional(),
   biography: z.string().optional(),
 });
 
@@ -166,7 +166,7 @@ export function CreateManagerModal({
                 name="phone"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Teléfono</FormLabel>
+                    <FormLabel>Teléfono (opcional)</FormLabel>
                     <FormControl>
                       <Input placeholder="+1 234 567 8901" {...field} />
                     </FormControl>

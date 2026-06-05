@@ -30,9 +30,10 @@ const STATUS_OPTIONS: { value: string; label: string }[] = [
 
 interface Props {
   canCreate: boolean;
+  canSeeCreator?: boolean;
 }
 
-export function ListProjectsClient({ canCreate }: Props) {
+export function ListProjectsClient({ canCreate, canSeeCreator = false }: Props) {
   const searchParams = useSearchParams();
   const pathname = usePathname();
   const { replace } = useRouter();
@@ -136,7 +137,7 @@ export function ListProjectsClient({ canCreate }: Props) {
           <p className="text-sm text-muted-foreground">{total} proyecto{total !== 1 ? "s" : ""}</p>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {projects.map((p) => (
-              <ProjectCard key={p.id} project={p} />
+              <ProjectCard key={p.id} project={p} showCreator={canSeeCreator} />
             ))}
           </div>
         </>

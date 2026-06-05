@@ -80,7 +80,7 @@ export type ManagerType = {
   client_id: number;
   name: string;
   email: string;
-  phone: string;
+  phone?: string;
   biography?: string;
   client_info?: ClientType;
 };

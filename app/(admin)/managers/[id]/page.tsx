@@ -88,7 +88,7 @@ export default async function ManagerPage({ params }: Props) {
                 key_update="phone"
                 endpoint={`managers/${id}`}
                 label="Teléfono"
-                value={phone}
+                value={phone ?? ""}
               />
               <ItemInfo
                 icon={BriefcaseBusiness}

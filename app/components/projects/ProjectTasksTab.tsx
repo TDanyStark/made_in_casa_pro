@@ -343,6 +343,11 @@ export function ProjectTasksTab({
 
   const isAdmin = currentUserRole === 1 || currentUserRole === 2;
 
+  // Override para completar tareas: admin, directivo y comercial pueden
+  // completar cualquier tarea aunque no sean el colaborador asignado.
+  // (No afecta "Tomar" ni "Validar", que siguen usando isAdmin.)
+  const canCompleteOverride = isAdmin || currentUserRole === 3;
+
   // Convert numeric role to enum for comparison
   const userRole = currentUserRole !== undefined 
     ? (currentUserRole as UserRole) 
@@ -591,7 +596,7 @@ export function ProjectTasksTab({
               const isCompleted = task.status === "completed";
               const isValidation = taskType === "validation";
                       const canStart = isNotStarted && (isMyTask(task) || isAdmin);
-                      const canComplete = isInProgress && !isValidation && (isMyTask(task) || isAdmin);
+                      const canComplete = isInProgress && !isValidation && (isMyTask(task) || canCompleteOverride);
                       const canValidate = isInProgress && isValidation && (isMyTask(task) || isAdmin);
                       const needsQuote = task.requires_quote === 1 && isBlocked;
 

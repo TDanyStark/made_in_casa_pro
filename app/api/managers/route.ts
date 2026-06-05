@@ -11,7 +11,7 @@ const managerSchema = z.object({
   client_id: z.number().int().positive(),
   name: z.string().min(1),
   email: z.string().email(),
-  phone: z.string().min(1),
+  phone: z.string().optional().default(""),
   biography: z.string(),
 });
 

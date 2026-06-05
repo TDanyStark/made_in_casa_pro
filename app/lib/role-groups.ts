@@ -35,7 +35,16 @@ export const PROJECT_VIEW_ROLES: readonly UserRole[] = [
 
 export const CREATOR_FILTER_ROLES: readonly UserRole[] = OPERATIONS_ROLES;
 
-export const TASK_OVERRIDE_ROLES: readonly UserRole[] = LEADERSHIP_ROLES;
+// Roles que pueden ver quién creó cada proyecto en la lista de proyectos.
+export const PROJECT_CREATOR_VIEW_ROLES: readonly UserRole[] = [
+  UserRole.ADMIN,
+  UserRole.DIRECTIVO,
+];
+
+export const TASK_OVERRIDE_ROLES: readonly UserRole[] = [
+  ...LEADERSHIP_ROLES,
+  UserRole.COMERCIAL,
+];
 
 export function hasAnyRole(userRole: UserRole, allowedRoles: readonly UserRole[]) {
   return allowedRoles.includes(userRole);

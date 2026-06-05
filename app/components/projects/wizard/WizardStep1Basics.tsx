@@ -1,14 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { useForm } from "react-hook-form";
+import { useForm, Control } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useQuery } from "@tanstack/react-query";
-import { debounce } from "lodash";
-import Select from "react-select";
 import { get } from "@/lib/services/apiService";
-import { BrandsAndManagersType, ApiResponseWithPagination } from "@/lib/definitions";
+import { BrandSelect } from "@/components/brands/BrandSelect";
 import {
   Form,
   FormControl,
@@ -43,7 +41,6 @@ type FormValues = z.infer<typeof schema>;
 interface BrandOption {
   value: number;
   label: string;
-  managerName?: string;
 }
 
 // Full brand detail returned by GET /api/brands/[id]
@@ -69,7 +66,6 @@ interface Props {
 }
 
 export function WizardStep1Basics({ state, onNext }: Props) {
-  const [search, setSearch] = useState("");
   const [selectedBrand, setSelectedBrand] = useState<BrandOption | null>(
     state.brand_id ? { value: state.brand_id, label: state.brand_name } : null
   );
@@ -85,25 +81,6 @@ export function WizardStep1Basics({ state, onNext }: Props) {
     },
   });
 
-  // Brands search
-  const { data: brandsData, isLoading: isLoadingBrands } = useQuery({
-    queryKey: ["brands-search", search],
-    queryFn: async () => {
-      const params = new URLSearchParams({ page: "1", limit: "30" });
-      if (search) params.set("search", search);
-      const res = await get<ApiResponseWithPagination<BrandsAndManagersType[]>>(`brands?${params}`);
-      if (!res.ok || !res.data) return [];
-      return ((res.data as unknown as { data: BrandsAndManagersType[] }).data ?? []).map(
-        (b): BrandOption => ({
-          value: b.id,
-          label: b.brand_name,
-          managerName: b.manager_name,
-        })
-      );
-    },
-    staleTime: 1000 * 30,
-  });
-
   // Full brand detail — auto-resolves manager + client when a brand is selected
   const { data: brandDetail, isLoading: isLoadingDetail } = useQuery<BrandDetail | null>({
     queryKey: ["brand-detail", selectedBrand?.value],
@@ -116,11 +93,15 @@ export function WizardStep1Basics({ state, onNext }: Props) {
     staleTime: 1000 * 60,
   });
 
-  const debouncedSearch = debounce((v: string) => setSearch(v), 400);
-
-  const handleBrandChange = (opt: BrandOption | null) => {
-    setSelectedBrand(opt);
-    form.setValue("brand_id", opt?.value ?? (undefined as unknown as number));
+  // BrandSelect maneja su propia búsqueda y escribe brand_id en el form.
+  // Aquí solo sincronizamos selectedBrand para disparar la resolución de
+  // manager/cliente (query "brand-detail").
+  const handleBrandChange = (value: number | undefined) => {
+    if (!value) {
+      setSelectedBrand(null);
+    } else {
+      setSelectedBrand({ value, label: "" });
+    }
     form.clearErrors("brand_id");
   };
 
@@ -167,41 +148,14 @@ export function WizardStep1Basics({ state, onNext }: Props) {
           )}
         />
 
-        {/* Brand select */}
-        <FormField
-          control={form.control}
+        {/* Brand select — permite buscar y crear una marca inline */}
+        <BrandSelect
+          form={form}
+          control={form.control as unknown as Control<{ brand_id: number; name: string; id?: number }>}
           name="brand_id"
-          render={() => (
-            <FormItem>
-              <FormLabel>Marca</FormLabel>
-              <FormControl>
-                <Select<BrandOption>
-                  instanceId="wizard-brand-select"
-                  options={brandsData ?? []}
-                  value={selectedBrand}
-                  onChange={(opt) => handleBrandChange(opt as BrandOption | null)}
-                  onInputChange={(v) => debouncedSearch(v)}
-                  isLoading={isLoadingBrands}
-                  placeholder="Buscar marca..."
-                  noOptionsMessage={({ inputValue }) =>
-                    inputValue ? "Sin resultados" : "Escribe para buscar"
-                  }
-                  loadingMessage={() => "Cargando..."}
-                  formatOptionLabel={(opt: BrandOption) => (
-                    <div className="flex items-center justify-between">
-                      <span>{opt.label}</span>
-                      {opt.managerName && (
-                        <span className="text-xs text-muted-foreground">{opt.managerName}</span>
-                      )}
-                    </div>
-                  )}
-                  classNamePrefix="react-select"
-                  filterOption={() => true}
-                />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
+          label="Marca"
+          placeholder="Buscar o crear marca..."
+          onChange={handleBrandChange}
         />
 
         <div className="grid gap-4 md:grid-cols-2">
