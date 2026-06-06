@@ -115,7 +115,7 @@ export function ListProjectsClient({ canCreate, canSeeCreator = false }: Props) 
       {isError ? (
         <div className="text-center py-8 text-destructive">Error al cargar los proyectos</div>
       ) : isLoading ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           {Array.from({ length: 6 }).map((_, i) => (
             <Skeleton key={i} className="h-44 w-full rounded-xl" />
           ))}
@@ -135,7 +135,7 @@ export function ListProjectsClient({ canCreate, canSeeCreator = false }: Props) 
       ) : (
         <>
           <p className="text-sm text-muted-foreground">{total} proyecto{total !== 1 ? "s" : ""}</p>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {projects.map((p) => (
               <ProjectCard key={p.id} project={p} showCreator={canSeeCreator} />
             ))}
