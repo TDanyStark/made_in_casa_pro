@@ -56,6 +56,14 @@ export function ProjectCard({ project, showCreator = false }: Props) {
       value: project.product_name,
     });
   }
+  
+  if (showCreator && project.created_by_name) {
+    metaItems.push({
+      icon: UserPlus,
+      label: "Creado por",
+      value: project.created_by_name,
+    });
+  }
 
   if (project.campaign_name) {
     metaItems.push({
@@ -65,28 +73,39 @@ export function ProjectCard({ project, showCreator = false }: Props) {
     });
   }
 
-  if (showCreator && project.created_by_name) {
-    metaItems.push({
-      icon: UserPlus,
-      label: "Creado por",
-      value: project.created_by_name,
-    });
-  }
+  
 
   return (
     <Link href={`/projects/${project.id}`} className="block group">
-      <Card className="relative h-full overflow-hidden hover:border-primary/50 hover:shadow-md transition-all duration-200">
+      <Card className="py-2 relative h-full overflow-hidden hover:border-primary/50 hover:shadow-md transition-all duration-200">
         {/* Top accent gradient line */}
         <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-border to-transparent" />
 
-        <CardContent className="space-y-4 pt-5">
-          {/* Header: title + status badge */}
+        <CardContent className="space-y-3 px-4 py-3">
+          {/* Header: title + status badge + drive */}
           <div className="space-y-1.5">
             <div className="flex items-start justify-between gap-2">
               <h3 className="font-semibold text-base leading-snug group-hover:text-primary transition-colors line-clamp-2">
                 {project.title}
               </h3>
-              <ProjectStatusBadge status={project.status} />
+              <div className="flex shrink-0 items-center gap-2">
+                {project.drive_folder_url && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      window.open(project.drive_folder_url!, "_blank");
+                    }}
+                    className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:text-primary/80 transition-colors"
+                    title="Abrir carpeta en Drive"
+                  >
+                    <FolderOpen className="h-3.5 w-3.5" />
+                    <ExternalLink className="h-3 w-3 opacity-60" />
+                  </button>
+                )}
+                <ProjectStatusBadge status={project.status} />
+              </div>
             </div>
             <div className="text-sm text-muted-foreground">
               <span className="font-medium text-foreground">
@@ -111,26 +130,6 @@ export function ProjectCard({ project, showCreator = false }: Props) {
               <MetaItem key={item.label} {...item} />
             ))}
           </div>
-
-          {/* Drive external link */}
-          {project.drive_folder_url && (
-            <div className="border-t border-border pt-3">
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  window.open(project.drive_folder_url!, "_blank");
-                }}
-                className="inline-flex items-center gap-2 rounded-md bg-muted px-3 py-1.5 text-xs font-medium text-foreground ring-1 ring-border hover:bg-muted/70 hover:text-primary transition-colors"
-                title="Abrir carpeta en Drive"
-              >
-                <FolderOpen className="h-3.5 w-3.5" />
-                Carpeta en Drive
-                <ExternalLink className="h-3 w-3 text-muted-foreground" />
-              </button>
-            </div>
-          )}
         </CardContent>
       </Card>
     </Link>
