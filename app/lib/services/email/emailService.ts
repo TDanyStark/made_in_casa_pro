@@ -1,10 +1,12 @@
 import { getUserEmailConnection } from "@/lib/queries/userEmailConnections";
 import {
   createNotificationDelivery,
+  getDeliveryById,
   getDeliveryCountByEventAndRecipient,
   markDeliveryFailed,
   markDeliverySent,
   markDeliverySkipped,
+  resetDeliveryForRetry,
 } from "@/lib/queries/notificationDeliveries";
 import {
   getOrCreateThread,
@@ -13,7 +15,7 @@ import {
 import { GmailEmailProvider } from "./gmailEmailProvider";
 import { SystemEmailProvider, getSystemFrom } from "./systemEmailProvider";
 import { notifLog } from "@/lib/services/notificationLogger";
-import type { SendEmailOptions, SendResult } from "./emailTypes";
+import type { SendEmailOptions, SendResult, ThreadContext } from "./emailTypes";
 
 // ---------------------------------------------------------------------------
 // emailService — unified email dispatcher
@@ -165,59 +167,125 @@ export async function sendEmail(opts: SendEmailOptions): Promise<SendResult> {
 }
 
 // ---------------------------------------------------------------------------
-// retryDelivery — re-sends a single failed delivery
+// resendExistingDelivery — re-sends a specific delivery row without creating
+// a new event or a new delivery record.
 //
-// Reads the stored delivery + event, re-builds a minimal email and sends it.
-// Enforces MAX_RETRY_COUNT to prevent infinite retries.
+// Bypasses the idempotency check (which would block re-sends for the same
+// event+recipient pair) by operating directly on the existing delivery row.
+// Resets status to 'pending', sends via the appropriate provider, then marks
+// the SAME delivery as 'sent' or 'failed'. The retry_count is incremented on
+// failure via markDeliveryFailed.
 // ---------------------------------------------------------------------------
-export async function retryDelivery(
+export async function resendExistingDelivery(
   deliveryId: number,
-  overrideMessage: {
+  message: {
     to: { email: string; name?: string };
     subject: string;
     html: string;
     text?: string;
+  },
+  opts?: {
+    projectId?: number | null;
+    adjustmentId?: number | null;
+    threadKey?: string;
+    forceSystemSender?: boolean;
   }
 ): Promise<SendResult> {
-  const {
-    getDeliveryById,
-    markDeliveryFailed: failDelivery,
-    MAX_RETRY_COUNT: maxRetries,
-    resetDeliveryForRetry,
-  } = await import("@/lib/queries/notificationDeliveries");
-
   const delivery = await getDeliveryById(deliveryId);
   if (!delivery) throw new Error(`Delivery ${deliveryId} not found`);
 
-  if (delivery.status !== "failed") {
-    throw new Error(`Delivery ${deliveryId} is not in 'failed' state (current: ${delivery.status})`);
-  }
-
-  if (delivery.retry_count >= maxRetries) {
-    const msg = `Max retry count (${maxRetries}) reached for delivery ${deliveryId}`;
-    notifLog.error("retryDelivery", msg);
-    throw new Error(msg);
-  }
-
-  // Reset to pending so the send attempt is fresh
+  // Reset to pending — throws if delivery is not currently in 'failed' state
   await resetDeliveryForRetry(deliveryId);
 
+  // ── Resolve provider (same logic as sendEmail) ────────────────────────
+  let useGmail = false;
+  let senderEmail: string;
+  let senderName: string;
+  let providerLabel: "gmail" | "smtp" = "smtp";
+
+  if (!opts?.forceSystemSender && delivery.sender_user_id) {
+    const connection = await getUserEmailConnection(delivery.sender_user_id);
+    if (connection?.status === "connected" && connection.refresh_token) {
+      useGmail = true;
+      senderEmail = connection.email;
+      senderName = process.env.NOTIFICATION_FROM_NAME ?? "Made in Casa";
+      providerLabel = "gmail";
+    }
+  }
+
+  if (!useGmail) {
+    const systemFrom = getSystemFrom();
+    senderEmail = systemFrom.email;
+    senderName = systemFrom.name;
+    providerLabel = "smtp";
+  }
+
+  // ── Resolve thread context ────────────────────────────────────────────
+  let resolvedThread: ThreadContext | undefined;
+  if (opts?.projectId && opts?.threadKey) {
+    const threadRecord = await getOrCreateThread({
+      project_id: opts.projectId,
+      adjustment_id: opts.adjustmentId ?? null,
+      thread_key: opts.threadKey,
+      provider: providerLabel,
+      created_by_user_id: delivery.sender_user_id ?? null,
+    });
+    resolvedThread = {
+      threadKey: threadRecord.thread_key,
+      gmailThreadId: threadRecord.gmail_thread_id,
+      rootMessageId: threadRecord.root_message_id,
+    };
+  }
+
+  // ── Send ──────────────────────────────────────────────────────────────
   try {
-    const result = await sendEmail({
-      senderUserId: delivery.sender_user_id,
-      message: overrideMessage,
-      eventId: delivery.event_id,
-      recipientUserId: delivery.recipient_user_id,
+    const provider = useGmail && delivery.sender_user_id
+      ? new GmailEmailProvider(delivery.sender_user_id)
+      : new SystemEmailProvider();
+
+    const result = await provider.send({
+      from: { email: senderEmail!, name: senderName! },
+      message,
+      thread: resolvedThread,
     });
 
-    notifLog.info("retryDelivery", `Retry succeeded — delivery=${deliveryId} attempt=${delivery.retry_count + 1}`);
-    return result;
+    await markDeliverySent(deliveryId, {
+      gmail_thread_id: result.gmailThreadId ?? undefined,
+      message_id: result.messageId ?? undefined,
+    });
+
+    notifLog.info("resendExistingDelivery", `Sent — delivery=${deliveryId} provider=${providerLabel} to=${message.to.email}`);
+
+    // Persist thread identifiers for future replies
+    if (opts?.projectId && resolvedThread?.threadKey) {
+      const threadRecord = await getOrCreateThread({
+        project_id: opts.projectId,
+        adjustment_id: opts.adjustmentId ?? null,
+        thread_key: resolvedThread.threadKey,
+        provider: providerLabel,
+        created_by_user_id: delivery.sender_user_id ?? null,
+      });
+      const needsUpdate =
+        (result.gmailThreadId && !threadRecord.gmail_thread_id) ||
+        (result.messageId && !threadRecord.root_message_id);
+      if (needsUpdate) {
+        await updateThreadExternalIds(threadRecord.id, {
+          gmail_thread_id: result.gmailThreadId ?? undefined,
+          root_message_id: result.messageId ?? undefined,
+        });
+      }
+    }
+
+    return {
+      deliveryId,
+      provider: providerLabel,
+      gmailThreadId: result.gmailThreadId,
+      messageId: result.messageId,
+    };
   } catch (error) {
     const errorMsg = error instanceof Error ? error.message : String(error);
-    notifLog.error("retryDelivery", `Retry failed — delivery=${deliveryId} attempt=${delivery.retry_count + 1}: ${errorMsg}`);
-
-    // Mark as failed again with incremented retry_count (markDeliveryFailed does this)
-    await failDelivery(deliveryId, errorMsg);
+    notifLog.error("resendExistingDelivery", `Failed — delivery=${deliveryId} to=${message.to.email}: ${errorMsg}`);
+    await markDeliveryFailed(deliveryId, errorMsg);
     throw error;
   }
 }

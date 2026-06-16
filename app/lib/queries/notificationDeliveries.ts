@@ -335,14 +335,20 @@ export async function getDeliveriesByProject(
 
 export async function resetDeliveryForRetry(deliveryId: number): Promise<void> {
   try {
-    await db.execute({
+    const result = await db.execute({
       sql: `
         UPDATE notification_deliveries
         SET status = 'pending', error = NULL
         WHERE id = $1 AND status = 'failed'
+        RETURNING id
       `,
       args: [deliveryId],
     });
+    if (result.rows.length === 0) {
+      throw new Error(
+        `Delivery ${deliveryId} was not in 'failed' state — reset skipped. It may already be pending or sent.`
+      );
+    }
   } catch (error) {
     console.error("Error resetting delivery for retry:", error);
     throw error;
