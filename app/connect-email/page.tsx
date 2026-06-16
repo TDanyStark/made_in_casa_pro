@@ -15,6 +15,7 @@ type ConnectEmailPageProps = {
   searchParams?: Promise<{
     email_error?: string;
     email_success?: string;
+    reconnect?: string;
   }>;
 };
 
@@ -36,10 +37,12 @@ export default async function ConnectEmailPage({ searchParams }: ConnectEmailPag
   }
 
   const params = await searchParams;
+  const isReconnect = params?.reconnect === "true";
   const connection = await getUserEmailConnection(session.id);
   const isConnected = connection?.status === "connected" && !!connection.refresh_token;
 
-  if (isConnected) {
+  // Only auto-redirect if user is connected AND not explicitly requesting a reconnect
+  if (isConnected && !isReconnect) {
     redirect("/dashboard");
   }
 

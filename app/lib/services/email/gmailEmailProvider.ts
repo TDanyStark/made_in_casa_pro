@@ -171,10 +171,17 @@ export class GmailEmailProvider implements EmailProvider {
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error);
 
-      if (msg.includes("invalid_grant") || msg.includes("Token has been expired")) {
+      const isPermanentAuthFailure =
+        msg.includes("invalid_grant") ||
+        msg.includes("Token has been expired") ||
+        msg.includes("Requested entity was not found") ||
+        msg.includes("insufficient authentication scopes") ||
+        msg.includes("Request had insufficient authentication scopes");
+
+      if (isPermanentAuthFailure) {
         await markEmailConnectionInvalid(this.userId, msg);
         throw new Error(
-          "La autorización de Gmail expiró o fue revocada. El usuario debe reconectar Gmail."
+          "La autorización de Gmail no es válida. El usuario debe reconectar Gmail desde /connect-email."
         );
       }
 
