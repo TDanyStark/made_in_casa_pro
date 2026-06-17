@@ -6,6 +6,12 @@ import { getUserEmailConnection, markEmailConnectionInvalid } from "@/lib/querie
 import { getAppSettings } from "@/lib/queries/settings";
 import { google } from "googleapis";
 
+function encodeRfc2047(value: string): string {
+  if (!/[^\x00-\x7F]/.test(value)) return value;
+  const encoded = Buffer.from(value, "utf8").toString("base64");
+  return `=?UTF-8?B?${encoded}?=`;
+}
+
 // ---------------------------------------------------------------------------
 // GET /api/user-email/test-send
 //
@@ -131,7 +137,7 @@ export async function GET(request: NextRequest) {
 
     // ── Step 5: Send test email to self ───────────────────────────────────
     const gmail = google.gmail({ version: "v1", auth: oauth2Client });
-    const subject = "Test de conexión Gmail — Made in Casa";
+    const subject = encodeRfc2047("Test de conexion Gmail - Made in Casa");
     const bodyText = `Este es un correo de prueba para verificar que la conexión Gmail de ${connection.email} funciona correctamente en Made in Casa.\n\nFecha: ${new Date().toISOString()}`;
     const bodyHtml = `<p>Este es un correo de prueba para verificar que la conexión Gmail de <strong>${connection.email}</strong> funciona correctamente en <strong>Made in Casa</strong>.</p><p style="color:#888;font-size:12px;">Fecha: ${new Date().toISOString()}</p>`;
 
