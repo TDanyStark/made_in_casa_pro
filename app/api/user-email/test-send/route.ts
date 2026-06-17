@@ -1,24 +1,24 @@
 import { NextRequest, NextResponse } from "next/server";
 import { validateApiRole, validateHttpMethod } from "@/lib/services/api-auth";
 import { getCurrentSession } from "@/lib/services/api-session";
-import { ADMIN_ONLY_ROLES } from "@/lib/role-groups";
+import { AUTHENTICATED_ROLES } from "@/lib/role-groups";
 import { getUserEmailConnection, markEmailConnectionInvalid } from "@/lib/queries/userEmailConnections";
 import { getAppSettings } from "@/lib/queries/settings";
 import { google } from "googleapis";
 
 // ---------------------------------------------------------------------------
-// POST /api/user-email/test-send
+// GET /api/user-email/test-send
 //
-// Sends a real test email from the authenticated user's connected Gmail account
-// to themselves, and returns a detailed diagnostic report.
-// Admin only.
+// Sends a real test email from the logged-in user's connected Gmail account
+// to themselves and returns a step-by-step diagnostic report.
+// Accessible by any authenticated user.
 // ---------------------------------------------------------------------------
 
-export async function POST(request: NextRequest) {
-  const methodValidation = validateHttpMethod(request, ["POST"]);
+export async function GET(request: NextRequest) {
+  const methodValidation = validateHttpMethod(request, ["GET"]);
   if (!methodValidation.isValidMethod) return methodValidation.response;
 
-  const roleValidation = await validateApiRole(request, ADMIN_ONLY_ROLES);
+  const roleValidation = await validateApiRole(request, AUTHENTICATED_ROLES);
   if (!roleValidation.isAuthorized) return roleValidation.response;
 
   const session = await getCurrentSession();
@@ -26,42 +26,34 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }
 
-  const body = await request.json().catch(() => ({}));
-  // Optional: test a specific user id (admin testing another user's connection)
-  const targetUserId: number = body.user_id ?? session.id;
-
-  const report: Record<string, unknown> = {
-    target_user_id: targetUserId,
-    steps: [],
-  };
-
-  const steps = report.steps as Array<{ step: string; ok: boolean; detail?: string }>;
+  const userId = session.id;
+  const steps: Array<{ step: string; ok: boolean; detail?: string }> = [];
 
   try {
     // ── Step 1: Load connection ───────────────────────────────────────────
-    const connection = await getUserEmailConnection(targetUserId);
+    const connection = await getUserEmailConnection(userId);
     steps.push({
       step: "load_connection",
       ok: !!connection,
       detail: connection
         ? `status=${connection.status} email=${connection.email}`
-        : "No connection found in DB",
+        : "No hay conexión Gmail registrada para este usuario",
     });
 
     if (!connection) {
-      return NextResponse.json({ ok: false, report }, { status: 200 });
+      return NextResponse.json({ ok: false, steps }, { status: 200 });
     }
 
     if (connection.status !== "connected" || !connection.refresh_token) {
       steps.push({
         step: "connection_valid",
         ok: false,
-        detail: `Connection status is '${connection.status}' — user must reconnect Gmail`,
+        detail: `Estado de la conexión: '${connection.status}' — debe reconectar Gmail`,
       });
-      return NextResponse.json({ ok: false, report }, { status: 200 });
+      return NextResponse.json({ ok: false, steps }, { status: 200 });
     }
 
-    steps.push({ step: "connection_valid", ok: true, detail: `Gmail connected as ${connection.email}` });
+    steps.push({ step: "connection_valid", ok: true, detail: `Conectado como ${connection.email}` });
 
     // ── Step 2: Load OAuth credentials ───────────────────────────────────
     const settings = await getAppSettings();
@@ -71,14 +63,14 @@ export async function POST(request: NextRequest) {
     steps.push({
       step: "oauth_credentials",
       ok: hasClientId && hasClientSecret,
-      detail: `client_id=${hasClientId ? "present" : "MISSING"} client_secret=${hasClientSecret ? "present" : "MISSING"}`,
+      detail: `client_id=${hasClientId ? "ok" : "FALTA"} client_secret=${hasClientSecret ? "ok" : "FALTA"}`,
     });
 
     if (!hasClientId || !hasClientSecret) {
-      return NextResponse.json({ ok: false, report }, { status: 200 });
+      return NextResponse.json({ ok: false, steps }, { status: 200 });
     }
 
-    // ── Step 3: Build OAuth2 client ───────────────────────────────────────
+    // ── Step 3: Build OAuth2 client & refresh token ───────────────────────
     const oauth2Client = new google.auth.OAuth2(
       settings.google_oauth_client_id!,
       settings.google_oauth_client_secret!
@@ -89,17 +81,15 @@ export async function POST(request: NextRequest) {
       access_token: connection.access_token ?? undefined,
     });
 
-    steps.push({ step: "oauth2_client_built", ok: true });
-
-    // ── Step 4: Refresh access token explicitly ───────────────────────────
     try {
       const tokenResponse = await oauth2Client.refreshAccessToken();
-      const newAccessToken = tokenResponse.credentials.access_token;
+      const newToken = tokenResponse.credentials.access_token;
       steps.push({
         step: "token_refresh",
-        ok: !!newAccessToken,
-        detail: newAccessToken ? "Token refreshed successfully" : "No access token returned",
+        ok: !!newToken,
+        detail: newToken ? "Token renovado correctamente" : "Google no devolvió access token",
       });
+      if (!newToken) return NextResponse.json({ ok: false, steps }, { status: 200 });
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       steps.push({ step: "token_refresh", ok: false, detail: msg });
@@ -112,46 +102,42 @@ export async function POST(request: NextRequest) {
         msg.includes("Request had insufficient authentication scopes");
 
       if (isPermanent) {
-        await markEmailConnectionInvalid(targetUserId, msg);
-        steps.push({ step: "connection_marked_invalid", ok: true, detail: msg });
+        await markEmailConnectionInvalid(userId, msg);
+        steps.push({ step: "connection_marked_invalid", ok: true, detail: "Conexión marcada como inválida en DB" });
       }
 
-      return NextResponse.json({ ok: false, report }, { status: 200 });
+      return NextResponse.json({ ok: false, steps }, { status: 200 });
     }
 
-    // ── Step 5: Check gmail.send scope ────────────────────────────────────
+    // ── Step 4: Verify gmail.send scope ───────────────────────────────────
     try {
-      const tokenInfo = await oauth2Client.getTokenInfo(
-        (await oauth2Client.getAccessToken()).token ?? ""
-      );
+      const { token } = await oauth2Client.getAccessToken();
+      const tokenInfo = await oauth2Client.getTokenInfo(token ?? "");
       const scopes: string[] = tokenInfo.scopes ?? [];
       const hasSendScope = scopes.includes("https://www.googleapis.com/auth/gmail.send");
       steps.push({
         step: "gmail_send_scope",
         ok: hasSendScope,
-        detail: `Scopes: ${scopes.join(", ")}`,
+        detail: hasSendScope
+          ? "Scope gmail.send presente"
+          : `Scope gmail.send AUSENTE. Scopes actuales: ${scopes.join(", ")}`,
       });
-
-      if (!hasSendScope) {
-        return NextResponse.json({ ok: false, report }, { status: 200 });
-      }
+      if (!hasSendScope) return NextResponse.json({ ok: false, steps }, { status: 200 });
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       steps.push({ step: "gmail_send_scope", ok: false, detail: msg });
-      return NextResponse.json({ ok: false, report }, { status: 200 });
+      return NextResponse.json({ ok: false, steps }, { status: 200 });
     }
 
-    // ── Step 6: Send test email ───────────────────────────────────────────
+    // ── Step 5: Send test email to self ───────────────────────────────────
     const gmail = google.gmail({ version: "v1", auth: oauth2Client });
-    const fromAddress = `"Made in Casa Test" <${connection.email}>`;
-    const toAddress = connection.email;
     const subject = "Test de conexión Gmail — Made in Casa";
-    const body_text = `Este es un correo de prueba enviado desde Made in Casa para verificar que la conexión Gmail de ${connection.email} funciona correctamente.\n\nFecha: ${new Date().toISOString()}`;
-    const body_html = `<p>Este es un correo de prueba enviado desde <strong>Made in Casa</strong> para verificar que la conexión Gmail de <strong>${connection.email}</strong> funciona correctamente.</p><p style="color:#888;font-size:12px;">Fecha: ${new Date().toISOString()}</p>`;
+    const bodyText = `Este es un correo de prueba para verificar que la conexión Gmail de ${connection.email} funciona correctamente en Made in Casa.\n\nFecha: ${new Date().toISOString()}`;
+    const bodyHtml = `<p>Este es un correo de prueba para verificar que la conexión Gmail de <strong>${connection.email}</strong> funciona correctamente en <strong>Made in Casa</strong>.</p><p style="color:#888;font-size:12px;">Fecha: ${new Date().toISOString()}</p>`;
 
     const raw = [
-      `From: ${fromAddress}`,
-      `To: ${toAddress}`,
+      `From: "Made in Casa" <${connection.email}>`,
+      `To: ${connection.email}`,
       `Subject: ${subject}`,
       `MIME-Version: 1.0`,
       `Content-Type: multipart/alternative; boundary="testboundary"`,
@@ -159,12 +145,12 @@ export async function POST(request: NextRequest) {
       `--testboundary`,
       `Content-Type: text/plain; charset=UTF-8`,
       ``,
-      body_text,
+      bodyText,
       ``,
       `--testboundary`,
       `Content-Type: text/html; charset=UTF-8`,
       ``,
-      body_html,
+      bodyHtml,
       ``,
       `--testboundary--`,
     ].join("\r\n");
@@ -184,10 +170,10 @@ export async function POST(request: NextRequest) {
       steps.push({
         step: "send_test_email",
         ok: true,
-        detail: `Sent! gmail_message_id=${res.data.id} thread_id=${res.data.threadId}`,
+        detail: `Enviado. Revisa tu bandeja de entrada en ${connection.email}. gmail_id=${res.data.id}`,
       });
 
-      return NextResponse.json({ ok: true, report }, { status: 200 });
+      return NextResponse.json({ ok: true, steps }, { status: 200 });
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       steps.push({ step: "send_test_email", ok: false, detail: msg });
@@ -199,15 +185,15 @@ export async function POST(request: NextRequest) {
         msg.includes("Request had insufficient authentication scopes");
 
       if (isPermanent) {
-        await markEmailConnectionInvalid(targetUserId, msg);
-        steps.push({ step: "connection_marked_invalid", ok: true, detail: msg });
+        await markEmailConnectionInvalid(userId, msg);
+        steps.push({ step: "connection_marked_invalid", ok: true, detail: "Conexión marcada como inválida en DB" });
       }
 
-      return NextResponse.json({ ok: false, report }, { status: 200 });
+      return NextResponse.json({ ok: false, steps }, { status: 200 });
     }
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error);
     steps.push({ step: "unexpected_error", ok: false, detail: msg });
-    return NextResponse.json({ ok: false, report }, { status: 500 });
+    return NextResponse.json({ ok: false, steps }, { status: 500 });
   }
 }
