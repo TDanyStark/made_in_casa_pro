@@ -183,17 +183,42 @@ async function sendToRecipients(
   );
 }
 
+// ── Metadata builder ───────────────────────────────────────────────────────
+// Persists event-specific fields into the notification_events.metadata column
+// so that the retry route can reconstruct the email without hitting missing data.
+
+function buildEventMetadata(input: DispatchInput): Record<string, unknown> {
+  const base = input.metadata ?? {};
+  switch (input.eventType) {
+    case "task.reassigned":
+      return { ...base, previous_user_id: input.previousUserId, new_user_id: input.newUserId ?? null };
+    case "quote.requested":
+      return { ...base, invitee_user_id: input.inviteeUserId };
+    case "quote.received":
+      return { ...base, price: input.price, delivery_days: input.deliveryDays, notes: input.notes ?? null };
+    case "quote.accepted":
+      return { ...base, quote_id: input.quoteId };
+    case "project.adjustment.created":
+      return { ...base, version_number: input.versionNumber, notes: input.notes ?? null, task_count: input.taskCount ?? null };
+    default:
+      return { ...base };
+  }
+}
+
 // ── Main dispatcher ────────────────────────────────────────────────────────
 
 export async function dispatchNotification(input: DispatchInput): Promise<void> {
   try {
+    // Build metadata: merge event-specific fields so retries can reconstruct the message
+    const eventMetadata = buildEventMetadata(input);
+
     const event = await createNotificationEvent({
       event_type: input.eventType,
       actor_user_id: input.actorUserId,
       project_id: "projectId" in input ? input.projectId : null,
       task_id: "taskId" in input ? input.taskId : null,
       adjustment_id: "adjustmentId" in input ? input.adjustmentId : null,
-      metadata: input.metadata,
+      metadata: eventMetadata,
     });
 
     const eventId = (event as unknown as { id: number }).id;
