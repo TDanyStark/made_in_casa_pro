@@ -6,6 +6,7 @@ import { ITEMS_PER_PAGE } from "@/config/constants";
 import { decrypt } from "@/lib/session";
 import { cookies } from "next/headers";
 import { PROJECT_EDIT_ROLES, PROJECT_VIEW_ROLES } from "@/lib/role-groups";
+import { UserRole } from "@/lib/definitions";
 import {
   isSupportedProjectDateTime,
   normalizeOptionalProjectText,
@@ -56,8 +57,25 @@ export async function GET(request: NextRequest) {
     const managerId = url.searchParams.get("manager_id") ? parseInt(url.searchParams.get("manager_id")!) : undefined;
     const campaignId = url.searchParams.get("campaign_id") ? parseInt(url.searchParams.get("campaign_id")!) : undefined;
 
+    // Restringir visibilidad según el rol del usuario:
+    //   - Colaborador: solo proyectos con al menos una tarea asignada a él
+    //   - Comercial: solo proyectos que él creó
+    //   - Admin / Directivo / Financiero: ven todo
+    const sessionCookie = (await cookies()).get("session")?.value;
+    const session = sessionCookie ? await decrypt(sessionCookie) : null;
+    let assignedUserId: number | undefined;
+    let createdById: number | undefined;
+    if (session?.id) {
+      if (session.rol_id === UserRole.COLABORADOR) {
+        assignedUserId = session.id;
+      } else if (session.rol_id === UserRole.COMERCIAL) {
+        createdById = session.id;
+      }
+    }
+
     const { projects, total } = await getProjectsWithPagination({
       page, limit, search, status, brandId, managerId, campaignId,
+      assignedUserId, createdById,
     });
 
     const pageCount = Math.ceil(total / limit);

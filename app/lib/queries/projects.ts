@@ -4,6 +4,7 @@ import {
   ProjectType,
   ProjectDetailType,
   ProjectStatus,
+  UserRole,
 } from "../definitions";
 import { buildWhereClause, buildPaginationArgs, parseTotal } from "../db/query-helpers";
 import { ITEMS_PER_PAGE } from "@/config/constants";
@@ -66,6 +67,50 @@ export async function getProjectById(id: number): Promise<ProjectType | null> {
   }
 }
 
+/**
+ * Determina si un usuario puede acceder a un proyecto específico según su rol.
+ *   - Colaborador: solo si tiene al menos una tarea asignada en el proyecto.
+ *   - Comercial: solo si es el creador del proyecto.
+ *   - Otros roles (admin, directivo, financiero): acceso total.
+ */
+export async function userCanAccessProject(
+  projectId: number,
+  userId: number,
+  roleId: number
+): Promise<boolean> {
+  // Admin, Directivo y Financiero ven todo
+  if (
+    roleId === UserRole.ADMIN ||
+    roleId === UserRole.DIRECTIVO ||
+    roleId === UserRole.FINANCIERO
+  ) {
+    return true;
+  }
+
+  try {
+    if (roleId === UserRole.COMERCIAL) {
+      const result = await db.execute({
+        sql: `SELECT 1 FROM projects WHERE id = $1 AND created_by = $2 LIMIT 1`,
+        args: [projectId, userId],
+      });
+      return result.rows.length > 0;
+    }
+
+    if (roleId === UserRole.COLABORADOR) {
+      const result = await db.execute({
+        sql: `SELECT 1 FROM project_tasks WHERE project_id = $1 AND assigned_user_id = $2 LIMIT 1`,
+        args: [projectId, userId],
+      });
+      return result.rows.length > 0;
+    }
+
+    return false;
+  } catch (error) {
+    console.error("Error checking project access:", error);
+    return false;
+  }
+}
+
 export async function getProjectDetail(id: number): Promise<ProjectDetailType | null> {
   try {
     const project = await getProjectById(id);
@@ -100,6 +145,8 @@ export async function getProjectsWithPagination({
   brandId,
   managerId,
   campaignId,
+  assignedUserId,
+  createdById,
 }: {
   page?: number;
   limit?: number;
@@ -108,6 +155,10 @@ export async function getProjectsWithPagination({
   brandId?: number;
   managerId?: number;
   campaignId?: number;
+  /** Restringe a proyectos con al menos una tarea asignada a este usuario (colaboradores) */
+  assignedUserId?: number;
+  /** Restringe a proyectos creados por este usuario (comerciales) */
+  createdById?: number;
 }) {
   try {
     const { whereSQL, args } = buildWhereClause([
@@ -116,6 +167,11 @@ export async function getProjectsWithPagination({
       { sql: "p.brand_id = $", value: brandId },
       { sql: "p.manager_id = $", value: managerId },
       { sql: "p.campaign_id = $", value: campaignId },
+      {
+        sql: "EXISTS (SELECT 1 FROM project_tasks pt WHERE pt.project_id = p.id AND pt.assigned_user_id = $)",
+        value: assignedUserId,
+      },
+      { sql: "p.created_by = $", value: createdById },
     ]);
 
     const countResult = await db.execute({

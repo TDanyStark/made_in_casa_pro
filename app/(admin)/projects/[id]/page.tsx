@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import { Breadcrumbs } from "@/components/navigation/Breadcrumbs";
 import { ProjectDetailClient } from "@/components/projects/ProjectDetailClient";
 import { getUserRole, decrypt } from "@/lib/session";
-import { getProjectById } from "@/lib/queries/projects";
+import { getProjectById, userCanAccessProject } from "@/lib/queries/projects";
 import { cookies } from "next/headers";
 
 type Props = {
@@ -25,6 +25,13 @@ export default async function ProjectDetailPage({ params }: Props) {
   ]);
 
   if (!project) notFound();
+
+  // Restringir acceso directo por URL: colaboradores solo a proyectos con tarea
+  // propia; comerciales solo a proyectos que crearon.
+  if (session?.id) {
+    const canAccess = await userCanAccessProject(projectId, session.id, userRole);
+    if (!canAccess) notFound();
+  }
 
   return (
     <section className="container pb-12">

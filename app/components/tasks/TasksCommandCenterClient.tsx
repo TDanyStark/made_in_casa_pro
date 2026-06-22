@@ -199,6 +199,10 @@ export function TasksCommandCenterClient({ userRole }: TasksCommandCenterClientP
       if (!res.ok) throw new Error(res.error || "Error al obtener tareas");
       return res.data!;
     },
+    // Mantener la vista al día: refrescar al visitar la vista y al enfocar la ventana
+    staleTime: 0,
+    refetchOnMount: "always",
+    refetchOnWindowFocus: true,
   });
 
   const { data: areas = [] } = useQuery({

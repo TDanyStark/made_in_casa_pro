@@ -25,17 +25,25 @@ import { AreaType, UserRole } from "@/lib/definitions";
 import {
   Select,
   SelectContent,
-  SelectGroup,
   SelectItem,
-  SelectLabel,
-  SelectSeparator,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
-import { Users, Zap, UserCheck, X, Search } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { Users, Zap, UserCheck, X, Search, Check, ChevronsUpDown } from "lucide-react";
 
 export type AssignMode = "auto" | "commercial" | "specific";
 
@@ -45,14 +53,6 @@ const ROL_LABELS: Record<number, string> = {
   [UserRole.FINANCIERO]: "Financiero",
   [UserRole.COMERCIAL]: "Comercial",
   [UserRole.COLABORADOR]: "Colaborador",
-};
-
-const ROL_BADGE_CLASS: Record<number, string> = {
-  [UserRole.ADMIN]: "bg-red-100 text-red-700 border-red-200 dark:bg-red-900/20 dark:text-red-400",
-  [UserRole.DIRECTIVO]: "bg-purple-100 text-purple-700 border-purple-200 dark:bg-purple-900/20 dark:text-purple-400",
-  [UserRole.FINANCIERO]: "bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-900/20 dark:text-emerald-400",
-  [UserRole.COMERCIAL]: "bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-900/20 dark:text-blue-400",
-  [UserRole.COLABORADOR]: "bg-green-100 text-green-700 border-green-200 dark:bg-green-900/20 dark:text-green-400",
 };
 
 interface UserOption {
@@ -106,17 +106,7 @@ export function TaskAssignmentSelector({
     staleTime: 1000 * 60 * 5,
   });
 
-  const { data: areasAll = [] } = useQuery<AreaType[]>({
-    queryKey: ["areas-all"],
-    queryFn: async () => {
-      const res = await get<{ data: AreaType[] }>("areas");
-      return res.ok ? ((res.data as unknown as { data: AreaType[] })?.data ?? []) : [];
-    },
-    staleTime: 1000 * 60 * 5,
-    enabled: assignMode === "specific",
-  });
-
-  const areas = assignMode === "auto" ? areasForAuto : areasAll;
+  const areas = areasForAuto;
 
   // External collaborators (for "requires_quote" quoter selection)
   const { data: externalUsers = [] } = useQuery<UserOption[]>({
@@ -129,13 +119,11 @@ export function TaskAssignmentSelector({
     staleTime: 1000 * 60 * 5,
   });
 
-  // All active users (for "specific" mode), optionally filtered by area
+  // All active users (for "specific" mode)
   const { data: allUsers = [] } = useQuery<UserOption[]>({
-    queryKey: ["all-users-for-assignment", areaId],
+    queryKey: ["all-users-for-assignment"],
     queryFn: async () => {
-      const params = new URLSearchParams({ all_users: "1" });
-      if (areaId) params.set("area_id", areaId.toString());
-      const res = await get<UserOption[]>(`collaborators?${params}`);
+      const res = await get<UserOption[]>(`collaborators?all_users=1`);
       return res.ok ? (res.data ?? []) : [];
     },
     enabled: assignMode === "specific",
@@ -176,34 +164,42 @@ export function TaskAssignmentSelector({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [assignMode]);
 
-  // Group users by role for the dropdown
-  const admins = allUsers.filter((u) => u.rol_id === UserRole.ADMIN);
-  const directivos = allUsers.filter((u) => u.rol_id === UserRole.DIRECTIVO);
-  const financieros = allUsers.filter((u) => u.rol_id === UserRole.FINANCIERO);
-  const comerciales = allUsers.filter((u) => u.rol_id === UserRole.COMERCIAL);
-  const internals = allUsers.filter((u) => u.rol_id === UserRole.COLABORADOR && u.is_internal === 1);
-  const externals = allUsers.filter((u) => u.rol_id === UserRole.COLABORADOR && u.is_internal === 0);
+  // Popover open state for the searchable person combobox
+  const [userPickerOpen, setUserPickerOpen] = useState(false);
 
-  const renderUserItem = (u: UserOption) => (
-    <SelectItem key={u.id} value={u.id.toString()}>
-      <div className="flex items-center justify-between gap-2 w-full">
-        <span>{u.name}</span>
-        <div className="flex items-center gap-1 ml-1">
-          {u.rol_id === UserRole.COLABORADOR && (
-            <span className="text-xs text-muted-foreground">
-              {u.active_task_count} tarea(s)
-            </span>
-          )}
-          {u.area_name && (
-            <span className="text-xs text-muted-foreground">· {u.area_name}</span>
-          )}
-          {u.is_internal === 0 && u.rol_id === UserRole.COLABORADOR && (
-            <span className="text-xs text-muted-foreground italic">(externo)</span>
-          )}
-        </div>
-      </div>
-    </SelectItem>
-  );
+  const NO_AREA_LABEL = "Sin área";
+
+  // Group users by area; within each area, internals first then externals, then by name.
+  const usersByArea = (() => {
+    const groups = new Map<string, UserOption[]>();
+    for (const u of allUsers) {
+      const key = u.area_name ?? NO_AREA_LABEL;
+      const list = groups.get(key) ?? [];
+      list.push(u);
+      groups.set(key, list);
+    }
+    const sortedKeys = Array.from(groups.keys()).sort((a, b) => {
+      // "Sin área" goes last
+      if (a === NO_AREA_LABEL) return 1;
+      if (b === NO_AREA_LABEL) return -1;
+      return a.localeCompare(b);
+    });
+    return sortedKeys.map((area) => ({
+      area,
+      users: groups
+        .get(area)!
+        .slice()
+        .sort((a, b) => {
+          // internal (1) before external (0)
+          if (a.is_internal !== b.is_internal) return b.is_internal - a.is_internal;
+          return a.name.localeCompare(b.name);
+        }),
+    }));
+  })();
+
+  const selectedUser = allUsers.find((u) => u.id === assignedUserId) ?? null;
+
+  const isCollaborator = (u: UserOption) => u.rol_id === UserRole.COLABORADOR;
 
   return (
     <div className="space-y-3">
@@ -297,13 +293,12 @@ export function TaskAssignmentSelector({
             </div>
           </div>
 
-          {/* Area selector — shown for auto and specific modes */}
-          {(assignMode === "auto" || assignMode === "specific") && (
+          {/* Area selector — shown only for auto mode */}
+          {assignMode === "auto" && (
             <div>
               <label className="text-sm font-medium block mb-1.5">
                 Área
-                {assignMode === "auto" && <span className="text-destructive ml-1">*</span>}
-                {assignMode === "specific" && <span className="text-muted-foreground text-xs ml-1">(opcional — filtra la lista)</span>}
+                <span className="text-destructive ml-1">*</span>
               </label>
               <Select
                 value={areaId?.toString() ?? "none"}
@@ -317,9 +312,7 @@ export function TaskAssignmentSelector({
                   <SelectValue placeholder="Seleccionar área" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="none">
-                    {assignMode === "specific" ? "Todas las áreas" : "Sin área específica"}
-                  </SelectItem>
+                  <SelectItem value="none">Sin área específica</SelectItem>
                   {areas.map((area) => (
                     <SelectItem key={area.id!} value={area.id!.toString()}>
                       {area.name}
@@ -327,7 +320,7 @@ export function TaskAssignmentSelector({
                   ))}
                 </SelectContent>
               </Select>
-              {assignMode === "auto" && !areaId && (
+              {!areaId && (
                 <p className="text-xs text-muted-foreground mt-1">
                   Si no seleccionas área, la auto-asignación no podrá ejecutarse.
                 </p>
@@ -341,99 +334,121 @@ export function TaskAssignmentSelector({
       {assignMode === "specific" && !requiresQuote && (
         <div>
           <label className="text-sm font-medium block mb-1.5">Persona asignada</label>
-          <Select
-            value={assignedUserId?.toString() ?? "none"}
-            onValueChange={(v) => onAssignedUserIdChange(v === "none" ? null : Number(v))}
-            disabled={disabled}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Seleccionar persona..." />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="none">Sin asignar (dejar vacío)</SelectItem>
-
-              {admins.length > 0 && (
-                <SelectGroup>
-                  <SelectLabel>
-                    <Badge variant="outline" className={`text-xs ${ROL_BADGE_CLASS[UserRole.ADMIN]}`}>
-                      {ROL_LABELS[UserRole.ADMIN]}
-                    </Badge>
-                  </SelectLabel>
-                  {admins.map(renderUserItem)}
-                </SelectGroup>
-              )}
-
-              {directivos.length > 0 && (
-                <>
-                  {admins.length > 0 && <SelectSeparator />}
-                  <SelectGroup>
-                    <SelectLabel>
-                      <Badge variant="outline" className={`text-xs ${ROL_BADGE_CLASS[UserRole.DIRECTIVO]}`}>
-                        {ROL_LABELS[UserRole.DIRECTIVO]}
+          <Popover open={userPickerOpen} onOpenChange={setUserPickerOpen}>
+            <PopoverTrigger asChild>
+              <Button
+                type="button"
+                variant="outline"
+                role="combobox"
+                aria-expanded={userPickerOpen}
+                disabled={disabled}
+                className="w-full justify-between font-normal"
+              >
+                {selectedUser ? (
+                  <span className="flex items-center gap-2 truncate">
+                    <span className="truncate">{selectedUser.name}</span>
+                    {selectedUser.area_name && (
+                      <span className="text-xs text-muted-foreground">· {selectedUser.area_name}</span>
+                    )}
+                    {isCollaborator(selectedUser) && (
+                      <Badge variant="outline" className="text-[10px] px-1 py-0">
+                        {selectedUser.is_internal === 1 ? "Interno" : "Externo"}
                       </Badge>
-                    </SelectLabel>
-                    {directivos.map(renderUserItem)}
-                  </SelectGroup>
-                </>
-              )}
-
-              {financieros.length > 0 && (
-                <>
-                  {(admins.length > 0 || directivos.length > 0) && <SelectSeparator />}
-                  <SelectGroup>
-                    <SelectLabel>
-                      <Badge variant="outline" className={`text-xs ${ROL_BADGE_CLASS[UserRole.FINANCIERO]}`}>
-                        {ROL_LABELS[UserRole.FINANCIERO]}
-                      </Badge>
-                    </SelectLabel>
-                    {financieros.map(renderUserItem)}
-                  </SelectGroup>
-                </>
-              )}
-
-              {comerciales.length > 0 && (
-                <>
-                  {(admins.length > 0 || directivos.length > 0 || financieros.length > 0) && <SelectSeparator />}
-                  <SelectGroup>
-                    <SelectLabel>
-                      <Badge variant="outline" className={`text-xs ${ROL_BADGE_CLASS[UserRole.COMERCIAL]}`}>
-                        {ROL_LABELS[UserRole.COMERCIAL]}
-                      </Badge>
-                    </SelectLabel>
-                    {comerciales.map(renderUserItem)}
-                  </SelectGroup>
-                </>
-              )}
-
-              {internals.length > 0 && (
-                <>
-                  <SelectSeparator />
-                  <SelectGroup>
-                    <SelectLabel>
-                      <Badge variant="outline" className={`text-xs ${ROL_BADGE_CLASS[UserRole.COLABORADOR]}`}>
-                        Colaborador Interno
-                      </Badge>
-                    </SelectLabel>
-                    {internals.map(renderUserItem)}
-                  </SelectGroup>
-                </>
-              )}
-
-              {externals.length > 0 && (
-                <>
-                  <SelectSeparator />
-                  <SelectGroup>
-                    <SelectLabel>
-                      <Badge variant="outline" className="text-xs text-amber-700 border-amber-300 bg-amber-50">
-                        Colaborador Externo
-                      </Badge>
-                    </SelectLabel>
-                    {externals.map(renderUserItem)}
-                  </SelectGroup>
-                </>
-              )}
-            </SelectContent>
-          </Select>
+                    )}
+                  </span>
+                ) : (
+                  <span className="text-muted-foreground">Seleccionar persona...</span>
+                )}
+                <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+              <Command
+                filter={(value, search) =>
+                  value.toLowerCase().includes(search.toLowerCase()) ? 1 : 0
+                }
+              >
+                <CommandInput placeholder="Buscar por nombre, área, interno/externo..." />
+                <CommandList>
+                  <CommandEmpty>No se encontraron personas.</CommandEmpty>
+                  <CommandGroup>
+                    <CommandItem
+                      value="sin asignar dejar vacío"
+                      onSelect={() => {
+                        onAssignedUserIdChange(null);
+                        setUserPickerOpen(false);
+                      }}
+                    >
+                      <Check
+                        className={cn(
+                          "mr-2 h-4 w-4",
+                          assignedUserId === null ? "opacity-100" : "opacity-0"
+                        )}
+                      />
+                      <span className="text-muted-foreground">Sin asignar (dejar vacío)</span>
+                    </CommandItem>
+                  </CommandGroup>
+                  {usersByArea.map(({ area, users }) => (
+                    <CommandGroup key={area} heading={area}>
+                      {users.map((u) => {
+                        const internalLabel = isCollaborator(u)
+                          ? u.is_internal === 1
+                            ? "interno"
+                            : "externo"
+                          : "";
+                        const searchValue = `${u.name} ${area} ${internalLabel}`;
+                        return (
+                          <CommandItem
+                            key={u.id}
+                            value={searchValue}
+                            onSelect={() => {
+                              onAssignedUserIdChange(u.id);
+                              setUserPickerOpen(false);
+                            }}
+                          >
+                            <Check
+                              className={cn(
+                                "mr-2 h-4 w-4",
+                                assignedUserId === u.id ? "opacity-100" : "opacity-0"
+                              )}
+                            />
+                            <div className="flex items-center justify-between gap-2 w-full min-w-0">
+                              <span className="truncate">{u.name}</span>
+                              <div className="flex items-center gap-1.5 shrink-0">
+                                {isCollaborator(u) && (
+                                  <span className="text-xs text-muted-foreground">
+                                    {u.active_task_count} tarea(s)
+                                  </span>
+                                )}
+                                {isCollaborator(u) && (
+                                  <Badge
+                                    variant="outline"
+                                    className={cn(
+                                      "text-[10px] px-1 py-0",
+                                      u.is_internal === 1
+                                        ? "text-green-700 border-green-300 bg-green-50 dark:bg-green-900/20 dark:text-green-400"
+                                        : "text-amber-700 border-amber-300 bg-amber-50 dark:bg-amber-900/20 dark:text-amber-400"
+                                    )}
+                                  >
+                                    {u.is_internal === 1 ? "Interno" : "Externo"}
+                                  </Badge>
+                                )}
+                                {!isCollaborator(u) && (
+                                  <Badge variant="outline" className="text-[10px] px-1 py-0">
+                                    {ROL_LABELS[u.rol_id] ?? "—"}
+                                  </Badge>
+                                )}
+                              </div>
+                            </div>
+                          </CommandItem>
+                        );
+                      })}
+                    </CommandGroup>
+                  ))}
+                </CommandList>
+              </Command>
+            </PopoverContent>
+          </Popover>
         </div>
       )}
 
