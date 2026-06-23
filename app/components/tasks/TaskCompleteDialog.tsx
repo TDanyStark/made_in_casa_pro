@@ -230,10 +230,18 @@ export function TaskCompleteDialog({
           </div>
 
           {/* ── A. Tiempo invertido ──────────────────────────────────── */}
-          <div className="space-y-3 rounded-md border p-4">
+          <div
+            className={`space-y-3 rounded-md border p-4 ${
+              accumulatedMinutes === 0
+                ? "border-destructive/50 bg-destructive/5"
+                : ""
+            }`}
+          >
             <div className="flex items-center gap-2">
               <Clock className="h-4 w-4 text-muted-foreground" />
-              <span className="text-sm font-semibold">Tiempo invertido</span>
+              <span className="text-sm font-semibold">
+                Tiempo invertido <span className="text-destructive">*</span>
+              </span>
             </div>
 
             {/* Accumulated display */}
@@ -287,12 +295,25 @@ export function TaskCompleteDialog({
             </div>
 
             {/* Running total */}
-            <p className="text-sm font-medium text-primary">
+            <p
+              className={`text-sm font-medium ${
+                accumulatedMinutes > 0 ? "text-primary" : "text-destructive"
+              }`}
+            >
               Total:{" "}
               {accumulatedMinutes > 0
                 ? formatProgressMinutes(accumulatedMinutes)
                 : "0 min"}
             </p>
+
+            {/* Required hint */}
+            {accumulatedMinutes === 0 && (
+              <p className="flex items-center gap-1.5 text-[11px] text-destructive">
+                <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+                Es obligatorio registrar el tiempo invertido antes de completar
+                la tarea.
+              </p>
+            )}
           </div>
 
           {/* ── B. Enlace entregable ────────────────────────────────── */}

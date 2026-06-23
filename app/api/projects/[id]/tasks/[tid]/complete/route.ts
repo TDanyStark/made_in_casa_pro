@@ -10,7 +10,10 @@ import { dispatchNotification, NOTIFICATION_EVENTS } from "@/lib/services/notifi
 
 const bodySchema = z.object({
   notes: z.string().optional().nullable(),
-  progress_minutes: z.number().int().min(0),
+  progress_minutes: z
+    .number({ required_error: "Debes registrar el tiempo invertido en la tarea" })
+    .int()
+    .min(1, "Debes registrar al menos 1 minuto de tiempo invertido"),
   delivery_url: z.string().url().optional().nullable(),
   completion_cost: z.number().min(0).optional().nullable(),
 });
@@ -59,14 +62,25 @@ export async function POST(request: NextRequest, { params }: Params) {
       );
     }
 
-    let body: { notes?: string | null; progress_minutes?: number; delivery_url?: string | null; completion_cost?: number | null } = { progress_minutes: 0 };
+    let raw: unknown;
     try {
-      const raw = await request.json();
-      const parsed = bodySchema.safeParse(raw);
-      if (parsed.success) body = parsed.data;
+      raw = await request.json();
     } catch {
-      // body is optional
+      return NextResponse.json(
+        { error: "El cuerpo de la petición es inválido o está vacío" },
+        { status: 400 }
+      );
     }
+
+    const parsed = bodySchema.safeParse(raw);
+    if (!parsed.success) {
+      const firstIssue = parsed.error.issues[0];
+      return NextResponse.json(
+        { error: firstIssue?.message ?? "Datos de la petición inválidos" },
+        { status: 400 }
+      );
+    }
+    const body = parsed.data;
 
     const result = await completeTask(taskId, userId, body.notes, {
       progress_minutes: body.progress_minutes,
