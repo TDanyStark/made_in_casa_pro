@@ -10,7 +10,17 @@ import { MailWarning } from "lucide-react";
 export default async function SideNav() {
   const session = await getCurrentSession();
   const connection = session?.id ? await getUserEmailConnection(session.id) : null;
+  // Conectar Gmail es opcional: los correos salen igual por el SMTP del sistema.
+  // Mostramos un aviso (no bloqueante) cuando el usuario no tiene Gmail conectado
+  // o cuando la conexión quedó inválida, para invitarlo a conectarlo.
+  const gmailConnected =
+    connection?.status === "connected" && !!connection.refresh_token;
   const gmailInvalid = connection?.status === "invalid";
+  const showGmailNotice = !!session?.id && !gmailConnected;
+  const gmailNoticeLabel = gmailInvalid ? "Reconectar Gmail" : "Conectar Gmail";
+  const gmailNoticeHref = gmailInvalid
+    ? "/connect-email?reconnect=true"
+    : "/connect-email";
 
   return (
     <aside className="flex h-full flex-col px-3 py-4 md:px-2 bg-primary-foreground">
@@ -23,13 +33,13 @@ export default async function SideNav() {
       <div className="flex grow flex-row justify-between space-x-2 md:flex-col md:space-x-0 md:space-y-2 max-w-full overflow-auto pb-4 md:pb-0">
         <NavLinks />
         <div className="hidden h-auto w-full grow rounded-md bg-muted md:block"></div>
-        {gmailInvalid && (
+        {showGmailNotice && (
           <Link
-            href="/connect-email?reconnect=true"
+            href={gmailNoticeHref}
             className="hidden md:flex items-center gap-2 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive hover:bg-destructive/20 transition-colors"
           >
             <MailWarning className="h-4 w-4 shrink-0" />
-            <span>Reconectar Gmail</span>
+            <span>{gmailNoticeLabel}</span>
           </Link>
         )}
         <form action={logout}>

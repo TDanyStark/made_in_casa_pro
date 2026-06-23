@@ -18,8 +18,16 @@ export type UserEmailConnectionType = {
   updated_at: string;
 };
 
+/**
+ * Conectar Gmail es OPCIONAL por defecto. Si un usuario no conecta su Gmail,
+ * los correos se envían igual a través del SMTP del sistema (Hostinger) como
+ * fallback (ver app/lib/services/email/emailService.ts).
+ *
+ * Solo se vuelve obligatorio si se establece explícitamente
+ * REQUIRE_GMAIL_CONNECTION="true".
+ */
 export function isGmailConnectionRequired() {
-  return process.env.REQUIRE_GMAIL_CONNECTION !== "false";
+  return process.env.REQUIRE_GMAIL_CONNECTION === "true";
 }
 
 export async function getUserEmailConnection(

@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Badge } from "@/components/ui/badge";
 import { logout } from "@/lib/actions/auth";
 import { UserRole } from "@/lib/definitions";
-import { getUserEmailConnection, isGmailConnectionRequired } from "@/lib/queries/userEmailConnections";
+import { getUserEmailConnection } from "@/lib/queries/userEmailConnections";
 import { getCurrentSession } from "@/lib/services/api-session";
 
 type ConnectEmailPageProps = {
@@ -32,10 +32,6 @@ export default async function ConnectEmailPage({ searchParams }: ConnectEmailPag
   const session = await getCurrentSession();
   if (!session?.id) redirect("/");
 
-  if (!isGmailConnectionRequired()) {
-    redirect("/dashboard");
-  }
-
   const params = await searchParams;
   const isReconnect = params?.reconnect === "true";
   const connection = await getUserEmailConnection(session.id);
@@ -54,8 +50,8 @@ export default async function ConnectEmailPage({ searchParams }: ConnectEmailPag
   const statusLabel = isConnected
     ? "Gmail conectado"
     : connection?.status === "invalid"
-      ? "Reconexión requerida"
-      : "Gmail requerido";
+      ? "Reconexión recomendada"
+      : "Gmail opcional";
 
   return (
     <main className="relative min-h-screen overflow-hidden bg-background">
@@ -74,10 +70,10 @@ export default async function ConnectEmailPage({ searchParams }: ConnectEmailPag
                 {statusLabel}
               </Badge>
               <CardTitle className="text-2xl md:text-3xl">
-                Conecta tu Gmail para continuar
+                Conecta tu Gmail (opcional)
               </CardTitle>
               <CardDescription className="mx-auto max-w-lg text-base">
-                Made in Casa usa tu Gmail para enviar notificaciones desde tu correo y mantener el seguimiento de los hilos de cada proyecto.
+                Conectar tu Gmail permite enviar notificaciones desde tu propio correo y mantener el seguimiento de los hilos de cada proyecto. Si no lo conectas, los correos se enviarán igual desde el correo del sistema.
               </CardDescription>
             </div>
           </CardHeader>
@@ -127,6 +123,9 @@ export default async function ConnectEmailPage({ searchParams }: ConnectEmailPag
                 <Link href="/settings">Configurar Google OAuth</Link>
               </Button>
             ) : null}
+            <Button asChild variant="ghost" size="lg">
+              <Link href="/dashboard">Continuar sin conectar</Link>
+            </Button>
             <form action={logout}>
               <Button type="submit" variant="outline" size="lg">
                 Cerrar sesión
