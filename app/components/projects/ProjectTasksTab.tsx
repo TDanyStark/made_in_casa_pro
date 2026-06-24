@@ -343,9 +343,9 @@ export function ProjectTasksTab({
 
   const isAdmin = currentUserRole === 1 || currentUserRole === 2;
 
-  // Override para completar tareas: admin, directivo y comercial pueden
-  // completar cualquier tarea aunque no sean el colaborador asignado.
-  // (No afecta "Tomar" ni "Validar", que siguen usando isAdmin.)
+  // Override para tomar/completar/validar tareas: admin, directivo y comercial
+  // pueden tomar, completar y validar cualquier tarea aunque no sean el
+  // colaborador asignado.
   const canCompleteOverride = isAdmin || currentUserRole === 3;
 
   // Convert numeric role to enum for comparison
@@ -595,9 +595,9 @@ export function ProjectTasksTab({
               const isNotStarted = task.status === "not_started";
               const isCompleted = task.status === "completed";
               const isValidation = taskType === "validation";
-                      const canStart = isNotStarted && (isMyTask(task) || isAdmin);
+                      const canStart = isNotStarted && (isMyTask(task) || canCompleteOverride);
                       const canComplete = isInProgress && !isValidation && (isMyTask(task) || canCompleteOverride);
-                      const canValidate = isInProgress && isValidation && (isMyTask(task) || isAdmin);
+                      const canValidate = isInProgress && isValidation && (isMyTask(task) || canCompleteOverride);
                       const needsQuote = task.requires_quote === 1 && isBlocked;
 
                       return (
@@ -1049,11 +1049,13 @@ export function ProjectTasksTab({
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
-                              {(Object.keys(TASK_STATUS_CONFIG) as ProjectTaskStatus[]).map((val) => (
-                                <SelectItem key={val} value={val}>
-                                  {TASK_STATUS_CONFIG[val].label}
-                                </SelectItem>
-                              ))}
+                              {(Object.keys(TASK_STATUS_CONFIG) as ProjectTaskStatus[])
+                                .filter((val) => val !== "completed")
+                                .map((val) => (
+                                  <SelectItem key={val} value={val}>
+                                    {TASK_STATUS_CONFIG[val].label}
+                                  </SelectItem>
+                                ))}
                             </SelectContent>
                           </Select>
                         </FormControl>

@@ -1,17 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { validateApiRole, validateHttpMethod } from "@/lib/services/api-auth";
 import { getProjectTaskById, startTask } from "@/lib/queries/projectTasks";
-import { db } from "@/lib/db";
 import { decrypt } from "@/lib/session";
 import { cookies } from "next/headers";
-import { AUTHENTICATED_ROLES, CREATOR_FILTER_ROLES } from "@/lib/role-groups";
+import { AUTHENTICATED_ROLES, TASK_OVERRIDE_ROLES } from "@/lib/role-groups";
 
 type Params = { params: Promise<{ id: string; tid: string }> };
 
 /**
  * POST /api/projects/[id]/tasks/[tid]/start
  * Transitions a task from 'not_started' to 'in_progress'.
- * Allowed for: assigned user, or an operations-scope creator for the project.
+ * Allowed for: assigned user, or a leadership role (override).
  */
 export async function POST(request: NextRequest, { params }: Params) {
   const methodValidation = validateHttpMethod(request, ["POST"]);
@@ -42,26 +41,10 @@ export async function POST(request: NextRequest, { params }: Params) {
 
     // Permission check:
     // - The assigned user can always start their own task
-    // - Operations-scope users can start if they are the project creator
+    // - Leadership roles can override and start any task
     const isAssigned = task.assigned_user_id === userId;
-    const isManagerRole = CREATOR_FILTER_ROLES.includes(userRole);
-
-    let canStart = isAssigned;
-
-    if (!canStart && isManagerRole) {
-      const projectResult = await db.execute({
-        sql: `SELECT created_by FROM projects WHERE id = $1`,
-        args: [projectId],
-      });
-      if (projectResult.rows.length > 0) {
-        const creatorUserId = Number(
-          (projectResult.rows[0] as unknown as { created_by: number | null }).created_by
-        );
-        canStart = creatorUserId === userId;
-      }
-    }
-
-    if (!canStart) {
+    const canOverride = TASK_OVERRIDE_ROLES.includes(userRole);
+    if (!isAssigned && !canOverride) {
       return NextResponse.json(
         { error: "No tienes permiso para iniciar esta tarea" },
         { status: 403 }

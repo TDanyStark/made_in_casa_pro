@@ -58,6 +58,13 @@ export async function PATCH(request: NextRequest, { params }: Params) {
       return NextResponse.json({ error: "Datos inválidos" }, { status: 400 });
     }
 
+    if (validation.data.status === "completed") {
+      return NextResponse.json(
+        { error: "No se puede marcar una tarea como completada desde la edición. Usa el botón 'Completar' para registrar la duración y los entregables." },
+        { status: 422 }
+      );
+    }
+
     const taskId = parseInt(tid);
     const existingTask = await getProjectTaskById(taskId);
     if (!existingTask) return NextResponse.json({ error: "Tarea no encontrada" }, { status: 404 });

@@ -244,6 +244,11 @@ export async function updateProjectTask(
       throw new Error("No se pueden editar tareas completadas.");
     }
 
+    // Protection: 'completed' can only be set via the complete-task flow (completeTask)
+    if (data.status === "completed") {
+      throw new Error("El estado 'completado' solo puede establecerse mediante el flujo de completar tarea.");
+    }
+
     const updates: string[] = [];
     const args: unknown[] = [];
 
