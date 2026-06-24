@@ -1251,6 +1251,14 @@ export async function getMyTasksWithPagination(
           pt.created_at,
           pt.updated_at,
           pt.delivery_url,
+          (
+            SELECT tt.notes
+            FROM task_transitions tt
+            WHERE tt.task_id = pt.id
+              AND tt.to_status = 'completed'
+            ORDER BY tt.transitioned_at DESC, tt.id DESC
+            LIMIT 1
+          )                    AS delivery_notes,
           pt.completion_cost,
           pt.progress_percent,
           pt.progress_minutes,
@@ -1422,7 +1430,17 @@ export async function getTasksCommandCenterWithPagination({
           pt.requires_quote,
           pt.assigned_at,
           pt.completed_at,
-          pa.version_number
+          pa.version_number,
+          pt.delivery_url,
+          pt.progress_minutes,
+          (
+            SELECT tt.notes
+            FROM task_transitions tt
+            WHERE tt.task_id = pt.id
+              AND tt.to_status = 'completed'
+            ORDER BY tt.transitioned_at DESC, tt.id DESC
+            LIMIT 1
+          ) AS delivery_notes
         FROM project_tasks pt
         INNER JOIN projects p ON p.id = pt.project_id
         LEFT JOIN users creator ON creator.id = p.created_by

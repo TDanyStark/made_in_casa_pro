@@ -6,11 +6,12 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import { UserPenIcon } from "lucide-react";
+import { Eye, UserPenIcon } from "lucide-react";
 import { get, patch } from "@/lib/services/apiService";
 import {
   ApiResponseWithPagination,
   ProjectTaskStatus,
+  ProjectTaskType,
   TaskCommandCenterRow,
   TaskFlag,
   TaskType,
@@ -46,30 +47,17 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import Pagination from "@/components/pagination/Pagination";
 import { toast } from "sonner";
+import {
+  TaskStatusBadge,
+  TASK_STATUS_LABELS,
+  TASK_STATUS_STYLES,
+  TASK_STATUS_DOT,
+} from "./TaskStatusBadge";
+import { TaskDeliverableDialog } from "./TaskDeliverableDialog";
 
-const STATUS_LABELS: Record<ProjectTaskStatus, string> = {
-  not_started: "Sin iniciar",
-  waiting: "En espera",
-  in_progress: "En progreso",
-  completed: "Completada",
-  blocked: "Bloqueada",
-};
-
-const STATUS_STYLES: Record<ProjectTaskStatus, string> = {
-  not_started: "bg-slate-100 text-slate-700 border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700",
-  waiting:     "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950 dark:text-amber-400 dark:border-amber-800",
-  in_progress: "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950 dark:text-blue-400 dark:border-blue-800",
-  completed:   "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950 dark:text-emerald-400 dark:border-emerald-800",
-  blocked:     "bg-red-50 text-red-700 border-red-200 dark:bg-red-950 dark:text-red-400 dark:border-red-800",
-};
-
-const STATUS_DOT: Record<ProjectTaskStatus, string> = {
-  not_started: "bg-slate-400",
-  waiting:     "bg-amber-400",
-  in_progress: "bg-blue-500 animate-pulse",
-  completed:   "bg-emerald-500",
-  blocked:     "bg-red-500",
-};
+const STATUS_LABELS = TASK_STATUS_LABELS;
+const STATUS_STYLES = TASK_STATUS_STYLES;
+const STATUS_DOT = TASK_STATUS_DOT;
 
 const TYPE_LABELS: Record<TaskType, string> = {
   execution: "Ejecución",
@@ -125,6 +113,20 @@ export function TasksCommandCenterClient({ userRole }: TasksCommandCenterClientP
   const [editingTaskId, setEditingTaskId] = useState<number | null>(null);
   const [pendingUserId, setPendingUserId] = useState<string>("none");
   const [pendingRequiresQuote, setPendingRequiresQuote] = useState<boolean>(false);
+
+  // State for the deliverable viewer dialog
+  const [deliverableTask, setDeliverableTask] = useState<ProjectTaskType | null>(null);
+  const [deliverableOpen, setDeliverableOpen] = useState(false);
+
+  function openDeliverableDialog(task: TaskCommandCenterRow) {
+    setDeliverableTask({
+      ...(task as unknown as ProjectTaskType),
+      delivery_url: task.delivery_url ?? null,
+      delivery_notes: task.delivery_notes ?? null,
+      progress_minutes: task.progress_minutes ?? 0,
+    });
+    setDeliverableOpen(true);
+  }
 
   const page = searchParams.get("page") || "1";
   const creatorUserId = searchParams.get("creatorUserId") || "";
@@ -382,8 +384,32 @@ export function TasksCommandCenterClient({ userRole }: TasksCommandCenterClientP
       </div>
 
       <div className="space-y-2">
-        <p className="text-sm font-medium">Estado</p>
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+          <p className="text-sm font-medium">Estado</p>
+          <span className="text-xs text-muted-foreground">
+            Doble clic en un estado para seleccionar solo ese y deseleccionar los demás
+          </span>
+        </div>
         <div className="flex flex-wrap gap-2">
+          {(() => {
+            const allSelected = selectedStatuses.length === STATUS_OPTIONS.length;
+            return (
+              <button
+                type="button"
+                onClick={() => {
+                  const nextStatuses = allSelected ? [] : [...STATUS_OPTIONS];
+                  replace(`${pathname}?${createQueryStringWithStatuses(nextStatuses)}`);
+                }}
+                className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition-all ${
+                  allSelected
+                    ? "border-primary bg-primary text-primary-foreground"
+                    : "border-border bg-muted/40 text-muted-foreground opacity-50"
+                }`}
+              >
+                Todos
+              </button>
+            );
+          })()}
           {STATUS_OPTIONS.map((taskStatus) => {
             const isChecked = selectedStatuses.includes(taskStatus);
             return (
@@ -396,6 +422,11 @@ export function TasksCommandCenterClient({ userRole }: TasksCommandCenterClientP
                     : Array.from(new Set([...selectedStatuses, taskStatus]));
                   replace(`${pathname}?${createQueryStringWithStatuses(nextStatuses)}`);
                 }}
+                onDoubleClick={() => {
+                  // Doble clic: aislar este estado (selecciona solo este)
+                  replace(`${pathname}?${createQueryStringWithStatuses([taskStatus])}`);
+                }}
+                title="Doble clic para seleccionar solo este estado"
                 className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition-all ${
                   isChecked
                     ? STATUS_STYLES[taskStatus]
@@ -471,6 +502,7 @@ export function TasksCommandCenterClient({ userRole }: TasksCommandCenterClientP
               <TableHead>Versión</TableHead>
               <TableHead>Asignada</TableHead>
               <TableHead>Completada</TableHead>
+              <TableHead className="text-right">Entregable</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -487,17 +519,18 @@ export function TasksCommandCenterClient({ userRole }: TasksCommandCenterClientP
                   <TableCell><Skeleton className="h-6 w-10" /></TableCell>
                   <TableCell><Skeleton className="h-6 w-24" /></TableCell>
                   <TableCell><Skeleton className="h-6 w-24" /></TableCell>
+                  <TableCell><Skeleton className="h-6 w-8 ml-auto" /></TableCell>
                 </TableRow>
               ))
             ) : isError ? (
               <TableRow>
-                <TableCell colSpan={10} className="text-center text-destructive h-20">
+                <TableCell colSpan={11} className="text-center text-destructive h-20">
                   Error al cargar tareas.
                 </TableCell>
               </TableRow>
             ) : rows.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={10} className="text-center text-muted-foreground h-20">
+                <TableCell colSpan={11} className="text-center text-muted-foreground h-20">
                   No se encontraron tareas con los filtros seleccionados.
                 </TableCell>
               </TableRow>
@@ -606,10 +639,7 @@ export function TasksCommandCenterClient({ userRole }: TasksCommandCenterClientP
                     </Badge>
                   </TableCell>
                   <TableCell>
-                    <Badge className={`inline-flex items-center gap-1.5 border font-medium ${STATUS_STYLES[task.status]}`}>
-                      <span className={`size-1.5 rounded-full shrink-0 ${STATUS_DOT[task.status]}`} />
-                      {STATUS_LABELS[task.status]}
-                    </Badge>
+                    <TaskStatusBadge status={task.status} />
                   </TableCell>
                   <TableCell>
                     {task.version_number != null ? (
@@ -630,12 +660,33 @@ export function TasksCommandCenterClient({ userRole }: TasksCommandCenterClientP
                       ? format(new Date(task.completed_at), "d MMM yyyy, HH:mm", { locale: es })
                       : "—"}
                   </TableCell>
+                  <TableCell className="text-right">
+                    {task.status === "completed" ? (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-muted-foreground"
+                        onClick={() => openDeliverableDialog(task)}
+                        title="Ver entregable"
+                      >
+                        <Eye className="h-4 w-4" />
+                      </Button>
+                    ) : (
+                      <span className="text-muted-foreground text-xs">—</span>
+                    )}
+                  </TableCell>
                 </TableRow>
               ))
             )}
           </TableBody>
         </Table>
       </div>
+
+      <TaskDeliverableDialog
+        open={deliverableOpen}
+        onOpenChange={setDeliverableOpen}
+        task={deliverableTask}
+      />
 
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-sm text-muted-foreground">Total: {total} tarea{total !== 1 ? "s" : ""}</p>

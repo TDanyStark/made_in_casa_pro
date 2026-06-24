@@ -23,14 +23,14 @@ export default async function SideNav() {
     : "/connect-email";
 
   return (
-    <aside className="flex h-full flex-col px-3 py-4 md:px-2 bg-primary-foreground">
+    <aside className="flex h-full max-h-full flex-col px-3 py-4 md:px-2 bg-primary-foreground md:overflow-hidden">
       <Link
-        className="mb-2 flex items-end justify-center rounded-md bg-mic-gradient p-4"
+        className="mb-2 flex flex-none items-end justify-center rounded-md bg-mic-gradient p-4"
         href="/dashboard"
       >
         <MICLogo onlyIcon={true} colorWhite={true} />
       </Link>
-      <div className="flex grow flex-row justify-between space-x-2 md:flex-col md:space-x-0 md:space-y-2 max-w-full overflow-auto pb-4 md:pb-0">
+      <div className="flex grow flex-row justify-between space-x-2 md:flex-col md:space-x-0 md:space-y-2 max-w-full overflow-auto no-scrollbar pb-4 md:pb-0">
         <NavLinks />
         <div className="hidden h-auto w-full grow rounded-md bg-muted md:block"></div>
         {showGmailNotice && (

@@ -26,14 +26,14 @@ export default async function Layout({
 
   return (
       <RoleProvider role={role}>
-        <main className="relative flex min-h-screen flex-col md:flex-row md:overflow-hidden">
-          <div className="absolute right-4 top-4 md:right-8 md:top-8">
+        <main className="relative flex min-h-screen flex-col md:h-screen md:max-h-screen md:flex-row md:overflow-hidden">
+          <div className="absolute right-4 top-4 md:right-8 md:top-8 z-10">
             <ModeToggle />
           </div>
-          <div className="w-full flex-none md:w-64">
+          <div className="w-full flex-none md:h-screen md:w-64">
             <SideNav />
           </div>
-          <div className="flex-grow p-6 md:overflow-y-auto md:p-16">
+          <div className="flex-grow overflow-y-auto p-6 md:p-16">
             {children}
           </div>
         </main>

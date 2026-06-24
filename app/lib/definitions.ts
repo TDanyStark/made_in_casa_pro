@@ -341,6 +341,7 @@ export type MyTaskRowPaginated = {
   pending_quote_count?: number;
   // completion fields
   delivery_url: string | null;
+  delivery_notes?: string | null;
   completion_cost: number | null;
   progress_percent: number;
   progress_minutes: number;
@@ -380,6 +381,10 @@ export type TaskCommandCenterRow = {
   assigned_at: string | null;
   completed_at: string | null;
   version_number: number | null;
+  // deliverable fields (populated for completed tasks)
+  delivery_url: string | null;
+  delivery_notes?: string | null;
+  progress_minutes: number;
 };
 
 export type QuoteStatus = 'pending' | 'accepted' | 'rejected';

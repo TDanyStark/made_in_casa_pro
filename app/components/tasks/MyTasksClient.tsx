@@ -19,7 +19,6 @@ import {
 import { ITEMS_PER_PAGE } from "@/config/constants";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -35,6 +34,13 @@ import { TaskValidationDialog } from "./TaskValidationDialog";
 import { TaskCompleteDialog } from "./TaskCompleteDialog";
 import { TaskHistoryDialog } from "./TaskHistoryDialog";
 import { TaskProgressReportModal } from "./TaskProgressReportModal";
+import { TaskDeliverableDialog } from "./TaskDeliverableDialog";
+import {
+  TaskStatusBadge,
+  TASK_STATUS_LABELS,
+  TASK_STATUS_STYLES,
+  TASK_STATUS_DOT,
+} from "./TaskStatusBadge";
 import {
   AlertTriangle,
   BellRing,
@@ -42,6 +48,7 @@ import {
   CheckCircle,
   Clock,
   ExternalLink,
+  Eye,
   History as HistoryIcon,
   PlayCircle,
   ShieldCheck,
@@ -81,13 +88,7 @@ const DEFAULT_STATUS_OPTIONS: ProjectTaskStatus[] = [
   "waiting",
 ];
 
-const STATUS_LABELS: Record<ProjectTaskStatus, string> = {
-  not_started: "Sin iniciar",
-  waiting: "En espera",
-  in_progress: "En progreso",
-  completed: "Completada",
-  blocked: "Bloqueada",
-};
+const STATUS_LABELS = TASK_STATUS_LABELS;
 
 const DEFAULT_STATUS_SET = new Set(DEFAULT_STATUS_OPTIONS);
 
@@ -97,30 +98,6 @@ const hasSameStatuses = (a: ProjectTaskStatus[], b: Set<ProjectTaskStatus>) => {
 };
 
 // ─── Status/type configs ──────────────────────────────────────────────────────
-
-const STATUS_CONFIG: Record<ProjectTaskStatus, { label: string; className: string }> = {
-  not_started: { label: "Sin iniciar", className: "bg-muted text-muted-foreground" },
-  waiting: {
-    label: "En espera",
-    className:
-      "bg-slate-100 text-slate-600 dark:bg-slate-800/50 dark:text-slate-400",
-  },
-  in_progress: {
-    label: "En progreso",
-    className:
-      "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400",
-  },
-  completed: {
-    label: "Completado",
-    className:
-      "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400",
-  },
-  blocked: {
-    label: "Bloqueado",
-    className:
-      "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400",
-  },
-};
 
 const TYPE_CONFIG: Record<TaskType, { label: string; className: string }> = {
   execution: {
@@ -209,6 +186,8 @@ export function MyTasksClient() {
   const [taskToComplete, setTaskToComplete] = useState<MyTaskRowPaginated | null>(null);
   const [historyDialogOpen, setHistoryDialogOpen] = useState(false);
   const [taskForHistory, setTaskForHistory] = useState<MyTaskRowPaginated | null>(null);
+  const [deliverableDialogOpen, setDeliverableDialogOpen] = useState(false);
+  const [taskForDeliverable, setTaskForDeliverable] = useState<ProjectTaskType | null>(null);
   const [reportDialogOpen, setReportDialogOpen] = useState(false);
   const [reportInitialTaskId, setReportInitialTaskId] = useState<number | null>(null);
   const [startingTaskId, setStartingTaskId] = useState<number | null>(null);
@@ -450,6 +429,16 @@ export function MyTasksClient() {
     setHistoryDialogOpen(true);
   };
 
+  const openDeliverableDialog = (task: MyTaskRowPaginated) => {
+    setTaskForDeliverable({
+      ...(task as unknown as ProjectTaskType),
+      delivery_url: task.delivery_url ?? null,
+      delivery_notes: task.delivery_notes ?? null,
+      progress_minutes: task.progress_minutes ?? 0,
+    });
+    setDeliverableDialogOpen(true);
+  };
+
   const markTaskViewed = (taskId: number) => {
     setReportState((prev) => ({
       ...prev,
@@ -645,6 +634,17 @@ export function MyTasksClient() {
 
           <div className="flex flex-col items-end gap-2">
             <div className="flex items-center gap-1.5">
+              {task.status === "completed" && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7 text-muted-foreground"
+                  onClick={() => openDeliverableDialog(task)}
+                  title="Ver entregable"
+                >
+                  <Eye className="h-3.5 w-3.5" />
+                </Button>
+              )}
               <Button
                 variant="ghost"
                 size="icon"
@@ -654,20 +654,7 @@ export function MyTasksClient() {
               >
                 <HistoryIcon className="h-3.5 w-3.5" />
               </Button>
-              <span
-                className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium ${
-                  STATUS_CONFIG[task.status]?.className
-                }`}
-              >
-                {task.status === "waiting" && <Clock className="h-3 w-3" />}
-                {task.status === "blocked" && (
-                  <AlertTriangle className="h-3 w-3" />
-                )}
-                {task.status === "in_progress" && (
-                  <span className="size-1.5 rounded-full bg-blue-500 animate-pulse shrink-0" />
-                )}
-                {STATUS_CONFIG[task.status]?.label}
-              </span>
+              <TaskStatusBadge status={task.status} />
             </div>
 
             {isNotStarted && (
@@ -796,30 +783,71 @@ export function MyTasksClient() {
           </Button>
         </div>
 
-        {/* Row 2: Status checkboxes */}
+        {/* Row 2: Status filter pills */}
         <div className="space-y-2">
-          <p className="text-sm font-medium">Estado</p>
-          <div className="flex flex-wrap gap-4">
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+            <p className="text-sm font-medium">Estado</p>
+            <span className="text-xs text-muted-foreground">
+              Doble clic en un estado para seleccionar solo ese y deseleccionar los demás
+            </span>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {(() => {
+              const allSelected =
+                selectedStatuses.length === STATUS_OPTIONS.length;
+              return (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const nextStatuses = allSelected ? [] : [...STATUS_OPTIONS];
+                    replace(
+                      `${pathname}?${createQueryStringWithStatuses(nextStatuses)}`
+                    );
+                  }}
+                  className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition-all ${
+                    allSelected
+                      ? "border-primary bg-primary text-primary-foreground"
+                      : "border-border bg-muted/40 text-muted-foreground opacity-50"
+                  }`}
+                >
+                  Todos
+                </button>
+              );
+            })()}
             {STATUS_OPTIONS.map((status) => {
               const isChecked = selectedStatuses.includes(status);
               return (
-                <div key={status} className="flex items-center gap-2">
-                  <Checkbox
-                    id={`my-task-status-${status}`}
-                    checked={isChecked}
-                    onCheckedChange={(checked) => {
-                      const nextStatuses = checked
-                        ? Array.from(new Set([...selectedStatuses, status]))
-                        : selectedStatuses.filter((s) => s !== status);
-                      replace(
-                        `${pathname}?${createQueryStringWithStatuses(nextStatuses)}`
-                      );
-                    }}
+                <button
+                  key={status}
+                  type="button"
+                  onClick={() => {
+                    const nextStatuses = isChecked
+                      ? selectedStatuses.filter((s) => s !== status)
+                      : Array.from(new Set([...selectedStatuses, status]));
+                    replace(
+                      `${pathname}?${createQueryStringWithStatuses(nextStatuses)}`
+                    );
+                  }}
+                  onDoubleClick={() => {
+                    // Doble clic: aislar este estado (selecciona solo este)
+                    replace(
+                      `${pathname}?${createQueryStringWithStatuses([status])}`
+                    );
+                  }}
+                  title="Doble clic para seleccionar solo este estado"
+                  className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition-all ${
+                    isChecked
+                      ? TASK_STATUS_STYLES[status]
+                      : "border-border bg-muted/40 text-muted-foreground opacity-50"
+                  }`}
+                >
+                  <span
+                    className={`size-1.5 rounded-full shrink-0 ${
+                      isChecked ? TASK_STATUS_DOT[status] : "bg-muted-foreground"
+                    }`}
                   />
-                  <Label htmlFor={`my-task-status-${status}`}>
-                    {STATUS_LABELS[status]}
-                  </Label>
-                </div>
+                  {STATUS_LABELS[status]}
+                </button>
               );
             })}
           </div>
@@ -1031,6 +1059,13 @@ export function MyTasksClient() {
         onOpenChange={setHistoryDialogOpen}
         taskId={taskForHistory?.id ?? null}
         taskTitle={taskForHistory?.title ?? ""}
+      />
+
+      {/* Deliverable Dialog */}
+      <TaskDeliverableDialog
+        open={deliverableDialogOpen}
+        onOpenChange={setDeliverableDialogOpen}
+        task={taskForDeliverable}
       />
     </div>
   );

@@ -5,7 +5,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ProjectTaskType } from "@/lib/definitions";
-import { Eye, ExternalLink, FileText, Link as LinkIcon } from "lucide-react";
+import { formatProgressMinutes } from "@/lib/task-progress";
+import { Clock, Eye, ExternalLink, FileText, Link as LinkIcon } from "lucide-react";
 
 interface TaskDeliverableDialogProps {
   open: boolean;
@@ -22,7 +23,9 @@ export function TaskDeliverableDialog({
 
   const hasDeliveryLink = Boolean(task.delivery_url?.trim());
   const hasDeliveryNotes = Boolean(task.delivery_notes?.trim());
-  const hasDeliverable = hasDeliveryLink || hasDeliveryNotes;
+  const elapsedMinutes = task.progress_minutes ?? 0;
+  const hasElapsedTime = elapsedMinutes > 0;
+  const hasDeliverable = hasDeliveryLink || hasDeliveryNotes || hasElapsedTime;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -45,12 +48,32 @@ export function TaskDeliverableDialog({
                 Sin entregable registrado
               </CardTitle>
               <CardDescription>
-                Esta tarea todavía no tiene enlace ni notas de entrega.
+                Esta tarea todavía no tiene enlace, notas de entrega ni tiempo registrado.
               </CardDescription>
             </CardHeader>
           </Card>
         ) : (
           <div className="flex flex-col gap-4">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <Clock className="text-muted-foreground" />
+                  Tiempo invertido
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {hasElapsedTime ? (
+                  <p className="text-sm font-medium">
+                    {formatProgressMinutes(elapsedMinutes)}
+                  </p>
+                ) : (
+                  <p className="text-sm text-muted-foreground">
+                    No se registró tiempo invertido.
+                  </p>
+                )}
+              </CardContent>
+            </Card>
+
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-base">

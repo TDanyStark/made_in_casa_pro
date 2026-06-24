@@ -135,6 +135,16 @@
   background: #555;
 }
 
+/* Permite scroll ocultando la barra de scroll */
+.no-scrollbar {
+  -ms-overflow-style: none; /* IE y Edge */
+  scrollbar-width: none; /* Firefox */
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none; /* Chrome, Safari y Opera */
+}
+
 button{
   cursor: pointer;
 }
