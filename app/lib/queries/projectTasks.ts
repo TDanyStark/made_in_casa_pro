@@ -14,6 +14,7 @@ import {
 import { buildPaginationArgs, buildWhereClause, parseTotal } from "../db/query-helpers";
 import { ITEMS_PER_PAGE } from "@/config/constants";
 import { CREATOR_FILTER_ROLES } from "@/lib/role-groups";
+import type { DbTransaction } from "../db/types";
 
 // ─── Shared SELECT fragments ──────────────────────────────────────────────────
 
@@ -316,11 +317,91 @@ export async function deleteProjectTask(id: number): Promise<void> {
     if (task.status === "completed") {
       throw new Error("No se pueden eliminar tareas completadas.");
     }
-    await db.execute({ sql: `DELETE FROM project_tasks WHERE id = $1`, args: [id] });
+
+    const transaction = await db.transaction("write");
+    try {
+      await transaction.execute({ sql: `DELETE FROM project_tasks WHERE id = $1`, args: [id] });
+
+      // Invariant: the project (scoped to the same adjustment version) must never
+      // be left with all remaining tasks in 'waiting'. If the deleted task was the
+      // active one (or its removal otherwise leaves no active task), promote the
+      // next pending task in order to 'not_started'. Completed tasks and tasks from
+      // other adjustment versions are never touched (same semantics as completeTask
+      // / reorderProjectTasks).
+      await ensureNextPendingTaskActive(transaction, task.project_id, task.adjustment_id);
+
+      await transaction.commit();
+    } catch (err) {
+      await transaction.rollback();
+      throw err;
+    }
+
     revalidatePath(`/projects/${task.project_id}`);
   } catch (error) {
     console.error("Error deleting project task:", error);
     throw error;
+  }
+}
+
+// ─── Pending-task promotion invariant ────────────────────────────────────────
+
+/**
+ * Ensures the invariant "the project (scoped to a single adjustment version)
+ * always has an active next task, never all-waiting" holds:
+ *   - The first non-completed task (lowest order_index) is promoted from
+ *     'waiting' to 'not_started' if needed.
+ *   - Any other 'not_started' task that isn't the first non-completed one is
+ *     demoted back to 'waiting' (keeps a single pending task active at a time).
+ *   - Tasks already 'in_progress' or 'blocked' are left untouched — those are
+ *     healthy active states, not something to "fix".
+ *   - Completed tasks are skipped entirely and never touched.
+ *
+ * Must run inside an existing write transaction (delete/reorder are atomic).
+ * Extracted from reorderProjectTasks() so deleteProjectTask() (and any future
+ * caller) can reuse the exact same promotion semantics instead of duplicating it.
+ */
+async function ensureNextPendingTaskActive(
+  transaction: DbTransaction,
+  projectId: number,
+  adjustmentId?: number | null
+): Promise<void> {
+  const adjustmentFilter =
+    adjustmentId === undefined
+      ? ""
+      : adjustmentId === null
+        ? "AND adjustment_id IS NULL"
+        : `AND adjustment_id = ${adjustmentId}`;
+
+  const tasksResult = await transaction.execute({
+    sql: `SELECT id, status, assigned_user_id FROM project_tasks WHERE project_id = $1 ${adjustmentFilter} ORDER BY order_index ASC`,
+    args: [projectId],
+  });
+  const tasks = tasksResult.rows as unknown as {
+    id: number;
+    status: ProjectTaskStatus;
+    assigned_user_id: number | null;
+  }[];
+
+  let firstNonCompletedFound = false;
+  for (const task of tasks) {
+    if (task.status === "completed") continue;
+
+    if (!firstNonCompletedFound) {
+      firstNonCompletedFound = true;
+      if (task.status === "waiting") {
+        await transaction.execute({
+          sql: `UPDATE project_tasks SET status = 'not_started', assigned_at = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $1`,
+          args: [task.id, task.assigned_user_id ? new Date() : null],
+        });
+      }
+    } else {
+      if (task.status === "not_started") {
+        await transaction.execute({
+          sql: `UPDATE project_tasks SET status = 'waiting', updated_at = CURRENT_TIMESTAMP WHERE id = $1`,
+          args: [task.id],
+        });
+      }
+    }
   }
 }
 
@@ -361,33 +442,7 @@ export async function reorderProjectTasks(
     // Status logic:
     // 1. The first task that is NOT completed must be set to 'not_started' if it was 'waiting'
     // 2. All subsequent tasks that are 'not_started' must be set to 'waiting'
-    const updatedTasksResult = await transaction.execute({
-      sql: `SELECT id, status, assigned_user_id FROM project_tasks WHERE project_id = $1 ${adjustmentFilter} ORDER BY order_index ASC`,
-      args: [projectId],
-    });
-    const updatedTasks = updatedTasksResult.rows as unknown as { id: number; status: ProjectTaskStatus; assigned_user_id: number | null }[];
-    
-    let firstNonCompletedFound = false;
-    for (const task of updatedTasks) {
-      if (task.status === "completed") continue;
-
-      if (!firstNonCompletedFound) {
-        firstNonCompletedFound = true;
-        if (task.status === "waiting") {
-          await transaction.execute({
-            sql: `UPDATE project_tasks SET status = 'not_started', assigned_at = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $1`,
-            args: [task.id, task.assigned_user_id ? new Date() : null],
-          });
-        }
-      } else {
-        if (task.status === "not_started") {
-          await transaction.execute({
-            sql: `UPDATE project_tasks SET status = 'waiting', updated_at = CURRENT_TIMESTAMP WHERE id = $1`,
-            args: [task.id],
-          });
-        }
-      }
-    }
+    await ensureNextPendingTaskActive(transaction, projectId, adjustmentId);
 
     await transaction.commit();
     revalidatePath(`/projects/${projectId}`);
