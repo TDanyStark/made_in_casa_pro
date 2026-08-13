@@ -1,0 +1,2532 @@
+- generic [active] [ref=e1]:
+  - link [ref=e2] [cursor=pointer]:
+    - /url: "#"
+    - text: ___
+  - generic [ref=e4]:
+    - generic [ref=e5]:
+      - navigation [ref=e6]:
+        - generic [ref=e7]:
+          - generic [ref=e9]:
+            - paragraph [ref=e10] [cursor=pointer]:
+              - text: COLOMBIA
+              - generic [ref=e11]: 
+            - text: 
+          - link "PORTAL DE CLIENTES" [ref=e15] [cursor=pointer]:
+            - /url: https://portaldeclientes.siigo.com/?__hstc=181257784.bd8743a90813fa925a738a68a102d17d.1686061370383.1692276727680.1692282365267.248&__hssc=181257784.3.1692282365267&__hsfp=3206432219
+          - paragraph [ref=e19] [cursor=pointer]:
+            - text: "CONTACTO: (+57) 3172647555"
+            - generic [ref=e20]: 
+      - banner [ref=e21]:
+        - generic [ref=e22]:
+          - link "Logo" [ref=e23] [cursor=pointer]:
+            - /url: /
+            - img "Logo" [ref=e24]
+          - generic [ref=e26]:
+            - list [ref=e27]:
+              - listitem [ref=e28]:
+                - link "Inicio" [ref=e29] [cursor=pointer]:
+                  - /url: /
+              - listitem [ref=e30]:
+                - link "Planes y precios" [ref=e31] [cursor=pointer]:
+                  - /url: /precios-siigo/
+              - listitem [ref=e32]:
+                - paragraph [ref=e34] [cursor=pointer]:
+                  - text: Productos y Funcionalidades
+                  - generic [ref=e35]: 
+              - listitem [ref=e36]:
+                - link "Prueba Gratis" [ref=e37] [cursor=pointer]:
+                  - /url: /prueba-gratis/
+              - listitem [ref=e38]:
+                - link "Por qué Siigo" [ref=e39] [cursor=pointer]:
+                  - /url: /por-que-siigo/
+            - list [ref=e40]:
+              - listitem [ref=e41]:
+                - paragraph [ref=e43] [cursor=pointer]:
+                  - text: Recursos
+                  - generic [ref=e44]: 
+              - listitem [ref=e45]:
+                - paragraph [ref=e47] [cursor=pointer]:
+                  - text: Iniciar sesión
+                  - generic [ref=e48]: 
+          - text: 
+      - generic [ref=e51]: Tu match perfecto
+    - button "Privacy -" [ref=e52]
+    - button "Terms" [ref=e53]
+    - generic [ref=e56]:
+      - link "Home" [ref=e57] [cursor=pointer]:
+        - /url: /
+      - generic [ref=e58]: 
+      - generic [ref=e59]: Planes y precios
+    - generic [ref=e67]:
+      - heading "Invierte en tu negocio con los planes y precios de Siigo" [level=1] [ref=e68]
+      - paragraph [ref=e69]: Encuentra diferentes paquetes, alineados a los objetivos y presupuesto de tu negocio
+    - generic [ref=e72]:
+      - generic [ref=e74]:
+        - button "Facturación Electrónica" [ref=e75] [cursor=pointer]:
+          - generic [ref=e76]: Facturación Electrónica
+        - button "Sistema POS + Facturación" [ref=e77] [cursor=pointer]:
+          - generic [ref=e78]: Sistema POS + Facturación
+        - button "Sistema POS Gastrobar" [ref=e79] [cursor=pointer]:
+          - generic [ref=e80]: Sistema POS Gastrobar
+        - button "Nómina Electrónica" [ref=e81] [cursor=pointer]:
+          - generic [ref=e82]: Nómina Electrónica
+        - button "Software Administrativo" [ref=e83] [cursor=pointer]:
+          - generic [ref=e84]: Software Administrativo
+        - button "Software Contable" [ref=e85] [cursor=pointer]:
+          - generic [ref=e86]: Software Contable
+      - generic [ref=e92]:
+        - generic [ref=e95]:
+          - generic [ref=e97]:
+            - generic [ref=e98]: "1"
+            - generic [ref=e99]: Elige un plan
+          - generic [ref=e102]:
+            - generic [ref=e103]: "2"
+            - generic [ref=e104]: Crea tu cuenta
+          - generic [ref=e107]:
+            - generic [ref=e108]: "3"
+            - generic [ref=e109]: Finaliza tu compra
+        - generic [ref=e111]:
+          - heading "Facturación Electrónica" [level=2] [ref=e112]
+          - paragraph [ref=e113]: Simplifica tu facturación electrónica de manera fácil, segura y eficiente, con soporte ilimitado.
+          - generic [ref=e114]:
+            - article [ref=e117]:
+              - generic [ref=e118]:
+                - generic [ref=e119]:
+                  - heading "Facturación electrónica" [level=3] [ref=e120]
+                  - generic [ref=e121]:
+                    - heading "GRATIS" [level=4] [ref=e122]
+                    - paragraph
+                - paragraph
+                - generic [ref=e123]:
+                  - button "Empieza a usarlo" [ref=e125] [cursor=pointer]:
+                    - generic [ref=e127]: Empieza a usarlo
+                  - paragraph
+                - list [ref=e128]:
+                  - generic [ref=e129]:
+                    - generic [ref=e130]:
+                      - listitem [ref=e131]:
+                        - generic [ref=e132]: 
+                        - generic [ref=e133]: 1 Usuario
+                      - img [ref=e135] [cursor=pointer]: 
+                    - generic [ref=e139]:
+                      - listitem [ref=e140]:
+                        - generic [ref=e141]: 
+                        - generic [ref=e142]: 5 Documentos electrónicos anuales
+                      - img [ref=e144] [cursor=pointer]: 
+                    - generic [ref=e148]:
+                      - listitem [ref=e149]:
+                        - generic [ref=e150]: 
+                        - generic [ref=e151]: Cobra con Siigo Pay
+                      - img [ref=e153] [cursor=pointer]: 
+                    - generic [ref=e157]:
+                      - listitem [ref=e158]:
+                        - generic [ref=e159]: 
+                        - generic [ref=e160]: Notificación de cobranza por WhatsApp
+                      - img [ref=e162] [cursor=pointer]: 
+                    - listitem [ref=e167]:
+                      - generic [ref=e168]: 
+                      - generic [ref=e169]: Siigo App
+                    - listitem [ref=e171]:
+                      - generic [ref=e172]: 
+                      - generic [ref=e173]: Cotizaciones/CRM
+                    - listitem [ref=e175]:
+                      - generic [ref=e176]: 
+                      - generic [ref=e177]: Cartera seguimiento de cobranza
+                    - listitem [ref=e179]:
+                      - generic [ref=e180]: 
+                      - generic [ref=e181]: Gastos/cuentas por pagar
+                  - paragraph
+            - generic [ref=e182]:
+              - paragraph [ref=e183]: Recibe el doble de documentos
+              - article [ref=e184]:
+                - generic [ref=e185]:
+                  - generic [ref=e186]:
+                    - heading "Facturación electrónica 24" [level=3] [ref=e187]
+                    - generic [ref=e188]:
+                      - heading "$ 9.992/ mes*" [level=4] [ref=e189]:
+                        - paragraph [ref=e190]:
+                          - text: $ 9.992
+                          - strong [ref=e191]: / mes*
+                      - heading "$ 119.900 / año" [level=4] [ref=e192]:
+                        - paragraph [ref=e193]: $ 119.900 / año
+                  - paragraph
+                  - generic [ref=e194]:
+                    - button "¡Comprar ahora!" [ref=e196] [cursor=pointer]:
+                      - generic [ref=e198]: ¡Comprar ahora!
+                    - paragraph [ref=e199]: "*El pago es anual. Descuento aplica para cliente nuevo."
+                  - list [ref=e200]:
+                    - generic [ref=e201]:
+                      - generic [ref=e202]:
+                        - listitem [ref=e203]:
+                          - generic [ref=e204]: 
+                          - generic [ref=e205]: 1 Usuario
+                        - img [ref=e207] [cursor=pointer]: 
+                      - generic [ref=e211]:
+                        - listitem [ref=e212]:
+                          - generic [ref=e213]: 
+                          - generic [ref=e214]: 24 Documentos electrónicos anuales
+                        - img [ref=e216] [cursor=pointer]: 
+                      - generic [ref=e220]:
+                        - listitem [ref=e221]:
+                          - generic [ref=e222]: 
+                          - generic [ref=e223]: Cobra con Siigo Pay
+                        - img [ref=e225] [cursor=pointer]: 
+                      - generic [ref=e229]:
+                        - listitem [ref=e230]:
+                          - generic [ref=e231]: 
+                          - generic [ref=e232]: Notificación de cobranza por WhatsApp
+                        - img [ref=e234] [cursor=pointer]: 
+                      - generic [ref=e238]:
+                        - listitem [ref=e239]:
+                          - generic [ref=e240]: 
+                          - generic [ref=e241]: Siigo App
+                        - img [ref=e243] [cursor=pointer]: 
+                      - listitem [ref=e248]:
+                        - generic [ref=e249]: 
+                        - generic [ref=e250]: Cotizaciones/CRM
+                      - listitem [ref=e252]:
+                        - generic [ref=e253]: 
+                        - generic [ref=e254]: Cartera seguimiento de cobranza
+                      - listitem [ref=e256]:
+                        - generic [ref=e257]: 
+                        - generic [ref=e258]: Gastos/cuentas por pagar
+                    - paragraph
+            - generic [ref=e259]:
+              - paragraph [ref=e260]: Recibe el doble de documentos
+              - article [ref=e261]:
+                - generic [ref=e262]:
+                  - generic [ref=e263]:
+                    - heading "Facturación electrónica WhatsApp 24" [level=3] [ref=e264]
+                    - generic [ref=e265]:
+                      - heading "$ 11.550/ mes*" [level=4] [ref=e266]:
+                        - paragraph [ref=e267]:
+                          - text: $ 11.550
+                          - strong [ref=e268]: / mes*
+                      - heading "$ 138.600 / año" [level=4] [ref=e269]:
+                        - paragraph [ref=e270]: $ 138.600 / año
+                      - generic [ref=e271]:
+                        - generic [ref=e272]: "-25%"
+                        - paragraph [ref=e273]: $ 184.800 / año
+                  - paragraph
+                  - generic [ref=e274]:
+                    - button "¡Comprar ahora!" [ref=e276] [cursor=pointer]:
+                      - generic [ref=e278]: ¡Comprar ahora!
+                    - paragraph [ref=e279]: "*El pago es anual. Descuento aplica para cliente nuevo."
+                  - list [ref=e280]:
+                    - generic [ref=e281]:
+                      - generic [ref=e282]:
+                        - listitem [ref=e283]:
+                          - generic [ref=e284]: 
+                          - generic [ref=e285]: 1 Usuario
+                        - img [ref=e287] [cursor=pointer]: 
+                      - generic [ref=e291]:
+                        - listitem [ref=e292]:
+                          - generic [ref=e293]: 
+                          - generic [ref=e294]: 24 Documentos electrónicos anuales
+                        - img [ref=e296] [cursor=pointer]: 
+                      - generic [ref=e300]:
+                        - listitem [ref=e301]:
+                          - generic [ref=e302]: 
+                          - generic [ref=e303]: Cobra con Siigo Pay
+                        - img [ref=e305] [cursor=pointer]: 
+                      - generic [ref=e309]:
+                        - listitem [ref=e310]:
+                          - generic [ref=e311]: 
+                          - generic [ref=e312]: Notificación de cobranza por WhatsApp
+                        - img [ref=e314] [cursor=pointer]: 
+                      - generic [ref=e318]:
+                        - listitem [ref=e319]:
+                          - generic [ref=e320]: 
+                          - generic [ref=e321]: Factura electrónicamente por Whatsapp
+                        - img [ref=e323] [cursor=pointer]: 
+                      - generic [ref=e327]:
+                        - listitem [ref=e328]:
+                          - generic [ref=e329]: 
+                          - generic [ref=e330]: 1 Línea celular
+                        - img [ref=e332] [cursor=pointer]: 
+                      - generic [ref=e336]:
+                        - listitem [ref=e337]:
+                          - generic [ref=e338]: 
+                          - generic [ref=e339]: Siigo App
+                        - img [ref=e341] [cursor=pointer]: 
+                      - listitem [ref=e346]:
+                        - generic [ref=e347]: 
+                        - generic [ref=e348]: Cotizaciones/CRM
+                    - paragraph
+                    - button "Contactar a un asesor" [ref=e350] [cursor=pointer]:
+                      - generic [ref=e352]: Contactar a un asesor
+            - generic [ref=e353]:
+              - paragraph [ref=e354]: Recibe el doble de documentos
+              - article [ref=e355]:
+                - generic [ref=e356]:
+                  - generic [ref=e357]:
+                    - heading "Facturación electrónica 120" [level=3] [ref=e358]
+                    - generic [ref=e359]:
+                      - heading "$ 22.493/ mes*" [level=4] [ref=e360]:
+                        - paragraph [ref=e361]:
+                          - text: $ 22.493
+                          - strong [ref=e362]: / mes*
+                      - heading "$ 269.910 / año" [level=4] [ref=e363]:
+                        - paragraph [ref=e364]: $ 269.910 / año
+                      - generic [ref=e365]:
+                        - generic [ref=e366]: "-10%"
+                        - paragraph [ref=e367]: $ 299.900 / año
+                  - paragraph
+                  - generic [ref=e368]:
+                    - button "¡Comprar ahora!" [ref=e370] [cursor=pointer]:
+                      - generic [ref=e372]: ¡Comprar ahora!
+                    - paragraph [ref=e373]: "*El pago es anual. Descuento aplica para cliente nuevo."
+                  - list [ref=e374]:
+                    - generic [ref=e375]:
+                      - generic [ref=e376]:
+                        - listitem [ref=e377]:
+                          - generic [ref=e378]: 
+                          - generic [ref=e379]: 1 Usuario
+                        - img [ref=e381] [cursor=pointer]: 
+                      - generic [ref=e385]:
+                        - listitem [ref=e386]:
+                          - generic [ref=e387]: 
+                          - generic [ref=e388]: 120 Documentos electrónicos anuales
+                        - img [ref=e390] [cursor=pointer]: 
+                      - generic [ref=e394]:
+                        - listitem [ref=e395]:
+                          - generic [ref=e396]: 
+                          - generic [ref=e397]: Cobra con Siigo Pay
+                        - img [ref=e399] [cursor=pointer]: 
+                      - generic [ref=e403]:
+                        - listitem [ref=e404]:
+                          - generic [ref=e405]: 
+                          - generic [ref=e406]: Notificación de cobranza por WhatsApp
+                        - img [ref=e408] [cursor=pointer]: 
+                      - generic [ref=e412]:
+                        - listitem [ref=e413]:
+                          - generic [ref=e414]: 
+                          - generic [ref=e415]: Siigo App
+                        - img [ref=e417] [cursor=pointer]: 
+                      - listitem [ref=e422]:
+                        - generic [ref=e423]: 
+                        - generic [ref=e424]: Cotizaciones/CRM
+                      - listitem [ref=e426]:
+                        - generic [ref=e427]: 
+                        - generic [ref=e428]: Cartera seguimiento de cobranza
+                      - listitem [ref=e430]:
+                        - generic [ref=e431]: 
+                        - generic [ref=e432]: Gastos/cuentas por pagar
+                    - paragraph
+            - generic [ref=e433]:
+              - paragraph [ref=e434]: Recibe el doble de documentos
+              - article [ref=e435]:
+                - generic [ref=e436]:
+                  - generic [ref=e437]:
+                    - heading "Facturación electrónica WhatsApp 120" [level=3] [ref=e438]
+                    - generic [ref=e439]:
+                      - heading "$ 22.800/ mes*" [level=4] [ref=e440]:
+                        - paragraph [ref=e441]:
+                          - text: $ 22.800
+                          - strong [ref=e442]: / mes*
+                      - heading "$ 273.600 / año" [level=4] [ref=e443]:
+                        - paragraph [ref=e444]: $ 273.600 / año
+                      - generic [ref=e445]:
+                        - generic [ref=e446]: "-25%"
+                        - paragraph [ref=e447]: $ 364.800 / año
+                  - paragraph
+                  - generic [ref=e448]:
+                    - button "¡Comprar ahora!" [ref=e450] [cursor=pointer]:
+                      - generic [ref=e452]: ¡Comprar ahora!
+                    - paragraph [ref=e453]: "*El pago es anual. Descuento aplica para cliente nuevo."
+                  - list [ref=e454]:
+                    - generic [ref=e455]:
+                      - generic [ref=e456]:
+                        - listitem [ref=e457]:
+                          - generic [ref=e458]: 
+                          - generic [ref=e459]: 1 Usuario
+                        - img [ref=e461] [cursor=pointer]: 
+                      - generic [ref=e465]:
+                        - listitem [ref=e466]:
+                          - generic [ref=e467]: 
+                          - generic [ref=e468]: 120 Documentos electrónicos anuales
+                        - img [ref=e470] [cursor=pointer]: 
+                      - generic [ref=e474]:
+                        - listitem [ref=e475]:
+                          - generic [ref=e476]: 
+                          - generic [ref=e477]: Cobra con Siigo Pay
+                        - img [ref=e479] [cursor=pointer]: 
+                      - generic [ref=e483]:
+                        - listitem [ref=e484]:
+                          - generic [ref=e485]: 
+                          - generic [ref=e486]: Notificación de cobranza por WhatsApp
+                        - img [ref=e488] [cursor=pointer]: 
+                      - generic [ref=e492]:
+                        - listitem [ref=e493]:
+                          - generic [ref=e494]: 
+                          - generic [ref=e495]: Factura electrónicamente por Whatsapp
+                        - img [ref=e497] [cursor=pointer]: 
+                      - generic [ref=e501]:
+                        - listitem [ref=e502]:
+                          - generic [ref=e503]: 
+                          - generic [ref=e504]: 1 Línea celular
+                        - img [ref=e506] [cursor=pointer]: 
+                      - generic [ref=e510]:
+                        - listitem [ref=e511]:
+                          - generic [ref=e512]: 
+                          - generic [ref=e513]: Siigo App
+                        - img [ref=e515] [cursor=pointer]: 
+                      - listitem [ref=e520]:
+                        - generic [ref=e521]: 
+                        - generic [ref=e522]: Cotizaciones/CRM
+                    - paragraph
+                    - button "Contacta a un Asesor" [ref=e524] [cursor=pointer]:
+                      - generic [ref=e526]: Contacta a un Asesor
+            - generic [ref=e527]:
+              - paragraph [ref=e528]: Recibe el doble de documentos
+              - article [ref=e529]:
+                - generic [ref=e530]:
+                  - generic [ref=e531]:
+                    - heading "Facturación electrónica 1500" [level=3] [ref=e532]
+                    - generic [ref=e533]:
+                      - heading "$ 92.318/ mes*" [level=4] [ref=e534]:
+                        - paragraph [ref=e535]:
+                          - text: $ 92.318
+                          - strong [ref=e536]: / mes*
+                      - heading "$ 1.107.810 / año" [level=4] [ref=e537]:
+                        - paragraph [ref=e538]: $ 1.107.810 / año
+                      - generic [ref=e539]:
+                        - generic [ref=e540]: "-10%"
+                        - paragraph [ref=e541]: $ 1.230.900 / año
+                  - paragraph
+                  - generic [ref=e542]:
+                    - button "¡Comprar ahora!" [ref=e544] [cursor=pointer]:
+                      - generic [ref=e546]: ¡Comprar ahora!
+                    - paragraph [ref=e547]: "*El pago es anual. Descuento aplica para cliente nuevo."
+                  - list [ref=e548]:
+                    - generic [ref=e549]:
+                      - generic [ref=e550]:
+                        - listitem [ref=e551]:
+                          - generic [ref=e552]: 
+                          - generic [ref=e553]: 1 Usuario
+                        - img [ref=e555] [cursor=pointer]: 
+                      - generic [ref=e559]:
+                        - listitem [ref=e560]:
+                          - generic [ref=e561]: 
+                          - generic [ref=e562]: 1500 Documentos electrónicos anuales
+                        - img [ref=e564] [cursor=pointer]: 
+                      - generic [ref=e568]:
+                        - listitem [ref=e569]:
+                          - generic [ref=e570]: 
+                          - generic [ref=e571]: Cobra con Siigo Pay
+                        - img [ref=e573] [cursor=pointer]: 
+                      - generic [ref=e577]:
+                        - listitem [ref=e578]:
+                          - generic [ref=e579]: 
+                          - generic [ref=e580]: Notificación de cobranza por WhatsApp
+                        - img [ref=e582] [cursor=pointer]: 
+                      - generic [ref=e586]:
+                        - listitem [ref=e587]:
+                          - generic [ref=e588]: 
+                          - generic [ref=e589]: Siigo App
+                        - img [ref=e591] [cursor=pointer]: 
+                      - listitem [ref=e596]:
+                        - generic [ref=e597]: 
+                        - generic [ref=e598]: Cotizaciones/CRM
+                      - listitem [ref=e600]:
+                        - generic [ref=e601]: 
+                        - generic [ref=e602]: Cartera seguimiento de cobranza
+                      - listitem [ref=e604]:
+                        - generic [ref=e605]: 
+                        - generic [ref=e606]: Gastos/cuentas por pagar
+                    - paragraph
+                    - button "Contactar a un asesor" [ref=e608] [cursor=pointer]:
+                      - generic [ref=e610]: Contactar a un asesor
+            - generic [ref=e611]:
+              - paragraph [ref=e612]: Recibe el doble de documentos
+              - article [ref=e613]:
+                - generic [ref=e614]:
+                  - generic [ref=e615]:
+                    - heading "Facturación electrónica PRO" [level=3] [ref=e616]
+                    - generic [ref=e617]:
+                      - heading "$ 57.068/ mes*" [level=4] [ref=e618]:
+                        - paragraph [ref=e619]:
+                          - text: $ 57.068
+                          - strong [ref=e620]: / mes*
+                      - heading "$ 684.810 / año" [level=4] [ref=e621]:
+                        - paragraph [ref=e622]: $ 684.810 / año
+                      - generic [ref=e623]:
+                        - generic [ref=e624]: "-10%"
+                        - paragraph [ref=e625]: $ 760.900 / año
+                  - paragraph
+                  - generic [ref=e626]:
+                    - button "¡Comprar ahora!" [ref=e628] [cursor=pointer]:
+                      - generic [ref=e630]: ¡Comprar ahora!
+                    - paragraph [ref=e631]: "*El pago es anual. Descuento aplica para cliente nuevo."
+                  - list [ref=e632]:
+                    - generic [ref=e633]:
+                      - generic [ref=e634]:
+                        - listitem [ref=e635]:
+                          - generic [ref=e636]: 
+                          - generic [ref=e637]: 1 Usuario
+                        - img [ref=e639] [cursor=pointer]: 
+                      - generic [ref=e643]:
+                        - listitem [ref=e644]:
+                          - generic [ref=e645]: 
+                          - generic [ref=e646]: 500 Documentos electrónicos anuales
+                        - img [ref=e648] [cursor=pointer]: 
+                      - generic [ref=e652]:
+                        - listitem [ref=e653]:
+                          - generic [ref=e654]: 
+                          - generic [ref=e655]: Cobra con Siigo Pay
+                        - img [ref=e657] [cursor=pointer]: 
+                      - generic [ref=e661]:
+                        - listitem [ref=e662]:
+                          - generic [ref=e663]: 
+                          - generic [ref=e664]: Notificación de cobranza por WhatsApp
+                        - img [ref=e666] [cursor=pointer]: 
+                      - generic [ref=e670]:
+                        - listitem [ref=e671]:
+                          - generic [ref=e672]: 
+                          - generic [ref=e673]: Siigo App
+                        - img [ref=e675] [cursor=pointer]: 
+                      - generic [ref=e679]:
+                        - listitem [ref=e680]:
+                          - generic [ref=e681]: 
+                          - generic [ref=e682]: Cotizaciones/CRM
+                        - img [ref=e684] [cursor=pointer]: 
+                      - generic [ref=e688]:
+                        - listitem [ref=e689]:
+                          - generic [ref=e690]: 
+                          - generic [ref=e691]: Cartera seguimiento de cobranza
+                        - img [ref=e693] [cursor=pointer]: 
+                      - generic [ref=e697]:
+                        - listitem [ref=e698]:
+                          - generic [ref=e699]: 
+                          - generic [ref=e700]: Gastos/cuentas por pagar
+                        - img [ref=e702] [cursor=pointer]: 
+                    - paragraph
+                    - button "Contactar a un asesor" [ref=e707] [cursor=pointer]:
+                      - generic [ref=e709]: Contactar a un asesor
+            - article [ref=e712]:
+              - generic [ref=e713]:
+                - generic [ref=e714]:
+                  - heading "Facturación electrónica 24 + Nómina Electrónica 24" [level=3] [ref=e715]
+                  - generic [ref=e716]:
+                    - heading "$ 17.985/ mes*" [level=4] [ref=e717]:
+                      - paragraph [ref=e718]:
+                        - text: $ 17.985
+                        - strong [ref=e719]: / mes*
+                    - heading "$ 215.820 / año" [level=4] [ref=e720]:
+                      - paragraph [ref=e721]: $ 215.820 / año
+                    - generic [ref=e722]:
+                      - generic [ref=e723]: "-10%"
+                      - paragraph [ref=e724]: $ 239.800 / año
+                - paragraph
+                - generic [ref=e725]:
+                  - button "¡Comprar ahora!" [ref=e727] [cursor=pointer]:
+                    - generic [ref=e729]: ¡Comprar ahora!
+                  - paragraph [ref=e730]: "*El pago es anual. Descuento aplica para cliente nuevo."
+                - list [ref=e731]:
+                  - generic [ref=e732]:
+                    - generic [ref=e733]:
+                      - listitem [ref=e734]:
+                        - generic [ref=e735]: 
+                        - generic [ref=e736]: 1 Usuario administrador
+                      - img [ref=e738] [cursor=pointer]: 
+                    - generic [ref=e742]:
+                      - listitem [ref=e743]:
+                        - generic [ref=e744]: 
+                        - generic [ref=e745]: Hasta 2 empleados
+                      - img [ref=e747] [cursor=pointer]: 
+                    - generic [ref=e751]:
+                      - listitem [ref=e752]:
+                        - generic [ref=e753]: 
+                        - generic [ref=e754]: 24 Documentos electrónicos anuales
+                      - img [ref=e756] [cursor=pointer]: 
+                    - generic [ref=e760]:
+                      - listitem [ref=e761]:
+                        - generic [ref=e762]: 
+                        - generic [ref=e763]: Cobra con Siigo Pay
+                      - img [ref=e765] [cursor=pointer]: 
+                    - generic [ref=e769]:
+                      - listitem [ref=e770]:
+                        - generic [ref=e771]: 
+                        - generic [ref=e772]: Certificado digital* y cumplimiento con la DIAN
+                      - img [ref=e774] [cursor=pointer]: 
+                    - generic [ref=e778]:
+                      - listitem [ref=e779]:
+                        - generic [ref=e780]: 
+                        - generic [ref=e781]: Reportes / Dashboard
+                      - img [ref=e783] [cursor=pointer]: 
+                    - generic [ref=e787]:
+                      - listitem [ref=e788]:
+                        - generic [ref=e789]: 
+                        - generic [ref=e790]: Material de capacitación
+                      - img [ref=e792] [cursor=pointer]: 
+                    - generic [ref=e796]:
+                      - listitem [ref=e797]:
+                        - generic [ref=e798]: 
+                        - generic [ref=e799]: Automatización de pagos y comprobantes
+                      - img [ref=e801] [cursor=pointer]: 
+                    - generic [ref=e805]:
+                      - listitem [ref=e806]:
+                        - generic [ref=e807]: 
+                        - generic [ref=e808]: Notificación de cobranza por WhatsApp
+                      - img [ref=e810] [cursor=pointer]: 
+                    - generic [ref=e814]:
+                      - listitem [ref=e815]:
+                        - generic [ref=e816]: 
+                        - generic [ref=e817]: Liquidación manual de contratos
+                      - img [ref=e819] [cursor=pointer]: 
+                    - generic [ref=e823]:
+                      - listitem [ref=e824]:
+                        - generic [ref=e825]: 
+                        - generic [ref=e826]: Liquidación manual de cesantías
+                      - img [ref=e828] [cursor=pointer]: 
+                    - generic [ref=e832]:
+                      - listitem [ref=e833]:
+                        - generic [ref=e834]: 
+                        - generic [ref=e835]: Siigo App
+                      - img [ref=e837] [cursor=pointer]: 
+                  - paragraph
+            - article [ref=e843]:
+              - generic [ref=e844]:
+                - generic [ref=e845]:
+                  - heading "Facturación electrónica 120 + Nómina Electrónica 120" [level=3] [ref=e846]
+                  - generic [ref=e847]:
+                    - heading "$ 42.486/ mes*" [level=4] [ref=e848]:
+                      - paragraph [ref=e849]:
+                        - text: $ 42.486
+                        - strong [ref=e850]: / mes*
+                    - heading "$ 509.830 / año" [level=4] [ref=e851]:
+                      - paragraph [ref=e852]: $ 509.830 / año
+                    - generic [ref=e853]:
+                      - generic [ref=e854]: "-15%"
+                      - paragraph [ref=e855]: $ 599.800 / año
+                - paragraph
+                - generic [ref=e856]:
+                  - button "¡Comprar ahora!" [ref=e858] [cursor=pointer]:
+                    - generic [ref=e860]: ¡Comprar ahora!
+                  - paragraph [ref=e861]: "*El pago es anual. Descuento aplica para cliente nuevo."
+                - list [ref=e862]:
+                  - generic [ref=e863]:
+                    - generic [ref=e864]:
+                      - listitem [ref=e865]:
+                        - generic [ref=e866]: 
+                        - generic [ref=e867]: 1 Usuario administrador
+                      - img [ref=e869] [cursor=pointer]: 
+                    - generic [ref=e873]:
+                      - listitem [ref=e874]:
+                        - generic [ref=e875]: 
+                        - generic [ref=e876]: Hasta 10 empleados
+                      - img [ref=e878] [cursor=pointer]: 
+                    - generic [ref=e882]:
+                      - listitem [ref=e883]:
+                        - generic [ref=e884]: 
+                        - generic [ref=e885]: 120 Documentos electrónicos anuales
+                      - img [ref=e887] [cursor=pointer]: 
+                    - generic [ref=e891]:
+                      - listitem [ref=e892]:
+                        - generic [ref=e893]: 
+                        - generic [ref=e894]: Certificado digital* y cumplimiento con la DIAN
+                      - img [ref=e896] [cursor=pointer]: 
+                    - generic [ref=e900]:
+                      - listitem [ref=e901]:
+                        - generic [ref=e902]: 
+                        - generic [ref=e903]: Automatización de pagos y comprobantes
+                      - img [ref=e905] [cursor=pointer]: 
+                    - generic [ref=e909]:
+                      - listitem [ref=e910]:
+                        - generic [ref=e911]: 
+                        - generic [ref=e912]: Reportes / Dashboard
+                      - img [ref=e914] [cursor=pointer]: 
+                    - generic [ref=e918]:
+                      - listitem [ref=e919]:
+                        - generic [ref=e920]: 
+                        - generic [ref=e921]: Material de capacitación
+                      - img [ref=e923] [cursor=pointer]: 
+                    - generic [ref=e927]:
+                      - listitem [ref=e928]:
+                        - generic [ref=e929]: 
+                        - generic [ref=e930]: Cobra con Siigo Pay
+                      - img [ref=e932] [cursor=pointer]: 
+                    - generic [ref=e936]:
+                      - listitem [ref=e937]:
+                        - generic [ref=e938]: 
+                        - generic [ref=e939]: Notificación de cobranza por WhatsApp
+                      - img [ref=e941] [cursor=pointer]: 
+                    - generic [ref=e945]:
+                      - listitem [ref=e946]:
+                        - generic [ref=e947]: 
+                        - generic [ref=e948]: Liquidación manual de contratos
+                      - img [ref=e950] [cursor=pointer]: 
+                    - generic [ref=e954]:
+                      - listitem [ref=e955]:
+                        - generic [ref=e956]: 
+                        - generic [ref=e957]: Liquidación manual de cesantías
+                      - img [ref=e959] [cursor=pointer]: 
+                    - generic [ref=e963]:
+                      - listitem [ref=e964]:
+                        - generic [ref=e965]: 
+                        - generic [ref=e966]: Siigo App
+                      - img [ref=e968] [cursor=pointer]: 
+                  - paragraph
+      - generic [ref=e979]:
+        - heading "Sistema POS + Facturación" [level=2] [ref=e980]
+        - paragraph [ref=e981]: Autogestiona tu negocio de manera fácil. Aumenta tus ventas y mantén al día tu inventario con tu próximo sistema POS, con soporte 24/7.
+        - generic [ref=e982]:
+          - generic [ref=e983]:
+            - paragraph [ref=e984]: Nuevo
+            - article [ref=e985]:
+              - generic [ref=e986]:
+                - generic [ref=e987]:
+                  - heading "Sistema POS Esencial" [level=3] [ref=e988]
+                  - generic [ref=e989]:
+                    - heading "$ 28.750/ mes*" [level=4] [ref=e990]:
+                      - paragraph [ref=e991]:
+                        - text: $ 28.750
+                        - strong [ref=e992]: / mes*
+                    - heading "$ 345.000 / año" [level=4] [ref=e993]:
+                      - paragraph [ref=e994]: $ 345.000 / año
+                - paragraph
+                - generic [ref=e995]:
+                  - button "¡Comprar ahora!" [ref=e997] [cursor=pointer]:
+                    - generic [ref=e999]: ¡Comprar ahora!
+                  - paragraph [ref=e1000]: "*El pago es anual. Descuento aplica para cliente nuevo."
+                - list [ref=e1001]:
+                  - generic [ref=e1002]:
+                    - generic [ref=e1003]:
+                      - listitem [ref=e1004]:
+                        - generic [ref=e1005]: 
+                        - generic [ref=e1006]: Cumplimiento normativo
+                      - img [ref=e1008] [cursor=pointer]: 
+                    - generic [ref=e1012]:
+                      - listitem [ref=e1013]:
+                        - generic [ref=e1014]: 
+                        - generic [ref=e1015]: 240 Facturas electrónicas anuales desde POS
+                      - img [ref=e1017] [cursor=pointer]: 
+                    - generic [ref=e1021]:
+                      - listitem [ref=e1022]:
+                        - generic [ref=e1023]: 
+                        - generic [ref=e1024]: Documentos electrónicos
+                      - img [ref=e1026] [cursor=pointer]: 
+                    - generic [ref=e1030]:
+                      - listitem [ref=e1031]:
+                        - generic [ref=e1032]: 
+                        - generic [ref=e1033]: Usuarios cajeros
+                      - img [ref=e1035] [cursor=pointer]: 
+                    - generic [ref=e1039]:
+                      - listitem [ref=e1040]:
+                        - generic [ref=e1041]: 
+                        - generic [ref=e1042]: 1 Usuario administrador Siigo Nube
+                      - img [ref=e1044] [cursor=pointer]: 
+                    - generic [ref=e1048]:
+                      - listitem [ref=e1049]:
+                        - generic [ref=e1050]: 
+                        - generic [ref=e1051]: Maquina POS Software
+                      - img [ref=e1053] [cursor=pointer]: 
+                    - generic [ref=e1057]:
+                      - listitem [ref=e1058]:
+                        - generic [ref=e1059]: 
+                        - generic [ref=e1060]: Configuraciones de POS
+                      - img [ref=e1062] [cursor=pointer]: 
+                    - generic [ref=e1066]:
+                      - listitem [ref=e1067]:
+                        - generic [ref=e1068]: 
+                        - generic [ref=e1069]: Precuentas
+                      - img [ref=e1071] [cursor=pointer]: 
+                    - generic [ref=e1075]:
+                      - listitem [ref=e1076]:
+                        - generic [ref=e1077]: 
+                        - generic [ref=e1078]: Turnos
+                      - img [ref=e1080] [cursor=pointer]: 
+                    - generic [ref=e1084]:
+                      - listitem [ref=e1085]:
+                        - generic [ref=e1086]: 
+                        - generic [ref=e1087]: Inventario
+                      - img [ref=e1089] [cursor=pointer]: 
+                    - generic [ref=e1093]:
+                      - listitem [ref=e1094]:
+                        - generic [ref=e1095]: 
+                        - generic [ref=e1096]: Almacenamiento
+                      - img [ref=e1098] [cursor=pointer]: 
+                    - generic [ref=e1102]:
+                      - listitem [ref=e1103]:
+                        - generic [ref=e1104]: 
+                        - generic [ref=e1105]: Reportes Generales
+                      - img [ref=e1107] [cursor=pointer]: 
+                    - listitem [ref=e1112]:
+                      - generic [ref=e1113]: 
+                      - generic [ref=e1114]: Reportes Avanzados
+                    - listitem [ref=e1116]:
+                      - generic [ref=e1117]: 
+                      - generic [ref=e1118]: Control de stocks
+                    - listitem [ref=e1120]:
+                      - generic [ref=e1121]: 
+                      - generic [ref=e1122]: Costeo
+                    - listitem [ref=e1124]:
+                      - generic [ref=e1125]: 
+                      - generic [ref=e1126]: Pagos en línea
+                    - listitem [ref=e1128]:
+                      - generic [ref=e1129]: 
+                      - generic [ref=e1130]: Contabilidad
+                    - listitem [ref=e1132]:
+                      - generic [ref=e1133]: 
+                      - generic [ref=e1134]: Centros de costo y bodegas ilimitadas
+                  - paragraph
+                  - button "Contactar a un asesor" [ref=e1136] [cursor=pointer]:
+                    - generic [ref=e1138]: Contactar a un asesor
+          - article [ref=e1141]:
+            - generic [ref=e1142]:
+              - generic [ref=e1143]:
+                - heading "Sistema POS Inicio" [level=3] [ref=e1144]
+                - generic [ref=e1145]:
+                  - heading "$ 43.943/ mes*" [level=4] [ref=e1146]:
+                    - paragraph [ref=e1147]:
+                      - text: $ 43.943
+                      - strong [ref=e1148]: / mes*
+                  - heading "$ 527.310 / año" [level=4] [ref=e1149]:
+                    - paragraph [ref=e1150]: $ 527.310 / año
+                  - generic [ref=e1151]:
+                    - generic [ref=e1152]: "-10%"
+                    - paragraph [ref=e1153]: $ 585.900 / año
+              - paragraph
+              - generic [ref=e1154]:
+                - button "¡Comprar ahora!" [ref=e1156] [cursor=pointer]:
+                  - generic [ref=e1158]: ¡Comprar ahora!
+                - paragraph [ref=e1159]: "*El pago es anual. Descuento aplica para cliente nuevo."
+              - list [ref=e1160]:
+                - generic [ref=e1161]:
+                  - generic [ref=e1162]:
+                    - listitem [ref=e1163]:
+                      - generic [ref=e1164]: 
+                      - generic [ref=e1165]: Cumplimiento normativo
+                    - img [ref=e1167] [cursor=pointer]: 
+                  - generic [ref=e1171]:
+                    - listitem [ref=e1172]:
+                      - generic [ref=e1173]: 
+                      - generic [ref=e1174]: Facturas electrónicas desde POS ilimitadas
+                    - img [ref=e1176] [cursor=pointer]: 
+                  - generic [ref=e1180]:
+                    - listitem [ref=e1181]:
+                      - generic [ref=e1182]: 
+                      - generic [ref=e1183]: Documentos electrónicos
+                    - img [ref=e1185] [cursor=pointer]: 
+                  - generic [ref=e1189]:
+                    - listitem [ref=e1190]:
+                      - generic [ref=e1191]: 
+                      - generic [ref=e1192]: Usuarios cajeros
+                    - img [ref=e1194] [cursor=pointer]: 
+                  - generic [ref=e1198]:
+                    - listitem [ref=e1199]:
+                      - generic [ref=e1200]: 
+                      - generic [ref=e1201]: 1 Usuario administrador Siigo Nube
+                    - img [ref=e1203] [cursor=pointer]: 
+                  - generic [ref=e1207]:
+                    - listitem [ref=e1208]:
+                      - generic [ref=e1209]: 
+                      - generic [ref=e1210]: Máquina POS Software
+                    - img [ref=e1212] [cursor=pointer]: 
+                  - generic [ref=e1216]:
+                    - listitem [ref=e1217]:
+                      - generic [ref=e1218]: 
+                      - generic [ref=e1219]: Configuraciones de POS
+                    - img [ref=e1221] [cursor=pointer]: 
+                  - generic [ref=e1225]:
+                    - listitem [ref=e1226]:
+                      - generic [ref=e1227]: 
+                      - generic [ref=e1228]: Precuentas
+                    - img [ref=e1230] [cursor=pointer]: 
+                  - generic [ref=e1234]:
+                    - listitem [ref=e1235]:
+                      - generic [ref=e1236]: 
+                      - generic [ref=e1237]: Turnos
+                    - img [ref=e1239] [cursor=pointer]: 
+                  - generic [ref=e1243]:
+                    - listitem [ref=e1244]:
+                      - generic [ref=e1245]: 
+                      - generic [ref=e1246]: Inventario
+                    - img [ref=e1248] [cursor=pointer]: 
+                  - generic [ref=e1252]:
+                    - listitem [ref=e1253]:
+                      - generic [ref=e1254]: 
+                      - generic [ref=e1255]: Almacenamiento
+                    - img [ref=e1257] [cursor=pointer]: 
+                  - generic [ref=e1261]:
+                    - listitem [ref=e1262]:
+                      - generic [ref=e1263]: 
+                      - generic [ref=e1264]: Reportes Generales
+                    - img [ref=e1266] [cursor=pointer]: 
+                  - listitem [ref=e1271]:
+                    - generic [ref=e1272]: 
+                    - generic [ref=e1273]: Reportes intermedios
+                  - listitem [ref=e1275]:
+                    - generic [ref=e1276]: 
+                    - generic [ref=e1277]: Control de stocks
+                  - listitem [ref=e1279]:
+                    - generic [ref=e1280]: 
+                    - generic [ref=e1281]: Costeo
+                  - listitem [ref=e1283]:
+                    - generic [ref=e1284]: 
+                    - generic [ref=e1285]: Pagos en línea
+                  - listitem [ref=e1287]:
+                    - generic [ref=e1288]: 
+                    - generic [ref=e1289]: Contabilidad
+                  - listitem [ref=e1291]:
+                    - generic [ref=e1292]: 
+                    - generic [ref=e1293]: Centros de costo y bodegas ilimitadas
+                - paragraph
+                - button "Contactar a un asesor" [ref=e1295] [cursor=pointer]:
+                  - generic [ref=e1297]: Contactar a un asesor
+          - article [ref=e1300]:
+            - generic [ref=e1301]:
+              - generic [ref=e1302]:
+                - heading "Sistema POS Avanzado" [level=3] [ref=e1303]
+                - generic [ref=e1304]:
+                  - heading "$ 63.743/ mes*" [level=4] [ref=e1305]:
+                    - paragraph [ref=e1306]:
+                      - text: $ 63.743
+                      - strong [ref=e1307]: / mes*
+                  - heading "$ 764.915 / año" [level=4] [ref=e1308]:
+                    - paragraph [ref=e1309]: $ 764.915 / año
+                  - generic [ref=e1310]:
+                    - generic [ref=e1311]: "-15%"
+                    - paragraph [ref=e1312]: $ 899.900 / año
+              - paragraph
+              - generic [ref=e1313]:
+                - button "¡Comprar ahora!" [ref=e1315] [cursor=pointer]:
+                  - generic [ref=e1317]: ¡Comprar ahora!
+                - paragraph [ref=e1318]: "*El pago es anual. Descuento aplica para cliente nuevo."
+              - list [ref=e1319]:
+                - generic [ref=e1320]:
+                  - generic [ref=e1321]:
+                    - listitem [ref=e1322]:
+                      - generic [ref=e1323]: 
+                      - generic [ref=e1324]: Cumplimiento normativo
+                    - img [ref=e1326] [cursor=pointer]: 
+                  - generic [ref=e1330]:
+                    - listitem [ref=e1331]:
+                      - generic [ref=e1332]: 
+                      - generic [ref=e1333]: Facturas electrónicas desde POS ilimitadas
+                    - img [ref=e1335] [cursor=pointer]: 
+                  - generic [ref=e1339]:
+                    - listitem [ref=e1340]:
+                      - generic [ref=e1341]: 
+                      - generic [ref=e1342]: Documentos electrónicos
+                    - img [ref=e1344] [cursor=pointer]: 
+                  - generic [ref=e1348]:
+                    - listitem [ref=e1349]:
+                      - generic [ref=e1350]: 
+                      - generic [ref=e1351]: Usuarios cajeros
+                    - img [ref=e1353] [cursor=pointer]: 
+                  - generic [ref=e1357]:
+                    - listitem [ref=e1358]:
+                      - generic [ref=e1359]: 
+                      - generic [ref=e1360]: 1 Usuario administrador Siigo Nube
+                    - img [ref=e1362] [cursor=pointer]: 
+                  - generic [ref=e1366]:
+                    - listitem [ref=e1367]:
+                      - generic [ref=e1368]: 
+                      - generic [ref=e1369]: Máquina POS Software
+                    - img [ref=e1371] [cursor=pointer]: 
+                  - generic [ref=e1375]:
+                    - listitem [ref=e1376]:
+                      - generic [ref=e1377]: 
+                      - generic [ref=e1378]: Configuraciones de POS
+                    - img [ref=e1380] [cursor=pointer]: 
+                  - generic [ref=e1384]:
+                    - listitem [ref=e1385]:
+                      - generic [ref=e1386]: 
+                      - generic [ref=e1387]: Precuentas
+                    - img [ref=e1389] [cursor=pointer]: 
+                  - generic [ref=e1393]:
+                    - listitem [ref=e1394]:
+                      - generic [ref=e1395]: 
+                      - generic [ref=e1396]: Turnos
+                    - img [ref=e1398] [cursor=pointer]: 
+                  - generic [ref=e1402]:
+                    - listitem [ref=e1403]:
+                      - generic [ref=e1404]: 
+                      - generic [ref=e1405]: Inventario intermedio
+                    - img [ref=e1407] [cursor=pointer]: 
+                  - generic [ref=e1411]:
+                    - listitem [ref=e1412]:
+                      - generic [ref=e1413]: 
+                      - generic [ref=e1414]: Almacenamiento
+                    - img [ref=e1416] [cursor=pointer]: 
+                  - generic [ref=e1420]:
+                    - listitem [ref=e1421]:
+                      - generic [ref=e1422]: 
+                      - generic [ref=e1423]: Reportes Generales
+                    - img [ref=e1425] [cursor=pointer]: 
+                  - generic [ref=e1429]:
+                    - listitem [ref=e1430]:
+                      - generic [ref=e1431]: 
+                      - generic [ref=e1432]: Reportes intermedios
+                    - img [ref=e1434] [cursor=pointer]: 
+                  - generic [ref=e1438]:
+                    - listitem [ref=e1439]:
+                      - generic [ref=e1440]: 
+                      - generic [ref=e1441]: Control de stocks
+                    - img [ref=e1443] [cursor=pointer]: 
+                  - generic [ref=e1447]:
+                    - listitem [ref=e1448]:
+                      - generic [ref=e1449]: 
+                      - generic [ref=e1450]: Costeo
+                    - img [ref=e1452] [cursor=pointer]: 
+                  - listitem [ref=e1457]:
+                    - generic [ref=e1458]: 
+                    - generic [ref=e1459]: Pagos en línea
+                  - listitem [ref=e1461]:
+                    - generic [ref=e1462]: 
+                    - generic [ref=e1463]: Contabilidad
+                  - listitem [ref=e1465]:
+                    - generic [ref=e1466]: 
+                    - generic [ref=e1467]: Centros de costo y bodegas ilimitadas
+                - paragraph
+                - button "Contactar a un asesor" [ref=e1469] [cursor=pointer]:
+                  - generic [ref=e1471]: Contactar a un asesor
+          - article [ref=e1474]:
+            - generic [ref=e1475]:
+              - generic [ref=e1476]:
+                - heading "Sistema POS Avanzado + Emprendedor" [level=3] [ref=e1477]
+                - generic [ref=e1478]:
+                  - heading "$ 235.613/ mes*" [level=4] [ref=e1479]:
+                    - paragraph [ref=e1480]:
+                      - text: $ 235.613
+                      - strong [ref=e1481]: / mes*
+                  - heading "$ 2.827.350 / año" [level=4] [ref=e1482]:
+                    - paragraph [ref=e1483]: $ 2.827.350 / año
+                  - generic [ref=e1484]:
+                    - generic [ref=e1485]: "-25%"
+                    - paragraph [ref=e1486]: $ 3.769.800 / año
+              - paragraph
+              - generic [ref=e1487]:
+                - button "¡Comprar ahora!" [ref=e1489] [cursor=pointer]:
+                  - generic [ref=e1491]: ¡Comprar ahora!
+                - paragraph [ref=e1492]: "*El pago es anual. Descuento aplica para cliente nuevo."
+              - list [ref=e1493]:
+                - generic [ref=e1494]:
+                  - generic [ref=e1495]:
+                    - listitem [ref=e1496]:
+                      - generic [ref=e1497]: 
+                      - generic [ref=e1498]: Cumplimiento normativo
+                    - img [ref=e1500] [cursor=pointer]: 
+                  - generic [ref=e1504]:
+                    - listitem [ref=e1505]:
+                      - generic [ref=e1506]: 
+                      - generic [ref=e1507]: Facturas electrónicas desde POS ilimitadas
+                    - img [ref=e1509] [cursor=pointer]: 
+                  - generic [ref=e1513]:
+                    - listitem [ref=e1514]:
+                      - generic [ref=e1515]: 
+                      - generic [ref=e1516]: Documentos electrónicos
+                    - img [ref=e1518] [cursor=pointer]: 
+                  - generic [ref=e1522]:
+                    - listitem [ref=e1523]:
+                      - generic [ref=e1524]: 
+                      - generic [ref=e1525]: Usuarios cajeros
+                    - img [ref=e1527] [cursor=pointer]: 
+                  - generic [ref=e1531]:
+                    - listitem [ref=e1532]:
+                      - generic [ref=e1533]: 
+                      - generic [ref=e1534]: 3 Usuarios administradores Siigo Nube
+                    - img [ref=e1536] [cursor=pointer]: 
+                  - generic [ref=e1540]:
+                    - listitem [ref=e1541]:
+                      - generic [ref=e1542]: 
+                      - generic [ref=e1543]: Máquina POS Software
+                    - img [ref=e1545] [cursor=pointer]: 
+                  - generic [ref=e1549]:
+                    - listitem [ref=e1550]:
+                      - generic [ref=e1551]: 
+                      - generic [ref=e1552]: Configuraciones de POS
+                    - img [ref=e1554] [cursor=pointer]: 
+                  - generic [ref=e1558]:
+                    - listitem [ref=e1559]:
+                      - generic [ref=e1560]: 
+                      - generic [ref=e1561]: Precuentas
+                    - img [ref=e1563] [cursor=pointer]: 
+                  - generic [ref=e1567]:
+                    - listitem [ref=e1568]:
+                      - generic [ref=e1569]: 
+                      - generic [ref=e1570]: Turnos
+                    - img [ref=e1572] [cursor=pointer]: 
+                  - generic [ref=e1576]:
+                    - listitem [ref=e1577]:
+                      - generic [ref=e1578]: 
+                      - generic [ref=e1579]: Inventario avanzado
+                    - img [ref=e1581] [cursor=pointer]: 
+                  - generic [ref=e1585]:
+                    - listitem [ref=e1586]:
+                      - generic [ref=e1587]: 
+                      - generic [ref=e1588]: Almacenamiento
+                    - img [ref=e1590] [cursor=pointer]: 
+                  - generic [ref=e1594]:
+                    - listitem [ref=e1595]:
+                      - generic [ref=e1596]: 
+                      - generic [ref=e1597]: Reportes Generales
+                    - img [ref=e1599] [cursor=pointer]: 
+                  - generic [ref=e1603]:
+                    - listitem [ref=e1604]:
+                      - generic [ref=e1605]: 
+                      - generic [ref=e1606]: Reportes avanzados
+                    - img [ref=e1608] [cursor=pointer]: 
+                  - generic [ref=e1612]:
+                    - listitem [ref=e1613]:
+                      - generic [ref=e1614]: 
+                      - generic [ref=e1615]: Control de stocks
+                    - img [ref=e1617] [cursor=pointer]: 
+                  - generic [ref=e1621]:
+                    - listitem [ref=e1622]:
+                      - generic [ref=e1623]: 
+                      - generic [ref=e1624]: Costeo
+                    - img [ref=e1626] [cursor=pointer]: 
+                  - generic [ref=e1630]:
+                    - listitem [ref=e1631]:
+                      - generic [ref=e1632]: 
+                      - generic [ref=e1633]: Pagos en línea
+                    - img [ref=e1635] [cursor=pointer]: 
+                  - generic [ref=e1639]:
+                    - listitem [ref=e1640]:
+                      - generic [ref=e1641]: 
+                      - generic [ref=e1642]: Contabilidad
+                    - img [ref=e1644] [cursor=pointer]: 
+                  - listitem [ref=e1649]:
+                    - generic [ref=e1650]: 
+                    - generic [ref=e1651]: Centros de costo y bodegas ilimitadas
+                - paragraph
+          - article [ref=e1654]:
+            - generic [ref=e1655]:
+              - generic [ref=e1656]:
+                - heading "Sistema POS Avanzado + Premium" [level=3] [ref=e1657]
+                - generic [ref=e1658]:
+                  - heading "$ 264.113/ mes*" [level=4] [ref=e1659]:
+                    - paragraph [ref=e1660]:
+                      - text: $ 264.113
+                      - strong [ref=e1661]: / mes*
+                  - heading "$ 3.169.350 / año" [level=4] [ref=e1662]:
+                    - paragraph [ref=e1663]: $ 3.169.350 / año
+                  - generic [ref=e1664]:
+                    - generic [ref=e1665]: "-25%"
+                    - paragraph [ref=e1666]: $ 4.225.800 / año
+              - paragraph
+              - generic [ref=e1667]:
+                - button "¡Comprar ahora!" [ref=e1669] [cursor=pointer]:
+                  - generic [ref=e1671]: ¡Comprar ahora!
+                - paragraph [ref=e1672]: "*El pago es anual. Descuento aplica para cliente nuevo."
+              - list [ref=e1673]:
+                - generic [ref=e1674]:
+                  - generic [ref=e1675]:
+                    - listitem [ref=e1676]:
+                      - generic [ref=e1677]: 
+                      - generic [ref=e1678]: Cumplimiento normativo
+                    - img [ref=e1680] [cursor=pointer]: 
+                  - generic [ref=e1684]:
+                    - listitem [ref=e1685]:
+                      - generic [ref=e1686]: 
+                      - generic [ref=e1687]: Facturas electrónicas desde POS ilimitadas
+                    - img [ref=e1689] [cursor=pointer]: 
+                  - generic [ref=e1693]:
+                    - listitem [ref=e1694]:
+                      - generic [ref=e1695]: 
+                      - generic [ref=e1696]: Documentos electrónicos
+                    - img [ref=e1698] [cursor=pointer]: 
+                  - generic [ref=e1702]:
+                    - listitem [ref=e1703]:
+                      - generic [ref=e1704]: 
+                      - generic [ref=e1705]: Usuarios cajeros
+                    - img [ref=e1707] [cursor=pointer]: 
+                  - generic [ref=e1711]:
+                    - listitem [ref=e1712]:
+                      - generic [ref=e1713]: 
+                      - generic [ref=e1714]: 5 Usuarios administradores Siigo Nube
+                    - img [ref=e1716] [cursor=pointer]: 
+                  - generic [ref=e1720]:
+                    - listitem [ref=e1721]:
+                      - generic [ref=e1722]: 
+                      - generic [ref=e1723]: Máquina POS Software
+                    - img [ref=e1725] [cursor=pointer]: 
+                  - generic [ref=e1729]:
+                    - listitem [ref=e1730]:
+                      - generic [ref=e1731]: 
+                      - generic [ref=e1732]: Configuraciones de POS
+                    - img [ref=e1734] [cursor=pointer]: 
+                  - generic [ref=e1738]:
+                    - listitem [ref=e1739]:
+                      - generic [ref=e1740]: 
+                      - generic [ref=e1741]: Precuentas
+                    - img [ref=e1743] [cursor=pointer]: 
+                  - generic [ref=e1747]:
+                    - listitem [ref=e1748]:
+                      - generic [ref=e1749]: 
+                      - generic [ref=e1750]: Turnos
+                    - img [ref=e1752] [cursor=pointer]: 
+                  - generic [ref=e1756]:
+                    - listitem [ref=e1757]:
+                      - generic [ref=e1758]: 
+                      - generic [ref=e1759]: Inventario premium
+                    - img [ref=e1761] [cursor=pointer]: 
+                  - generic [ref=e1765]:
+                    - listitem [ref=e1766]:
+                      - generic [ref=e1767]: 
+                      - generic [ref=e1768]: Almacenamiento
+                    - img [ref=e1770] [cursor=pointer]: 
+                  - generic [ref=e1774]:
+                    - listitem [ref=e1775]:
+                      - generic [ref=e1776]: 
+                      - generic [ref=e1777]: Reportes Generales
+                    - img [ref=e1779] [cursor=pointer]: 
+                  - generic [ref=e1783]:
+                    - listitem [ref=e1784]:
+                      - generic [ref=e1785]: 
+                      - generic [ref=e1786]: Reportes premium
+                    - img [ref=e1788] [cursor=pointer]: 
+                  - generic [ref=e1792]:
+                    - listitem [ref=e1793]:
+                      - generic [ref=e1794]: 
+                      - generic [ref=e1795]: Control de stocks
+                    - img [ref=e1797] [cursor=pointer]: 
+                  - generic [ref=e1801]:
+                    - listitem [ref=e1802]:
+                      - generic [ref=e1803]: 
+                      - generic [ref=e1804]: Costeo
+                    - img [ref=e1806] [cursor=pointer]: 
+                  - generic [ref=e1810]:
+                    - listitem [ref=e1811]:
+                      - generic [ref=e1812]: 
+                      - generic [ref=e1813]: Pagos en línea
+                    - img [ref=e1815] [cursor=pointer]: 
+                  - generic [ref=e1819]:
+                    - listitem [ref=e1820]:
+                      - generic [ref=e1821]: 
+                      - generic [ref=e1822]: Contabilidad
+                    - img [ref=e1824] [cursor=pointer]: 
+                  - generic [ref=e1828]:
+                    - listitem [ref=e1829]:
+                      - generic [ref=e1830]: 
+                      - generic [ref=e1831]: Centros de costo y bodegas ilimitadas
+                    - img [ref=e1833] [cursor=pointer]: 
+                - paragraph
+      - generic [ref=e1844]:
+        - heading "Sistema POS Gastrobar" [level=2] [ref=e1845]
+        - paragraph [ref=e1846]: Lleva tu restaurante al siguiente nivel. Optimiza procesos, mejora la experiencia del cliente y construye una marca sólida con un sistema POS para restaurantes.
+        - generic [ref=e1847]:
+          - article [ref=e1851]:
+            - generic [ref=e1852]:
+              - generic [ref=e1853]:
+                - heading "Sistema POS GastroBar PRO" [level=3] [ref=e1854]
+                - generic [ref=e1855]:
+                  - heading "$ 87.494/ mes*" [level=4] [ref=e1856]:
+                    - paragraph [ref=e1857]:
+                      - text: $ 87.494
+                      - strong [ref=e1858]: / mes*
+                  - heading "$ 1.049.930 / año" [level=4] [ref=e1859]:
+                    - paragraph [ref=e1860]: $ 1.049.930 / año
+                  - generic [ref=e1861]:
+                    - generic [ref=e1862]: "-30%"
+                    - paragraph [ref=e1863]: $ 1.499.900 / año
+              - paragraph
+              - generic [ref=e1864]:
+                - button "¡Comprar ahora!" [ref=e1866] [cursor=pointer]:
+                  - generic [ref=e1868]: ¡Comprar ahora!
+                - paragraph [ref=e1869]: "*El pago es anual. Descuento aplica para cliente nuevo."
+              - list [ref=e1870]:
+                - generic [ref=e1871]:
+                  - generic [ref=e1872]:
+                    - listitem [ref=e1873]:
+                      - generic [ref=e1874]: 
+                      - generic [ref=e1875]: Combos, recetas y comandas
+                    - img [ref=e1877] [cursor=pointer]: 
+                  - generic [ref=e1881]:
+                    - listitem [ref=e1882]:
+                      - generic [ref=e1883]: 
+                      - generic [ref=e1884]: Gestión Dinámica de Mesas y Meseros
+                    - img [ref=e1886] [cursor=pointer]: 
+                  - generic [ref=e1890]:
+                    - listitem [ref=e1891]:
+                      - generic [ref=e1892]: 
+                      - generic [ref=e1893]: Comandas y órdenes de servicio
+                    - img [ref=e1895] [cursor=pointer]: 
+                  - generic [ref=e1899]:
+                    - listitem [ref=e1900]:
+                      - generic [ref=e1901]: 
+                      - generic [ref=e1902]: Gestión de propinas
+                    - img [ref=e1904] [cursor=pointer]: 
+                  - generic [ref=e1908]:
+                    - listitem [ref=e1909]:
+                      - generic [ref=e1910]: 
+                      - generic [ref=e1911]: Cumplimiento normativo
+                    - img [ref=e1913] [cursor=pointer]: 
+                  - generic [ref=e1917]:
+                    - listitem [ref=e1918]:
+                      - generic [ref=e1919]: 
+                      - generic [ref=e1920]: Documentos electrónicos
+                    - img [ref=e1922] [cursor=pointer]: 
+                  - generic [ref=e1926]:
+                    - listitem [ref=e1927]:
+                      - generic [ref=e1928]: 
+                      - generic [ref=e1929]: Usuarios cajeros
+                    - img [ref=e1931] [cursor=pointer]: 
+                  - generic [ref=e1935]:
+                    - listitem [ref=e1936]:
+                      - generic [ref=e1937]: 
+                      - generic [ref=e1938]: 1 Usuario administrador Siigo Nube
+                    - img [ref=e1940] [cursor=pointer]: 
+                  - generic [ref=e1944]:
+                    - listitem [ref=e1945]:
+                      - generic [ref=e1946]: 
+                      - generic [ref=e1947]: Caja POS Software
+                    - img [ref=e1949] [cursor=pointer]: 
+                  - generic [ref=e1953]:
+                    - listitem [ref=e1954]:
+                      - generic [ref=e1955]: 
+                      - generic [ref=e1956]: Precuentas
+                    - img [ref=e1958] [cursor=pointer]: 
+                  - generic [ref=e1962]:
+                    - listitem [ref=e1963]:
+                      - generic [ref=e1964]: 
+                      - generic [ref=e1965]: Turnos personal
+                    - img [ref=e1967] [cursor=pointer]: 
+                  - generic [ref=e1971]:
+                    - listitem [ref=e1972]:
+                      - generic [ref=e1973]: 
+                      - generic [ref=e1974]: Inventario, Stocks y Costeo
+                    - img [ref=e1976] [cursor=pointer]: 
+                  - generic [ref=e1980]:
+                    - listitem [ref=e1981]:
+                      - generic [ref=e1982]: 
+                      - generic [ref=e1983]: Almacenamiento
+                    - img [ref=e1985] [cursor=pointer]: 
+                  - generic [ref=e1989]:
+                    - listitem [ref=e1990]:
+                      - generic [ref=e1991]: 
+                      - generic [ref=e1992]: Reportes Generales e Intermedios
+                    - img [ref=e1994] [cursor=pointer]: 
+                  - listitem [ref=e1999]:
+                    - generic [ref=e2000]: 
+                    - generic [ref=e2001]: Pagos en línea, Contabilidad y Centros de costo y bodegas ilimitadas
+                - generic [ref=e2002]:
+                  - heading "Potencia tu plan con nuestros complementos pagos" [level=3] [ref=e2003]
+                  - generic [ref=e2005]:
+                    - generic [ref=e2006]:
+                      - checkbox [ref=e2008]
+                      - generic [ref=e2012]: App A la orden *
+                    - generic [ref=e2014] [cursor=pointer]: "?"
+                - paragraph
+                - button "Contactar a un asesor" [ref=e2016] [cursor=pointer]:
+                  - generic [ref=e2018]: Contactar a un asesor
+          - generic [ref=e2019]:
+            - paragraph [ref=e2020]: Nuevo
+            - article [ref=e2021]:
+              - generic [ref=e2022]:
+                - generic [ref=e2023]:
+                  - heading "Sistema POS GastroBar PRO + Premium" [level=3] [ref=e2024]
+                  - generic [ref=e2025]:
+                    - heading "$ 261.398/ mes*" [level=4] [ref=e2026]:
+                      - paragraph [ref=e2027]:
+                        - text: $ 261.398
+                        - strong [ref=e2028]: / mes*
+                    - heading "$ 3.136.770 / año" [level=4] [ref=e2029]:
+                      - paragraph [ref=e2030]: $ 3.136.770 / año
+                    - generic [ref=e2031]:
+                      - generic [ref=e2032]: "-35%"
+                      - paragraph [ref=e2033]: $ 4.825.800 / año
+                - paragraph
+                - generic [ref=e2034]:
+                  - button "¡Comprar ahora!" [ref=e2036] [cursor=pointer]:
+                    - generic [ref=e2038]: ¡Comprar ahora!
+                  - paragraph [ref=e2039]: "*El pago es anual. Descuento aplica para cliente nuevo."
+                - list [ref=e2040]:
+                  - generic [ref=e2041]:
+                    - generic [ref=e2042]:
+                      - listitem [ref=e2043]:
+                        - generic [ref=e2044]: 
+                        - generic [ref=e2045]: Combos, recetas y comandas
+                      - img [ref=e2047] [cursor=pointer]: 
+                    - generic [ref=e2051]:
+                      - listitem [ref=e2052]:
+                        - generic [ref=e2053]: 
+                        - generic [ref=e2054]: Gestión Dinámica de Mesas y Meseros
+                      - img [ref=e2056] [cursor=pointer]: 
+                    - generic [ref=e2060]:
+                      - listitem [ref=e2061]:
+                        - generic [ref=e2062]: 
+                        - generic [ref=e2063]: Comandas y órdenes de servicio
+                      - img [ref=e2065] [cursor=pointer]: 
+                    - generic [ref=e2069]:
+                      - listitem [ref=e2070]:
+                        - generic [ref=e2071]: 
+                        - generic [ref=e2072]: Gestión de propinas
+                      - img [ref=e2074] [cursor=pointer]: 
+                    - generic [ref=e2078]:
+                      - listitem [ref=e2079]:
+                        - generic [ref=e2080]: 
+                        - generic [ref=e2081]: Cumplimiento normativo
+                      - img [ref=e2083] [cursor=pointer]: 
+                    - generic [ref=e2087]:
+                      - listitem [ref=e2088]:
+                        - generic [ref=e2089]: 
+                        - generic [ref=e2090]: Documentos electrónicos
+                      - img [ref=e2092] [cursor=pointer]: 
+                    - generic [ref=e2096]:
+                      - listitem [ref=e2097]:
+                        - generic [ref=e2098]: 
+                        - generic [ref=e2099]: Usuario cajeros
+                      - img [ref=e2101] [cursor=pointer]: 
+                    - generic [ref=e2105]:
+                      - listitem [ref=e2106]:
+                        - generic [ref=e2107]: 
+                        - generic [ref=e2108]: 5 Usuarios administrador Siigo Nube
+                      - img [ref=e2110] [cursor=pointer]: 
+                    - generic [ref=e2114]:
+                      - listitem [ref=e2115]:
+                        - generic [ref=e2116]: 
+                        - generic [ref=e2117]: Caja POS Software
+                      - img [ref=e2119] [cursor=pointer]: 
+                    - generic [ref=e2123]:
+                      - listitem [ref=e2124]:
+                        - generic [ref=e2125]: 
+                        - generic [ref=e2126]: Precuentas
+                      - img [ref=e2128] [cursor=pointer]: 
+                    - generic [ref=e2132]:
+                      - listitem [ref=e2133]:
+                        - generic [ref=e2134]: 
+                        - generic [ref=e2135]: Turnos personal
+                      - img [ref=e2137] [cursor=pointer]: 
+                    - generic [ref=e2141]:
+                      - listitem [ref=e2142]:
+                        - generic [ref=e2143]: 
+                        - generic [ref=e2144]: Gestión Premium de Inventarios y Stocks
+                      - img [ref=e2146] [cursor=pointer]: 
+                    - generic [ref=e2150]:
+                      - listitem [ref=e2151]:
+                        - generic [ref=e2152]: 
+                        - generic [ref=e2153]: Almacenamiento
+                      - img [ref=e2155] [cursor=pointer]: 
+                    - generic [ref=e2159]:
+                      - listitem [ref=e2160]:
+                        - generic [ref=e2161]: 
+                        - generic [ref=e2162]: Reportes Generales y Premium
+                      - img [ref=e2164] [cursor=pointer]: 
+                    - generic [ref=e2168]:
+                      - listitem [ref=e2169]:
+                        - generic [ref=e2170]: 
+                        - generic [ref=e2171]: Pagos en línea, Contabilidad y Centros de costo y bodegas ilimitadas
+                      - img [ref=e2173] [cursor=pointer]: 
+                  - generic [ref=e2177]:
+                    - heading "Potencia tu plan con nuestros complementos pagos" [level=3] [ref=e2178]
+                    - generic [ref=e2180]:
+                      - generic [ref=e2181]:
+                        - checkbox [ref=e2183]
+                        - generic [ref=e2187]: App A la orden *
+                      - generic [ref=e2189] [cursor=pointer]: "?"
+                  - paragraph
+                  - button "Contactar a un asesor" [ref=e2191] [cursor=pointer]:
+                    - generic [ref=e2193]: Contactar a un asesor
+      - generic [ref=e2201]:
+        - heading "Nómina Electrónica" [level=2] [ref=e2202]
+        - paragraph [ref=e2203]: ¡Nómina preconfigurada y automatizada!. Convierte tu nómina a digital y facilita tus procesos de liquidación de nómina, con soporte en línea 24/7.
+        - generic [ref=e2204]:
+          - article [ref=e2207]:
+            - generic [ref=e2208]:
+              - generic [ref=e2209]:
+                - heading "Nómina Electrónica Lite 24" [level=3] [ref=e2210]
+                - generic [ref=e2211]:
+                  - heading "$ 9.992/ mes*" [level=4] [ref=e2212]:
+                    - paragraph [ref=e2213]:
+                      - text: $ 9.992
+                      - strong [ref=e2214]: / mes*
+                  - heading "$ 119.900 / año" [level=4] [ref=e2215]:
+                    - paragraph [ref=e2216]: $ 119.900 / año
+              - paragraph
+              - generic [ref=e2217]:
+                - button "¡Comprar ahora!" [ref=e2219] [cursor=pointer]:
+                  - generic [ref=e2221]: ¡Comprar ahora!
+                - paragraph [ref=e2222]: "*El pago es anual. Descuento aplica para cliente nuevo."
+              - list [ref=e2223]:
+                - generic [ref=e2224]:
+                  - generic [ref=e2225]:
+                    - listitem [ref=e2226]:
+                      - generic [ref=e2227]: 
+                      - generic [ref=e2228]: Hasta 2 empleados
+                    - img [ref=e2230] [cursor=pointer]: 
+                  - generic [ref=e2234]:
+                    - listitem [ref=e2235]:
+                      - generic [ref=e2236]: 
+                      - generic [ref=e2237]: Cumple al 100% los requisitos de la DIAN
+                    - img [ref=e2239] [cursor=pointer]: 
+                  - generic [ref=e2243]:
+                    - listitem [ref=e2244]:
+                      - generic [ref=e2245]: 
+                      - generic [ref=e2246]: Certificado digital
+                    - img [ref=e2248] [cursor=pointer]: 
+                  - generic [ref=e2252]:
+                    - listitem [ref=e2253]:
+                      - generic [ref=e2254]: 
+                      - generic [ref=e2255]: Reportes / Dashboard
+                    - img [ref=e2257] [cursor=pointer]: 
+                  - generic [ref=e2261]:
+                    - listitem [ref=e2262]:
+                      - generic [ref=e2263]: 
+                      - generic [ref=e2264]: Material de capacitación
+                    - img [ref=e2266] [cursor=pointer]: 
+                  - generic [ref=e2270]:
+                    - listitem [ref=e2271]:
+                      - generic [ref=e2272]: 
+                      - generic [ref=e2273]: Envío de comprobantes a empleados
+                    - img [ref=e2275] [cursor=pointer]: 
+                  - generic [ref=e2279]:
+                    - listitem [ref=e2280]:
+                      - generic [ref=e2281]: 
+                      - generic [ref=e2282]: Generación de archivos planos a bancos
+                    - img [ref=e2284] [cursor=pointer]: 
+                  - generic [ref=e2288]:
+                    - listitem [ref=e2289]:
+                      - generic [ref=e2290]: 
+                      - generic [ref=e2291]: Liquidación manual de contratos
+                    - img [ref=e2293] [cursor=pointer]: 
+                  - generic [ref=e2297]:
+                    - listitem [ref=e2298]:
+                      - generic [ref=e2299]: 
+                      - generic [ref=e2300]: Liquidación manual de cesantías
+                    - img [ref=e2302] [cursor=pointer]: 
+                  - listitem [ref=e2307]:
+                    - generic [ref=e2308]: 
+                    - generic [ref=e2309]: Liquidación automática de nomina
+                  - listitem [ref=e2311]:
+                    - generic [ref=e2312]: 
+                    - generic [ref=e2313]: Contabilización
+                  - listitem [ref=e2315]:
+                    - generic [ref=e2316]: 
+                    - generic [ref=e2317]: Generación certificado laboral
+                  - listitem [ref=e2319]:
+                    - generic [ref=e2320]: 
+                    - generic [ref=e2321]: Seguridad social (PILA)
+                  - listitem [ref=e2323]:
+                    - generic [ref=e2324]: 
+                    - generic [ref=e2325]: Libro de vacaciones
+                  - listitem [ref=e2327]:
+                    - generic [ref=e2328]: 
+                    - generic [ref=e2329]: Liquidación de prima
+                  - listitem [ref=e2331]:
+                    - generic [ref=e2332]: 
+                    - generic [ref=e2333]: Captura de acumulados iniciales de nómina
+                - paragraph
+          - generic [ref=e2334]:
+            - paragraph [ref=e2335]: ¡Más popular!
+            - article [ref=e2336]:
+              - generic [ref=e2337]:
+                - generic [ref=e2338]:
+                  - heading "Nómina Electrónica Lite 120" [level=3] [ref=e2339]
+                  - generic [ref=e2340]:
+                    - heading "$ 19.993/ mes*" [level=4] [ref=e2341]:
+                      - paragraph [ref=e2342]:
+                        - text: $ 19.993
+                        - strong [ref=e2343]: / mes*
+                    - heading "$ 239.920 / año" [level=4] [ref=e2344]:
+                      - paragraph [ref=e2345]: $ 239.920 / año
+                    - generic [ref=e2346]:
+                      - generic [ref=e2347]: "-20%"
+                      - paragraph [ref=e2348]: $ 299.900 / año
+                - paragraph
+                - generic [ref=e2349]:
+                  - button "¡Comprar ahora!" [ref=e2351] [cursor=pointer]:
+                    - generic [ref=e2353]: ¡Comprar ahora!
+                  - paragraph [ref=e2354]: "*El pago es anual. Descuento aplica para cliente nuevo."
+                - list [ref=e2355]:
+                  - generic [ref=e2356]:
+                    - generic [ref=e2357]:
+                      - listitem [ref=e2358]:
+                        - generic [ref=e2359]: 
+                        - generic [ref=e2360]: Hasta 10 empleados
+                      - img [ref=e2362] [cursor=pointer]: 
+                    - generic [ref=e2366]:
+                      - listitem [ref=e2367]:
+                        - generic [ref=e2368]: 
+                        - generic [ref=e2369]: Cumple al 100% los requisitos de la DIAN
+                      - img [ref=e2371] [cursor=pointer]: 
+                    - generic [ref=e2375]:
+                      - listitem [ref=e2376]:
+                        - generic [ref=e2377]: 
+                        - generic [ref=e2378]: Certificado digital
+                      - img [ref=e2380] [cursor=pointer]: 
+                    - generic [ref=e2384]:
+                      - listitem [ref=e2385]:
+                        - generic [ref=e2386]: 
+                        - generic [ref=e2387]: Reportes / Dashboard
+                      - img [ref=e2389] [cursor=pointer]: 
+                    - generic [ref=e2393]:
+                      - listitem [ref=e2394]:
+                        - generic [ref=e2395]: 
+                        - generic [ref=e2396]: Material de capacitación
+                      - img [ref=e2398] [cursor=pointer]: 
+                    - generic [ref=e2402]:
+                      - listitem [ref=e2403]:
+                        - generic [ref=e2404]: 
+                        - generic [ref=e2405]: Envío de comprobantes a empleados
+                      - img [ref=e2407] [cursor=pointer]: 
+                    - generic [ref=e2411]:
+                      - listitem [ref=e2412]:
+                        - generic [ref=e2413]: 
+                        - generic [ref=e2414]: Generación de archivos planos a bancos
+                      - img [ref=e2416] [cursor=pointer]: 
+                    - generic [ref=e2420]:
+                      - listitem [ref=e2421]:
+                        - generic [ref=e2422]: 
+                        - generic [ref=e2423]: Liquidación manual de contratos
+                      - img [ref=e2425] [cursor=pointer]: 
+                    - generic [ref=e2429]:
+                      - listitem [ref=e2430]:
+                        - generic [ref=e2431]: 
+                        - generic [ref=e2432]: Liquidación manual de cesantías
+                      - img [ref=e2434] [cursor=pointer]: 
+                    - listitem [ref=e2439]:
+                      - generic [ref=e2440]: 
+                      - generic [ref=e2441]: Liquidación automática de nomina
+                    - listitem [ref=e2443]:
+                      - generic [ref=e2444]: 
+                      - generic [ref=e2445]: Contabilización
+                    - listitem [ref=e2447]:
+                      - generic [ref=e2448]: 
+                      - generic [ref=e2449]: Generación certificado laboral
+                    - listitem [ref=e2451]:
+                      - generic [ref=e2452]: 
+                      - generic [ref=e2453]: Seguridad social (PILA)
+                    - listitem [ref=e2455]:
+                      - generic [ref=e2456]: 
+                      - generic [ref=e2457]: Libro de vacaciones
+                    - listitem [ref=e2459]:
+                      - generic [ref=e2460]: 
+                      - generic [ref=e2461]: Liquidación de prima
+                    - listitem [ref=e2463]:
+                      - generic [ref=e2464]: 
+                      - generic [ref=e2465]: Captura de acumulados iniciales de nómina
+                  - paragraph
+          - article [ref=e2468]:
+            - generic [ref=e2469]:
+              - generic [ref=e2470]:
+                - heading "Nómina Electrónica Lite 300" [level=3] [ref=e2471]
+                - generic [ref=e2472]:
+                  - heading "$ 37.494/ mes*" [level=4] [ref=e2473]:
+                    - paragraph [ref=e2474]:
+                      - text: $ 37.494
+                      - strong [ref=e2475]: / mes*
+                  - heading "$ 449.925 / año" [level=4] [ref=e2476]:
+                    - paragraph [ref=e2477]: $ 449.925 / año
+                  - generic [ref=e2478]:
+                    - generic [ref=e2479]: "-25%"
+                    - paragraph [ref=e2480]: $ 599.900 / año
+              - paragraph
+              - generic [ref=e2481]:
+                - button "¡Comprar ahora!" [ref=e2483] [cursor=pointer]:
+                  - generic [ref=e2485]: ¡Comprar ahora!
+                - paragraph [ref=e2486]: "*El pago es anual. Descuento aplica para cliente nuevo."
+              - list [ref=e2487]:
+                - generic [ref=e2488]:
+                  - generic [ref=e2489]:
+                    - listitem [ref=e2490]:
+                      - generic [ref=e2491]: 
+                      - generic [ref=e2492]: Hasta 25 empleados
+                    - img [ref=e2494] [cursor=pointer]: 
+                  - generic [ref=e2498]:
+                    - listitem [ref=e2499]:
+                      - generic [ref=e2500]: 
+                      - generic [ref=e2501]: Cumple al 100% los requisitos de la DIAN
+                    - img [ref=e2503] [cursor=pointer]: 
+                  - generic [ref=e2507]:
+                    - listitem [ref=e2508]:
+                      - generic [ref=e2509]: 
+                      - generic [ref=e2510]: Certificado digital
+                    - img [ref=e2512] [cursor=pointer]: 
+                  - generic [ref=e2516]:
+                    - listitem [ref=e2517]:
+                      - generic [ref=e2518]: 
+                      - generic [ref=e2519]: Reportes / Dashboard
+                    - img [ref=e2521] [cursor=pointer]: 
+                  - generic [ref=e2525]:
+                    - listitem [ref=e2526]:
+                      - generic [ref=e2527]: 
+                      - generic [ref=e2528]: Material de capacitación
+                    - img [ref=e2530] [cursor=pointer]: 
+                  - generic [ref=e2534]:
+                    - listitem [ref=e2535]:
+                      - generic [ref=e2536]: 
+                      - generic [ref=e2537]: Envío de comprobantes a empleados
+                    - img [ref=e2539] [cursor=pointer]: 
+                  - generic [ref=e2543]:
+                    - listitem [ref=e2544]:
+                      - generic [ref=e2545]: 
+                      - generic [ref=e2546]: Generación de archivos planos a bancos
+                    - img [ref=e2548] [cursor=pointer]: 
+                  - generic [ref=e2552]:
+                    - listitem [ref=e2553]:
+                      - generic [ref=e2554]: 
+                      - generic [ref=e2555]: Liquidación manual de contratos
+                    - img [ref=e2557] [cursor=pointer]: 
+                  - generic [ref=e2561]:
+                    - listitem [ref=e2562]:
+                      - generic [ref=e2563]: 
+                      - generic [ref=e2564]: Liquidación manual de cesantías
+                    - img [ref=e2566] [cursor=pointer]: 
+                  - listitem [ref=e2571]:
+                    - generic [ref=e2572]: 
+                    - generic [ref=e2573]: Liquidación automática de nomina
+                  - listitem [ref=e2575]:
+                    - generic [ref=e2576]: 
+                    - generic [ref=e2577]: Contabilización
+                  - listitem [ref=e2579]:
+                    - generic [ref=e2580]: 
+                    - generic [ref=e2581]: Generación certificado laboral
+                  - listitem [ref=e2583]:
+                    - generic [ref=e2584]: 
+                    - generic [ref=e2585]: Seguridad social (PILA)
+                  - listitem [ref=e2587]:
+                    - generic [ref=e2588]: 
+                    - generic [ref=e2589]: Libro de vacaciones
+                  - listitem [ref=e2591]:
+                    - generic [ref=e2592]: 
+                    - generic [ref=e2593]: Liquidación de prima
+                  - listitem [ref=e2595]:
+                    - generic [ref=e2596]: 
+                    - generic [ref=e2597]: Captura de acumulados iniciales de nómina
+                - paragraph
+          - article [ref=e2600]:
+            - generic [ref=e2601]:
+              - generic [ref=e2602]:
+                - heading "Nómina PLUS" [level=3] [ref=e2603]
+                - generic [ref=e2604]:
+                  - heading "$ 62.494/ mes*" [level=4] [ref=e2605]:
+                    - paragraph [ref=e2606]:
+                      - text: $ 62.494
+                      - strong [ref=e2607]: / mes*
+                  - heading "$ 749.925 / año" [level=4] [ref=e2608]:
+                    - paragraph [ref=e2609]: $ 749.925 / año
+                  - generic [ref=e2610]:
+                    - generic [ref=e2611]: "-25%"
+                    - paragraph [ref=e2612]: $ 999.900 / año
+              - paragraph
+              - generic [ref=e2613]:
+                - button "¡Comprar ahora!" [ref=e2615] [cursor=pointer]:
+                  - generic [ref=e2617]: ¡Comprar ahora!
+                - paragraph [ref=e2618]: "*El pago es anual. Descuento aplica para cliente nuevo."
+              - list [ref=e2619]:
+                - generic [ref=e2620]:
+                  - generic [ref=e2621]:
+                    - listitem [ref=e2622]:
+                      - generic [ref=e2623]: 
+                      - generic [ref=e2624]: Empleados ilimitados
+                    - img [ref=e2626] [cursor=pointer]: 
+                  - generic [ref=e2630]:
+                    - listitem [ref=e2631]:
+                      - generic [ref=e2632]: 
+                      - generic [ref=e2633]: Cumple al 100% los requisitos de la DIAN
+                    - img [ref=e2635] [cursor=pointer]: 
+                  - generic [ref=e2639]:
+                    - listitem [ref=e2640]:
+                      - generic [ref=e2641]: 
+                      - generic [ref=e2642]: Certificado digital
+                    - img [ref=e2644] [cursor=pointer]: 
+                  - generic [ref=e2648]:
+                    - listitem [ref=e2649]:
+                      - generic [ref=e2650]: 
+                      - generic [ref=e2651]: Reportes / Dashboard
+                    - img [ref=e2653] [cursor=pointer]: 
+                  - generic [ref=e2657]:
+                    - listitem [ref=e2658]:
+                      - generic [ref=e2659]: 
+                      - generic [ref=e2660]: Material de capacitación
+                    - img [ref=e2662] [cursor=pointer]: 
+                  - generic [ref=e2666]:
+                    - listitem [ref=e2667]:
+                      - generic [ref=e2668]: 
+                      - generic [ref=e2669]: Envío de comprobantes a empleados
+                    - img [ref=e2671] [cursor=pointer]: 
+                  - generic [ref=e2675]:
+                    - listitem [ref=e2676]:
+                      - generic [ref=e2677]: 
+                      - generic [ref=e2678]: Generación de archivos planos a bancos
+                    - img [ref=e2680] [cursor=pointer]: 
+                  - generic [ref=e2684]:
+                    - listitem [ref=e2685]:
+                      - generic [ref=e2686]: 
+                      - generic [ref=e2687]: Liquidación automática de contratos
+                    - img [ref=e2689] [cursor=pointer]: 
+                  - generic [ref=e2693]:
+                    - listitem [ref=e2694]:
+                      - generic [ref=e2695]: 
+                      - generic [ref=e2696]: Liquidación manual de cesantías
+                    - img [ref=e2698] [cursor=pointer]: 
+                  - generic [ref=e2702]:
+                    - listitem [ref=e2703]:
+                      - generic [ref=e2704]: 
+                      - generic [ref=e2705]: Liquidación automática de nomina
+                    - img [ref=e2707] [cursor=pointer]: 
+                  - generic [ref=e2711]:
+                    - listitem [ref=e2712]:
+                      - generic [ref=e2713]: 
+                      - generic [ref=e2714]: Contabilización
+                    - img [ref=e2716] [cursor=pointer]: 
+                  - generic [ref=e2720]:
+                    - listitem [ref=e2721]:
+                      - generic [ref=e2722]: 
+                      - generic [ref=e2723]: Generación certificado laboral
+                    - img [ref=e2725] [cursor=pointer]: 
+                  - listitem [ref=e2730]:
+                    - generic [ref=e2731]: 
+                    - generic [ref=e2732]: Seguridad social (PILA)
+                  - listitem [ref=e2734]:
+                    - generic [ref=e2735]: 
+                    - generic [ref=e2736]: Libro de vacaciones
+                  - listitem [ref=e2738]:
+                    - generic [ref=e2739]: 
+                    - generic [ref=e2740]: Liquidación de prima
+                  - listitem [ref=e2742]:
+                    - generic [ref=e2743]: 
+                    - generic [ref=e2744]: Captura de acumulados iniciales de nómina
+                - paragraph
+          - article [ref=e2747]:
+            - generic [ref=e2748]:
+              - generic [ref=e2749]:
+                - heading "Nómina PRO" [level=3] [ref=e2750]
+                - generic [ref=e2751]:
+                  - heading "$ 116.869/ mes*" [level=4] [ref=e2752]:
+                    - paragraph [ref=e2753]:
+                      - text: $ 116.869
+                      - strong [ref=e2754]: / mes*
+                  - heading "$ 1.402.425 / año" [level=4] [ref=e2755]:
+                    - paragraph [ref=e2756]: $ 1.402.425 / año
+                  - generic [ref=e2757]:
+                    - generic [ref=e2758]: "-25%"
+                    - paragraph [ref=e2759]: $ 1.869.900 / año
+              - paragraph
+              - generic [ref=e2760]:
+                - button "¡Comprar ahora!" [ref=e2762] [cursor=pointer]:
+                  - generic [ref=e2764]: ¡Comprar ahora!
+                - paragraph [ref=e2765]: "*El pago es anual. Descuento aplica para cliente nuevo."
+              - list [ref=e2766]:
+                - generic [ref=e2767]:
+                  - generic [ref=e2768]:
+                    - listitem [ref=e2769]:
+                      - generic [ref=e2770]: 
+                      - generic [ref=e2771]: Empleados ilimitados
+                    - img [ref=e2773] [cursor=pointer]: 
+                  - generic [ref=e2777]:
+                    - listitem [ref=e2778]:
+                      - generic [ref=e2779]: 
+                      - generic [ref=e2780]: Cumple al 100% los requisitos de la DIAN
+                    - img [ref=e2782] [cursor=pointer]: 
+                  - generic [ref=e2786]:
+                    - listitem [ref=e2787]:
+                      - generic [ref=e2788]: 
+                      - generic [ref=e2789]: Certificado digital
+                    - img [ref=e2791] [cursor=pointer]: 
+                  - generic [ref=e2795]:
+                    - listitem [ref=e2796]:
+                      - generic [ref=e2797]: 
+                      - generic [ref=e2798]: Reportes / Dashboard
+                    - img [ref=e2800] [cursor=pointer]: 
+                  - generic [ref=e2804]:
+                    - listitem [ref=e2805]:
+                      - generic [ref=e2806]: 
+                      - generic [ref=e2807]: Material de capacitación
+                    - img [ref=e2809] [cursor=pointer]: 
+                  - generic [ref=e2813]:
+                    - listitem [ref=e2814]:
+                      - generic [ref=e2815]: 
+                      - generic [ref=e2816]: Envío de comprobantes a empleados
+                    - img [ref=e2818] [cursor=pointer]: 
+                  - generic [ref=e2822]:
+                    - listitem [ref=e2823]:
+                      - generic [ref=e2824]: 
+                      - generic [ref=e2825]: Generación de archivos planos a bancos
+                    - img [ref=e2827] [cursor=pointer]: 
+                  - generic [ref=e2831]:
+                    - listitem [ref=e2832]:
+                      - generic [ref=e2833]: 
+                      - generic [ref=e2834]: Liquidación automática de contratos
+                    - img [ref=e2836] [cursor=pointer]: 
+                  - generic [ref=e2840]:
+                    - listitem [ref=e2841]:
+                      - generic [ref=e2842]: 
+                      - generic [ref=e2843]: Liquidación automática de cesantías
+                    - img [ref=e2845] [cursor=pointer]: 
+                  - generic [ref=e2849]:
+                    - listitem [ref=e2850]:
+                      - generic [ref=e2851]: 
+                      - generic [ref=e2852]: Liquidación automática de nomina
+                    - img [ref=e2854] [cursor=pointer]: 
+                  - generic [ref=e2858]:
+                    - listitem [ref=e2859]:
+                      - generic [ref=e2860]: 
+                      - generic [ref=e2861]: Contabilización
+                    - img [ref=e2863] [cursor=pointer]: 
+                  - generic [ref=e2867]:
+                    - listitem [ref=e2868]:
+                      - generic [ref=e2869]: 
+                      - generic [ref=e2870]: Generación certificado laboral
+                    - img [ref=e2872] [cursor=pointer]: 
+                  - generic [ref=e2876]:
+                    - listitem [ref=e2877]:
+                      - generic [ref=e2878]: 
+                      - generic [ref=e2879]: Seguridad social (PILA)
+                    - img [ref=e2881] [cursor=pointer]: 
+                  - generic [ref=e2885]:
+                    - listitem [ref=e2886]:
+                      - generic [ref=e2887]: 
+                      - generic [ref=e2888]: Libro de vacaciones
+                    - img [ref=e2890] [cursor=pointer]: 
+                  - generic [ref=e2894]:
+                    - listitem [ref=e2895]:
+                      - generic [ref=e2896]: 
+                      - generic [ref=e2897]: Liquidación de prima
+                    - img [ref=e2899] [cursor=pointer]: 
+                  - generic [ref=e2903]:
+                    - listitem [ref=e2904]:
+                      - generic [ref=e2905]: 
+                      - generic [ref=e2906]: Captura de acumulados iniciales de nómina
+                    - img [ref=e2908] [cursor=pointer]: 
+                - paragraph
+      - generic [ref=e2918]:
+        - generic [ref=e2919]:
+          - heading "Software Administrativo" [level=2] [ref=e2920]
+          - paragraph [ref=e2921]: Lleva tu empresa contigo y recibe apoyo de asesores expertos cuando lo necesites mientras sigues fortaleciendo tu negocio paso a paso.
+          - generic [ref=e2922]:
+            - article [ref=e2925]:
+              - generic [ref=e2926]:
+                - generic [ref=e2927]:
+                  - heading "Profesional independiente" [level=3] [ref=e2928]
+                  - generic [ref=e2929]:
+                    - heading "$ 155.118/ mes*" [level=4] [ref=e2930]:
+                      - paragraph [ref=e2931]:
+                        - text: $ 155.118
+                        - strong [ref=e2932]: / mes*
+                    - heading "$ 1.861.415 / año" [level=4] [ref=e2933]:
+                      - paragraph [ref=e2934]: $ 1.861.415 / año
+                    - generic [ref=e2935]:
+                      - generic [ref=e2936]: "-15%"
+                      - paragraph [ref=e2937]: $ 2.189.900 / año
+                - paragraph
+                - generic [ref=e2938]:
+                  - button "¡Comprar ahora!" [ref=e2940] [cursor=pointer]:
+                    - generic [ref=e2942]: ¡Comprar ahora!
+                  - paragraph [ref=e2943]: "*El pago es anual. Descuento aplica para cliente nuevo."
+                - list [ref=e2944]:
+                  - generic [ref=e2945]:
+                    - generic [ref=e2946]:
+                      - listitem [ref=e2947]:
+                        - generic [ref=e2948]: 
+                        - generic [ref=e2949]: 1 Usuario
+                      - img [ref=e2951] [cursor=pointer]: 
+                    - generic [ref=e2955]:
+                      - listitem [ref=e2956]:
+                        - generic [ref=e2957]: 
+                        - generic [ref=e2958]: Documentos electrónicos ilimitados
+                      - img [ref=e2960] [cursor=pointer]: 
+                    - generic [ref=e2964]:
+                      - listitem [ref=e2965]:
+                        - generic [ref=e2966]: 
+                        - generic [ref=e2967]: Cobra con Siigo Pay
+                      - img [ref=e2969] [cursor=pointer]: 
+                    - generic [ref=e2973]:
+                      - listitem [ref=e2974]:
+                        - generic [ref=e2975]: 
+                        - generic [ref=e2976]: Notificación de cobranza por WhatsApp
+                      - img [ref=e2978] [cursor=pointer]: 
+                    - generic [ref=e2982]:
+                      - listitem [ref=e2983]:
+                        - generic [ref=e2984]: 
+                        - generic [ref=e2985]: Siigo App
+                      - img [ref=e2987] [cursor=pointer]: 
+                    - generic [ref=e2991]:
+                      - listitem [ref=e2992]:
+                        - generic [ref=e2993]: 
+                        - generic [ref=e2994]: Cotizaciones/CRM
+                      - img [ref=e2996] [cursor=pointer]: 
+                    - generic [ref=e3000]:
+                      - listitem [ref=e3001]:
+                        - generic [ref=e3002]: 
+                        - generic [ref=e3003]: Cartera seguimiento de cobranza
+                      - img [ref=e3005] [cursor=pointer]: 
+                    - generic [ref=e3009]:
+                      - listitem [ref=e3010]:
+                        - generic [ref=e3011]: 
+                        - generic [ref=e3012]: Gastos/cuentas por pagar
+                      - img [ref=e3014] [cursor=pointer]: 
+                    - generic [ref=e3018]:
+                      - listitem [ref=e3019]:
+                        - generic [ref=e3020]: 
+                        - generic [ref=e3021]: Contabilidad
+                      - img [ref=e3023] [cursor=pointer]: 
+                    - listitem [ref=e3028]:
+                      - generic [ref=e3029]: 
+                      - generic [ref=e3030]: Inventarios/Compras y costeo
+                    - listitem [ref=e3032]:
+                      - generic [ref=e3033]: 
+                      - generic [ref=e3034]: Centro de costos/Bodega
+                  - paragraph
+                  - button "Contactar a un asesor" [ref=e3036] [cursor=pointer]:
+                    - generic [ref=e3038]: Contactar a un asesor
+            - article [ref=e3041]:
+              - generic [ref=e3042]:
+                - generic [ref=e3043]:
+                  - heading "Emprendedor" [level=3] [ref=e3044]
+                  - generic [ref=e3045]:
+                    - heading "$ 191.327/ mes*" [level=4] [ref=e3046]:
+                      - paragraph [ref=e3047]:
+                        - text: $ 191.327
+                        - strong [ref=e3048]: / mes*
+                    - heading "$ 2.295.920 / año" [level=4] [ref=e3049]:
+                      - paragraph [ref=e3050]: $ 2.295.920 / año
+                    - generic [ref=e3051]:
+                      - generic [ref=e3052]: "-20%"
+                      - paragraph [ref=e3053]: $ 2.869.900 / año
+                - paragraph
+                - generic [ref=e3054]:
+                  - button "¡Comprar ahora!" [ref=e3056] [cursor=pointer]:
+                    - generic [ref=e3058]: ¡Comprar ahora!
+                  - paragraph [ref=e3059]: "*El pago es anual. Descuento aplica para cliente nuevo."
+                - list [ref=e3060]:
+                  - generic [ref=e3061]:
+                    - generic [ref=e3062]:
+                      - listitem [ref=e3063]:
+                        - generic [ref=e3064]: 
+                        - generic [ref=e3065]: 3 Usuarios
+                      - img [ref=e3067] [cursor=pointer]: 
+                    - generic [ref=e3071]:
+                      - listitem [ref=e3072]:
+                        - generic [ref=e3073]: 
+                        - generic [ref=e3074]: Documentos electrónicos ilimitados
+                      - img [ref=e3076] [cursor=pointer]: 
+                    - generic [ref=e3080]:
+                      - listitem [ref=e3081]:
+                        - generic [ref=e3082]: 
+                        - generic [ref=e3083]: Cobra con Siigo Pay
+                      - img [ref=e3085] [cursor=pointer]: 
+                    - generic [ref=e3089]:
+                      - listitem [ref=e3090]:
+                        - generic [ref=e3091]: 
+                        - generic [ref=e3092]: Notificación de cobranza por WhatsApp
+                      - img [ref=e3094] [cursor=pointer]: 
+                    - generic [ref=e3098]:
+                      - listitem [ref=e3099]:
+                        - generic [ref=e3100]: 
+                        - generic [ref=e3101]: Siigo App
+                      - img [ref=e3103] [cursor=pointer]: 
+                    - generic [ref=e3107]:
+                      - listitem [ref=e3108]:
+                        - generic [ref=e3109]: 
+                        - generic [ref=e3110]: Cotizaciones/CRM
+                      - img [ref=e3112] [cursor=pointer]: 
+                    - generic [ref=e3116]:
+                      - listitem [ref=e3117]:
+                        - generic [ref=e3118]: 
+                        - generic [ref=e3119]: Cartera seguimiento de cobranza
+                      - img [ref=e3121] [cursor=pointer]: 
+                    - generic [ref=e3125]:
+                      - listitem [ref=e3126]:
+                        - generic [ref=e3127]: 
+                        - generic [ref=e3128]: Gastos/cuentas por pagar
+                      - img [ref=e3130] [cursor=pointer]: 
+                    - generic [ref=e3134]:
+                      - listitem [ref=e3135]:
+                        - generic [ref=e3136]: 
+                        - generic [ref=e3137]: Contabilidad
+                      - img [ref=e3139] [cursor=pointer]: 
+                    - generic [ref=e3143]:
+                      - listitem [ref=e3144]:
+                        - generic [ref=e3145]: 
+                        - generic [ref=e3146]: Inventarios/Compras y costeo
+                      - img [ref=e3148] [cursor=pointer]: 
+                    - listitem [ref=e3153]:
+                      - generic [ref=e3154]: 
+                      - generic [ref=e3155]: Centro de costos/Bodega
+                  - paragraph
+                  - button "Contactar a un asesor" [ref=e3157] [cursor=pointer]:
+                    - generic [ref=e3159]: Contactar a un asesor
+            - article [ref=e3162]:
+              - generic [ref=e3163]:
+                - generic [ref=e3164]:
+                  - heading "Premium" [level=3] [ref=e3165]
+                  - generic [ref=e3166]:
+                    - heading "$ 221.727/ mes*" [level=4] [ref=e3167]:
+                      - paragraph [ref=e3168]:
+                        - text: $ 221.727
+                        - strong [ref=e3169]: / mes*
+                    - heading "$ 2.660.720 / año" [level=4] [ref=e3170]:
+                      - paragraph [ref=e3171]: $ 2.660.720 / año
+                    - generic [ref=e3172]:
+                      - generic [ref=e3173]: "-20%"
+                      - paragraph [ref=e3174]: $ 3.325.900 / año
+                - paragraph
+                - generic [ref=e3175]:
+                  - button "¡Comprar ahora!" [ref=e3177] [cursor=pointer]:
+                    - generic [ref=e3179]: ¡Comprar ahora!
+                  - paragraph [ref=e3180]: "*El pago es anual. Descuento aplica para cliente nuevo."
+                - list [ref=e3181]:
+                  - generic [ref=e3182]:
+                    - generic [ref=e3183]:
+                      - listitem [ref=e3184]:
+                        - generic [ref=e3185]: 
+                        - generic [ref=e3186]: 5 Usuarios
+                      - img [ref=e3188] [cursor=pointer]: 
+                    - generic [ref=e3192]:
+                      - listitem [ref=e3193]:
+                        - generic [ref=e3194]: 
+                        - generic [ref=e3195]: Documentos electrónicos ilimitados
+                      - img [ref=e3197] [cursor=pointer]: 
+                    - generic [ref=e3201]:
+                      - listitem [ref=e3202]:
+                        - generic [ref=e3203]: 
+                        - generic [ref=e3204]: Cobra con Siigo Pay
+                      - img [ref=e3206] [cursor=pointer]: 
+                    - generic [ref=e3210]:
+                      - listitem [ref=e3211]:
+                        - generic [ref=e3212]: 
+                        - generic [ref=e3213]: Notificación de cobranza por WhatsApp
+                      - img [ref=e3215] [cursor=pointer]: 
+                    - generic [ref=e3219]:
+                      - listitem [ref=e3220]:
+                        - generic [ref=e3221]: 
+                        - generic [ref=e3222]: Siigo App
+                      - img [ref=e3224] [cursor=pointer]: 
+                    - generic [ref=e3228]:
+                      - listitem [ref=e3229]:
+                        - generic [ref=e3230]: 
+                        - generic [ref=e3231]: Cotizaciones/CRM
+                      - img [ref=e3233] [cursor=pointer]: 
+                    - generic [ref=e3237]:
+                      - listitem [ref=e3238]:
+                        - generic [ref=e3239]: 
+                        - generic [ref=e3240]: Cartera seguimiento de cobranza
+                      - img [ref=e3242] [cursor=pointer]: 
+                    - generic [ref=e3246]:
+                      - listitem [ref=e3247]:
+                        - generic [ref=e3248]: 
+                        - generic [ref=e3249]: Gastos/cuentas por pagar
+                      - img [ref=e3251] [cursor=pointer]: 
+                    - generic [ref=e3255]:
+                      - listitem [ref=e3256]:
+                        - generic [ref=e3257]: 
+                        - generic [ref=e3258]: Contabilidad
+                      - img [ref=e3260] [cursor=pointer]: 
+                    - generic [ref=e3264]:
+                      - listitem [ref=e3265]:
+                        - generic [ref=e3266]: 
+                        - generic [ref=e3267]: Inventarios/Compras y costeo
+                      - img [ref=e3269] [cursor=pointer]: 
+                    - generic [ref=e3273]:
+                      - listitem [ref=e3274]:
+                        - generic [ref=e3275]: 
+                        - generic [ref=e3276]: Centro de costos/Bodega
+                      - img [ref=e3278] [cursor=pointer]: 
+                  - paragraph
+                  - button "Contactar a un asesor" [ref=e3283] [cursor=pointer]:
+                    - generic [ref=e3285]: Contactar a un asesor
+            - article [ref=e3288]:
+              - generic [ref=e3289]:
+                - generic [ref=e3290]:
+                  - heading "Nube independiente + Nómina Electrónica 120" [level=3] [ref=e3291]
+                  - generic [ref=e3292]:
+                    - heading "$ 186.735/ mes*" [level=4] [ref=e3293]:
+                      - paragraph [ref=e3294]:
+                        - text: $ 186.735
+                        - strong [ref=e3295]: / mes*
+                    - heading "$ 2.240.820 / año" [level=4] [ref=e3296]:
+                      - paragraph [ref=e3297]: $ 2.240.820 / año
+                    - generic [ref=e3298]:
+                      - generic [ref=e3299]: "-10%"
+                      - paragraph [ref=e3300]: $ 2.489.800 / año
+                - paragraph
+                - generic [ref=e3301]:
+                  - button "¡Comprar ahora!" [ref=e3303] [cursor=pointer]:
+                    - generic [ref=e3305]: ¡Comprar ahora!
+                  - paragraph [ref=e3306]: "*El pago es anual. Descuento aplica para cliente nuevo."
+                - list [ref=e3307]:
+                  - generic [ref=e3308]:
+                    - generic [ref=e3309]:
+                      - listitem [ref=e3310]:
+                        - generic [ref=e3311]: 
+                        - generic [ref=e3312]: 1 Usuario administrador
+                      - img [ref=e3314] [cursor=pointer]: 
+                    - generic [ref=e3318]:
+                      - listitem [ref=e3319]:
+                        - generic [ref=e3320]: 
+                        - generic [ref=e3321]: Hasta 10 empleados
+                      - img [ref=e3323] [cursor=pointer]: 
+                    - generic [ref=e3327]:
+                      - listitem [ref=e3328]:
+                        - generic [ref=e3329]: 
+                        - generic [ref=e3330]: Documentos electrónicos ilimitados
+                      - img [ref=e3332] [cursor=pointer]: 
+                    - generic [ref=e3336]:
+                      - listitem [ref=e3337]:
+                        - generic [ref=e3338]: 
+                        - generic [ref=e3339]: Certificado digital* y cumplimiento con la DIAN
+                      - img [ref=e3341] [cursor=pointer]: 
+                    - generic [ref=e3345]:
+                      - listitem [ref=e3346]:
+                        - generic [ref=e3347]: 
+                        - generic [ref=e3348]: Automatización de pagos y comprobantes
+                      - img [ref=e3350] [cursor=pointer]: 
+                    - generic [ref=e3354]:
+                      - listitem [ref=e3355]:
+                        - generic [ref=e3356]: 
+                        - generic [ref=e3357]: Cartera seguimiento de cobranza
+                      - img [ref=e3359] [cursor=pointer]: 
+                    - generic [ref=e3363]:
+                      - listitem [ref=e3364]:
+                        - generic [ref=e3365]: 
+                        - generic [ref=e3366]: Notificación de cobranza por WhatsApp
+                      - img [ref=e3368] [cursor=pointer]: 
+                    - generic [ref=e3372]:
+                      - listitem [ref=e3373]:
+                        - generic [ref=e3374]: 
+                        - generic [ref=e3375]: Cotizaciones/CRM
+                      - img [ref=e3377] [cursor=pointer]: 
+                    - generic [ref=e3381]:
+                      - listitem [ref=e3382]:
+                        - generic [ref=e3383]: 
+                        - generic [ref=e3384]: Contabilidad
+                      - img [ref=e3386] [cursor=pointer]: 
+                    - generic [ref=e3390]:
+                      - listitem [ref=e3391]:
+                        - generic [ref=e3392]: 
+                        - generic [ref=e3393]: Gastos/cuentas por pagar
+                      - img [ref=e3395] [cursor=pointer]: 
+                    - generic [ref=e3399]:
+                      - listitem [ref=e3400]:
+                        - generic [ref=e3401]: 
+                        - generic [ref=e3402]: Liquidación manual de contratos
+                      - img [ref=e3404] [cursor=pointer]: 
+                    - generic [ref=e3408]:
+                      - listitem [ref=e3409]:
+                        - generic [ref=e3410]: 
+                        - generic [ref=e3411]: Liquidación manual de cesantías
+                      - img [ref=e3413] [cursor=pointer]: 
+                    - generic [ref=e3417]:
+                      - listitem [ref=e3418]:
+                        - generic [ref=e3419]: 
+                        - generic [ref=e3420]: Reportes / Dashboard
+                      - img [ref=e3422] [cursor=pointer]: 
+                    - generic [ref=e3426]:
+                      - listitem [ref=e3427]:
+                        - generic [ref=e3428]: 
+                        - generic [ref=e3429]: Material de capacitación
+                      - img [ref=e3431] [cursor=pointer]: 
+                    - generic [ref=e3435]:
+                      - listitem [ref=e3436]:
+                        - generic [ref=e3437]: 
+                        - generic [ref=e3438]: Cobra con Siigo Pay
+                      - img [ref=e3440] [cursor=pointer]: 
+                    - generic [ref=e3444]:
+                      - listitem [ref=e3445]:
+                        - generic [ref=e3446]: 
+                        - generic [ref=e3447]: Siigo App
+                      - img [ref=e3449] [cursor=pointer]: 
+                  - paragraph
+        - paragraph [ref=e3454]: La disponibilidad del plan está sujeta a la categorización económica del usuario*
+      - generic [ref=e3462]:
+        - heading "Software contable 100% en la nube" [level=2] [ref=e3463]
+        - paragraph [ref=e3464]: Mantén tu contabilidad segura y actualizada en tiempo real. Elige tu plan de Siigo Contador pago o empieza gratis y pruébalo.
+        - generic [ref=e3465]:
+          - article [ref=e3469]:
+            - generic [ref=e3470]:
+              - generic [ref=e3471]:
+                - heading "Siigo contador" [level=3] [ref=e3472]
+                - generic [ref=e3473]:
+                  - heading "GRATIS" [level=4] [ref=e3474]
+                  - paragraph
+              - paragraph
+              - generic [ref=e3475]:
+                - button "¡Quiero mi software gratis!" [ref=e3477] [cursor=pointer]:
+                  - generic [ref=e3479]: ¡Quiero mi software gratis!
+                - paragraph
+              - list [ref=e3480]:
+                - generic [ref=e3481]:
+                  - generic [ref=e3482]:
+                    - listitem [ref=e3483]:
+                      - generic [ref=e3484]: 
+                      - generic [ref=e3485]: 1 Empresa
+                    - img [ref=e3487] [cursor=pointer]: 
+                  - generic [ref=e3491]:
+                    - listitem [ref=e3492]:
+                      - generic [ref=e3493]: 
+                      - generic [ref=e3494]: Contabilidad
+                    - img [ref=e3496] [cursor=pointer]: 
+                  - generic [ref=e3500]:
+                    - listitem [ref=e3501]:
+                      - generic [ref=e3502]: 
+                      - generic [ref=e3503]: Impuestos
+                    - img [ref=e3505] [cursor=pointer]: 
+                  - generic [ref=e3509]:
+                    - listitem [ref=e3510]:
+                      - generic [ref=e3511]: 
+                      - generic [ref=e3512]: Estados financieros
+                    - img [ref=e3514] [cursor=pointer]: 
+                  - generic [ref=e3518]:
+                    - listitem [ref=e3519]:
+                      - generic [ref=e3520]: 
+                      - generic [ref=e3521]: Portal contador
+                    - img [ref=e3523] [cursor=pointer]: 
+                - paragraph
+          - article [ref=e3529]:
+            - generic [ref=e3530]:
+              - generic [ref=e3531]:
+                - heading "Siigo contador ilimitado" [level=3] [ref=e3532]
+                - generic [ref=e3533]:
+                  - heading "$ 44.658/ mes*" [level=4] [ref=e3534]:
+                    - paragraph [ref=e3535]:
+                      - text: $ 44.658
+                      - strong [ref=e3536]: / mes*
+                  - heading "$ 535.900 / año" [level=4] [ref=e3537]:
+                    - paragraph [ref=e3538]: $ 535.900 / año
+              - paragraph
+              - generic [ref=e3539]:
+                - button "Contacta a un asesor" [ref=e3541] [cursor=pointer]:
+                  - generic [ref=e3543]: Contacta a un asesor
+                - paragraph [ref=e3544]: "*El pago es anual. Descuento aplica para cliente nuevo."
+              - list [ref=e3545]:
+                - generic [ref=e3546]:
+                  - generic [ref=e3547]:
+                    - listitem [ref=e3548]:
+                      - generic [ref=e3549]: 
+                      - generic [ref=e3550]: Empresas ilimitadas
+                    - img [ref=e3552] [cursor=pointer]: 
+                  - generic [ref=e3556]:
+                    - listitem [ref=e3557]:
+                      - generic [ref=e3558]: 
+                      - generic [ref=e3559]: Contabilidad
+                    - img [ref=e3561] [cursor=pointer]: 
+                  - generic [ref=e3565]:
+                    - listitem [ref=e3566]:
+                      - generic [ref=e3567]: 
+                      - generic [ref=e3568]: Impuestos
+                    - img [ref=e3570] [cursor=pointer]: 
+                  - generic [ref=e3574]:
+                    - listitem [ref=e3575]:
+                      - generic [ref=e3576]: 
+                      - generic [ref=e3577]: Estados financieros
+                    - img [ref=e3579] [cursor=pointer]: 
+                  - generic [ref=e3583]:
+                    - listitem [ref=e3584]:
+                      - generic [ref=e3585]: 
+                      - generic [ref=e3586]: Portal contador
+                    - img [ref=e3588] [cursor=pointer]: 
+                - paragraph
+    - generic [ref=e3595]:
+      - heading "Esto dicen nuestros clientes" [level=2] [ref=e3596]
+      - generic [ref=e3597]:
+        - button "Empresarios" [ref=e3598] [cursor=pointer]
+        - button "Contadores" [ref=e3599] [cursor=pointer]
+      - generic [ref=e3604]:
+        - generic [ref=e3605]:
+          - generic:
+            - group "1 / 3" [ref=e3606]:
+              - article [ref=e3607]:
+                - article [ref=e3608]:
+                  - article [ref=e3610]
+                  - paragraph [ref=e3612]: Tatiana González
+                  - paragraph [ref=e3613]: Ferretería Triplex González
+                  - paragraph [ref=e3615]: Todos en la empresa lo usamos porque es muy fácil. Me da la comodidad de registrar compras y ventas desde cualquier lugar y dispositivo. Para la implementación del programa los asesores de Siigo fueron excelentes personas, respetuosos, muy amables y nos llevaron siempre de la mano.
+            - group "2 / 3" [ref=e3616]:
+              - article [ref=e3617]:
+                - article [ref=e3618]:
+                  - article [ref=e3620]
+                  - paragraph [ref=e3622]: Juan David Moncayo
+                  - paragraph [ref=e3623]: Comercializadora GPH
+                  - paragraph [ref=e3625]: Nos identificamos con Siigo por su versatilidad y porque no se necesita ser un contador para poder manejarlo, no tienes que saberte una cuenta contable para poder ingresar una mercancía o un inventario o poder hacer ingreso de dinero, es muy fácil de manejar, lógico y predictivo.
+            - group "3 / 3" [ref=e3626]:
+              - article [ref=e3627]:
+                - article [ref=e3628]:
+                  - article [ref=e3630]
+                  - paragraph [ref=e3632]: Gonzalo Rojas
+                  - paragraph [ref=e3633]: Gerente Studio Tonner’s S.A.S
+                  - paragraph [ref=e3635]: Tengo más tiempo para buscar nuevos negocios y nuevos clientes. La parte de nómina se maneja con un solo clic. Con Siigo Nómina no necesito modificar valores porque ya Siigo hizo eso por mí. Sin una inversión tan alta tener la nómina, ventas, facturación y exactamente todo, es excelente.
+        - button "Previous slide" [disabled] [ref=e3636]: 
+        - button "Next slide" [ref=e3637] [cursor=pointer]: 
+        - generic [ref=e3638]:
+          - button "Go to slide 1" [ref=e3639] [cursor=pointer]
+          - button "Go to slide 2" [ref=e3640] [cursor=pointer]
+    - generic [ref=e3642]:
+      - heading "Nuestras alianzas estratégicas" [level=2] [ref=e3644]
+      - link "Ver todas las alianzas" [ref=e3653] [cursor=pointer]:
+        - /url: /alianzas-e-integraciones/
+        - generic [ref=e3655]: Ver todas las alianzas
+    - generic [ref=e3658]:
+      - heading "¿Tienes preguntas? Aquí te las respondemos" [level=2] [ref=e3659]
+      - generic [ref=e3660]:
+        - article [ref=e3661] [cursor=pointer]:
+          - generic [ref=e3662]:
+            - heading "¿Cuáles son los planes gratuitos de Siigo?" [level=3] [ref=e3663]
+            - button "botón" [ref=e3664]:
+              - img [ref=e3666]: +
+        - article [ref=e3668] [cursor=pointer]:
+          - generic [ref=e3669]:
+            - heading "¿Voy a recibir asesoría para la implementación del software, al comprar mi plan?" [level=3] [ref=e3670]
+            - button "botón" [ref=e3671]:
+              - img [ref=e3673]: +
+        - article [ref=e3675] [cursor=pointer]:
+          - generic [ref=e3676]:
+            - heading "¿Puedo adquirir en un mismo plan de Siigo todas las funcionalidades como contabilidad, inventario y nómina electrónica?" [level=3] [ref=e3677]
+            - button "botón" [ref=e3678]:
+              - img [ref=e3680]: +
+        - article [ref=e3682] [cursor=pointer]:
+          - generic [ref=e3683]:
+            - heading "¿Todos los planes incluyen el certificado digital de facturación electrónica?" [level=3] [ref=e3684]
+            - button "botón" [ref=e3685]:
+              - img [ref=e3687]: +
+        - article [ref=e3689] [cursor=pointer]:
+          - generic [ref=e3690]:
+            - heading "¿Puedo empezar con un plan gratis y después pasar a uno de pago?" [level=3] [ref=e3691]
+            - button "botón" [ref=e3692]:
+              - img [ref=e3694]: +
+        - article [ref=e3696] [cursor=pointer]:
+          - generic [ref=e3697]:
+            - heading "¿Cuáles métodos de pago se manejan?" [level=3] [ref=e3698]
+            - button "botón" [ref=e3699]:
+              - img [ref=e3701]: +
+    - contentinfo [ref=e3703]:
+      - generic [ref=e3704]:
+        - generic [ref=e3705]:
+          - link "ir a pagina principal":
+            - /url: https://www.siigo.com/
+        - generic [ref=e3706]:
+          - generic [ref=e3707]:
+            - generic [ref=e3709]:
+              - paragraph [ref=e3710]: Nosotros
+              - generic [ref=e3711]:
+                - link "Ir a Quienes somos" [ref=e3712] [cursor=pointer]:
+                  - /url: /nosotros/
+                  - text: ¿Quiénes somos?
+                - link "Nuestros Líderes" [ref=e3713] [cursor=pointer]:
+                  - /url: /empresa/
+                  - text: Líderes
+                - link "Ir a trabaja con nostros" [ref=e3714] [cursor=pointer]:
+                  - /url: https://talentosiigo.siigo.com/
+                  - text: Trabaja en Siigo
+                - link "Ir a nuestras alianzas" [ref=e3715] [cursor=pointer]:
+                  - /url: /alianzas-e-integraciones/
+                  - text: Alianzas estratégicas
+                - link "Nuestra fundación" [ref=e3716] [cursor=pointer]:
+                  - /url: https://www.fundacionsiigo.org/
+                  - text: Fundación Siigo
+                - link "Sostenibilidad" [ref=e3717] [cursor=pointer]:
+                  - /url: /sostenibilidad/
+            - generic [ref=e3719]:
+              - paragraph [ref=e3720]: Productos
+              - generic [ref=e3721]:
+                - link "Software contable" [ref=e3722] [cursor=pointer]:
+                  - /url: /software-contable/
+                - link "Nómina electrónica" [ref=e3723] [cursor=pointer]:
+                  - /url: /nomina-electronica/
+                - link "Facturación electrónica" [ref=e3724] [cursor=pointer]:
+                  - /url: /facturacion-electronica/
+                - link "Software de inventario" [ref=e3725] [cursor=pointer]:
+                  - /url: /gestion-de-inventario/
+                - link "Sistema POS" [ref=e3726] [cursor=pointer]:
+                  - /url: /sistema-pos/
+                - link "Sistema POS Gastrobar" [ref=e3727] [cursor=pointer]:
+                  - /url: /sistema-pos/restaurantes/
+                - link "Siigo Contador" [ref=e3728] [cursor=pointer]:
+                  - /url: /siigo-contador/
+                - link "Software de Gestión Empresarial" [ref=e3729] [cursor=pointer]:
+                  - /url: /software-administrativo/
+                  - text: Software Gestión Empresarial
+            - generic [ref=e3731]:
+              - paragraph [ref=e3732]: Contenido
+              - generic [ref=e3733]:
+                - link "Blog" [ref=e3734] [cursor=pointer]:
+                  - /url: /blog/
+                - link "Eventos" [ref=e3735] [cursor=pointer]:
+                  - /url: /eventos/
+                - link "Siigo Partners" [ref=e3736] [cursor=pointer]:
+                  - /url: /siigo-contador/partners/
+                - link "Divulgación académica" [ref=e3737] [cursor=pointer]:
+                  - /url: https://divulgacionacademica.siigo.com/
+                - link "Testimonios" [ref=e3738] [cursor=pointer]:
+                  - /url: /testimonios/
+                - link "Siigo y Rigo" [ref=e3739] [cursor=pointer]:
+                  - /url: /siigo-con-rigo/
+                - link "Mapa del sitio" [ref=e3740] [cursor=pointer]:
+                  - /url: /sitemap/
+            - generic [ref=e3742]:
+              - paragraph [ref=e3743]: Empleados
+              - generic [ref=e3744]:
+                - link "Synergy" [ref=e3745] [cursor=pointer]:
+                  - /url: https://empleados.siigo.com/docs/Portal.aspx
+                - link "People App" [ref=e3746] [cursor=pointer]:
+                  - /url: https://peopleapp.siigo.com
+                - link "Siigo Entrenamiento" [ref=e3747] [cursor=pointer]:
+                  - /url: https://siigomoodle.siigo.com/
+            - generic [ref=e3749]:
+              - paragraph [ref=e3750]: Clientes
+              - generic [ref=e3751]:
+                - link "Iniciar sesión" [ref=e3752] [cursor=pointer]:
+                  - /url: https://www.siigo.com/iniciar-sesion/
+                - link "Paga tu factura" [ref=e3753] [cursor=pointer]:
+                  - /url: https://cartera.siigo.com/accountStatementNit
+                - link "Portal de clientes" [ref=e3754] [cursor=pointer]:
+                  - /url: https://portaldeclientes.siigo.com/
+                - link "Soporte" [ref=e3755] [cursor=pointer]:
+                  - /url: https://www.siigo.com/contactenos/
+            - generic [ref=e3757]:
+              - paragraph [ref=e3758]: Políticas
+              - generic [ref=e3759]:
+                - link "Ir a Politica de privacidad" [ref=e3760] [cursor=pointer]:
+                  - /url: https://seguridad.siigo.com/paises/colombia/legal/politica-uso-siigo
+                  - text: Protección de datos
+                - link "Política de seguridad" [ref=e3761] [cursor=pointer]:
+                  - /url: https://seguridad.siigo.com/paises/colombia/seguridad/politica-de-seguridad
+                - link "Condiciones de uso Siigo Nube" [ref=e3762] [cursor=pointer]:
+                  - /url: https://seguridad.siigo.com/paises/colombia/legal/condiciones-de-uso-software-nube
+                - link "Condiciones de uso Siigo Pyme" [ref=e3763] [cursor=pointer]:
+                  - /url: https://seguridad.siigo.com/paises/colombia/legal/condiciones-de-uso-software-pyme
+                - link "Sagrilaft/PTEE" [ref=e3764] [cursor=pointer]:
+                  - /url: https://www.siigo.com/politica-sagrilaft-ptee/
+                - link "Términos y condiciones" [ref=e3765] [cursor=pointer]:
+                  - /url: https://seguridad.siigo.com/paises/colombia/legal/terminos
+                - link "Reporte Responsable de Vulnerabilidades" [ref=e3766] [cursor=pointer]:
+                  - /url: https://seguridad.siigo.com/paises/latam/seguridad/divulgacion-responsable
+                  - text: Reporte de Vulnerabilidades
+                - link "Superintendencia de Industria y Comercio" [ref=e3767] [cursor=pointer]:
+                  - /url: https://sedeelectronica.sic.gov.co/
+                  - text: Superint. Industria y Comercio
+            - generic [ref=e3769]:
+              - paragraph [ref=e3770]: Países
+              - generic [ref=e3771]:
+                - link "Colombia" [ref=e3772] [cursor=pointer]:
+                  - /url: https://www.siigo.com/
+                - link "Ecuador" [ref=e3773] [cursor=pointer]:
+                  - /url: https://www.siigo.com/ec/
+                - link "México" [ref=e3774] [cursor=pointer]:
+                  - /url: https://www.siigo.com/mx/
+                - link "Perú" [ref=e3775] [cursor=pointer]:
+                  - /url: /peru/
+                - link "Uruguay" [ref=e3776] [cursor=pointer]:
+                  - /url: https://memory.com.uy/
+                - link "Chile" [ref=e3777] [cursor=pointer]:
+                  - /url: https://www.kame.cl/
+          - generic [ref=e3779]:
+            - separator [ref=e3780]
+            - generic [ref=e3781]:
+              - paragraph [ref=e3782]: "SIIGO S.A.S. NIT. 830.048.145-8 / Dirección de notificación judicial: Carrera 18 No 79 A - 42 Bogotá"
+              - generic [ref=e3783]:
+                - link "Youtube" [ref=e3784] [cursor=pointer]:
+                  - /url: https://www.youtube.com/channel/UCi-tb4GUk3UQb7e9GL5MD6A
+                  - generic [ref=e3785]: 
+                - link "Linkedin" [ref=e3786] [cursor=pointer]:
+                  - /url: https://www.linkedin.com/company/siigo-colombia/mycompany/
+                  - generic [ref=e3787]: 
+                - link "Facebook" [ref=e3788] [cursor=pointer]:
+                  - /url: https://www.facebook.com/siigocolombia/
+                  - generic [ref=e3789]: 
+                - link "Twitter" [ref=e3790] [cursor=pointer]:
+                  - /url: https://twitter.com/siigocolombia
+                  - generic [ref=e3791]: 
+                - link "Instagram" [ref=e3792] [cursor=pointer]:
+                  - /url: https://www.instagram.com/siigocolombia/
+                  - generic [ref=e3793]: 
+                - link "Spotify" [ref=e3794] [cursor=pointer]:
+                  - /url: https://open.spotify.com/show/5pXowrQAm6bOrYxr0DcUi2?si=63854b3943bd44bd
+                  - generic [ref=e3795]: 
+    - generic [ref=e3797] [cursor=pointer]:
+      - img "Logo" [ref=e3798]
+      - generic [ref=e3799]: ¿Como te podemos ayudar?
+  - alert [ref=e3800]
