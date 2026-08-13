@@ -89,8 +89,113 @@ export type BrandType = {
   id?: number;
   name: string;
   manager_id: number;
+  /**
+   * Cliente dueño de la marca. Desde la migración 012 es una columna propia de
+   * `brands`, ya no se deriva de `managers.client_id`: trasladar al gerente no
+   * cambia el cliente de la marca.
+   */
+  client_id?: number;
   business_unit_id?: number;
   manager?: ManagerType;
+  client_info?: ClientType;
+};
+
+// ─── Historiales de responsable ─────────────────────────────────────────────
+
+export type BrandManagerHistoryEntry = {
+  id: number;
+  brandId: number;
+  previousManagerId: number | null;
+  previousManagerName: string | null;
+  newManagerId: number;
+  newManagerName: string | null;
+  changedBy: number | null;
+  changedByName: string | null;
+  reason: string | null;
+  changedAt: string;
+};
+
+export type ProjectManagerHistoryEntry = {
+  id: number;
+  projectId: number;
+  previousManagerId: number | null;
+  previousManagerName: string | null;
+  newManagerId: number;
+  newManagerName: string | null;
+  changedBy: number | null;
+  changedByName: string | null;
+  reason: string | null;
+  changedAt: string;
+};
+
+export type ManagerClientHistoryEntry = {
+  id: number;
+  managerId: number;
+  previousClientId: number | null;
+  previousClientName: string | null;
+  newClientId: number;
+  newClientName: string | null;
+  changedBy: number | null;
+  changedByName: string | null;
+  reason: string | null;
+  changedAt: string;
+};
+
+// ─── Traslado de gerente entre clientes ─────────────────────────────────────
+
+/** Marca que quedaría huérfana si el gerente se traslada. */
+export type TransferPreviewBrand = {
+  id: number;
+  name: string;
+};
+
+/** Proyecto activo (no archivado) que quedaría huérfano tras el traslado. */
+export type TransferPreviewProject = {
+  id: number;
+  title: string;
+  status: ProjectStatus;
+  brand_id: number;
+  brand_name: string | null;
+};
+
+export type TransferPreviewSuccessor = {
+  id: number;
+  name: string;
+  email: string;
+};
+
+export type ManagerTransferPreview = {
+  manager: ManagerType;
+  /** Cliente al que pertenece hoy el gerente */
+  current_client: ClientType | null;
+  brands: TransferPreviewBrand[];
+  projects: TransferPreviewProject[];
+  /** Otros gerentes del cliente actual, candidatos a heredar marcas / proyectos */
+  available_managers: TransferPreviewSuccessor[];
+};
+
+export type BrandReassignment = {
+  brand_id: number;
+  new_manager_id: number;
+};
+
+export type ProjectReassignment = {
+  project_id: number;
+  new_manager_id: number;
+};
+
+export type ManagerTransferResult = {
+  manager: ManagerType | null;
+  previous_client_id: number;
+  new_client_id: number;
+  /** Marcas entregadas a un sucesor; se quedan en el cliente que el gerente deja. */
+  reassigned_brands: number;
+  /** Proyectos entregados a un sucesor; se quedan en el cliente que el gerente deja. */
+  reassigned_projects: number;
+  /** Marcas sin sucesor: viajan con el gerente al nuevo cliente. */
+  moved_brands: number;
+  /** Proyectos sin sucesor: siguen a su marca al nuevo cliente. */
+  moved_projects: number;
 };
 
 export type BrandsAndManagersType = {
@@ -98,6 +203,8 @@ export type BrandsAndManagersType = {
   brand_name: string;
   manager_id: number;
   manager_name?: string;
+  /** Cliente propio de la marca (brands.client_id) */
+  client_id?: number;
 };
 
 export type ManagersParams ={

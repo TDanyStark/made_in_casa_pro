@@ -4,35 +4,45 @@ import { useEffect, useMemo, useState } from "react";
 import CreatableSelect from "react-select/creatable";
 import { debounce } from "lodash";
 import { useGetEndpointQueryClient } from "@/hooks/useGetEndpointQueryClient";
-import { 
-  FormControl, 
-  FormItem, 
-  FormLabel, 
+import {
+  FormControl,
+  FormItem,
+  FormLabel,
   FormMessage,
-  FormField
+  FormField,
 } from "@/components/ui/form";
-import { Control, UseFormReturn } from "react-hook-form";
+import {
+  Control,
+  FieldPath,
+  FieldValues,
+  PathValue,
+  UseFormReturn,
+} from "react-hook-form";
 import CreateManagerModal from "./CreateManagerModal";
-import { BrandType, ManagerType } from "@/lib/definitions";
+import { ManagerType } from "@/lib/definitions";
+import {
+  ManagerOption,
+  createManagerOptionFormatter,
+  toManagerOption,
+} from "./managerOption";
+import { useClientsDirectory } from "@/hooks/useClientsDirectory";
 
-interface ManagerOption {
-  value: number;
-  label: string;
-}
-
-interface ManagerSelectProps {
-  form: UseFormReturn<BrandType>; 
-  control: Control<BrandType>;
-  name: "manager_id" | "name";
+interface ManagerSelectProps<T extends FieldValues> {
+  form: UseFormReturn<T>;
+  control: Control<T>;
+  name: FieldPath<T>;
   label?: string;
   placeholder?: string;
   required?: boolean;
   disabled?: boolean;
+  /** Restringe la búsqueda a los gerentes de un cliente. */
   clientId?: number;
+  /** Permite dejar el campo vacío (traslados: "sin sucesor"). */
+  isClearable?: boolean;
   onChange?: (value: number | undefined) => void;
 }
 
-export function ManagerSelect({
+export function ManagerSelect<T extends FieldValues>({
   form,
   control,
   name,
@@ -41,12 +51,18 @@ export function ManagerSelect({
   required = false,
   disabled = false,
   clientId,
+  isClearable = false,
   onChange,
-}: ManagerSelectProps) {
+}: ManagerSelectProps<T>) {
   const [searchTerm, setSearchTerm] = useState("");
   const [managerOptions, setManagerOptions] = useState<ManagerOption[]>([]);
   const [isCreatingManager, setIsCreatingManager] = useState(false);
   const [newManagerName, setNewManagerName] = useState("");
+
+  // Sin filtro de cliente el select mezcla laboratorios: hace falta el nombre
+  // del cliente para distinguir gerentes homónimos.
+  const showClient = clientId === undefined;
+  const { clientNames } = useClientsDirectory(showClient);
 
   const { data, isLoading: isLoadingManagers } = useGetEndpointQueryClient<ManagerType>({
     clientId: clientId?.toString(),
@@ -68,13 +84,14 @@ export function ManagerSelect({
 
   useEffect(() => {
     if (managers && managers.length > 0) {
-      const options = managers.map((manager: ManagerType) => ({
-        value: manager.id as number,
-        label: manager.name,
-      }));
-      setManagerOptions(options);
+      setManagerOptions(managers.map(toManagerOption));
     }
   }, [managers]);
+
+  const formatOptionLabel = useMemo(
+    () => createManagerOptionFormatter({ clientNames, showClient }),
+    [clientNames, showClient]
+  );
 
   const handleCreateManager = (inputValue: string) => {
     setIsCreatingManager(true);
@@ -86,21 +103,15 @@ export function ManagerSelect({
   };
 
   const handleManagerCreated = (newManager: ManagerType) => {
-    // Add the new manager to the options
-    const newOption = {
-      value: newManager.id as number,
-      label: newManager.name,
-    };
-
-    setManagerOptions((prev) => [...prev, newOption]);
+    setManagerOptions((prev) => [...prev, toManagerOption(newManager)]);
 
     // Select the newly created manager and notify parent
     if (onChange) {
       onChange(newManager.id as number);
     }
-    
+
     // Actualizar el valor en el formulario usando la API pública de React Hook Form
-    form.setValue(name, newManager.id as number);
+    form.setValue(name, newManager.id as PathValue<T, FieldPath<T>>);
 
     setIsCreatingManager(false);
   };
@@ -119,9 +130,12 @@ export function ManagerSelect({
                 options={managerOptions}
                 placeholder={placeholder}
                 required={required}
-                value={managerOptions.find(
-                  (option) => option.value === field.value
-                )}
+                isClearable={isClearable}
+                value={
+                  managerOptions.find(
+                    (option) => option.value === field.value
+                  ) ?? null
+                }
                 onChange={(selectedOption) => {
                   field.onChange(selectedOption?.value);
                   if (onChange) onChange(selectedOption?.value);
@@ -132,6 +146,7 @@ export function ManagerSelect({
                 formatCreateLabel={(inputValue) =>
                   `Crear gerente "${inputValue}"`
                 }
+                formatOptionLabel={formatOptionLabel}
                 isDisabled={disabled}
                 classNamePrefix="react-select"
                 loadingMessage={() => "Cargando gerentes..."}

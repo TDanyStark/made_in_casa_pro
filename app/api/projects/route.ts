@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { validateApiRole, validateHttpMethod } from "@/lib/services/api-auth";
+import { domainErrorResponse } from "@/lib/services/api-errors";
 import { createProject, getProjectsWithPagination } from "@/lib/queries/projects";
 import { ITEMS_PER_PAGE } from "@/config/constants";
 import { decrypt } from "@/lib/session";
@@ -55,6 +56,7 @@ export async function GET(request: NextRequest) {
     const status = url.searchParams.get("status") || undefined;
     const brandId = url.searchParams.get("brand_id") ? parseInt(url.searchParams.get("brand_id")!) : undefined;
     const managerId = url.searchParams.get("manager_id") ? parseInt(url.searchParams.get("manager_id")!) : undefined;
+    const clientId = url.searchParams.get("client_id") ? parseInt(url.searchParams.get("client_id")!) : undefined;
     const campaignId = url.searchParams.get("campaign_id") ? parseInt(url.searchParams.get("campaign_id")!) : undefined;
 
     // Restringir visibilidad según el rol del usuario:
@@ -74,7 +76,7 @@ export async function GET(request: NextRequest) {
     }
 
     const { projects, total } = await getProjectsWithPagination({
-      page, limit, search, status, brandId, managerId, campaignId,
+      page, limit, search, status, brandId, managerId, clientId, campaignId,
       assignedUserId, createdById,
     });
 
@@ -114,6 +116,8 @@ export async function POST(request: NextRequest) {
     });
     return NextResponse.json(project, { status: 201 });
   } catch (error) {
+    const domain = domainErrorResponse(error);
+    if (domain) return domain;
     console.error("Error creating project:", error);
     return NextResponse.json({ error: "Error al crear el proyecto" }, { status: 500 });
   }

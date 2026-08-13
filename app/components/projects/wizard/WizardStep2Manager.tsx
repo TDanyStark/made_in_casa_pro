@@ -32,11 +32,16 @@ export function WizardStep2Manager({ state, onNext, onBack }: Props) {
     }))
   );
 
-  // All managers except the main one and already-added co-managers
+  // Co-responsables del MISMO cliente del proyecto, excepto el gerente
+  // principal. `limit` lo respeta ahora el endpoint (antes truncaba a
+  // ITEMS_PER_PAGE en silencio) y `client_id` impide mezclar laboratorios.
   const { data: allManagers = [], isLoading } = useQuery({
-    queryKey: ["managers-all-for-comanager", state.manager_id],
+    queryKey: ["managers-all-for-comanager", state.manager_id, state.client_id],
     queryFn: async () => {
-      const res = await get<ApiResponseWithPagination<ManagerType[]>>("managers?limit=200");
+      if (!state.client_id) return [];
+      const res = await get<ApiResponseWithPagination<ManagerType[]>>(
+        `managers?limit=200&client_id=${state.client_id}`
+      );
       if (!res.ok || !res.data) return [];
       const data = (res.data as unknown as { data: ManagerType[] }).data ?? [];
       return data

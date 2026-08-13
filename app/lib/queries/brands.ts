@@ -1,7 +1,8 @@
 import { db } from "../db";
 import { revalidatePath } from "next/cache";
-import { BrandType } from "../definitions";
+import { BrandManagerHistoryEntry, BrandType } from "../definitions";
 import { getManagerById } from "./managers";
+import { DomainError } from "../errors";
 import { ITEMS_PER_PAGE } from "@/config/constants";
 
 export async function getBrandsByManagerId(managerId: string) {
@@ -37,6 +38,7 @@ export async function getBrandById(id: string) {
           m.name as manager_name,
           m.email as manager_email,
           m.phone as manager_phone,
+          m.client_id as manager_client_id,
           c.id as client_id,
           c.name as client_name,
           c.accept_business_units,
@@ -44,8 +46,8 @@ export async function getBrandById(id: string) {
           co.name as country_name,
           co.flag as country_flag
         FROM brands b
-        JOIN managers m ON b.manager_id = m.id
-        JOIN clients c ON m.client_id = c.id
+        LEFT JOIN managers m ON b.manager_id = m.id
+        JOIN clients c ON b.client_id = c.id
         LEFT JOIN countries co ON c.country_id = co.id
         WHERE b.id = $1
       `,
@@ -56,29 +58,35 @@ export async function getBrandById(id: string) {
 
     const row = result.rows[0];
 
+    const clientInfo = {
+      id: row.client_id,
+      name: row.client_name,
+      accept_business_units: Boolean(row.accept_business_units),
+      country: row.country_id
+        ? {
+            id: row.country_id,
+            name: row.country_name,
+            flag: row.country_flag,
+          }
+        : undefined,
+    };
+
     return {
       id: row.id,
       name: row.name,
       manager_id: row.manager_id,
+      client_id: row.client_id,
       business_unit_id: row.business_unit_id,
+      client_info: clientInfo,
       manager: {
         id: row.manager_id,
-        client_id: row.client_id,
+        // Cliente REAL del gerente. Puede diferir del cliente de la marca si el
+        // gerente fue trasladado: la marca conserva su cliente original.
+        client_id: row.manager_client_id,
         name: row.manager_name,
         email: row.manager_email,
         phone: row.manager_phone,
-        client_info: {
-          id: row.client_id,
-          name: row.client_name,
-          accept_business_units: Boolean(row.accept_business_units),
-          country: row.country_id
-            ? {
-                id: row.country_id,
-                name: row.country_name,
-                flag: row.country_flag,
-              }
-            : undefined,
-        },
+        client_info: clientInfo,
       },
     } as BrandType;
   } catch (error) {
@@ -101,24 +109,38 @@ export async function getBrands() {
 
 export async function createBrand(brandData: Omit<BrandType, "id">) {
   try {
-    // No need for transaction since we're only doing a single operation now
+    // El cliente de la marca se fija al crearla, a partir del cliente del
+    // gerente inicial. A partir de ahí es inmutable: trasladar al gerente NO
+    // cambia el cliente de la marca (ver migración 012).
+    const manager = await getManagerById(brandData.manager_id.toString());
+    if (!manager) {
+      throw new DomainError(
+        "MANAGER_NOT_FOUND",
+        "El gerente especificado no existe"
+      );
+    }
+
+    const clientId = Number(manager.client_id);
+
     const brandResult = await db.execute({
-      sql: `INSERT INTO brands (name, manager_id, business_unit_id)
-      VALUES ($1, $2, $3) RETURNING id`,
-      args: [brandData.name, brandData.manager_id, brandData.business_unit_id ?? null],
+      sql: `INSERT INTO brands (name, manager_id, business_unit_id, client_id)
+      VALUES ($1, $2, $3, $4) RETURNING id`,
+      args: [
+        brandData.name,
+        brandData.manager_id,
+        brandData.business_unit_id ?? null,
+        clientId,
+      ],
     });
 
     const brandId = Number(brandResult.rows[0]?.id);
 
-    const manager = await getManagerById(brandData.manager_id.toString());
-    // Revalidamos la ruta del cliente al que pertenece el manager
-    if (manager && manager.client_id) {
-      revalidatePath(`/clients/${manager.client_id}`);
-    }
+    revalidatePath(`/clients/${clientId}`);
 
     return {
       id: brandId,
       ...brandData,
+      client_id: clientId,
     };
   } catch (error) {
     console.error("Error creating brand:", error);
@@ -126,16 +148,51 @@ export async function createBrand(brandData: Omit<BrandType, "id">) {
   }
 }
 
-export async function updateBrand(id: string, updateData: Partial<BrandType>) {
+/**
+ * Actualiza una marca.
+ *
+ * GUARDRAIL: cambiar el gerente NUNCA cambia el cliente de la marca. El nuevo
+ * gerente debe pertenecer al mismo `brands.client_id`; de lo contrario se lanza
+ * `DomainError("MANAGER_CLIENT_MISMATCH")`. Antes de la migración 012 el cliente
+ * se derivaba del gerente, así que reasignar a un gerente de otro laboratorio
+ * movía la marca de cliente en silencio.
+ *
+ * @param changedBy id del usuario que ejecuta el cambio (auditoría)
+ */
+export async function updateBrand(
+  id: string,
+  updateData: Partial<BrandType>,
+  changedBy?: number | null,
+  reason?: string | null
+) {
   try {
     const { name, manager_id, business_unit_id } = updateData;
     const updates = [];
     const args = [];
 
-    // Si hay un cambio de manager, necesitamos obtener el manager actual antes de actualizar
+    // Si hay un cambio de manager, necesitamos el estado actual antes de actualizar
     let currentBrand = null;
     if (manager_id) {
       currentBrand = await getBrandById(id);
+      if (!currentBrand) {
+        throw new DomainError("BRAND_NOT_FOUND", "La marca no existe");
+      }
+
+      if (currentBrand.manager_id !== manager_id) {
+        const newManager = await getManagerById(manager_id.toString());
+        if (!newManager) {
+          throw new DomainError(
+            "MANAGER_NOT_FOUND",
+            "El gerente especificado no existe"
+          );
+        }
+        if (Number(newManager.client_id) !== Number(currentBrand.client_id)) {
+          throw new DomainError(
+            "MANAGER_CLIENT_MISMATCH",
+            "El gerente pertenece a otro cliente. Una marca solo puede asignarse a gerentes de su mismo cliente."
+          );
+        }
+      }
     }
 
     // Build update statement based on provided fields
@@ -175,8 +232,16 @@ export async function updateBrand(id: string, updateData: Partial<BrandType>) {
           currentBrand.manager_id !== manager_id
         ) {
           await transaction.execute({
-            sql: "INSERT INTO brand_manager_history (brand_id, previous_manager_id, new_manager_id, changed_at) VALUES ($1, $2, $3, NOW() - INTERVAL '5 hours')",
-            args: [id, currentBrand.manager_id, manager_id],
+            sql: `INSERT INTO brand_manager_history
+                    (brand_id, previous_manager_id, new_manager_id, changed_by, reason, changed_at)
+                  VALUES ($1, $2, $3, $4, $5, CURRENT_TIMESTAMP)`,
+            args: [
+              id,
+              currentBrand.manager_id,
+              manager_id,
+              changedBy ?? null,
+              reason ?? null,
+            ],
           });
         }
 
@@ -187,7 +252,11 @@ export async function updateBrand(id: string, updateData: Partial<BrandType>) {
         const updatedBrand = await getBrandById(id);
 
         // Revalidate paths
+        revalidatePath("/brands");
         revalidatePath(`/brands/${id}`);
+        if (currentBrand?.client_id) {
+          revalidatePath(`/clients/${currentBrand.client_id}`);
+        }
 
         return updatedBrand;
       } catch (error) {
@@ -221,12 +290,14 @@ export async function getBrandsWithPagination({
   search,
 }: PaginationParams) {
   try {
-    // Modified query to use manager_id from brands table
+    // LEFT JOIN a managers: solo aporta `manager_name` y el término de búsqueda.
+    // El cliente ya NO se deriva del gerente (migración 012), así que una marca
+    // sin gerente asignado debe seguir apareciendo en el listado.
     let sql = `
-      SELECT b.id as id, b.name as brand_name, 
-            b.manager_id, m.name as manager_name 
+      SELECT b.id as id, b.name as brand_name,
+            b.manager_id, b.client_id, m.name as manager_name
       FROM brands b
-      JOIN managers m ON b.manager_id = m.id
+      LEFT JOIN managers m ON b.manager_id = m.id
     `;
     const filterArgs: Array<string | number> = [];
 
@@ -240,7 +311,8 @@ export async function getBrandsWithPagination({
 
     if (clientId) {
       filterArgs.push(clientId);
-      conditions.push(`m.client_id = $${filterArgs.length}`);
+      // Columna propia de brands, no derivada del gerente.
+      conditions.push(`b.client_id = $${filterArgs.length}`);
     }
 
     if (search) {
@@ -256,11 +328,12 @@ export async function getBrandsWithPagination({
       sql += " WHERE " + conditions.join(" AND ");
     }
 
-    // Get total count for pagination
+    // El COUNT ya no necesita managers para filtrar por cliente, pero sí para
+    // la búsqueda por nombre de gerente. LEFT JOIN para no alterar el total.
     let countSql = `
-      SELECT COUNT(*) as count 
+      SELECT COUNT(*) as count
       FROM brands b
-      JOIN managers m ON b.manager_id = m.id
+      LEFT JOIN managers m ON b.manager_id = m.id
     `;
     if (conditions.length > 0) {
       countSql += " WHERE " + conditions.join(" AND ");
@@ -290,6 +363,7 @@ export async function getBrandsWithPagination({
       brand_name: row.brand_name,
       manager_id: row.manager_id,
       manager_name: row.manager_name,
+      client_id: row.client_id,
     }));
 
     return {
@@ -302,42 +376,46 @@ export async function getBrandsWithPagination({
   }
 }
 
-// Function to get brand manager history including the current manager
-export async function getBrandManagerHistory(brandId: string) {
+// Historial de cambios de gerente de una marca, con el actor que los ejecutó.
+export async function getBrandManagerHistory(
+  brandId: string
+): Promise<BrandManagerHistoryEntry[]> {
   try {
-    
-    // Query for past manager changes from history table
     const historyResult = await db.execute({
       sql: `
-        SELECT 
+        SELECT
           bmh.id,
           bmh.brand_id,
           bmh.previous_manager_id,
           prev_m.name as previous_manager_name,
           bmh.new_manager_id,
           new_m.name as new_manager_name,
+          bmh.changed_by,
+          u.name as changed_by_name,
+          bmh.reason,
           bmh.changed_at
         FROM brand_manager_history bmh
-        JOIN managers prev_m ON bmh.previous_manager_id = prev_m.id
-        JOIN managers new_m ON bmh.new_manager_id = new_m.id
+        LEFT JOIN managers prev_m ON bmh.previous_manager_id = prev_m.id
+        LEFT JOIN managers new_m  ON bmh.new_manager_id      = new_m.id
+        LEFT JOIN users    u      ON bmh.changed_by          = u.id
         WHERE bmh.brand_id = $1
         ORDER BY bmh.changed_at DESC
       `,
       args: [brandId],
     });
-    
-    // Format the history entries
-    const historyEntries = historyResult.rows.map(row => ({
+
+    return historyResult.rows.map((row) => ({
       id: row.id,
       brandId: row.brand_id,
       previousManagerId: row.previous_manager_id,
       previousManagerName: row.previous_manager_name,
       newManagerId: row.new_manager_id,
       newManagerName: row.new_manager_name,
-      changedAt: row.changed_at
-    }));
-    
-    return historyEntries;
+      changedBy: row.changed_by,
+      changedByName: row.changed_by_name,
+      reason: row.reason,
+      changedAt: row.changed_at,
+    })) as unknown as BrandManagerHistoryEntry[];
   } catch (error) {
     console.error("Error fetching brand manager history:", error);
     return [];

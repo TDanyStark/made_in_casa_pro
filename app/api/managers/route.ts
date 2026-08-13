@@ -6,6 +6,9 @@ import { ITEMS_PER_PAGE } from "@/config/constants";
 import { validateApiRole, validateHttpMethod } from "@/lib/services/api-auth";
 import { AUTHENTICATED_ROLES, OPERATIONS_ROLES } from "@/lib/role-groups";
 
+/** Tope del parámetro `limit` para que un cliente no pueda pedir toda la tabla. */
+const MAX_MANAGERS_LIMIT = 200;
+
 // Schema for validating manager data
 const managerSchema = z.object({
   client_id: z.number().int().positive(),
@@ -84,7 +87,14 @@ export async function GET(request: NextRequest) {
     const url = new URL(request.url);
     const clientId = url.searchParams.get("client_id");
     const page = parseInt(url.searchParams.get("page") || "1");
-    const limit = ITEMS_PER_PAGE;
+    // El parámetro `limit` se ignoraba y siempre se paginaba a ITEMS_PER_PAGE,
+    // así que los consumidores que pedían `?limit=200` (selects de
+    // co-responsables) recibían la lista truncada en silencio.
+    const requestedLimit = parseInt(url.searchParams.get("limit") || "");
+    const limit =
+      Number.isFinite(requestedLimit) && requestedLimit > 0
+        ? Math.min(requestedLimit, MAX_MANAGERS_LIMIT)
+        : ITEMS_PER_PAGE;
     const search = url.searchParams.get("search");
     
     // Get paginated results

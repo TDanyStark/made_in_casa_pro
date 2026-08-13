@@ -1,5 +1,6 @@
 "use client";
 
+import { useMemo } from "react";
 import {
   ColumnDef,
   flexRender,
@@ -16,32 +17,54 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import Link from "next/link";
+import { useClientsDirectory } from "@/hooks/useClientsDirectory";
 
 interface TableManagersProps {
   managers: ManagerType[];
   pageCount: number;
 }
 
-// Define columns for the managers table
-export const columns: ColumnDef<ManagerType>[] = [
-  {
-    accessorKey: "name",
-    header: "Nombre",
-    size: 250,
-  },
-  {
-    accessorKey: "email",
-    header: "Correo",
-    size: 250,
-  },
-  {
-    accessorKey: "phone",
-    header: "Teléfono",
-    size: 200,
-  },
-];
-
 const TableManagers = ({ managers, pageCount }: TableManagersProps) => {
+  // En `/managers` la lista es global, así que sin el cliente dos gerentes
+  // homónimos son indistinguibles.
+  const { clientNames } = useClientsDirectory();
+
+  const columns = useMemo<ColumnDef<ManagerType>[]>(
+    () => [
+      {
+        accessorKey: "name",
+        header: "Nombre",
+        size: 220,
+      },
+      {
+        accessorKey: "email",
+        header: "Correo",
+        size: 220,
+      },
+      {
+        accessorKey: "client_id",
+        header: "Cliente",
+        size: 160,
+        cell: ({ row }) => {
+          const clientId = row.original.client_id;
+          return (
+            <span>
+              {(clientId && clientNames[clientId]) ||
+                row.original.client_info?.name ||
+                "—"}
+            </span>
+          );
+        },
+      },
+      {
+        accessorKey: "phone",
+        header: "Teléfono",
+        size: 160,
+      },
+    ],
+    [clientNames]
+  );
+
   // Initialize the table
   const table = useReactTable({
     data: managers,
@@ -86,7 +109,7 @@ const TableManagers = ({ managers, pageCount }: TableManagersProps) => {
               >
                 {row.getVisibleCells().map((cell) => (
                   <TableCell key={cell.id} className="p-0">
-                    <Link 
+                    <Link
                       href={`/managers/${row.original.id}`}
                       className="block w-full h-full cursor-pointer p-2"
                       >

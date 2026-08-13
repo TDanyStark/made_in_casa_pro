@@ -35,20 +35,26 @@ interface ManagerOption {
 
 interface Props {
   projectId: number;
+  /** Cliente del proyecto: los co-responsables deben salir de él. */
+  clientId: number;
   mainManagerId: number;
   coManagers: Manager[];
   canEdit: boolean;
 }
 
-export function ProjectCoManagersTab({ projectId, mainManagerId, coManagers, canEdit }: Props) {
+export function ProjectCoManagersTab({ projectId, clientId, mainManagerId, coManagers, canEdit }: Props) {
   const queryClient = useQueryClient();
   const [selectedOption, setSelectedOption] = useState<ManagerOption | null>(null);
   const [adding, setAdding] = useState(false);
 
+  // `limit` ahora sí lo respeta el endpoint, y `client_id` evita ofrecer
+  // gerentes de otro laboratorio como co-responsables.
   const { data: allManagers = [], isLoading } = useQuery({
-    queryKey: ["managers-all"],
+    queryKey: ["managers-all", clientId],
     queryFn: async () => {
-      const res = await get<ApiResponseWithPagination<ManagerType[]>>("managers?limit=200");
+      const res = await get<ApiResponseWithPagination<ManagerType[]>>(
+        `managers?limit=200&client_id=${clientId}`
+      );
       if (!res.ok || !res.data) return [];
       return ((res.data as unknown as { data: ManagerType[] }).data ?? [])
         .filter((m) => m.id !== mainManagerId && !coManagers.find((cm) => cm.id === m.id!))
@@ -98,6 +104,14 @@ export function ProjectCoManagersTab({ projectId, mainManagerId, coManagers, can
               onChange={(opt) => setSelectedOption(opt as ManagerOption | null)}
               isLoading={isLoading}
               placeholder="Buscar gerente para agregar..."
+              formatOptionLabel={(opt: ManagerOption) => (
+                <div>
+                  <p className="text-sm font-medium">{opt.label}</p>
+                  {opt.email && (
+                    <p className="text-xs text-muted-foreground">{opt.email}</p>
+                  )}
+                </div>
+              )}
               classNamePrefix="react-select"
             />
           </div>

@@ -3,7 +3,10 @@ import { z } from "zod";
 import { getBrandById, updateBrand } from "@/lib/queries/brands";
 import { revalidatePath } from "next/cache";
 import { validateApiRole, validateHttpMethod } from "@/lib/services/api-auth";
+import { domainErrorResponse } from "@/lib/services/api-errors";
 import { OPERATIONS_ROLES } from "@/lib/role-groups";
+import { cookies } from "next/headers";
+import { decrypt } from "@/lib/session";
 
 // Schema for validating brand update data
 const brandUpdateSchema = z.object({
@@ -91,18 +94,28 @@ export async function PATCH(
       return NextResponse.json(existingBrand);
     }
 
+    // El actor queda registrado en brand_manager_history si cambia el gerente
+    const cookie = (await cookies()).get("session")?.value;
+    const session = cookie ? await decrypt(cookie) : null;
+
     // Update brand using the model function
-    const updatedBrand = await updateBrand(id, { name, manager_id, business_unit_id });
+    const updatedBrand = await updateBrand(
+      id,
+      { name, manager_id, business_unit_id },
+      session?.id ?? null
+    );
 
     // Revalidate paths
     revalidatePath(`/brands/${id}`);
-    // If the brand has a manager with a client, revalidate that client's path too
-    if (existingBrand.manager && existingBrand.manager.client_info) {
-      revalidatePath(`/clients/${existingBrand.manager.client_info.id}`);
+    // El cliente de la marca es su columna propia, no la del gerente
+    if (existingBrand.client_id) {
+      revalidatePath(`/clients/${existingBrand.client_id}`);
     }
 
     return NextResponse.json(updatedBrand);
   } catch (error) {
+    const domain = domainErrorResponse(error);
+    if (domain) return domain;
     console.error("Error updating brand:", error);
     return NextResponse.json(
       { error: "Error al actualizar la marca: " + error },

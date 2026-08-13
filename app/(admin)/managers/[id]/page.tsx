@@ -13,6 +13,10 @@ import { Breadcrumbs } from "@/components/navigation/Breadcrumbs";
 import ItemInfo from "@/components/managers/ItemInfo";
 import { BriefcaseBusiness } from "lucide-react";
 import { API_FLAG_URL, IMG_FLAG_EXT } from "@/config/constants";
+import TransferManagerButton from "@/components/managers/TransferManagerButton";
+import ManagerClientHistory from "@/components/managers/ManagerClientHistory";
+import { getUserRole } from "@/lib/session";
+import { OPERATIONS_ROLES } from "@/lib/role-groups";
 
 type Props = {
   params: Promise<{ id: string }>;
@@ -36,6 +40,11 @@ export default async function ManagerPage({ params }: Props) {
   }
 
   const { name, email, phone, biography } = manager as ManagerType;
+
+  // El traslado y la trayectoria son operaciones de negocio: mismo grupo de
+  // roles que exige `/api/managers/[id]/transfer`.
+  const userRole = await getUserRole();
+  const canOperate = OPERATIONS_ROLES.includes(userRole);
 
   const brandsData = await getBrandsByManagerId(id);
   // Serializa las marcas para asegurarse de que solo se pasan objetos planos al componente cliente
@@ -67,7 +76,10 @@ export default async function ManagerPage({ params }: Props) {
       <div className="mt-6">
         <Card className="w-fit p-4 shadow-md rounded-lg">
           <CardHeader className="flex flex-col gap-2">
-            <h2 className="text-2xl font-bold">Información</h2>
+            <div className="flex flex-wrap items-center justify-between gap-4">
+              <h2 className="text-2xl font-bold">Información</h2>
+              {canOperate && <TransferManagerButton managerId={Number(id)} />}
+            </div>
           </CardHeader>
           <CardContent className="flex gap-4">
             <div>
@@ -110,6 +122,7 @@ export default async function ManagerPage({ params }: Props) {
           </CardContent>
         </Card>
       </div>
+      {canOperate && <ManagerClientHistory managerId={Number(id)} />}
       <div className="mt-6">
         <BiographyEditor initialContent={biography || ""} />
       </div>

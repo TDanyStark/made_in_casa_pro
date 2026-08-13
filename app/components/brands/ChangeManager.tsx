@@ -19,6 +19,11 @@ import { Loader2 } from "lucide-react";
 import CreatableSelect from "react-select/creatable";
 import CreateManagerModal from "@/components/managers/CreateManagerModal";
 import { ManagerType } from "@/lib/definitions";
+import {
+  ManagerOption,
+  createManagerOptionFormatter,
+  toManagerOption,
+} from "@/components/managers/managerOption";
 import { useGetEndpointQueryClient } from "@/hooks/useGetEndpointQueryClient";
 import { patch } from "@/lib/services/apiService";
 import { useRouter } from "next/navigation";
@@ -45,9 +50,7 @@ export function ChangeManager({ brandId, managerId, clientId, onSuccess }: Props
     },
   });
 
-  const [managerOptions, setManagerOptions] = useState<
-    { value: number; label: string }[]
-  >([]);
+  const [managerOptions, setManagerOptions] = useState<ManagerOption[]>([]);
   const [isCreatingManager, setIsCreatingManager] = useState(false);
   const [newManagerName, setNewManagerName] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
@@ -69,13 +72,16 @@ export function ChangeManager({ brandId, managerId, clientId, onSuccess }: Props
   // Actualizar las opciones cuando cambian los datos de managers
   useEffect(() => {
     if (managers && managers.length > 0) {
-      const options = managers.map((manager) => ({
-        value: manager.id as number,
-        label: manager.name,
-      }));
-      setManagerOptions(options);
+      setManagerOptions(managers.map(toManagerOption));
     }
   }, [managers]);
+
+  // El select ya está filtrado por cliente, así que basta el correo para
+  // distinguir gerentes con el mismo nombre.
+  const formatOptionLabel = useMemo(
+    () => createManagerOptionFormatter(),
+    []
+  );
 
   // Implementar debounce para la búsqueda
   const debouncedSearch = debounce((value: string) => {
@@ -137,12 +143,7 @@ export function ChangeManager({ brandId, managerId, clientId, onSuccess }: Props
 
   const handleManagerCreated = (manager: ManagerType) => {
     // Agregar el nuevo gerente a las opciones
-    const newOption = {
-      value: manager.id as number,
-      label: manager.name,
-    };
-
-    setManagerOptions((prev) => [...prev, newOption]);
+    setManagerOptions((prev) => [...prev, toManagerOption(manager)]);
 
     // Seleccionar el gerente recién creado
     form.setValue("manager_id", manager.id as number);
@@ -185,6 +186,7 @@ export function ChangeManager({ brandId, managerId, clientId, onSuccess }: Props
                       formatCreateLabel={(inputValue) =>
                         `Crear gerente "${inputValue}"`
                       }
+                      formatOptionLabel={formatOptionLabel}
                       className="react-select-container min-w-72"
                       classNamePrefix="react-select"
                       loadingMessage={() => "Cargando gerentes..."}

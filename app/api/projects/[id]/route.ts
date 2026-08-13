@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
+import { cookies } from "next/headers";
+import { decrypt } from "@/lib/session";
 import { validateApiRole, validateHttpMethod } from "@/lib/services/api-auth";
+import { domainErrorResponse } from "@/lib/services/api-errors";
 import { getProjectDetail, updateProject, deleteProject } from "@/lib/queries/projects";
 import {
   LEADERSHIP_ROLES,
@@ -27,6 +30,12 @@ const nullableTextSchema = z
 
 const patchSchema = z.object({
   title: z.string().min(1).max(300).optional(),
+  /**
+   * Reasignación de responsable. El nuevo gerente debe pertenecer al mismo
+   * cliente del proyecto; si no, la capa de queries lanza MANAGER_CLIENT_MISMATCH
+   * y aquí se devuelve 400.
+   */
+  manager_id: z.coerce.number().int().positive().optional(),
   campaign_id: z.coerce.number().int().positive().nullable().optional(),
   drive_folder_id: z.string().nullable().optional(),
   drive_folder_url: z.string().url().nullable().optional(),
@@ -70,10 +79,20 @@ export async function PATCH(request: NextRequest, { params }: Params) {
         { status: 400 }
       );
     }
-    const updated = await updateProject(parseInt(id), validation.data);
+    // El actor queda registrado en project_manager_history si cambia el gerente
+    const cookie = (await cookies()).get("session")?.value;
+    const session = cookie ? await decrypt(cookie) : null;
+
+    const updated = await updateProject(
+      parseInt(id),
+      validation.data,
+      session?.id ?? null
+    );
     if (!updated) return NextResponse.json({ error: "Proyecto no encontrado" }, { status: 404 });
     return NextResponse.json(updated);
   } catch (error) {
+    const domain = domainErrorResponse(error);
+    if (domain) return domain;
     console.error("Error updating project:", error);
     return NextResponse.json({ error: "Error al actualizar proyecto" }, { status: 500 });
   }

@@ -76,6 +76,7 @@ describe('getBrandById()', () => {
     mockExecute.mockResolvedValueOnce(makeResult([{
       id: 5, name: 'Adidas', manager_id: 10, business_unit_id: null,
       manager_name: 'Carlos', manager_email: 'c@test.com', manager_phone: '555',
+      manager_client_id: 2,
       client_id: 2, client_name: 'Acme', accept_business_units: 0,
       country_id: 1, country_name: 'Colombia', country_flag: 'co',
     }]));
@@ -83,6 +84,29 @@ describe('getBrandById()', () => {
     expect(result?.name).toBe('Adidas');
     expect(result?.manager?.name).toBe('Carlos');
     expect(result?.manager?.client_info?.name).toBe('Acme');
+  });
+
+  it('resolves the client from brands.client_id, not from the manager', async () => {
+    mockExecute.mockResolvedValueOnce(makeResult([]));
+    await getBrandById('5');
+    const call = (mockExecute as jest.Mock).mock.calls[0][0];
+    expect(call.sql).toContain('JOIN clients c ON b.client_id = c.id');
+    expect(call.sql).not.toContain('JOIN clients c ON m.client_id = c.id');
+  });
+
+  it('exposes client_id and client_info at the top level of the brand', async () => {
+    mockExecute.mockResolvedValueOnce(makeResult([{
+      id: 5, name: 'Adidas', manager_id: 10, business_unit_id: null,
+      manager_name: 'Carlos', manager_email: 'c@test.com', manager_phone: '555',
+      manager_client_id: 7,
+      client_id: 2, client_name: 'Acme', accept_business_units: 0,
+      country_id: null, country_name: null, country_flag: null,
+    }]));
+    const result = await getBrandById('5');
+    expect(result?.client_id).toBe(2);
+    expect(result?.client_info?.name).toBe('Acme');
+    // El gerente fue trasladado: su cliente real (7) ya no es el de la marca (2)
+    expect(result?.manager?.client_id).toBe(7);
   });
 
   it('sets country to undefined when country_id is null', async () => {
@@ -104,7 +128,7 @@ describe('getBrandById()', () => {
 });
 
 describe('createBrand()', () => {
-  it('calls db.execute with INSERT SQL and correct args', async () => {
+  it('persists client_id taken from the initial manager', async () => {
     mockExecute.mockResolvedValueOnce(makeResult([{ id: 15 }]));
     mockGetManagerById.mockResolvedValueOnce({
       id: 10, client_id: 2, name: 'Carlos', email: 'c@test.com', phone: '555',
@@ -112,7 +136,7 @@ describe('createBrand()', () => {
     await createBrand({ name: 'New Brand', manager_id: 10 });
     expect(mockExecute).toHaveBeenCalledWith(expect.objectContaining({
       sql: expect.stringContaining('INSERT INTO brands'),
-      args: ['New Brand', 10, null],
+      args: ['New Brand', 10, null, 2],
     }));
   });
 
@@ -126,8 +150,15 @@ describe('createBrand()', () => {
     expect(call.args[2]).toBeNull();
   });
 
-  it('calls revalidatePath when manager has a client_id', async () => {
-    mockExecute.mockResolvedValueOnce(makeResult([], 15));
+  it('throws MANAGER_NOT_FOUND when the manager does not exist', async () => {
+    mockGetManagerById.mockResolvedValueOnce(null);
+    await expect(createBrand({ name: 'Brand', manager_id: 99 }))
+      .rejects.toMatchObject({ code: 'MANAGER_NOT_FOUND' });
+    expect(mockExecute).not.toHaveBeenCalled();
+  });
+
+  it('calls revalidatePath with the client of the manager', async () => {
+    mockExecute.mockResolvedValueOnce(makeResult([{ id: 15 }]));
     mockGetManagerById.mockResolvedValueOnce({
       id: 10, client_id: 3, name: 'Manager', email: 'm@m.com', phone: '0',
     });
@@ -135,68 +166,91 @@ describe('createBrand()', () => {
     expect(revalidatePath).toHaveBeenCalledWith('/clients/3');
   });
 
-  it('returns the new brand with id from RETURNING clause', async () => {
+  it('returns the new brand with id from RETURNING clause and its client_id', async () => {
     mockExecute.mockResolvedValueOnce(makeResult([{ id: 20 }]));
     mockGetManagerById.mockResolvedValueOnce({
       id: 10, client_id: 2, name: 'M', email: 'm@m.com', phone: '0',
     });
     const result = await createBrand({ name: 'Brand', manager_id: 10 });
     expect(result.id).toBe(20);
+    expect(result.client_id).toBe(2);
   });
 });
 
 describe('updateBrand()', () => {
-  it('opens a transaction when updates are provided', async () => {
-    // First getBrandById call (to get current brand)
-    mockExecute.mockResolvedValueOnce(makeResult([{
-      id: 5, name: 'Old', manager_id: 10, business_unit_id: null,
+  /** Fila cruda de getBrandById: marca 5, gerente 10, cliente 2. */
+  function currentBrandRow(overrides: Record<string, unknown> = {}) {
+    return makeResult([{
+      id: 5, name: 'Brand', manager_id: 10, business_unit_id: null,
       manager_name: 'M', manager_email: 'm@m.com', manager_phone: '0',
+      manager_client_id: 2,
       client_id: 2, client_name: 'Corp', accept_business_units: 0,
       country_id: null, country_name: null, country_flag: null,
-    }]));
+      ...overrides,
+    }]);
+  }
+
+  /** Gerente sucesor válido: mismo cliente (2) que la marca. */
+  function sameClientManager() {
+    return { id: 20, client_id: 2, name: 'New', email: 'new@m.com', phone: '0' };
+  }
+
+  it('opens a transaction when updates are provided', async () => {
+    mockExecute.mockResolvedValueOnce(currentBrandRow());
+    mockGetManagerById.mockResolvedValueOnce(sameClientManager());
     mockTransaction.execute.mockResolvedValue(makeResult([]));
     mockTransaction.commit.mockResolvedValue(undefined);
-    // getBrandById after update
-    mockExecute.mockResolvedValueOnce(makeResult([{
-      id: 5, name: 'Old', manager_id: 20, business_unit_id: null,
-      manager_name: 'New', manager_email: 'new@m.com', manager_phone: '0',
-      client_id: 2, client_name: 'Corp', accept_business_units: 0,
-      country_id: null, country_name: null, country_flag: null,
-    }]));
+    mockExecute.mockResolvedValueOnce(currentBrandRow({ manager_id: 20 }));
 
     await updateBrand('5', { manager_id: 20 });
     expect(db.transaction).toHaveBeenCalledWith('write');
   });
 
-  it('inserts a history record when manager_id changes from current value', async () => {
-    // Current brand has manager_id 10
-    mockExecute.mockResolvedValueOnce(makeResult([{
-      id: 5, name: 'Brand', manager_id: 10, business_unit_id: null,
-      manager_name: 'M', manager_email: 'm@m.com', manager_phone: '0',
-      client_id: 2, client_name: 'Corp', accept_business_units: 0,
-      country_id: null, country_name: null, country_flag: null,
-    }]));
+  it('inserts a history record with changed_by when manager_id changes', async () => {
+    mockExecute.mockResolvedValueOnce(currentBrandRow());
+    mockGetManagerById.mockResolvedValueOnce(sameClientManager());
     mockTransaction.execute.mockResolvedValue(makeResult([]));
     mockTransaction.commit.mockResolvedValue(undefined);
-    // getBrandById after update
     mockExecute.mockResolvedValueOnce(makeResult([]));
 
-    await updateBrand('5', { manager_id: 20 }); // new manager is 20
-    // Should have called transaction.execute twice: once for UPDATE, once for history INSERT
+    await updateBrand('5', { manager_id: 20 }, 77, 'Traslado');
+
     expect(mockTransaction.execute).toHaveBeenCalledTimes(2);
     expect(mockTransaction.execute).toHaveBeenCalledWith(expect.objectContaining({
       sql: expect.stringContaining('brand_manager_history'),
+      args: ['5', 10, 20, 77, 'Traslado'],
     }));
   });
 
+  it('uses CURRENT_TIMESTAMP instead of the old NOW() - INTERVAL hack', async () => {
+    mockExecute.mockResolvedValueOnce(currentBrandRow());
+    mockGetManagerById.mockResolvedValueOnce(sameClientManager());
+    mockTransaction.execute.mockResolvedValue(makeResult([]));
+    mockTransaction.commit.mockResolvedValue(undefined);
+    mockExecute.mockResolvedValueOnce(makeResult([]));
+
+    await updateBrand('5', { manager_id: 20 });
+
+    const historyCall = mockTransaction.execute.mock.calls
+      .map((call) => call[0] as { sql: string })
+      .find((arg) => arg.sql.includes('brand_manager_history'))!;
+    expect(historyCall.sql).toContain('CURRENT_TIMESTAMP');
+    expect(historyCall.sql).not.toContain('INTERVAL');
+  });
+
+  it('rejects a manager from a different client and does NOT touch the brand', async () => {
+    mockExecute.mockResolvedValueOnce(currentBrandRow()); // marca del cliente 2
+    mockGetManagerById.mockResolvedValueOnce({
+      id: 30, client_id: 99, name: 'Otro', email: 'o@m.com', phone: '0',
+    });
+
+    await expect(updateBrand('5', { manager_id: 30 }))
+      .rejects.toMatchObject({ code: 'MANAGER_CLIENT_MISMATCH' });
+    expect(db.transaction).not.toHaveBeenCalled();
+  });
+
   it('does NOT insert history when manager_id is the same as current', async () => {
-    // Current brand already has manager_id 10
-    mockExecute.mockResolvedValueOnce(makeResult([{
-      id: 5, name: 'Brand', manager_id: 10, business_unit_id: null,
-      manager_name: 'M', manager_email: 'm@m.com', manager_phone: '0',
-      client_id: 2, client_name: 'Corp', accept_business_units: 0,
-      country_id: null, country_name: null, country_flag: null,
-    }]));
+    mockExecute.mockResolvedValueOnce(currentBrandRow());
     mockTransaction.execute.mockResolvedValue(makeResult([]));
     mockTransaction.commit.mockResolvedValue(undefined);
     mockExecute.mockResolvedValueOnce(makeResult([]));
@@ -204,15 +258,13 @@ describe('updateBrand()', () => {
     await updateBrand('5', { manager_id: 10 }); // same manager
     // Only the UPDATE call, no history insert
     expect(mockTransaction.execute).toHaveBeenCalledTimes(1);
+    // Tampoco valida al gerente: no hay cambio que validar
+    expect(mockGetManagerById).not.toHaveBeenCalled();
   });
 
   it('commits the transaction on success', async () => {
-    mockExecute.mockResolvedValueOnce(makeResult([{
-      id: 5, name: 'Brand', manager_id: 10, business_unit_id: null,
-      manager_name: 'M', manager_email: 'm@m.com', manager_phone: '0',
-      client_id: 2, client_name: 'Corp', accept_business_units: 0,
-      country_id: null, country_name: null, country_flag: null,
-    }]));
+    mockExecute.mockResolvedValueOnce(currentBrandRow());
+    mockGetManagerById.mockResolvedValueOnce(sameClientManager());
     mockTransaction.execute.mockResolvedValue(makeResult([]));
     mockTransaction.commit.mockResolvedValue(undefined);
     mockExecute.mockResolvedValueOnce(makeResult([]));
@@ -222,12 +274,8 @@ describe('updateBrand()', () => {
   });
 
   it('rolls back the transaction on transaction.execute error', async () => {
-    mockExecute.mockResolvedValueOnce(makeResult([{
-      id: 5, name: 'Brand', manager_id: 10, business_unit_id: null,
-      manager_name: 'M', manager_email: 'm@m.com', manager_phone: '0',
-      client_id: 2, client_name: 'Corp', accept_business_units: 0,
-      country_id: null, country_name: null, country_flag: null,
-    }]));
+    mockExecute.mockResolvedValueOnce(currentBrandRow());
+    mockGetManagerById.mockResolvedValueOnce(sameClientManager());
     mockTransaction.execute.mockRejectedValueOnce(new Error('TX error'));
     mockTransaction.rollback.mockResolvedValue(undefined);
 
@@ -249,14 +297,24 @@ describe('getBrandsWithPagination()', () => {
     expect(result).toEqual({ brands: [], total: 0 });
   });
 
-  it('filters by clientId when provided', async () => {
+  it('filters by clientId using brands.client_id, not the manager client', async () => {
     mockExecute
       .mockResolvedValueOnce(makeResult([{ count: 0 }]))
       .mockResolvedValueOnce(makeResult([]));
     await getBrandsWithPagination({ clientId: '3' });
-    const countCall = mockExecute.mock.calls[0];
-    expect(countCall[0]).toEqual(expect.objectContaining({
-      args: expect.arrayContaining(['3']),
-    }));
+    const countCall = mockExecute.mock.calls[0][0] as { sql: string; args: unknown[] };
+    expect(countCall.args).toEqual(expect.arrayContaining(['3']));
+    expect(countCall.sql).toContain('b.client_id = $1');
+    expect(countCall.sql).not.toContain('m.client_id');
+  });
+
+  it('exposes client_id on each row', async () => {
+    mockExecute
+      .mockResolvedValueOnce(makeResult([{ count: 1 }]))
+      .mockResolvedValueOnce(makeResult([
+        { id: 1, brand_name: 'Nike', manager_id: 10, manager_name: 'M', client_id: 3 },
+      ]));
+    const result = await getBrandsWithPagination({});
+    expect(result.brands[0]).toEqual(expect.objectContaining({ client_id: 3 }));
   });
 });

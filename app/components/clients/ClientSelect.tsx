@@ -13,9 +13,8 @@ import {
   FormLabel, 
   FormMessage 
 } from "@/components/ui/form";
-import { Control } from "react-hook-form";
+import { Control, FieldPath, FieldValues } from "react-hook-form";
 import { FormField } from "@/components/ui/form";
-import { ManagerType } from "@/lib/definitions";
 
 // Este tipo debe coincidir con la definición en su proyecto
 interface ClientType {
@@ -34,25 +33,28 @@ interface ClientOption {
   countryName?: string;
 }
 
-interface ClientSelectProps {
-  control: Control<ManagerType>;
-  name: "client_id" | "name" | "email" | "phone" | "biography" | "id";
+interface ClientSelectProps<T extends FieldValues> {
+  control: Control<T>;
+  name: FieldPath<T>;
   label?: string;
   placeholder?: string;
   required?: boolean;
   disabled?: boolean;
+  /** Cliente que no debe ofrecerse (p. ej. el actual en un traslado). */
+  excludeClientId?: number;
   onChange?: (value: number | undefined) => void;
 }
 
-export function ClientSelect({
+export function ClientSelect<T extends FieldValues>({
   control,
   name,
   label = "Cliente",
   placeholder = "Selecciona o crea un cliente",
   required = false,
   disabled = false,
+  excludeClientId,
   onChange,
-}: ClientSelectProps) {
+}: ClientSelectProps<T>) {
   const [searchTerm, setSearchTerm] = useState("");
   const [clientOptions, setClientOptions] = useState<ClientOption[]>([]);
   const [isCreatingClient, setIsCreatingClient] = useState(false);
@@ -80,17 +82,19 @@ export function ClientSelect({
 
   useEffect(() => {
     if (clients) {
-      const options = clients.map((client: ClientType) => ({
-        value: client.id,
-        label: client.name,
-        countryFlag: client.country
-          ? `${API_FLAG_URL}${client.country.flag}${IMG_FLAG_EXT}`
-          : undefined,
-        countryName: client.country?.name,
-      }));
+      const options = clients
+        .filter((client: ClientType) => client.id !== excludeClientId)
+        .map((client: ClientType) => ({
+          value: client.id,
+          label: client.name,
+          countryFlag: client.country
+            ? `${API_FLAG_URL}${client.country.flag}${IMG_FLAG_EXT}`
+            : undefined,
+          countryName: client.country?.name,
+        }));
       setClientOptions(options);
     }
-  }, [clients]);
+  }, [clients, excludeClientId]);
 
   const handleCreateClient = (inputValue: string) => {
     setIsCreatingClient(true);

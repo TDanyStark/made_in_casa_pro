@@ -4,6 +4,7 @@ import { createBrand, getBrandById, getBrandsWithPagination } from "@/lib/querie
 import { getManagerById } from "@/lib/queries/managers";
 import { ITEMS_PER_PAGE } from "@/config/constants";
 import { validateApiRole, validateHttpMethod } from "@/lib/services/api-auth";
+import { domainErrorResponse } from "@/lib/services/api-errors";
 import { AUTHENTICATED_ROLES, OPERATIONS_ROLES } from "@/lib/role-groups";
 
 // Schema para validar los datos de una marca
@@ -55,6 +56,8 @@ export async function POST(request: NextRequest) {
     
     return NextResponse.json(newBrand, { status: 201 });
   } catch (error) {
+    const domain = domainErrorResponse(error);
+    if (domain) return domain;
     console.error("Error al crear la marca:", error);
     return NextResponse.json(
       { error: "Error al crear la marca" },

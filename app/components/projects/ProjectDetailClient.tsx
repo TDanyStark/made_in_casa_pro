@@ -8,6 +8,7 @@ import { ProjectQuotesTab } from "./ProjectQuotesTab";
 import { ProjectNotesEditor } from "./ProjectNotesEditor";
 import { ProjectCoManagersTab } from "./ProjectCoManagersTab";
 import { ProjectInfoTab } from "./ProjectInfoTab";
+import { ProjectManagerCard } from "./ProjectManagerCard";
 import { ProjectAdjustmentsTab } from "./ProjectAdjustmentsTab";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -111,13 +112,18 @@ export function ProjectDetailClient({ projectId, userRole, currentUserId }: Prop
         <TabsContent value="co-managers" className="mt-6">
           <ProjectCoManagersTab
             projectId={projectId}
+            clientId={project.client_id}
             mainManagerId={project.manager_id}
             coManagers={project.co_managers}
             canEdit={canEdit && project.status !== 'completed'}
           />
         </TabsContent>
 
-        <TabsContent value="info" className="mt-6">
+        <TabsContent value="info" className="mt-6 space-y-6">
+          <ProjectManagerCard
+            project={project}
+            canEdit={canEdit && project.status !== 'completed'}
+          />
           <ProjectInfoTab project={project} canEdit={canEdit && project.status !== 'completed'} />
         </TabsContent>
 

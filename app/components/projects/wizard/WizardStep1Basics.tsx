@@ -48,15 +48,21 @@ interface BrandDetail {
   id: number;
   name: string;
   manager_id: number;
+  /**
+   * Cliente DUEÑO de la marca (columna propia desde la migración 012). No usar
+   * `manager.client_info`: si el gerente fue trasladado, ese es su cliente
+   * actual, no el de la marca.
+   */
+  client_id: number | null;
+  client_info: {
+    id: number;
+    name: string;
+  } | null;
   manager: {
     id: number;
     name: string;
     email: string;
     client_id: number;
-    client_info: {
-      id: number;
-      name: string;
-    };
   };
 }
 
@@ -112,8 +118,8 @@ export function WizardStep1Basics({ state, onNext }: Props) {
       title: values.title,
       brand_id: values.brand_id,
       brand_name: brandDetail.name,
-      client_id: brandDetail.manager?.client_info?.id ?? null,
-      client_name: brandDetail.manager?.client_info?.name ?? "",
+      client_id: brandDetail.client_id ?? brandDetail.client_info?.id ?? null,
+      client_name: brandDetail.client_info?.name ?? "",
       manager_id: brandDetail.manager_id,
       manager_name: brandDetail.manager?.name ?? "",
       manager_email: brandDetail.manager?.email ?? "",
@@ -230,7 +236,7 @@ export function WizardStep1Basics({ state, onNext }: Props) {
                 <div className="flex items-center gap-2 text-sm">
                   <Building2 className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
                   <span className="text-muted-foreground">
-                    {brandDetail.manager?.client_info?.name ?? "Sin cliente"}
+                    {brandDetail.client_info?.name ?? "Sin cliente"}
                   </span>
                 </div>
               </Card>

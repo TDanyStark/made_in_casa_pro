@@ -3,9 +3,11 @@ import { revalidatePath } from "next/cache";
 import {
   ProjectType,
   ProjectDetailType,
+  ProjectManagerHistoryEntry,
   ProjectStatus,
   UserRole,
 } from "../definitions";
+import { DomainError } from "../errors";
 import { buildWhereClause, buildPaginationArgs, parseTotal } from "../db/query-helpers";
 import { ITEMS_PER_PAGE } from "@/config/constants";
 
@@ -40,11 +42,13 @@ const PROJECT_SELECT = `
   p.completed_at
 `;
 
+// El cliente sale de `projects.client_id` (migración 012), NO del gerente.
+// `managers` se mantiene solo para resolver `manager_name`.
 const PROJECT_JOINS = `
   FROM projects p
   LEFT JOIN brands           b   ON p.brand_id    = b.id
   LEFT JOIN managers         m   ON p.manager_id  = m.id
-  LEFT JOIN clients          cl  ON m.client_id   = cl.id
+  LEFT JOIN clients          cl  ON p.client_id   = cl.id
   LEFT JOIN campaigns        cam ON p.campaign_id = cam.id
   LEFT JOIN products         pr  ON p.product_id  = pr.id
   LEFT JOIN product_categories pc ON pr.category_id = pc.id
@@ -144,6 +148,7 @@ export async function getProjectsWithPagination({
   status,
   brandId,
   managerId,
+  clientId,
   campaignId,
   assignedUserId,
   createdById,
@@ -154,6 +159,8 @@ export async function getProjectsWithPagination({
   status?: string;
   brandId?: number;
   managerId?: number;
+  /** Filtra por el cliente propio del proyecto (projects.client_id) */
+  clientId?: number;
   campaignId?: number;
   /** Restringe a proyectos con al menos una tarea asignada a este usuario (colaboradores) */
   assignedUserId?: number;
@@ -166,6 +173,7 @@ export async function getProjectsWithPagination({
       { sql: "p.status = $", value: status },
       { sql: "p.brand_id = $", value: brandId },
       { sql: "p.manager_id = $", value: managerId },
+      { sql: "p.client_id = $", value: clientId },
       { sql: "p.campaign_id = $", value: campaignId },
       {
         sql: "EXISTS (SELECT 1 FROM project_tasks pt WHERE pt.project_id = p.id AND pt.assigned_user_id = $)",
@@ -203,6 +211,49 @@ export async function getProjectsWithPagination({
   }
 }
 
+// ─── Reglas de cliente / gerente ─────────────────────────────────────────────
+
+/** Devuelve el cliente dueño de una marca. Lanza si la marca no existe. */
+async function getBrandClientId(brandId: number): Promise<number> {
+  const result = await db.execute({
+    sql: `SELECT client_id FROM brands WHERE id = $1`,
+    args: [brandId],
+  });
+  if (result.rows.length === 0) {
+    throw new DomainError("BRAND_NOT_FOUND", "La marca especificada no existe");
+  }
+  return Number((result.rows[0] as { client_id: number }).client_id);
+}
+
+/**
+ * Un proyecto solo puede tener como responsable a un gerente del MISMO cliente.
+ * Es la regla que impide que reasignar el gerente mueva el proyecto de cliente.
+ */
+async function assertManagerBelongsToClient(
+  managerId: number,
+  clientId: number
+): Promise<void> {
+  const result = await db.execute({
+    sql: `SELECT client_id FROM managers WHERE id = $1`,
+    args: [managerId],
+  });
+  if (result.rows.length === 0) {
+    throw new DomainError(
+      "MANAGER_NOT_FOUND",
+      "El gerente especificado no existe"
+    );
+  }
+  const managerClientId = Number(
+    (result.rows[0] as { client_id: number }).client_id
+  );
+  if (managerClientId !== clientId) {
+    throw new DomainError(
+      "MANAGER_CLIENT_MISMATCH",
+      "El gerente pertenece a otro cliente. Un proyecto solo puede asignarse a gerentes de su mismo cliente."
+    );
+  }
+}
+
 // ─── Create ──────────────────────────────────────────────────────────────────
 
 export async function createProject(data: {
@@ -221,17 +272,23 @@ export async function createProject(data: {
   created_by?: number | null;
 }): Promise<ProjectType> {
   try {
+    // El cliente del proyecto lo determina la MARCA, que es la fuente de verdad
+    // desde la migración 012. No se deriva del gerente.
+    const clientId = await getBrandClientId(data.brand_id);
+    await assertManagerBelongsToClient(data.manager_id, clientId);
+
     const result = await db.execute({
       sql: `
         INSERT INTO projects
-          (title, brand_id, manager_id, product_id, campaign_id, drive_folder_id, drive_folder_url, notes, ideal_delivery_at, oc, billing_closed_at, status, created_by)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+          (title, brand_id, manager_id, client_id, product_id, campaign_id, drive_folder_id, drive_folder_url, notes, ideal_delivery_at, oc, billing_closed_at, status, created_by)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
         RETURNING id
       `,
       args: [
         data.title,
         data.brand_id,
         data.manager_id,
+        clientId,
         data.product_id ?? null,
         data.campaign_id ?? null,
         data.drive_folder_id ?? null,
@@ -266,10 +323,22 @@ export async function createProject(data: {
 
 // ─── Update ──────────────────────────────────────────────────────────────────
 
+/**
+ * Actualiza un proyecto.
+ *
+ * `manager_id` es actualizable desde la migración 014, con dos reglas:
+ *   - el nuevo gerente debe pertenecer al mismo `projects.client_id`
+ *     (si no, `DomainError("MANAGER_CLIENT_MISMATCH")`);
+ *   - el cambio queda auditado en `project_manager_history` dentro de la misma
+ *     transacción que el UPDATE.
+ *
+ * @param changedBy id del usuario que ejecuta el cambio (auditoría)
+ */
 export async function updateProject(
   id: number,
   data: Partial<{
     title: string;
+    manager_id: number;
     product_id: number | null;
     campaign_id: number | null;
     drive_folder_id: string | null;
@@ -280,7 +349,9 @@ export async function updateProject(
     billing_closed_at: string | null;
     status: ProjectStatus;
     progress: number;
-  }>
+  }>,
+  changedBy?: number | null,
+  reason?: string | null
 ): Promise<ProjectType | null> {
   try {
     const currentProject = await getProjectById(id);
@@ -289,11 +360,23 @@ export async function updateProject(
        throw new Error("No se pueden editar proyectos completados");
     }
 
+    const managerChanged =
+      data.manager_id !== undefined &&
+      Number(data.manager_id) !== Number(currentProject.manager_id);
+
+    if (managerChanged) {
+      await assertManagerBelongsToClient(
+        Number(data.manager_id),
+        Number(currentProject.client_id)
+      );
+    }
+
     const updates: string[] = [];
     const args: unknown[] = [];
 
     const fields: Array<[string, unknown]> = [
       ["title", data.title],
+      ["manager_id", managerChanged ? data.manager_id : undefined],
       ["product_id", data.product_id],
       ["campaign_id", data.campaign_id],
       ["drive_folder_id", data.drive_folder_id],
@@ -319,10 +402,34 @@ export async function updateProject(
     updates.push("updated_at = CURRENT_TIMESTAMP");
     args.push(id);
 
-    await db.execute({
-      sql: `UPDATE projects SET ${updates.join(", ")} WHERE id = $${args.length}`,
-      args,
-    });
+    const updateSql = `UPDATE projects SET ${updates.join(", ")} WHERE id = $${args.length}`;
+
+    if (managerChanged) {
+      // El UPDATE y su registro de auditoría van en la misma transacción:
+      // un proyecto no puede cambiar de responsable sin dejar rastro.
+      const transaction = await db.transaction("write");
+      try {
+        await transaction.execute({ sql: updateSql, args });
+        await transaction.execute({
+          sql: `INSERT INTO project_manager_history
+                  (project_id, previous_manager_id, new_manager_id, changed_by, reason)
+                VALUES ($1, $2, $3, $4, $5)`,
+          args: [
+            id,
+            currentProject.manager_id ?? null,
+            data.manager_id,
+            changedBy ?? null,
+            reason ?? null,
+          ],
+        });
+        await transaction.commit();
+      } catch (error) {
+        await transaction.rollback();
+        throw error;
+      }
+    } else {
+      await db.execute({ sql: updateSql, args });
+    }
 
     revalidatePath("/projects");
     revalidatePath(`/projects/${id}`);
@@ -330,6 +437,56 @@ export async function updateProject(
   } catch (error) {
     console.error("Error updating project:", error);
     throw error;
+  }
+}
+
+/**
+ * Historial de reasignaciones de gerente de un proyecto, con nombres resueltos
+ * del gerente anterior, el nuevo y el usuario que ejecutó el cambio.
+ * Espeja `getBrandManagerHistory` en brands.ts.
+ */
+export async function getProjectManagerHistory(
+  projectId: number
+): Promise<ProjectManagerHistoryEntry[]> {
+  try {
+    const result = await db.execute({
+      sql: `
+        SELECT
+          pmh.id,
+          pmh.project_id,
+          pmh.previous_manager_id,
+          prev_m.name AS previous_manager_name,
+          pmh.new_manager_id,
+          new_m.name  AS new_manager_name,
+          pmh.changed_by,
+          u.name      AS changed_by_name,
+          pmh.reason,
+          pmh.changed_at
+        FROM project_manager_history pmh
+        LEFT JOIN managers prev_m ON pmh.previous_manager_id = prev_m.id
+        LEFT JOIN managers new_m  ON pmh.new_manager_id      = new_m.id
+        LEFT JOIN users    u      ON pmh.changed_by          = u.id
+        WHERE pmh.project_id = $1
+        ORDER BY pmh.changed_at DESC
+      `,
+      args: [projectId],
+    });
+
+    return result.rows.map((row) => ({
+      id: row.id,
+      projectId: row.project_id,
+      previousManagerId: row.previous_manager_id,
+      previousManagerName: row.previous_manager_name,
+      newManagerId: row.new_manager_id,
+      newManagerName: row.new_manager_name,
+      changedBy: row.changed_by,
+      changedByName: row.changed_by_name,
+      reason: row.reason,
+      changedAt: row.changed_at,
+    })) as unknown as ProjectManagerHistoryEntry[];
+  } catch (error) {
+    console.error("Error fetching project manager history:", error);
+    return [];
   }
 }
 
