@@ -6,10 +6,12 @@ import dynamic from "next/dynamic";
 import { post, patch, get, del } from "@/lib/services/apiService";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Loader2 } from "lucide-react";
 import { WizardState } from "@/hooks/useProjectWizard";
 import { ProjectType, ProjectTaskType } from "@/lib/definitions";
+import { parseDriveFolderId } from "@/lib/utils/drive-url";
 import {
   normalizeOptionalProjectText,
   normalizeProjectDateTime,
@@ -39,34 +41,54 @@ export function WizardStep6Confirm({ state, onBack }: Props) {
   const [submitting, setSubmitting] = useState(false);
   const [currentAction, setCurrentAction] = useState("");
 
+  // Optional manual Drive folder URL. Left empty → the automatic creation
+  // flow below runs unchanged. Filled with a valid URL → skip creation and
+  // persist the pasted folder instead.
+  const [driveUrlInput, setDriveUrlInput] = useState("");
+  const trimmedDriveUrl = driveUrlInput.trim();
+  const parsedDriveFolderId = trimmedDriveUrl ? parseDriveFolderId(trimmedDriveUrl) : null;
+  const driveUrlInvalid = trimmedDriveUrl.length > 0 && !parsedDriveFolderId;
+
   const handleConfirm = async () => {
     if (!state.brand_id || !state.manager_id || !state.title || !state.product) {
       toast.error("Faltan datos obligatorios");
       return;
     }
 
+    if (driveUrlInvalid) {
+      toast.error("La URL de Drive no es válida");
+      return;
+    }
+
     setSubmitting(true);
     try {
-      // 1. Create Drive folder (mandatory)
-      setCurrentAction("Creando carpeta en Drive...");
+      let drive: DriveResult;
 
-      const shareEmails = [
-        state.manager_email,
-        ...state.co_manager_emails,
-      ].filter(Boolean);
+      if (trimmedDriveUrl && parsedDriveFolderId) {
+        // User pasted an existing Drive folder URL — skip creation entirely.
+        drive = { projectFolderId: parsedDriveFolderId, projectFolderUrl: trimmedDriveUrl };
+      } else {
+        // 1. Create Drive folder (mandatory) — unchanged from original flow.
+        setCurrentAction("Creando carpeta en Drive...");
 
-      const driveRes = await post<DriveResult>("drive/create-folder", {
-        clientName: state.client_name,
-        brandName: state.brand_name,
-        projectTitle: state.title,
-        shareEmails,
-      });
+        const shareEmails = [
+          state.manager_email,
+          ...state.co_manager_emails,
+        ].filter(Boolean);
 
-      if (!driveRes.ok || !driveRes.data) {
-        throw new Error(driveRes.error ?? "Error al crear la carpeta en Drive");
+        const driveRes = await post<DriveResult>("drive/create-folder", {
+          clientName: state.client_name,
+          brandName: state.brand_name,
+          projectTitle: state.title,
+          shareEmails,
+        });
+
+        if (!driveRes.ok || !driveRes.data) {
+          throw new Error(driveRes.error ?? "Error al crear la carpeta en Drive");
+        }
+
+        drive = driveRes.data as unknown as DriveResult;
       }
-
-      const drive = driveRes.data as unknown as DriveResult;
 
       // 2. Create the project
       setCurrentAction("Creando proyecto...");
@@ -211,6 +233,29 @@ export function WizardStep6Confirm({ state, onBack }: Props) {
 
   return (
     <div className="space-y-6">
+      {/* Optional manual Drive folder URL */}
+      <div className="space-y-2">
+        <label htmlFor="drive-folder-url" className="text-sm font-medium">
+          ¿Ya existe una carpeta de Drive para este proyecto?{" "}
+          <span className="text-muted-foreground font-normal">(opcional)</span>
+        </label>
+        <Input
+          id="drive-folder-url"
+          value={driveUrlInput}
+          onChange={(e) => setDriveUrlInput(e.target.value)}
+          placeholder="https://drive.google.com/drive/folders/..."
+          disabled={submitting}
+        />
+        <p className="text-xs text-muted-foreground">
+          Si dejas este campo vacío, la carpeta se creará automáticamente al confirmar.
+        </p>
+        {driveUrlInvalid && (
+          <p className="text-xs text-destructive">
+            La URL debe pertenecer a drive.google.com y contener un id de carpeta válido.
+          </p>
+        )}
+      </div>
+
       {/* Notes */}
       <div className="space-y-2">
         <label className="text-sm font-medium">
@@ -235,7 +280,7 @@ export function WizardStep6Confirm({ state, onBack }: Props) {
         <Button
           type="button"
           onClick={handleConfirm}
-          disabled={submitting}
+          disabled={submitting || driveUrlInvalid}
           className="min-w-44"
         >
           {submitting ? (

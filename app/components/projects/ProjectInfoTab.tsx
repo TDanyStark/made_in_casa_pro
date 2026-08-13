@@ -5,13 +5,24 @@ import { ProjectDetailType } from "@/lib/definitions";
 import { CampaignSelect } from "./CampaignSelect";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { patch } from "@/lib/services/apiService";
+import { patch, post } from "@/lib/services/apiService";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import { Calendar, User, Package, Tag } from "lucide-react";
+import { Calendar, User, Package, Tag, HardDrive, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import {
   formatProjectDateTimeForDisplay,
   formatProjectDateTimeForInput,
@@ -40,6 +51,15 @@ export function ProjectInfoTab({ project, canEdit }: Props) {
   useEffect(() => {
     setMetadata(initialMetadata);
   }, [initialMetadata]);
+
+  const initialDriveUrl = project.drive_folder_url ?? "";
+  const [driveUrl, setDriveUrl] = useState(initialDriveUrl);
+  const [isSavingDrive, setIsSavingDrive] = useState(false);
+  const [isRecreatingDrive, setIsRecreatingDrive] = useState(false);
+
+  useEffect(() => {
+    setDriveUrl(initialDriveUrl);
+  }, [initialDriveUrl]);
 
   const handleCampaignChange = async (id: number | null, name?: string) => {
     try {
@@ -99,6 +119,57 @@ export function ProjectInfoTab({ project, canEdit }: Props) {
       toast.error("Error al actualizar la información del proyecto");
     } finally {
       setIsSavingMetadata(false);
+    }
+  };
+
+  const hasDriveUrlChanges = driveUrl !== initialDriveUrl;
+
+  const handleDriveUrlReset = () => {
+    setDriveUrl(initialDriveUrl);
+  };
+
+  const handleDriveUrlSave = async () => {
+    try {
+      setIsSavingDrive(true);
+      const res = await patch(`projects/${project.id}`, {
+        drive_folder_url: driveUrl.trim(),
+      });
+
+      if (!res.ok) throw new Error(res.error);
+
+      queryClient.invalidateQueries({ queryKey: ["project", project.id] });
+      queryClient.invalidateQueries({ queryKey: ["projects"] });
+      toast.success(
+        driveUrl.trim() ? "Carpeta de Drive actualizada" : "Carpeta de Drive desvinculada"
+      );
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Error al actualizar la carpeta de Drive"
+      );
+    } finally {
+      setIsSavingDrive(false);
+    }
+  };
+
+  const handleRecreateDrive = async () => {
+    try {
+      setIsRecreatingDrive(true);
+      const res = await post<{ projectFolderId: string; projectFolderUrl: string }>(
+        `projects/${project.id}/drive/recreate`,
+        {}
+      );
+
+      if (!res.ok) throw new Error(res.error);
+
+      queryClient.invalidateQueries({ queryKey: ["project", project.id] });
+      queryClient.invalidateQueries({ queryKey: ["projects"] });
+      toast.success("Carpeta de Drive recreada");
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Error al recrear la carpeta de Drive"
+      );
+    } finally {
+      setIsRecreatingDrive(false);
     }
   };
 
@@ -210,6 +281,101 @@ export function ProjectInfoTab({ project, canEdit }: Props) {
             >
               {isSavingMetadata ? "Guardando..." : "Guardar cambios"}
             </Button>
+          </div>
+        )}
+      </div>
+
+      {/* Drive folder */}
+      <div className="space-y-4 rounded-lg border p-4">
+        <div className="space-y-1">
+          <h3 className="text-sm font-medium text-foreground flex items-center gap-1.5">
+            <HardDrive className="h-3.5 w-3.5" />
+            Carpeta en Drive
+          </h3>
+          <p className="text-xs text-muted-foreground">
+            Vincula o corrige manualmente la carpeta de Google Drive de este proyecto.
+          </p>
+        </div>
+
+        <div className="space-y-2">
+          <Label>Carpeta actual</Label>
+          {project.drive_folder_url ? (
+            <div>
+              <Button variant="outline" size="sm" asChild>
+                <a href={project.drive_folder_url} target="_blank" rel="noopener noreferrer">
+                  <HardDrive className="h-3.5 w-3.5 mr-1.5" />
+                  Abrir carpeta
+                  <ExternalLink className="h-3 w-3 ml-1 opacity-60" />
+                </a>
+              </Button>
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">Sin carpeta vinculada</p>
+          )}
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="project-drive-url">URL personalizada</Label>
+          {canEdit ? (
+            <Input
+              id="project-drive-url"
+              value={driveUrl}
+              onChange={(event) => setDriveUrl(event.target.value)}
+              placeholder="https://drive.google.com/drive/folders/..."
+            />
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              {project.drive_folder_url ?? "Sin carpeta vinculada"}
+            </p>
+          )}
+          <p className="text-xs text-muted-foreground">
+            Debe ser un enlace de drive.google.com. Dejar vacío y guardar para desvincular.
+          </p>
+        </div>
+
+        {canEdit && (
+          <div className="flex justify-between items-center gap-2 pt-2 flex-wrap">
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button type="button" variant="outline" size="sm" disabled={isRecreatingDrive}>
+                  {isRecreatingDrive ? "Recreando..." : "Recrear carpeta"}
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Recrear carpeta de Drive</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Se buscara o creara la carpeta del proyecto en Google Drive (cliente → marca →
+                    proyecto) y se vinculara automaticamente. Si ya existe una carpeta con el mismo
+                    nombre, se reutilizara en lugar de crear una duplicada.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                  <AlertDialogAction onClick={handleRecreateDrive} disabled={isRecreatingDrive}>
+                    {isRecreatingDrive ? "Recreando..." : "Recrear carpeta"}
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+
+            <div className="flex gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleDriveUrlReset}
+                disabled={isSavingDrive || !hasDriveUrlChanges}
+              >
+                Restablecer
+              </Button>
+              <Button
+                type="button"
+                onClick={handleDriveUrlSave}
+                disabled={isSavingDrive || !hasDriveUrlChanges}
+              >
+                {isSavingDrive ? "Guardando..." : "Guardar"}
+              </Button>
+            </div>
           </div>
         )}
       </div>

@@ -15,6 +15,7 @@ import {
   normalizeOptionalProjectText,
   normalizeProjectDateTime,
 } from "@/lib/utils/project-date-time";
+import { parseDriveFolderId } from "@/lib/utils/drive-url";
 
 const projectDateTimeSchema = z
   .string()
@@ -28,6 +29,25 @@ const nullableTextSchema = z
   .nullable()
   .transform(normalizeOptionalProjectText);
 
+/**
+ * Un string vacío se trata como "desvincular" (ver PATCH handler, que además
+ * limpia drive_folder_id). Un string no vacío debe pertenecer a
+ * drive.google.com; el `.refine` va ANTES de `.nullable().optional()` para
+ * que null/undefined no lo ejecuten (comportamiento existente intacto).
+ */
+const driveFolderUrlSchema = z
+  .string()
+  .refine((value) => {
+    if (value === "") return true;
+    try {
+      return new URL(value).hostname.endsWith("drive.google.com");
+    } catch {
+      return false;
+    }
+  }, "La URL debe pertenecer a drive.google.com")
+  .nullable()
+  .optional();
+
 const patchSchema = z.object({
   title: z.string().min(1).max(300).optional(),
   /**
@@ -38,7 +58,7 @@ const patchSchema = z.object({
   manager_id: z.coerce.number().int().positive().optional(),
   campaign_id: z.coerce.number().int().positive().nullable().optional(),
   drive_folder_id: z.string().nullable().optional(),
-  drive_folder_url: z.string().url().nullable().optional(),
+  drive_folder_url: driveFolderUrlSchema,
   notes: z.string().nullable().optional(),
   ideal_delivery_at: projectDateTimeSchema.optional().nullable(),
   oc: nullableTextSchema,
@@ -83,9 +103,27 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     const cookie = (await cookies()).get("session")?.value;
     const session = cookie ? await decrypt(cookie) : null;
 
+    const data = { ...validation.data };
+    if (typeof data.drive_folder_url === "string") {
+      if (data.drive_folder_url === "") {
+        // Desvincular: limpiar ambos campos, sin tocar Drive.
+        data.drive_folder_url = null;
+        data.drive_folder_id = null;
+      } else {
+        const parsedId = parseDriveFolderId(data.drive_folder_url);
+        if (!parsedId) {
+          return NextResponse.json(
+            { error: "No se pudo extraer el id de la carpeta desde la URL" },
+            { status: 400 }
+          );
+        }
+        data.drive_folder_id = parsedId;
+      }
+    }
+
     const updated = await updateProject(
       parseInt(id),
-      validation.data,
+      data,
       session?.id ?? null
     );
     if (!updated) return NextResponse.json({ error: "Proyecto no encontrado" }, { status: 404 });

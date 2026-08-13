@@ -169,4 +169,165 @@ describe('PATCH /api/projects/[id]', () => {
     expect(data.error).toMatch(/inválidos/i);
     expect(mockUpdateProject).not.toHaveBeenCalled();
   });
+
+  describe('drive_folder_url', () => {
+    it('persists the url and the parsed folder id for a valid Drive URL', async () => {
+      mockUpdateProject.mockResolvedValue({ id: 10 } as never);
+
+      const req = new NextRequest('http://localhost/api/projects/10', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          drive_folder_url: 'https://drive.google.com/drive/folders/abc123XYZ_-',
+        }),
+      });
+
+      const res = await callPatch(req);
+
+      expect(res.status).toBe(200);
+      expect(mockUpdateProject).toHaveBeenCalledWith(
+        10,
+        {
+          drive_folder_url: 'https://drive.google.com/drive/folders/abc123XYZ_-',
+          drive_folder_id: 'abc123XYZ_-',
+        },
+        77
+      );
+    });
+
+    it('derives the folder id even when a stale drive_folder_id was also sent', async () => {
+      mockUpdateProject.mockResolvedValue({ id: 10 } as never);
+
+      const req = new NextRequest('http://localhost/api/projects/10', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          drive_folder_url: 'https://drive.google.com/drive/u/0/folders/newFolderId',
+          drive_folder_id: 'stale-id',
+        }),
+      });
+
+      const res = await callPatch(req);
+
+      expect(res.status).toBe(200);
+      expect(mockUpdateProject).toHaveBeenCalledWith(
+        10,
+        {
+          drive_folder_url: 'https://drive.google.com/drive/u/0/folders/newFolderId',
+          drive_folder_id: 'newFolderId',
+        },
+        77
+      );
+    });
+
+    it('rejects a non-Drive domain with 400 and does not call updateProject', async () => {
+      const req = new NextRequest('http://localhost/api/projects/10', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          drive_folder_url: 'https://evil-drive.google.com.attacker.io/folders/abc123',
+        }),
+      });
+
+      const res = await callPatch(req);
+      const data = await res.json();
+
+      expect(res.status).toBe(400);
+      expect(data.error).toMatch(/inválidos/i);
+      expect(mockUpdateProject).not.toHaveBeenCalled();
+    });
+
+    it('rejects a malformed URL with 400', async () => {
+      const req = new NextRequest('http://localhost/api/projects/10', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          drive_folder_url: 'not-a-valid-url',
+        }),
+      });
+
+      const res = await callPatch(req);
+      const data = await res.json();
+
+      expect(res.status).toBe(400);
+      expect(data.error).toMatch(/inválidos/i);
+      expect(mockUpdateProject).not.toHaveBeenCalled();
+    });
+
+    it('unlinks both drive_folder_url and drive_folder_id when the value is an empty string', async () => {
+      mockUpdateProject.mockResolvedValue({ id: 10 } as never);
+
+      const req = new NextRequest('http://localhost/api/projects/10', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          drive_folder_url: '',
+        }),
+      });
+
+      const res = await callPatch(req);
+
+      expect(res.status).toBe(200);
+      expect(mockUpdateProject).toHaveBeenCalledWith(
+        10,
+        {
+          drive_folder_url: null,
+          drive_folder_id: null,
+        },
+        77
+      );
+    });
+
+    it('allows explicit null without triggering the domain refine or touching drive_folder_id', async () => {
+      mockUpdateProject.mockResolvedValue({ id: 10 } as never);
+
+      const req = new NextRequest('http://localhost/api/projects/10', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          drive_folder_url: null,
+        }),
+      });
+
+      const res = await callPatch(req);
+
+      expect(res.status).toBe(200);
+      expect(mockUpdateProject).toHaveBeenCalledWith(10, { drive_folder_url: null }, 77);
+    });
+
+    it('leaves drive_folder_url untouched when omitted from the body (no regression)', async () => {
+      mockUpdateProject.mockResolvedValue({ id: 10 } as never);
+
+      const req = new NextRequest('http://localhost/api/projects/10', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title: 'Nuevo título' }),
+      });
+
+      const res = await callPatch(req);
+
+      expect(res.status).toBe(200);
+      expect(mockUpdateProject).toHaveBeenCalledWith(10, { title: 'Nuevo título' }, 77);
+    });
+
+    it('rejects the request when the caller lacks PROJECT_EDIT_ROLES', async () => {
+      mockValidateApiRole.mockResolvedValue({
+        isAuthorized: false,
+        response: new Response(JSON.stringify({ error: 'Forbidden' }), { status: 403 }),
+      } as never);
+
+      const req = new NextRequest('http://localhost/api/projects/10', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          drive_folder_url: 'https://drive.google.com/drive/folders/abc123',
+        }),
+      });
+
+      const res = await callPatch(req);
+
+      expect(res.status).toBe(403);
+      expect(mockUpdateProject).not.toHaveBeenCalled();
+    });
+  });
 });

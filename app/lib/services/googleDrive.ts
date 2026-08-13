@@ -47,14 +47,15 @@ async function getDriveClient() {
 }
 
 /**
- * Finds or creates a folder by name inside a given parent folder.
- * Returns the folder ID.
+ * Searches (read-only, never creates) for a folder by name inside a given
+ * parent folder. Returns the first match's ID (or null) plus the total
+ * number of matches, so callers can detect duplicates.
  */
-async function findOrCreateFolder(
+export async function findFolderByName(
   drive: Awaited<ReturnType<typeof getDriveClient>>,
   name: string,
   parentId: string
-): Promise<string> {
+): Promise<{ id: string | null; count: number }> {
   const safeName = name.replace(/\//g, "-").trim();
 
   const search = await drive.files.list({
@@ -63,9 +64,27 @@ async function findOrCreateFolder(
     spaces: "drive",
   });
 
-  if (search.data.files && search.data.files.length > 0) {
-    return search.data.files[0].id!;
+  const files = search.data.files ?? [];
+
+  return { id: files[0]?.id ?? null, count: files.length };
+}
+
+/**
+ * Finds or creates a folder by name inside a given parent folder.
+ * Returns the folder ID.
+ */
+async function findOrCreateFolder(
+  drive: Awaited<ReturnType<typeof getDriveClient>>,
+  name: string,
+  parentId: string
+): Promise<string> {
+  const found = await findFolderByName(drive, name, parentId);
+
+  if (found.id) {
+    return found.id;
   }
+
+  const safeName = name.replace(/\//g, "-").trim();
 
   const folder = await drive.files.create({
     requestBody: {

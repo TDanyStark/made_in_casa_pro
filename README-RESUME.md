@@ -158,6 +158,47 @@ sucesores) y `moved_brands` / `moved_projects` (lo que viajó con el gerente).
 `project_manager_history` en la misma transacción. El `client_id` del proyecto no
 se toca. El historial se consulta en `GET /api/projects/[id]/manager-history`.
 
+## Carpetas de Drive de proyectos
+
+Cada proyecto puede vincularse a una carpeta de Google Drive bajo la jerarquía
+`Made In Casa / {cliente} / {marca} / {proyecto}`. El id se persiste en
+`projects.drive_folder_id` y la URL completa en `drive_folder_url`.
+
+### Carpeta de Drive al crear un proyecto (wizard)
+
+En el paso de confirmación del wizard de creación (`WizardStep6Confirm`) hay un
+campo **opcional**: "¿Ya existe una carpeta de Drive para este proyecto?". No
+hay ninguna búsqueda automática por nombre (el equipo puede haber creado la
+carpeta en otro lugar de la jerarquía o con un nombre distinto, así que una
+detección automática por nombre no puede garantizar encontrarla). Según lo que
+el usuario ingrese:
+
+| Campo | Comportamiento |
+|-------|-----------------|
+| Vacío | Flujo original sin cambios: se llama a `POST /api/drive/create-folder` y se crea (o reutiliza si ya existe con ese nombre exacto) la carpeta al confirmar |
+| URL válida de `drive.google.com` | Se omite la creación por completo; se persiste directamente `drive_folder_url` y el `drive_folder_id` derivado con `parseDriveFolderId` |
+| URL inválida | Error de validación en línea; bloquea "Crear proyecto" hasta corregirla o dejar el campo vacío |
+
+La creación del proyecto nunca se bloquea por causa de Drive.
+
+### Reparar o recrear la carpeta de un proyecto existente
+
+En la pestaña de información del proyecto (`ProjectInfoTab`), la sección
+"Carpeta en Drive" permite:
+
+- **Recrear carpeta**: `POST /api/projects/[id]/drive/recreate` busca o crea
+  (reutilizando si ya existe) la cadena cliente → marca → proyecto y actualiza
+  `drive_folder_id`/`drive_folder_url`. Pensada para proyectos con carpeta
+  huérfana u obsoleta (p. ej. tras la migración de service-account a OAuth).
+  Requiere confirmación en un `AlertDialog`.
+- **URL personalizada**: editar manualmente `drive_folder_url` vía
+  `PATCH /api/projects/[id]`. Debe ser un enlace de `drive.google.com`; el id
+  de la carpeta se deriva en el servidor con `parseDriveFolderId`
+  (`app/lib/utils/drive-url.ts`). Dejar el campo vacío y guardar desvincula la
+  carpeta (limpia `drive_folder_id` y `drive_folder_url`, sin tocar Drive).
+
+Ambas acciones requieren rol `PROJECT_EDIT_ROLES`.
+
 ## Auditoría e historial
 
 | Tabla | Registra |

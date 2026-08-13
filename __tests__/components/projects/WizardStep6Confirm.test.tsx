@@ -45,50 +45,48 @@ jest.mock('sonner', () => ({
   },
 }));
 
+const baseState = {
+  title: 'Proyecto metadata',
+  brand_id: 2,
+  brand_name: 'Marca Uno',
+  ideal_delivery_at: '2026-04-07T09:30',
+  oc: '  OC-123  ',
+  billing_closed_at: '2026-04-08T18:45',
+  client_id: 9,
+  client_name: 'Cliente Uno',
+  created_by: 4,
+  created_by_name: 'Ana',
+  manager_id: 7,
+  manager_name: 'Carlos',
+  manager_email: 'carlos@test.com',
+  co_manager_ids: [],
+  co_manager_names: [],
+  co_manager_emails: [],
+  product: { id: 5, name: 'Producto X' } as never,
+  task_overrides: [],
+  extra_tasks: [],
+  removed_template_ids: [],
+  campaign_id: null,
+  campaign_name: '',
+  notes: '',
+  drive_folder_id: null,
+  drive_folder_url: null,
+};
+
 describe('WizardStep6Confirm', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+  });
+
+  it('empty Drive URL field: runs the automatic creation flow byte-for-byte identical to before', async () => {
     mockPost
       .mockResolvedValueOnce({ ok: true, data: { projectFolderId: 'drive-1', projectFolderUrl: 'https://drive.test/folder' } })
       .mockResolvedValueOnce({ ok: true, data: { id: 44 } })
       .mockResolvedValueOnce({ ok: true, data: {} });
-  });
 
-  it('includes normalized metadata fields in the create project payload', async () => {
     const user = userEvent.setup();
 
-    render(
-      <WizardStep6Confirm
-        state={{
-          title: 'Proyecto metadata',
-          brand_id: 2,
-          brand_name: 'Marca Uno',
-          ideal_delivery_at: '2026-04-07T09:30',
-          oc: '  OC-123  ',
-          billing_closed_at: '2026-04-08T18:45',
-          client_id: 9,
-          client_name: 'Cliente Uno',
-          created_by: 4,
-          created_by_name: 'Ana',
-          manager_id: 7,
-          manager_name: 'Carlos',
-          manager_email: 'carlos@test.com',
-          co_manager_ids: [],
-          co_manager_names: [],
-          co_manager_emails: [],
-          product: { id: 5, name: 'Producto X' } as never,
-          task_overrides: [],
-          extra_tasks: [],
-          removed_template_ids: [],
-          campaign_id: null,
-          campaign_name: '',
-          notes: '',
-          drive_folder_id: null,
-          drive_folder_url: null,
-        }}
-        onBack={jest.fn()}
-      />
-    );
+    render(<WizardStep6Confirm state={baseState} onBack={jest.fn()} />);
 
     await user.click(screen.getByRole('button', { name: /crear proyecto/i }));
 
@@ -97,10 +95,73 @@ describe('WizardStep6Confirm', () => {
         ideal_delivery_at: normalizeProjectDateTime('2026-04-07T09:30'),
         oc: 'OC-123',
         billing_closed_at: normalizeProjectDateTime('2026-04-08T18:45'),
+        drive_folder_id: 'drive-1',
+        drive_folder_url: 'https://drive.test/folder',
       }));
     });
 
+    // Byte-for-byte identical: create-folder is called with the exact same args as before.
+    expect(mockPost).toHaveBeenNthCalledWith(1, 'drive/create-folder', {
+      clientName: 'Cliente Uno',
+      brandName: 'Marca Uno',
+      projectTitle: 'Proyecto metadata',
+      shareEmails: ['carlos@test.com'],
+    });
+
+    // No automatic lookup is ever performed anymore.
+    expect(mockGet).not.toHaveBeenCalled();
+
     expect(mockPush).toHaveBeenCalledWith('/projects/44');
     expect(mockToastSuccess).toHaveBeenCalled();
+  });
+
+  it('valid Drive URL provided: skips creation entirely and persists the pasted folder', async () => {
+    mockPost.mockResolvedValueOnce({ ok: true, data: { id: 44 } });
+
+    const user = userEvent.setup();
+    render(<WizardStep6Confirm state={baseState} onBack={jest.fn()} />);
+
+    const urlInput = screen.getByPlaceholderText(/drive.google.com/i);
+    await user.type(urlInput, 'https://drive.google.com/drive/folders/existing-id');
+
+    await user.click(screen.getByRole('button', { name: /crear proyecto/i }));
+
+    await waitFor(() => {
+      expect(mockPost).toHaveBeenCalledWith('projects', expect.objectContaining({
+        drive_folder_id: 'existing-id',
+        drive_folder_url: 'https://drive.google.com/drive/folders/existing-id',
+      }));
+    });
+
+    // drive/create-folder must NOT be called — creation skipped entirely.
+    expect(mockPost).not.toHaveBeenCalledWith('drive/create-folder', expect.anything());
+    expect(mockPush).toHaveBeenCalledWith('/projects/44');
+  });
+
+  it('invalid Drive URL blocks submission until fixed or cleared', async () => {
+    const user = userEvent.setup();
+    render(<WizardStep6Confirm state={baseState} onBack={jest.fn()} />);
+
+    const urlInput = screen.getByPlaceholderText(/drive.google.com/i);
+    const confirmButton = screen.getByRole('button', { name: /crear proyecto/i });
+
+    await user.type(urlInput, 'https://example.com/not-a-drive-link');
+
+    expect(await screen.findByText(/la url debe pertenecer a drive\.google\.com/i)).toBeInTheDocument();
+    expect(confirmButton).toBeDisabled();
+    expect(mockPost).not.toHaveBeenCalled();
+
+    // Clearing the field un-blocks submission and runs the automatic flow.
+    await user.clear(urlInput);
+    await waitFor(() => expect(confirmButton).not.toBeDisabled());
+
+    mockPost
+      .mockResolvedValueOnce({ ok: true, data: { projectFolderId: 'drive-1', projectFolderUrl: 'https://drive.test/folder' } })
+      .mockResolvedValueOnce({ ok: true, data: { id: 44 } });
+
+    await user.click(confirmButton);
+
+    await waitFor(() => expect(mockPush).toHaveBeenCalledWith('/projects/44'));
+    expect(mockPost).toHaveBeenNthCalledWith(1, 'drive/create-folder', expect.anything());
   });
 });

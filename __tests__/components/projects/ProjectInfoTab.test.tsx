@@ -7,6 +7,7 @@ import {
 } from '@/lib/utils/project-date-time';
 
 const mockPatch = jest.fn();
+const mockPost = jest.fn();
 const mockInvalidateQueries = jest.fn();
 const mockToastSuccess = jest.fn();
 const mockToastError = jest.fn();
@@ -27,6 +28,21 @@ jest.mock('@/components/projects/CampaignSelect', () => ({
 
 jest.mock('@/lib/services/apiService', () => ({
   patch: (...args: unknown[]) => mockPatch(...args),
+  post: (...args: unknown[]) => mockPost(...args),
+}));
+
+jest.mock('@/components/ui/alert-dialog', () => ({
+  AlertDialog: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  AlertDialogTrigger: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  AlertDialogContent: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  AlertDialogHeader: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  AlertDialogTitle: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  AlertDialogDescription: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  AlertDialogFooter: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  AlertDialogCancel: ({ children }: { children: React.ReactNode }) => <button>{children}</button>,
+  AlertDialogAction: ({ children, onClick, disabled }: { children: React.ReactNode; onClick: () => void; disabled?: boolean }) => (
+    <button onClick={onClick} disabled={disabled}>{children}</button>
+  ),
 }));
 
 jest.mock('@tanstack/react-query', () => ({
@@ -201,5 +217,111 @@ describe('ProjectInfoTab', () => {
       screen.getByText(/corresponde al cierre administrativo\/facturación, no a/i)
     ).toBeInTheDocument();
     expect(screen.getByText('completed_at')).toBeInTheDocument();
+  });
+
+  const baseDriveProject = {
+    id: 20,
+    title: 'Proyecto Drive',
+    brand_id: 1,
+    brand_name: 'Marca Drive',
+    manager_id: 2,
+    manager_name: 'Ana',
+    client_id: 3,
+    client_name: 'Cliente Drive',
+    campaign_id: null,
+    campaign_name: null,
+    product_id: null,
+    product_name: null,
+    product_category_name: null,
+    drive_folder_id: null,
+    drive_folder_url: null,
+    notes: null,
+    ideal_delivery_at: null,
+    oc: null,
+    billing_closed_at: null,
+    status: 'active' as const,
+    progress: 0,
+    created_by: null,
+    created_by_name: null,
+    created_at: '2026-04-01T10:00:00.000Z',
+    updated_at: '2026-04-02T12:00:00.000Z',
+    co_managers: [],
+  };
+
+  it('recreates the Drive folder and persists the returned id/url', async () => {
+    const user = userEvent.setup();
+    mockPost.mockResolvedValue({
+      ok: true,
+      data: {
+        projectFolderId: 'new-folder-1',
+        projectFolderUrl: 'https://drive.google.com/drive/folders/new-folder-1',
+      },
+    });
+
+    render(<ProjectInfoTab canEdit={true} project={baseDriveProject} />);
+
+    const recreateButtons = screen.getAllByRole('button', { name: /recrear carpeta/i });
+    // [0] = AlertDialogTrigger button, [1] = AlertDialogAction (confirm) button.
+    await user.click(recreateButtons[0]);
+    await user.click(recreateButtons[1]);
+
+    await waitFor(() => {
+      expect(mockPost).toHaveBeenCalledWith('projects/20/drive/recreate', {});
+    });
+
+    expect(mockInvalidateQueries).toHaveBeenCalledWith({ queryKey: ['project', 20] });
+    expect(mockInvalidateQueries).toHaveBeenCalledWith({ queryKey: ['projects'] });
+    expect(mockToastSuccess).toHaveBeenCalledWith('Carpeta de Drive recreada');
+  });
+
+  it('saves a custom Drive URL', async () => {
+    const user = userEvent.setup();
+    mockPatch.mockResolvedValue({ ok: true, data: { id: 20 } });
+
+    render(<ProjectInfoTab canEdit={true} project={baseDriveProject} />);
+
+    const urlInput = screen.getByLabelText(/url personalizada/i);
+    await user.type(urlInput, 'https://drive.google.com/drive/folders/manual-1');
+    await user.click(screen.getByRole('button', { name: /^guardar$/i }));
+
+    await waitFor(() => {
+      expect(mockPatch).toHaveBeenCalledWith('projects/20', {
+        drive_folder_url: 'https://drive.google.com/drive/folders/manual-1',
+      });
+    });
+
+    expect(mockToastSuccess).toHaveBeenCalledWith('Carpeta de Drive actualizada');
+  });
+
+  it('unlinks the Drive folder by clearing the URL field and saving', async () => {
+    const user = userEvent.setup();
+    mockPatch.mockResolvedValue({ ok: true, data: { id: 21 } });
+
+    render(
+      <ProjectInfoTab
+        canEdit={true}
+        project={{
+          ...baseDriveProject,
+          id: 21,
+          drive_folder_id: 'existing-1',
+          drive_folder_url: 'https://drive.google.com/drive/folders/existing-1',
+        }}
+      />
+    );
+
+    expect(screen.getByRole('link', { name: /abrir carpeta/i })).toHaveAttribute(
+      'href',
+      'https://drive.google.com/drive/folders/existing-1'
+    );
+
+    const urlInput = screen.getByLabelText(/url personalizada/i);
+    await user.clear(urlInput);
+    await user.click(screen.getByRole('button', { name: /^guardar$/i }));
+
+    await waitFor(() => {
+      expect(mockPatch).toHaveBeenCalledWith('projects/21', { drive_folder_url: '' });
+    });
+
+    expect(mockToastSuccess).toHaveBeenCalledWith('Carpeta de Drive desvinculada');
   });
 });
