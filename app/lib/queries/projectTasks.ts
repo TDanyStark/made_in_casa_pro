@@ -583,7 +583,13 @@ export async function completeTask(
       args: [taskId, task.project_id, task.status, task.task_flag, userId, notes ?? null],
     });
 
-    // 3. Find next task in this project — must be in the same adjustment version
+    // 3. Find next task in this project — must be in the same adjustment version.
+    // IMPORTANT: tasks are strictly sequential per project + adjustment_id.
+    // We must look at the IMMEDIATE next task by order_index regardless of its
+    // status — NOT filter to ('waiting','not_started'). Filtering there would
+    // skip over an immediate-next task that is already 'blocked' (e.g. an
+    // unresolved quote) and incorrectly jump ahead to evaluate/activate a
+    // later task, letting work after the blocked one cut the queue.
     const adjFilter = task.adjustment_id !== null
       ? `AND adjustment_id = ${task.adjustment_id}`
       : `AND adjustment_id IS NULL`;
@@ -594,7 +600,6 @@ export async function completeTask(
         FROM project_tasks
         WHERE project_id = $1
           AND order_index > (SELECT order_index FROM project_tasks WHERE id = $2)
-          AND status IN ('waiting', 'not_started')
           ${adjFilter}
         ORDER BY order_index ASC
         LIMIT 1
@@ -614,47 +619,55 @@ export async function completeTask(
         status: string;
       };
 
-      if (Number(next.requires_quote) === 1 && !next.assigned_user_id) {
-        // Block: requires external quote, no one assigned yet
-        await transaction.execute({
-          sql: `UPDATE project_tasks SET status = 'blocked', updated_at = CURRENT_TIMESTAMP WHERE id = $1`,
-          args: [next.id],
-        });
-        await transaction.execute({
-          sql: `
-            INSERT INTO task_transitions (task_id, project_id, from_status, to_status, from_flag, to_flag, moved_by, notes)
-            VALUES ($1, $2, $3, 'blocked', $4, $4, $5, $6)
-          `,
-          args: [next.id, task.project_id, next.status, next.task_flag, userId, "Requiere cotización de colaborador externo"],
-        });
-        blockedReason = "La siguiente tarea requiere cotización de un colaborador externo. El encargado del proyecto debe invitar a un externo para cotizar.";
-      } else if (!next.assigned_user_id) {
-        // Block: no one assigned
-        await transaction.execute({
-          sql: `UPDATE project_tasks SET status = 'blocked', updated_at = CURRENT_TIMESTAMP WHERE id = $1`,
-          args: [next.id],
-        });
-        await transaction.execute({
-          sql: `
-            INSERT INTO task_transitions (task_id, project_id, from_status, to_status, from_flag, to_flag, moved_by, notes)
-            VALUES ($1, $2, $3, 'blocked', $4, $4, $5, $6)
-          `,
-          args: [next.id, task.project_id, next.status, next.task_flag, userId, "Sin colaborador asignado"],
-        });
-        blockedReason = "La siguiente tarea no tiene colaborador asignado. El encargado del proyecto debe asignar a alguien.";
-      } else {
-        // Activate next task
-        await transaction.execute({
-          sql: `UPDATE project_tasks SET status = 'not_started', assigned_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id = $1`,
-          args: [next.id],
-        });
-        await transaction.execute({
-          sql: `
-            INSERT INTO task_transitions (task_id, project_id, from_status, to_status, from_flag, to_flag, moved_by, notes)
-            VALUES ($1, $2, $3, 'not_started', $4, $4, $5, $6)
-          `,
-          args: [next.id, task.project_id, next.status, next.task_flag, userId, "Activada automáticamente al completar tarea anterior"],
-        });
+      // Only 'waiting' or 'not_started' immediate-next tasks are eligible to be
+      // evaluated/activated here. Any other status (most notably 'blocked', but
+      // also 'in_progress'/'completed' should they ever appear) already occupies
+      // the queue's turn and must be left untouched — never promoted past.
+      if (next.status === "waiting" || next.status === "not_started") {
+        if (Number(next.requires_quote) === 1 && !next.assigned_user_id) {
+          // Block: requires external quote, no one assigned yet
+          await transaction.execute({
+            sql: `UPDATE project_tasks SET status = 'blocked', updated_at = CURRENT_TIMESTAMP WHERE id = $1`,
+            args: [next.id],
+          });
+          await transaction.execute({
+            sql: `
+              INSERT INTO task_transitions (task_id, project_id, from_status, to_status, from_flag, to_flag, moved_by, notes)
+              VALUES ($1, $2, $3, 'blocked', $4, $4, $5, $6)
+            `,
+            args: [next.id, task.project_id, next.status, next.task_flag, userId, "Requiere cotización de colaborador externo"],
+          });
+          blockedReason = "La siguiente tarea requiere cotización de un colaborador externo. El encargado del proyecto debe invitar a un externo para cotizar.";
+        } else if (!next.assigned_user_id) {
+          // Block: no one assigned
+          await transaction.execute({
+            sql: `UPDATE project_tasks SET status = 'blocked', updated_at = CURRENT_TIMESTAMP WHERE id = $1`,
+            args: [next.id],
+          });
+          await transaction.execute({
+            sql: `
+              INSERT INTO task_transitions (task_id, project_id, from_status, to_status, from_flag, to_flag, moved_by, notes)
+              VALUES ($1, $2, $3, 'blocked', $4, $4, $5, $6)
+            `,
+            args: [next.id, task.project_id, next.status, next.task_flag, userId, "Sin colaborador asignado"],
+          });
+          blockedReason = "La siguiente tarea no tiene colaborador asignado. El encargado del proyecto debe asignar a alguien.";
+        } else {
+          // Activate next task
+          await transaction.execute({
+            sql: `UPDATE project_tasks SET status = 'not_started', assigned_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id = $1`,
+            args: [next.id],
+          });
+          await transaction.execute({
+            sql: `
+              INSERT INTO task_transitions (task_id, project_id, from_status, to_status, from_flag, to_flag, moved_by, notes)
+              VALUES ($1, $2, $3, 'not_started', $4, $4, $5, $6)
+            `,
+            args: [next.id, task.project_id, next.status, next.task_flag, userId, "Activada automáticamente al completar tarea anterior"],
+          });
+        }
+      } else if (next.status === "blocked") {
+        blockedReason = "La siguiente tarea ya está bloqueada en espera de resolución (cotización o asignación pendiente).";
       }
     }
 

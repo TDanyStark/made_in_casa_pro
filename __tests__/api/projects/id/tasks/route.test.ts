@@ -160,6 +160,42 @@ describe("POST /api/projects/[id]/tasks — canonical initial status", () => {
     expect(mockTransaction.commit).toHaveBeenCalled();
   });
 
+  it("resolves to waiting (not not_started) when a predecessor task in the same adjustment is blocked — a blocked task occupies the queue's turn", async () => {
+    // order_index query: not the first task in the adjustment
+    mockDbExecute.mockResolvedValueOnce({ rows: [{ next_order: 2 }] } as never);
+    // active-tasks-count query: one predecessor is 'blocked' (pending quote) — must count as active
+    mockDbExecute.mockResolvedValueOnce({ rows: [{ cnt: "1" }] } as never);
+
+    mockResolveProjectTaskAssignment.mockResolvedValue(null);
+    mockCreateProjectTask.mockResolvedValue({
+      id: 102,
+      project_id: 15,
+      status: "waiting",
+    } as never);
+
+    const res = await callPost({
+      title: "Tarea detrás de una bloqueada",
+      adjustment_id: 9,
+      requires_quote: 0,
+    });
+    const data = await res.json();
+
+    expect(res.status).toBe(201);
+    expect(data.status).toBe("waiting");
+    expect(mockCreateProjectTask).toHaveBeenCalledWith(
+      expect.objectContaining({ status: "waiting" })
+    );
+
+    // The active-count query must include 'blocked' in its IN(...) filter so a
+    // blocked predecessor is counted as occupying the queue.
+    expect(mockDbExecute).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        sql: expect.stringContaining("'blocked'"),
+      })
+    );
+  });
+
   it("still honors an explicit status sent by the caller (e.g. admin tooling), untouched by the default-status computation", async () => {
     mockDbExecute.mockResolvedValueOnce({ rows: [{ next_order: 3 }] } as never);
     mockDbExecute.mockResolvedValueOnce({ rows: [{ cnt: "1" }] } as never); // an active task exists

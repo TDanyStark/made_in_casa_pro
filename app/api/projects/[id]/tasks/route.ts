@@ -98,6 +98,10 @@ export async function POST(request: NextRequest, { params }: Params) {
     // 4. Determine initial status
     // Use not_started when: it's the first task, or all existing tasks are done
     // (no task in an active state is blocking the queue). Otherwise waiting.
+    // 'blocked' MUST count as active here: tasks are strictly sequential per
+    // project + adjustment_id, so a predecessor stuck on 'blocked' (e.g. an
+    // unresolved quote) still occupies the queue's turn — a new task must wait
+    // behind it, not jump ahead into 'not_started'.
     let defaultStatus: "not_started" | "waiting" = "waiting";
     if (nextOrder === 0) {
       defaultStatus = "not_started";
@@ -105,7 +109,7 @@ export async function POST(request: NextRequest, { params }: Params) {
       const activeResult = await db.execute({
         sql: `SELECT COUNT(*) AS cnt FROM project_tasks
               WHERE project_id = $1 AND adjustment_id = $2
-                AND status IN ('not_started', 'in_progress', 'waiting')`,
+                AND status IN ('not_started', 'in_progress', 'waiting', 'blocked')`,
         args: [projectId, adjustmentId],
       });
       const activeCount = Number((activeResult.rows[0] as unknown as { cnt: string }).cnt);
