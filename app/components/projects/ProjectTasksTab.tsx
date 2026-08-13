@@ -153,7 +153,39 @@ const taskSchema = z
     }
   });
 
-type TaskFormValues = z.infer<typeof taskSchema>;
+export type TaskFormValues = z.infer<typeof taskSchema>;
+
+// ─── Task payload builder ────────────────────────────────────────────────────
+//
+// Extracted as a pure function (instead of inline in onSubmit) so the
+// create-vs-edit status handling can be unit tested directly:
+//   - Creating a task must OMIT `status` so the backend
+//     (POST /api/projects/[id]/tasks) computes the canonical initial status
+//     (not_started when the adjustment's task queue has no active tasks,
+//     waiting otherwise, blocked when requires_quote has no assignee).
+//   - Editing a task keeps sending the user-selected `status`.
+export function buildTaskPayload(
+  values: TaskFormValues,
+  options: { isEditing: boolean; adjustmentId: number | null }
+) {
+  const assign_to_commercial = values.assign_mode === "commercial" ? 1 : 0;
+  const area_id = values.assign_mode !== "commercial" ? (values.area_id ?? null) : null;
+  const assigned_user_id = values.assign_mode === "specific" ? (values.assigned_user_id ?? null) : null;
+
+  const basePayload = {
+    title: values.title,
+    description: values.description ?? null,
+    task_type: values.task_type,
+    requires_quote: values.requires_quote ? 1 : 0,
+    quoter_ids: values.quoter_ids,
+    assign_to_commercial,
+    area_id,
+    assigned_user_id,
+    adjustment_id: options.adjustmentId,
+  };
+
+  return options.isEditing ? { ...basePayload, status: values.status } : basePayload;
+}
 
 function deriveAssignMode(task: ProjectTaskType): AssignMode {
   if (task.assign_to_commercial === 1) return "commercial";
@@ -360,12 +392,16 @@ export function ProjectTasksTab({
   const openCreate = () => {
     setEditingTask(null);
     setEditingAssigneeOnly(false);
-    // New tasks default to waiting unless it's the very first one
-    const defaultStatus = tasks.length === 0 ? "not_started" : "waiting";
+    // `status` is intentionally left undefined for new tasks: the status
+    // selector is only rendered when editing, and on creation we must NOT
+    // send a hardcoded value to the API — the backend (POST /api/projects/
+    // [id]/tasks) already computes the correct initial status (not_started
+    // when the task queue for this adjustment_id has no active tasks,
+    // waiting otherwise, blocked when requires_quote has no assignee).
     form.reset({
       title: "",
       description: "",
-      status: defaultStatus,
+      status: undefined,
       task_type: "execution",
       requires_quote: false,
       quoter_ids: [],
@@ -406,18 +442,10 @@ export function ProjectTasksTab({
 
     setSubmitting(true);
     try {
-      const assign_to_commercial = values.assign_mode === "commercial" ? 1 : 0;
-      const area_id = values.assign_mode !== "commercial" ? (values.area_id ?? null) : null;
-      const assigned_user_id = values.assign_mode === "specific" ? (values.assigned_user_id ?? null) : null;
-
-      const payload = {
-        title: values.title, description: values.description ?? null,
-        status: values.status, task_type: values.task_type,
-        requires_quote: values.requires_quote ? 1 : 0,
-        quoter_ids: values.quoter_ids,
-        assign_to_commercial, area_id, assigned_user_id,
-        adjustment_id: adjustmentId,
-      };
+      const payload = buildTaskPayload(values, {
+        isEditing: !!editingTask,
+        adjustmentId,
+      });
 
       if (editingTask) {
         const res = await patch(`projects/${projectId}/tasks/${editingTask.id}`, payload);

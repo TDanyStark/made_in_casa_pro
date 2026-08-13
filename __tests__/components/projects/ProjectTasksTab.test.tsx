@@ -161,7 +161,7 @@ jest.mock("lucide-react", () => new Proxy({}, {
   },
 }));
 
-import { ProjectTasksTab } from "@/components/projects/ProjectTasksTab";
+import { ProjectTasksTab, buildTaskPayload, TaskFormValues } from "@/components/projects/ProjectTasksTab";
 
 describe("ProjectTasksTab", () => {
   beforeEach(() => {
@@ -186,5 +186,64 @@ describe("ProjectTasksTab", () => {
     expect(screen.getByText(/ver entregable/i)).toBeInTheDocument();
     expect(screen.getByText("https://example.com/final")).toBeInTheDocument();
     expect(screen.getByText(/entrega publicada/i)).toBeInTheDocument();
+  });
+});
+
+describe("buildTaskPayload", () => {
+  const baseValues: TaskFormValues = {
+    title: "Nueva tarea",
+    description: "",
+    status: "waiting", // simulates a stale/leftover form value
+    task_type: "execution",
+    requires_quote: false,
+    quoter_ids: [],
+    assign_mode: "auto",
+    area_id: 3,
+    assigned_user_id: null,
+  };
+
+  it("omits `status` when creating a task, so the backend computes the canonical initial status", () => {
+    const payload = buildTaskPayload(baseValues, { isEditing: false, adjustmentId: 42 });
+
+    expect(payload).not.toHaveProperty("status");
+    expect(payload).toMatchObject({
+      title: "Nueva tarea",
+      task_type: "execution",
+      requires_quote: 0,
+      area_id: 3,
+      assigned_user_id: null,
+      assign_to_commercial: 0,
+      adjustment_id: 42,
+    });
+  });
+
+  it("keeps sending the user-selected `status` when editing a task", () => {
+    const payload = buildTaskPayload(
+      { ...baseValues, status: "in_progress" },
+      { isEditing: true, adjustmentId: 42 }
+    );
+
+    expect(payload).toHaveProperty("status", "in_progress");
+  });
+
+  it("maps requires_quote/assign_mode correctly regardless of create/edit", () => {
+    const commercialValues: TaskFormValues = {
+      ...baseValues,
+      requires_quote: true,
+      assign_mode: "commercial",
+      area_id: null,
+      assigned_user_id: null,
+    };
+
+    const payload = buildTaskPayload(commercialValues, { isEditing: false, adjustmentId: null });
+
+    expect(payload).toMatchObject({
+      requires_quote: 1,
+      assign_to_commercial: 1,
+      area_id: null,
+      assigned_user_id: null,
+      adjustment_id: null,
+    });
+    expect(payload).not.toHaveProperty("status");
   });
 });
