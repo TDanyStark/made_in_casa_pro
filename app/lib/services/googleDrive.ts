@@ -284,12 +284,20 @@ export async function deleteDriveFolderPermission(
   });
 }
 
-export async function syncDriveFolderAccess(
+/**
+ * Shares a folder with the given emails, converting any partial-sharing
+ * failure into a safe `DriveSyncWarning` instead of throwing. Used by both
+ * `syncDriveFolderAccess` (existing project flows) and `createProjectFolders`
+ * (initial creation flow) so a few recipients failing to sync never masks
+ * an otherwise-successful folder creation/lookup as a hard error.
+ */
+async function shareFolderSafely(
+  drive: Awaited<ReturnType<typeof getDriveClient>>,
   folderId: string,
   emails: string[]
 ): Promise<DriveSyncWarning | null> {
   try {
-    await shareFolderWithEmails(await getDriveClient(), folderId, emails);
+    await shareFolderWithEmails(drive, folderId, emails);
     return null;
   } catch (error) {
     const message = error instanceof Error ? error.message : "Error desconocido de Google Drive";
@@ -301,9 +309,24 @@ export async function syncDriveFolderAccess(
   }
 }
 
+export async function syncDriveFolderAccess(
+  folderId: string,
+  emails: string[]
+): Promise<DriveSyncWarning | null> {
+  return shareFolderSafely(await getDriveClient(), folderId, emails);
+}
+
 export interface DriveProjectFolders {
   projectFolderId: string;
   projectFolderUrl: string;
+  /**
+   * Present only when the folder chain was created/found successfully but
+   * one or more recipients could not be synced. Real folder-creation
+   * failures (auth, network, API errors before/while creating folders)
+   * still reject the promise — this is only for the best-effort sharing
+   * step that runs after the folder already exists.
+   */
+  driveWarning?: DriveSyncWarning;
 }
 
 /**
@@ -339,11 +362,19 @@ export async function createProjectFolders({
   // 4. Project folder — share with all emails
   const projectId = await findOrCreateFolder(drive, projectTitle, brandId);
   const projectUrl = `https://drive.google.com/drive/folders/${projectId}`;
+
+  let driveWarning: DriveSyncWarning | null = null;
   if (emails.length > 0) {
-    await shareFolderWithEmails(drive, projectId, emails);
+    // Best-effort: some recipients failing to sync must not undo/hide the
+    // fact that the folder chain itself was created/found successfully.
+    driveWarning = await shareFolderSafely(drive, projectId, emails);
   }
 
-  return { projectFolderId: projectId, projectFolderUrl: projectUrl };
+  return {
+    projectFolderId: projectId,
+    projectFolderUrl: projectUrl,
+    ...(driveWarning ? { driveWarning } : {}),
+  };
 }
 
 /**

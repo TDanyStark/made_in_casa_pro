@@ -280,4 +280,113 @@ describe("googleDrive service", () => {
       expect(createMock).not.toHaveBeenCalled();
     });
   });
+
+  describe("createProjectFolders() partial-sharing regression", () => {
+    it("resolves with the created folder data plus a safe driveWarning when some recipients fail to sync, instead of rejecting", async () => {
+      // Regression guard: previously a partial-sharing failure rejected the
+      // whole promise even though the folder chain was created successfully,
+      // which made the /api/drive/create-folder route return a 500 and
+      // blocked the wizard from ever creating the project.
+      jest.spyOn(console, "warn").mockImplementation(() => undefined);
+      const {
+        listMock,
+        createMock,
+        filesGetMock,
+        permissionsListMock,
+        permissionsCreateMock,
+      } = await getMocks();
+
+      listMock
+        .mockResolvedValueOnce(filesResult([]))
+        .mockResolvedValueOnce(filesResult([]))
+        .mockResolvedValueOnce(filesResult([]))
+        .mockResolvedValueOnce(filesResult([]));
+
+      createMock
+        .mockResolvedValueOnce({ data: { id: "root-id" } })
+        .mockResolvedValueOnce({ data: { id: "client-id" } })
+        .mockResolvedValueOnce({ data: { id: "brand-id" } })
+        .mockResolvedValueOnce({ data: { id: "project-id" } });
+
+      filesGetMock.mockResolvedValue({ data: { capabilities: { canShare: true } } });
+      permissionsListMock.mockResolvedValue({ data: { permissions: [] } });
+      permissionsCreateMock
+        .mockRejectedValueOnce(new Error("sensitive provider response"))
+        .mockResolvedValueOnce({ data: { id: "second" } });
+
+      await expect(
+        createProjectFolders({
+          clientName: "Acme Corp",
+          brandName: "Acme Brand",
+          projectTitle: "Campaign Q1",
+          shareEmails: ["first@test.com", "second@test.com"],
+        })
+      ).resolves.toEqual({
+        projectFolderId: "project-id",
+        projectFolderUrl: "https://drive.google.com/drive/folders/project-id",
+        driveWarning: {
+          code: "DRIVE_ACCESS_SYNC_FAILED",
+          message: "No se pudieron sincronizar todos los accesos de Google Drive.",
+        },
+      });
+
+      // Both folder creation and the (partially failing) sharing step ran.
+      expect(createMock).toHaveBeenCalledTimes(4);
+      expect(permissionsCreateMock).toHaveBeenCalledTimes(2);
+    });
+
+    it("omits driveWarning entirely when sharing succeeds for every recipient", async () => {
+      const {
+        listMock,
+        createMock,
+        filesGetMock,
+        permissionsListMock,
+        permissionsCreateMock,
+      } = await getMocks();
+
+      listMock
+        .mockResolvedValueOnce(filesResult([]))
+        .mockResolvedValueOnce(filesResult([]))
+        .mockResolvedValueOnce(filesResult([]))
+        .mockResolvedValueOnce(filesResult([]));
+
+      createMock
+        .mockResolvedValueOnce({ data: { id: "root-id" } })
+        .mockResolvedValueOnce({ data: { id: "client-id" } })
+        .mockResolvedValueOnce({ data: { id: "brand-id" } })
+        .mockResolvedValueOnce({ data: { id: "project-id" } });
+
+      filesGetMock.mockResolvedValue({ data: { capabilities: { canShare: true } } });
+      permissionsListMock.mockResolvedValue({ data: { permissions: [] } });
+      permissionsCreateMock.mockResolvedValue({ data: { id: "shared" } });
+
+      const result = await createProjectFolders({
+        clientName: "Acme Corp",
+        brandName: "Acme Brand",
+        projectTitle: "Campaign Q1",
+        shareEmails: ["first@test.com"],
+      });
+
+      expect(result).toEqual({
+        projectFolderId: "project-id",
+        projectFolderUrl: "https://drive.google.com/drive/folders/project-id",
+      });
+      expect(result).not.toHaveProperty("driveWarning");
+    });
+
+    it("still rejects when the folder chain itself cannot be created (real failure, not a sharing issue)", async () => {
+      const { listMock, createMock } = await getMocks();
+      listMock.mockResolvedValueOnce(filesResult([]));
+      createMock.mockRejectedValueOnce(new Error("Drive API unavailable"));
+
+      await expect(
+        createProjectFolders({
+          clientName: "Acme Corp",
+          brandName: "Acme Brand",
+          projectTitle: "Campaign Q1",
+          shareEmails: ["first@test.com"],
+        })
+      ).rejects.toThrow("Drive API unavailable");
+    });
+  });
 });

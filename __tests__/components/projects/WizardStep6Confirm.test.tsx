@@ -10,6 +10,7 @@ const mockPatch = jest.fn();
 const mockDel = jest.fn();
 const mockToastSuccess = jest.fn();
 const mockToastError = jest.fn();
+const mockToastWarning = jest.fn();
 
 jest.mock('lucide-react', () => new Proxy({}, {
   get: (_, iconName: string) => {
@@ -42,6 +43,7 @@ jest.mock('sonner', () => ({
   toast: {
     success: (...args: unknown[]) => mockToastSuccess(...args),
     error: (...args: unknown[]) => mockToastError(...args),
+    warning: (...args: unknown[]) => mockToastWarning(...args),
   },
 }));
 
@@ -113,6 +115,47 @@ describe('WizardStep6Confirm', () => {
 
     expect(mockPush).toHaveBeenCalledWith('/projects/44');
     expect(mockToastSuccess).toHaveBeenCalled();
+  });
+
+  it('regression: a driveWarning from create-folder (partial sharing failure) does NOT block project creation, just warns', async () => {
+    // Regression guard: create-folder used to return a 500 whenever some
+    // recipients failed to sync, even though the folder itself was created
+    // successfully — this aborted project creation entirely. Now the API
+    // returns 201 with the folder data plus a driveWarning, and the wizard
+    // must continue creating the project and only show a warning toast.
+    mockPost
+      .mockResolvedValueOnce({
+        ok: true,
+        data: {
+          projectFolderId: 'drive-1',
+          projectFolderUrl: 'https://drive.test/folder',
+          driveWarning: {
+            code: 'DRIVE_ACCESS_SYNC_FAILED',
+            message: 'No se pudieron sincronizar todos los accesos de Google Drive.',
+          },
+        },
+      })
+      .mockResolvedValueOnce({ ok: true, data: { id: 44 } })
+      .mockResolvedValueOnce({ ok: true, data: {} });
+
+    const user = userEvent.setup();
+
+    render(<WizardStep6Confirm state={baseState} onBack={jest.fn()} />);
+
+    await user.click(screen.getByRole('button', { name: /crear proyecto/i }));
+
+    await waitFor(() => expect(mockPush).toHaveBeenCalledWith('/projects/44'));
+
+    // Folder+project creation both proceeded — no abort, no misleading error.
+    expect(mockToastError).not.toHaveBeenCalled();
+    expect(mockToastWarning).toHaveBeenCalledWith(
+      expect.stringContaining('No se pudieron sincronizar todos los accesos de Google Drive.')
+    );
+    expect(mockToastSuccess).toHaveBeenCalled();
+    expect(mockPost).toHaveBeenCalledWith('projects', expect.objectContaining({
+      drive_folder_id: 'drive-1',
+      drive_folder_url: 'https://drive.test/folder',
+    }));
   });
 
   it('valid Drive URL provided: skips creation entirely and persists the pasted folder', async () => {

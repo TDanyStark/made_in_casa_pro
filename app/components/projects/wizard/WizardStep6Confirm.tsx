@@ -28,6 +28,12 @@ const RichTextEditor = dynamic(
 interface DriveResult {
   projectFolderId: string;
   projectFolderUrl: string;
+  /**
+   * Present only when the folder itself was created/found successfully but
+   * some recipients could not be synced (best-effort sharing). This must
+   * NOT abort project creation — only real folder-creation failures do.
+   */
+  driveWarning?: DriveSyncWarning;
 }
 
 interface Props {
@@ -88,6 +94,15 @@ export function WizardStep6Confirm({ state, onBack }: Props) {
         }
 
         drive = driveRes.data as unknown as DriveResult;
+
+        // The folder chain was created/found successfully, but sharing it
+        // with one or more recipients failed. This is a best-effort step —
+        // it must NOT block project creation, just warn the user.
+        if (drive.driveWarning) {
+          toast.warning(
+            `La carpeta de Drive se creó, pero no se pudieron sincronizar todos los accesos: ${drive.driveWarning.message}`
+          );
+        }
       }
 
       // 2. Create the project

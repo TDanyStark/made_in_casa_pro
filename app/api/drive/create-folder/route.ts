@@ -56,10 +56,13 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json(result, { status: 201 });
   } catch (error) {
+    // Only genuine folder-creation failures land here (auth/config/network/API
+    // errors). Partial recipient-sharing failures are handled inside
+    // createProjectFolders and returned as a `driveWarning` on the 201 response
+    // above instead of throwing, so they never reach this branch.
     console.error("Error creating Drive folders:", error);
-    const message = error instanceof Error ? error.message : "Error desconocido";
     return NextResponse.json(
-      { error: "Error al crear carpetas en Drive", detail: message },
+      { error: "Error al crear carpetas en Drive" },
       { status: 500 }
     );
   }
