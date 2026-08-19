@@ -199,6 +199,24 @@ En la pestaña de información del proyecto (`ProjectInfoTab`), la sección
 
 Ambas acciones requieren rol `PROJECT_EDIT_ROLES`.
 
+### Control de acceso de Drive
+
+Google Drive es la fuente de verdad de los permisos; no se replica la ACL en la
+base de datos. En Información del proyecto se consultan los permisos reales con
+`GET /api/projects/[id]/drive/permissions`, incluyendo accesos de usuario, grupo,
+dominio o enlace y la capacidad `canShare`. Los usuarios con acceso al proyecto
+pueden ver la lista. `PROJECT_EDIT_ROLES` puede agregar un correo como lector o
+editor y quitar permisos directos; nunca se permite quitar al propietario,
+permisos heredados ni a la cuenta OAuth conectada.
+
+Al asignar colaboradores, aceptar cotizaciones, instanciar plantillas/ajustes o
+agregar/cambiar responsables, el sistema sincroniza de forma secuencial y
+aditiva el conjunto actual de interesados como `writer`. Nunca revoca
+automáticamente a antiguos asignados. Si Drive falla, la mutación de negocio se
+mantiene exitosa y la respuesta incluye `driveWarning`; el reintento no vuelve a
+crear la tarea o asignación. La recreación comparte con administradores,
+directivos, creador, gerente principal, co-gerentes y asignados actuales.
+
 ## Auditoría e historial
 
 | Tabla | Registra |

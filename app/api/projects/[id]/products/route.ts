@@ -11,6 +11,7 @@ import { instantiateTasksFromTemplates } from "@/lib/queries/projectTasks";
 import { cookies } from "next/headers";
 import { decrypt } from "@/lib/session";
 import { OPERATIONS_ROLES } from "@/lib/role-groups";
+import { syncProjectDriveAccess } from "@/lib/services/projectDriveAccess";
 
 const bodySchema = z.object({
   product_id: z.coerce.number().int().positive(),
@@ -64,12 +65,16 @@ export async function POST(request: NextRequest, { params }: Params) {
 
     const commercialUserId = project.created_by ?? null;
     await instantiateTasksFromTemplates(projectId, product_id, commercialUserId, v1?.id, currentUserId);
+    const driveWarning = await syncProjectDriveAccess(projectId);
 
     // Recalculate progress
     await recalculateProjectProgress(projectId);
 
     const updated = await getProjectDetail(projectId);
-    return NextResponse.json(updated, { status: 201 });
+    return NextResponse.json(
+      { ...updated, ...(driveWarning ? { driveWarning } : {}) },
+      { status: 201 }
+    );
   } catch (error) {
     console.error("Error adding product to project:", error);
     return NextResponse.json({ error: "Error al agregar producto al proyecto" }, { status: 500 });

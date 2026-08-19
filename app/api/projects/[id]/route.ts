@@ -16,6 +16,7 @@ import {
   normalizeProjectDateTime,
 } from "@/lib/utils/project-date-time";
 import { parseDriveFolderId } from "@/lib/utils/drive-url";
+import { syncProjectDriveAccess } from "@/lib/services/projectDriveAccess";
 
 const projectDateTimeSchema = z
   .string()
@@ -127,7 +128,10 @@ export async function PATCH(request: NextRequest, { params }: Params) {
       session?.id ?? null
     );
     if (!updated) return NextResponse.json({ error: "Proyecto no encontrado" }, { status: 404 });
-    return NextResponse.json(updated);
+    const driveWarning = data.manager_id !== undefined
+      ? await syncProjectDriveAccess(parseInt(id))
+      : null;
+    return NextResponse.json({ ...updated, ...(driveWarning ? { driveWarning } : {}) });
   } catch (error) {
     const domain = domainErrorResponse(error);
     if (domain) return domain;

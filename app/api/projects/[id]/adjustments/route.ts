@@ -11,6 +11,7 @@ import { cookies } from "next/headers";
 import { db } from "@/lib/db";
 import { AUTHENTICATED_ROLES, OPERATIONS_ROLES } from "@/lib/role-groups";
 import { dispatchNotification, NOTIFICATION_EVENTS } from "@/lib/services/notificationEngine";
+import { syncProjectDriveAccess } from "@/lib/services/projectDriveAccess";
 
 // Task template row type
 interface TaskTemplateRow {
@@ -265,6 +266,9 @@ export async function POST(
     }
 
     await recalculateProjectProgress(projectId);
+    const driveWarning = createdNotifications.some((created) => created.assignedTo)
+      ? await syncProjectDriveAccess(projectId)
+      : null;
 
     if (currentUserId) {
       await dispatchNotification({
@@ -299,7 +303,10 @@ export async function POST(
       }
     }
 
-    return NextResponse.json(adjustment, { status: 201 });
+    return NextResponse.json(
+      { ...adjustment, ...(driveWarning ? { driveWarning } : {}) },
+      { status: 201 }
+    );
   } catch (error) {
     console.error("Error al crear ajuste:", error);
     return NextResponse.json({ error: "Error interno al crear ajuste" }, { status: 500 });

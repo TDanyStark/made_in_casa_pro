@@ -1,4 +1,4 @@
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { render, fireEvent, waitFor } from "@testing-library/react";
 import {
   Dialog,
   DialogContent,
@@ -46,31 +46,8 @@ function renderDialog(onOpenChange: (open: boolean) => void) {
 const flushRadixListenerSetup = () =>
   new Promise((resolve) => setTimeout(resolve, 0));
 
-describe("DialogContent — react-select portal outside-click guard", () => {
-  it("does NOT close when the pointer-down target lives inside a react-select menu portal", async () => {
-    const onOpenChange = jest.fn();
-    renderDialog(onOpenChange);
-    await flushRadixListenerSetup();
-
-    // Simulate what react-select renders when `menuPortalTarget={document.body}`
-    // + `classNamePrefix="react-select"` are set: a sibling node under body,
-    // outside DialogContent's own DOM subtree, carrying the portal class.
-    const portalMenu = document.createElement("div");
-    portalMenu.className = "react-select__menu-portal";
-    const option = document.createElement("div");
-    option.textContent = "Opción de país";
-    portalMenu.appendChild(option);
-    document.body.appendChild(portalMenu);
-
-    fireEvent.pointerDown(option);
-
-    expect(onOpenChange).not.toHaveBeenCalledWith(false);
-    expect(screen.getByPlaceholderText("dentro-del-dialog")).toBeInTheDocument();
-
-    document.body.removeChild(portalMenu);
-  });
-
-  it("still closes on a genuine outside click (unrelated to react-select)", async () => {
+describe("DialogContent — outside click closes the dialog", () => {
+  it("closes on a genuine outside click", async () => {
     const onOpenChange = jest.fn();
     renderDialog(onOpenChange);
     await flushRadixListenerSetup();

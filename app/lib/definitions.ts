@@ -340,6 +340,32 @@ export type ProjectDetailType = ProjectType & {
   co_managers: Array<{ id: number; name: string; email: string }>;
 };
 
+export type DrivePermissionRole = "reader" | "writer" | "owner" | string;
+
+export type DrivePermissionType = "user" | "group" | "domain" | "anyone" | string;
+
+export type ProjectDrivePermission = {
+  id: string;
+  type: DrivePermissionType;
+  role: DrivePermissionRole;
+  emailAddress: string | null;
+  displayName: string | null;
+  domain: string | null;
+  inherited: boolean;
+  isConnectedAccount: boolean;
+  canDelete: boolean;
+};
+
+export type ProjectDrivePermissionsResponse = {
+  canShare: boolean;
+  permissions: ProjectDrivePermission[];
+};
+
+export type DriveSyncWarning = {
+  code: "DRIVE_ACCESS_SYNC_FAILED";
+  message: string;
+};
+
 export type ProjectAdjustmentType = {
   id: number;
   project_id: number;

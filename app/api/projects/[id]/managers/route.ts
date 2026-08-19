@@ -3,6 +3,7 @@ import { z } from "zod";
 import { validateApiRole, validateHttpMethod } from "@/lib/services/api-auth";
 import { OPERATIONS_ROLES } from "@/lib/role-groups";
 import { addCoManager, removeCoManager } from "@/lib/queries/projects";
+import { syncProjectDriveAccess } from "@/lib/services/projectDriveAccess";
 
 const bodySchema = z.object({
   manager_id: z.coerce.number().int().positive(),
@@ -25,7 +26,11 @@ export async function POST(request: NextRequest, { params }: Params) {
       return NextResponse.json({ error: "manager_id requerido" }, { status: 400 });
     }
     await addCoManager(parseInt(id), validation.data.manager_id);
-    return NextResponse.json({ success: true }, { status: 201 });
+    const driveWarning = await syncProjectDriveAccess(parseInt(id));
+    return NextResponse.json(
+      { success: true, ...(driveWarning ? { driveWarning } : {}) },
+      { status: 201 }
+    );
   } catch (error) {
     console.error("Error adding co-manager:", error);
     return NextResponse.json({ error: "Error al agregar co-responsable" }, { status: 500 });

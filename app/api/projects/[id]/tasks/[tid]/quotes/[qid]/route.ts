@@ -8,6 +8,7 @@ import { recalculateProjectProgress } from "@/lib/queries/projects";
 import { decrypt } from "@/lib/session";
 import { cookies } from "next/headers";
 import { dispatchNotification, NOTIFICATION_EVENTS } from "@/lib/services/notificationEngine";
+import { syncProjectDriveAccess } from "@/lib/services/projectDriveAccess";
 
 const bodySchema = z.object({
   action: z.enum(["accept", "reject"]),
@@ -50,6 +51,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     if (validation.data.action === "accept") {
       const quote = (await getTaskQuotes(taskId)).find((q) => q.id === quoteId);
       await acceptQuote(quoteId, session.id);
+      const driveWarning = await syncProjectDriveAccess(projectId);
       await recalculateProjectProgress(projectId);
       await dispatchNotification({
         eventType: NOTIFICATION_EVENTS.QUOTE_ACCEPTED,
@@ -62,7 +64,11 @@ export async function PATCH(request: NextRequest, { params }: Params) {
           delivery_days: quote?.delivery_days ?? 0,
         },
       });
-      return NextResponse.json({ success: true, action: "accepted" });
+      return NextResponse.json({
+        success: true,
+        action: "accepted",
+        ...(driveWarning ? { driveWarning } : {}),
+      });
     } else {
       await rejectQuote(quoteId);
       return NextResponse.json({ success: true, action: "rejected" });

@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Loader2 } from "lucide-react";
 import { WizardState } from "@/hooks/useProjectWizard";
-import { ProjectType, ProjectTaskType } from "@/lib/definitions";
+import { DriveSyncWarning, ProjectType, ProjectTaskType } from "@/lib/definitions";
 import { parseDriveFolderId } from "@/lib/utils/drive-url";
 import {
   normalizeOptionalProjectText,
@@ -125,9 +125,12 @@ export function WizardStep6Confirm({ state, onBack }: Props) {
       // 4. Add product (auto-instantiates tasks from templates)
       if (state.product) {
         setCurrentAction("Agregando producto...");
-        await post(`projects/${project.id}/products`, {
+        const productResult = await post<ProjectType & { driveWarning?: DriveSyncWarning }>(`projects/${project.id}/products`, {
           product_id: state.product.id,
         });
+        if (productResult?.data?.driveWarning) {
+          toast.warning(`Proyecto creado, pero Drive no pudo sincronizar accesos: ${productResult.data.driveWarning.message}`);
+        }
       }
 
       // 5. Apply task customizations

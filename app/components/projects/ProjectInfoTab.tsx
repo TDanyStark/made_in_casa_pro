@@ -29,6 +29,7 @@ import {
   normalizeOptionalProjectText,
   normalizeProjectDateTime,
 } from "@/lib/utils/project-date-time";
+import { ProjectDriveAccessManager } from "./ProjectDriveAccessManager";
 
 interface Props {
   project: ProjectDetailType;
@@ -282,6 +283,10 @@ export function ProjectInfoTab({ project, canEdit }: Props) {
               {isSavingMetadata ? "Guardando..." : "Guardar cambios"}
             </Button>
           </div>
+        )}
+
+        {project.drive_folder_id && (
+          <ProjectDriveAccessManager projectId={project.id} canEdit={canEdit} />
         )}
       </div>
 

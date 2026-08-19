@@ -8,6 +8,7 @@ import { cookies } from "next/headers";
 import { decrypt } from "@/lib/session";
 import { AUTHENTICATED_ROLES, OPERATIONS_ROLES } from "@/lib/role-groups";
 import { dispatchNotification, NOTIFICATION_EVENTS } from "@/lib/services/notificationEngine";
+import { syncProjectDriveAccess } from "@/lib/services/projectDriveAccess";
 
 const taskSchema = z.object({
   title: z.string().min(1, "El título es requerido"),
@@ -139,6 +140,9 @@ export async function POST(request: NextRequest, { params }: Params) {
       order_index: nextOrder,
       adjustment_id: adjustmentId,
     });
+    const driveWarning = resolvedAssignedUserId
+      ? await syncProjectDriveAccess(projectId)
+      : null;
 
     // 5. Handle quoter invitations and transition log
     const cookie = (await cookies()).get("session")?.value;
@@ -194,7 +198,7 @@ export async function POST(request: NextRequest, { params }: Params) {
       }
     }
 
-    return NextResponse.json(task, { status: 201 });
+    return NextResponse.json({ ...task, ...(driveWarning ? { driveWarning } : {}) }, { status: 201 });
   } catch (error) {
     console.error("Error creating project task:", error);
     return NextResponse.json({ error: "Error al crear tarea" }, { status: 500 });

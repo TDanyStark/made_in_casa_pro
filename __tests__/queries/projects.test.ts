@@ -20,6 +20,7 @@ import {
   createProject,
   getProjectById,
   getProjectManagerHistory,
+  getProjectStakeholderEmails,
   getProjectsWithPagination,
   recalculateProjectProgress,
   updateProject,
@@ -51,6 +52,24 @@ beforeEach(() => {
 });
 
 describe('project queries metadata fields', () => {
+
+  it('loads current Drive stakeholders across leadership, creator, managers, and task assignees', async () => {
+    mockExecute.mockResolvedValueOnce(makeResult([
+      { email: 'admin@test.com' },
+      { email: 'manager@test.com' },
+      { email: 'collaborator@test.com' },
+    ]));
+
+    await expect(getProjectStakeholderEmails(15)).resolves.toEqual([
+      'admin@test.com',
+      'manager@test.com',
+      'collaborator@test.com',
+    ]);
+    const call = mockExecute.mock.calls[0]?.[0] as { sql: string; args: unknown[] };
+    expect(call.args[0]).toBe(15);
+    expect(call.sql).toContain('SELECT DISTINCT assigned_user_id FROM project_tasks');
+    expect(call.sql).toContain('SELECT manager_id FROM project_managers');
+  });
 
   it('getProjectById selects the new metadata columns', async () => {
     mockExecute.mockResolvedValueOnce(makeResult([{ id: 1, ideal_delivery_at: null, oc: null, billing_closed_at: null }]));

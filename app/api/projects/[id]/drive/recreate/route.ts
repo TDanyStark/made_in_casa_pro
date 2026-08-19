@@ -2,8 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { decrypt } from "@/lib/session";
 import { validateApiRole, validateHttpMethod } from "@/lib/services/api-auth";
-import { getProjectDetail, updateProject } from "@/lib/queries/projects";
-import { getAdminAndLeadershipEmails } from "@/lib/queries/users";
+import {
+  getProjectDetail,
+  getProjectStakeholderEmails,
+  updateProject,
+  userCanAccessProject,
+} from "@/lib/queries/projects";
 import { createProjectFolders } from "@/lib/services/googleDrive";
 import { PROJECT_EDIT_ROLES } from "@/lib/role-groups";
 
@@ -28,7 +32,19 @@ export async function POST(request: NextRequest, { params }: Params) {
 
   try {
     const { id } = await params;
-    const projectId = parseInt(id);
+    const projectId = Number(id);
+    if (!Number.isInteger(projectId) || projectId <= 0) {
+      return NextResponse.json({ error: "ID de proyecto inválido" }, { status: 400 });
+    }
+
+    const cookie = (await cookies()).get("session")?.value;
+    const session = cookie ? await decrypt(cookie) : null;
+    if (!session?.id) {
+      return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+    }
+    if (!await userCanAccessProject(projectId, Number(session.id), roleValidation.userRole)) {
+      return NextResponse.json({ error: "Acceso prohibido" }, { status: 403 });
+    }
 
     const project = await getProjectDetail(projectId);
     if (!project) {
@@ -36,12 +52,10 @@ export async function POST(request: NextRequest, { params }: Params) {
     }
 
     // Email del usuario que ejecuta la acción (igual que create-folder).
-    const cookie = (await cookies()).get("session")?.value;
-    const session = cookie ? await decrypt(cookie) : null;
     const creatorEmail = session?.email ?? null;
 
-    const adminEmails = await getAdminAndLeadershipEmails();
-    const shareEmails = [...adminEmails, ...(creatorEmail ? [creatorEmail] : [])];
+    const stakeholderEmails = await getProjectStakeholderEmails(projectId);
+    const shareEmails = [...stakeholderEmails, ...(creatorEmail ? [creatorEmail] : [])];
 
     const result = await createProjectFolders({
       clientName: project.client_name,
@@ -69,9 +83,8 @@ export async function POST(request: NextRequest, { params }: Params) {
     );
   } catch (error) {
     console.error("Error recreating Drive folder:", error);
-    const message = error instanceof Error ? error.message : "Error desconocido";
     return NextResponse.json(
-      { error: "Error al recrear la carpeta en Drive", detail: message },
+      { error: "Error al recrear la carpeta en Drive" },
       { status: 500 }
     );
   }

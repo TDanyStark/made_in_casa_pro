@@ -26,6 +26,10 @@ jest.mock('@/components/projects/CampaignSelect', () => ({
   ),
 }));
 
+jest.mock('@/components/projects/ProjectDriveAccessManager', () => ({
+  ProjectDriveAccessManager: () => <div data-testid="drive-access-manager" />,
+}));
+
 jest.mock('@/lib/services/apiService', () => ({
   patch: (...args: unknown[]) => mockPatch(...args),
   post: (...args: unknown[]) => mockPost(...args),

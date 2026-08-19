@@ -141,6 +141,35 @@ export async function getProjectDetail(id: number): Promise<ProjectDetailType | 
   }
 }
 
+/** Current people who should receive additive access to the project folder. */
+export async function getProjectStakeholderEmails(projectId: number): Promise<string[]> {
+  const result = await db.execute({
+    sql: `
+      SELECT email FROM users
+      WHERE is_active = 1 AND email IS NOT NULL AND (
+        rol_id IN ($2, $3) OR
+        id = (SELECT created_by FROM projects WHERE id = $1) OR
+        id IN (
+          SELECT DISTINCT assigned_user_id FROM project_tasks
+          WHERE project_id = $1 AND assigned_user_id IS NOT NULL
+        )
+      )
+      UNION
+      SELECT email FROM managers
+      WHERE email IS NOT NULL AND id IN (
+        SELECT manager_id FROM projects WHERE id = $1
+        UNION
+        SELECT manager_id FROM project_managers WHERE project_id = $1
+      )
+    `,
+    args: [projectId, UserRole.ADMIN, UserRole.DIRECTIVO],
+  });
+
+  return result.rows
+    .map((row) => String(row.email ?? "").trim())
+    .filter(Boolean);
+}
+
 export async function getProjectsWithPagination({
   page = 1,
   limit = ITEMS_PER_PAGE,

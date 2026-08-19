@@ -9,11 +9,9 @@ jest.mock("@/lib/services/api-auth", () => ({
 
 jest.mock("@/lib/queries/projects", () => ({
   getProjectDetail: jest.fn(),
+  getProjectStakeholderEmails: jest.fn(),
   updateProject: jest.fn(),
-}));
-
-jest.mock("@/lib/queries/users", () => ({
-  getAdminAndLeadershipEmails: jest.fn(),
+  userCanAccessProject: jest.fn(),
 }));
 
 jest.mock("@/lib/services/googleDrive", () => ({
@@ -31,8 +29,12 @@ jest.mock("@/lib/session", () => ({
 import { NextRequest, NextResponse } from "next/server";
 import { POST } from "@/api/projects/[id]/drive/recreate/route";
 import { validateApiRole, validateHttpMethod } from "@/lib/services/api-auth";
-import { getProjectDetail, updateProject } from "@/lib/queries/projects";
-import { getAdminAndLeadershipEmails } from "@/lib/queries/users";
+import {
+  getProjectDetail,
+  getProjectStakeholderEmails,
+  updateProject,
+  userCanAccessProject,
+} from "@/lib/queries/projects";
 import { createProjectFolders } from "@/lib/services/googleDrive";
 import { cookies } from "next/headers";
 import { decrypt } from "@/lib/session";
@@ -42,9 +44,8 @@ const mockValidateHttpMethod = validateHttpMethod as jest.MockedFunction<typeof 
 const mockValidateApiRole = validateApiRole as jest.MockedFunction<typeof validateApiRole>;
 const mockGetProjectDetail = getProjectDetail as jest.MockedFunction<typeof getProjectDetail>;
 const mockUpdateProject = updateProject as jest.MockedFunction<typeof updateProject>;
-const mockGetAdminAndLeadershipEmails = getAdminAndLeadershipEmails as jest.MockedFunction<
-  typeof getAdminAndLeadershipEmails
->;
+const mockGetProjectStakeholderEmails = getProjectStakeholderEmails as jest.MockedFunction<typeof getProjectStakeholderEmails>;
+const mockUserCanAccessProject = userCanAccessProject as jest.MockedFunction<typeof userCanAccessProject>;
 const mockCreateProjectFolders = createProjectFolders as jest.MockedFunction<typeof createProjectFolders>;
 const mockCookies = cookies as jest.MockedFunction<typeof cookies>;
 const mockDecrypt = decrypt as jest.MockedFunction<typeof decrypt>;
@@ -93,7 +94,8 @@ describe("POST /api/projects/[id]/drive/recreate", () => {
     mockValidateHttpMethod.mockReturnValue({ isValidMethod: true, response: undefined });
     mockValidateApiRole.mockResolvedValue({ isAuthorized: true, userRole: 1, response: undefined } as never);
     mockGetProjectDetail.mockResolvedValue(baseProject);
-    mockGetAdminAndLeadershipEmails.mockResolvedValue(["admin@test.com"]);
+    mockUserCanAccessProject.mockResolvedValue(true);
+    mockGetProjectStakeholderEmails.mockResolvedValue(["admin@test.com", "manager@test.com"]);
     mockCookies.mockResolvedValue({ get: jest.fn().mockReturnValue({ value: "session-token" }) } as never);
     mockDecrypt.mockResolvedValue({ id: 7, email: "user@test.com", rol_id: 1 } as never);
     mockCreateProjectFolders.mockResolvedValue({
@@ -116,7 +118,7 @@ describe("POST /api/projects/[id]/drive/recreate", () => {
       clientName: "Cliente Uno",
       brandName: "Marca X",
       projectTitle: "Campaña Verano",
-      shareEmails: ["admin@test.com", "user@test.com"],
+      shareEmails: ["admin@test.com", "manager@test.com", "user@test.com"],
     });
     expect(mockUpdateProject).toHaveBeenCalledWith(
       15,
@@ -126,6 +128,16 @@ describe("POST /api/projects/[id]/drive/recreate", () => {
       },
       7
     );
+  });
+
+  it("rejects a project editor without resource-level access", async () => {
+    mockUserCanAccessProject.mockResolvedValue(false);
+
+    const response = await callPost();
+
+    expect(response.status).toBe(403);
+    expect(mockGetProjectDetail).not.toHaveBeenCalled();
+    expect(mockCreateProjectFolders).not.toHaveBeenCalled();
   });
 
   it("idempotent reuse: persists the same folder returned when it already existed (no duplicate logic at route level)", async () => {
@@ -203,7 +215,7 @@ describe("POST /api/projects/[id]/drive/recreate", () => {
     expect(mockValidateApiRole).not.toHaveBeenCalled();
   });
 
-  it("returns 500 with error/detail when Drive OAuth fails (invalid_grant)", async () => {
+  it("returns a safe 500 error when Drive OAuth fails (invalid_grant)", async () => {
     mockCreateProjectFolders.mockRejectedValue(
       new Error("La autorización de Google Drive ha expirado o fue revocada. Reconecta Google Drive en Configuración.")
     );
@@ -213,7 +225,7 @@ describe("POST /api/projects/[id]/drive/recreate", () => {
 
     expect(response.status).toBe(500);
     expect(body.error).toBe("Error al recrear la carpeta en Drive");
-    expect(body.detail).toContain("autorización de Google Drive ha expirado");
+    expect(body).not.toHaveProperty("detail");
     expect(mockUpdateProject).not.toHaveBeenCalled();
   });
 });

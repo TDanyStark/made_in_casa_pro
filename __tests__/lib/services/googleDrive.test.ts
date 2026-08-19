@@ -5,6 +5,11 @@
 jest.mock("googleapis", () => {
   const listMock = jest.fn();
   const createMock = jest.fn();
+  const filesGetMock = jest.fn();
+  const permissionsListMock = jest.fn();
+  const permissionsCreateMock = jest.fn();
+  const permissionsUpdateMock = jest.fn();
+  const permissionsDeleteMock = jest.fn();
 
   return {
     google: {
@@ -18,36 +23,59 @@ jest.mock("googleapis", () => {
         files: {
           list: listMock,
           create: createMock,
+          get: filesGetMock,
         },
         permissions: {
-          create: jest.fn().mockResolvedValue({}),
+          list: permissionsListMock,
+          create: permissionsCreateMock,
+          update: permissionsUpdateMock,
+          delete: permissionsDeleteMock,
         },
       }),
     },
     __listMock: listMock,
     __createMock: createMock,
+    __filesGetMock: filesGetMock,
+    __permissionsListMock: permissionsListMock,
+    __permissionsCreateMock: permissionsCreateMock,
+    __permissionsUpdateMock: permissionsUpdateMock,
+    __permissionsDeleteMock: permissionsDeleteMock,
   };
 });
 
 jest.mock("@/lib/queries/settings", () => ({
-  getAppSettings: jest.fn().mockResolvedValue({
-    google_oauth_client_id: "client-id",
-    google_oauth_client_secret: "client-secret",
-    google_oauth_refresh_token: "refresh-token",
-  }),
+  getAppSettings: jest.fn(),
 }));
 
 import {
   findFolderByName,
   createProjectFolders,
+  addDriveFolderPermission,
+  deleteDriveFolderPermission,
+  listDriveFolderPermissions,
+  syncDriveFolderAccess,
 } from "@/lib/services/googleDrive";
+import { getAppSettings } from "@/lib/queries/settings";
 
 async function getMocks() {
   const mod = (await import("googleapis")) as unknown as {
     __listMock: jest.Mock;
     __createMock: jest.Mock;
+    __filesGetMock: jest.Mock;
+    __permissionsListMock: jest.Mock;
+    __permissionsCreateMock: jest.Mock;
+    __permissionsUpdateMock: jest.Mock;
+    __permissionsDeleteMock: jest.Mock;
   };
-  return { listMock: mod.__listMock, createMock: mod.__createMock };
+  return {
+    listMock: mod.__listMock,
+    createMock: mod.__createMock,
+    filesGetMock: mod.__filesGetMock,
+    permissionsListMock: mod.__permissionsListMock,
+    permissionsCreateMock: mod.__permissionsCreateMock,
+    permissionsUpdateMock: mod.__permissionsUpdateMock,
+    permissionsDeleteMock: mod.__permissionsDeleteMock,
+  };
 }
 
 function filesResult(files: { id: string; name: string }[]) {
@@ -57,6 +85,101 @@ function filesResult(files: { id: string; name: string }[]) {
 describe("googleDrive service", () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    (getAppSettings as jest.Mock).mockResolvedValue({
+      google_oauth_client_id: "client-id",
+      google_oauth_client_secret: "client-secret",
+      google_oauth_refresh_token: "refresh-token",
+      google_oauth_connected_email: "connected@test.com",
+    });
+  });
+
+  describe("folder permissions", () => {
+    it("paginates ACL entries and protects owner, inherited, and connected-account permissions", async () => {
+      const { filesGetMock, permissionsListMock } = await getMocks();
+      filesGetMock.mockResolvedValue({ data: { capabilities: { canShare: true } } });
+      permissionsListMock
+        .mockResolvedValueOnce({ data: { nextPageToken: "next", permissions: [
+          { id: "owner", type: "user", role: "owner", emailAddress: "owner@test.com" },
+          { id: "direct", type: "user", role: "writer", emailAddress: "person@test.com" },
+          { id: "connected", type: "user", role: "writer", emailAddress: "connected@test.com" },
+        ] } })
+        .mockResolvedValueOnce({ data: { permissions: [
+          { id: "inherited", type: "group", role: "reader", emailAddress: "group@test.com", permissionDetails: [{ inherited: true }] },
+        ] } });
+
+      const result = await listDriveFolderPermissions("folder-1");
+      expect(permissionsListMock).toHaveBeenCalledTimes(2);
+      expect(result.permissions.find((item) => item.id === "owner")?.canDelete).toBe(false);
+      expect(result.permissions.find((item) => item.id === "direct")?.canDelete).toBe(true);
+      expect(result.permissions.find((item) => item.id === "connected")?.canDelete).toBe(false);
+      expect(result.permissions.find((item) => item.id === "inherited")?.canDelete).toBe(false);
+    });
+
+    it("normalizes a manual email and uses the selected role", async () => {
+      const { filesGetMock, permissionsListMock, permissionsCreateMock } = await getMocks();
+      filesGetMock.mockResolvedValue({ data: { capabilities: { canShare: true } } });
+      permissionsListMock.mockResolvedValue({ data: { permissions: [] } });
+      permissionsCreateMock.mockResolvedValue({ data: { id: "new" } });
+
+      await addDriveFolderPermission("folder-1", " Person@Example.COM ", "reader");
+      expect(permissionsCreateMock).toHaveBeenCalledWith(expect.objectContaining({
+        fileId: "folder-1",
+        supportsAllDrives: true,
+        requestBody: { type: "user", role: "reader", emailAddress: "person@example.com" },
+      }));
+    });
+
+    it("refuses deletion of an inherited permission", async () => {
+      const { filesGetMock, permissionsListMock, permissionsDeleteMock } = await getMocks();
+      filesGetMock.mockResolvedValue({ data: { capabilities: { canShare: true } } });
+      permissionsListMock.mockResolvedValue({ data: { permissions: [
+        { id: "inherited", type: "user", role: "writer", permissionDetails: [{ inherited: true }] },
+      ] } });
+      await expect(deleteDriveFolderPermission("folder-1", "inherited")).rejects.toThrow(/heredado/i);
+      expect(permissionsDeleteMock).not.toHaveBeenCalled();
+    });
+
+    it("continues syncing later recipients after one permission creation fails", async () => {
+      jest.spyOn(console, "warn").mockImplementation(() => undefined);
+      const { filesGetMock, permissionsListMock, permissionsCreateMock } = await getMocks();
+      filesGetMock.mockResolvedValue({ data: { capabilities: { canShare: true } } });
+      permissionsListMock.mockResolvedValue({ data: { permissions: [] } });
+      permissionsCreateMock
+        .mockRejectedValueOnce(new Error("sensitive provider response"))
+        .mockResolvedValueOnce({ data: { id: "second" } });
+
+      await expect(syncDriveFolderAccess("folder-1", ["first@test.com", "second@test.com"]))
+        .resolves.toEqual({
+          code: "DRIVE_ACCESS_SYNC_FAILED",
+          message: "No se pudieron sincronizar todos los accesos de Google Drive.",
+        });
+      expect(permissionsCreateMock).toHaveBeenCalledTimes(2);
+      expect(permissionsCreateMock).toHaveBeenLastCalledWith(expect.objectContaining({
+        requestBody: expect.objectContaining({ emailAddress: "second@test.com" }),
+      }));
+    });
+
+    it("adds a direct writer permission when shared-drive access is only inherited reader", async () => {
+      const { filesGetMock, permissionsListMock, permissionsCreateMock, permissionsUpdateMock } = await getMocks();
+      filesGetMock.mockResolvedValue({ data: { capabilities: { canShare: true } } });
+      permissionsListMock.mockResolvedValue({ data: { permissions: [
+        {
+          id: "inherited-reader",
+          type: "user",
+          role: "reader",
+          emailAddress: "person@test.com",
+          permissionDetails: [{ inherited: true, inheritedFrom: "shared-drive" }],
+        },
+      ] } });
+      permissionsCreateMock.mockResolvedValue({ data: { id: "direct-writer" } });
+
+      await expect(syncDriveFolderAccess("folder-1", ["person@test.com"])).resolves.toBeNull();
+      expect(permissionsUpdateMock).not.toHaveBeenCalled();
+      expect(permissionsCreateMock).toHaveBeenCalledWith(expect.objectContaining({
+        supportsAllDrives: true,
+        requestBody: { type: "user", role: "writer", emailAddress: "person@test.com" },
+      }));
+    });
   });
 
   describe("findFolderByName()", () => {

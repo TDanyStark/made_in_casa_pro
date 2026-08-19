@@ -13,6 +13,7 @@ import { cookies } from "next/headers";
 import { decrypt } from "@/lib/session";
 import { AUTHENTICATED_ROLES, OPERATIONS_ROLES } from "@/lib/role-groups";
 import { dispatchNotification, NOTIFICATION_EVENTS } from "@/lib/services/notificationEngine";
+import { syncProjectDriveAccess } from "@/lib/services/projectDriveAccess";
 
 const patchSchema = z.object({
   title: z.string().min(1).optional(),
@@ -94,6 +95,10 @@ export async function PATCH(request: NextRequest, { params }: Params) {
 
     const updated = await updateProjectTask(taskId, updateData);
     if (!updated) return NextResponse.json({ error: "Tarea no encontrada" }, { status: 404 });
+    const assignmentChanged = updated.assigned_user_id !== existingTask.assigned_user_id;
+    const driveWarning = assignmentChanged && updated.assigned_user_id
+      ? await syncProjectDriveAccess(projectId)
+      : null;
 
     const cookie = (await cookies()).get("session")?.value;
     const session = cookie ? await decrypt(cookie) : null;
@@ -126,7 +131,6 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     }
 
     if (currentUserId) {
-      const assignmentChanged = updated.assigned_user_id !== existingTask.assigned_user_id;
       if (assignmentChanged && existingTask.assigned_user_id) {
         await dispatchNotification({
           eventType: NOTIFICATION_EVENTS.TASK_REASSIGNED,
@@ -158,7 +162,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
       }
     }
 
-    return NextResponse.json(updated);
+    return NextResponse.json({ ...updated, ...(driveWarning ? { driveWarning } : {}) });
   } catch (error) {
     console.error("Error updating task:", error);
     return NextResponse.json({ error: "Error al actualizar tarea" }, { status: 500 });
