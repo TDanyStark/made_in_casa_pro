@@ -243,6 +243,10 @@ export function BusinessUnitBrandSelect(props: BusinessUnitBrandSelectProps) {
           filterOption={filterOption}
           isDisabled={disabled}
           classNamePrefix="react-select"
+          // Sin portal ni menuPosition="fixed": ver comentario en
+          // ManagerSelect.tsx.
+          menuPlacement="bottom"
+          maxMenuHeight={240}
           loadingMessage={() => "Cargando unidades de negocio..."}
           noOptionsMessage={({ inputValue }) =>
             inputValue
@@ -292,6 +296,10 @@ export function BusinessUnitBrandSelect(props: BusinessUnitBrandSelectProps) {
               filterOption={filterOption}
               isDisabled={disabled}
               classNamePrefix="react-select"
+              // Sin portal ni menuPosition="fixed": ver comentario en
+              // ManagerSelect.tsx.
+              menuPlacement="bottom"
+              maxMenuHeight={240}
               loadingMessage={() => "Cargando..."}
               noOptionsMessage={({ inputValue }) =>
                 inputValue

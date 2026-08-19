@@ -191,15 +191,8 @@ export function ChangeManager({ brandId, managerId, clientId, onSuccess }: Props
                       formatOptionLabel={formatOptionLabel}
                       className="react-select-container min-w-72"
                       classNamePrefix="react-select"
-                      menuPortalTarget={
-                        typeof document !== "undefined" ? document.body : undefined
-                      }
-                      menuPosition="fixed"
                       menuPlacement="bottom"
                       maxMenuHeight={240}
-                      styles={{
-                        menuPortal: (base) => ({ ...base, zIndex: 9999 }),
-                      }}
                       loadingMessage={() => "Cargando gerentes..."}
                       noOptionsMessage={({ inputValue }) =>
                         inputValue

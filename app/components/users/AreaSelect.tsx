@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import CreatableSelect from "react-select/creatable";
 import { debounce } from "lodash";
 import { useGetEndpointQueryClient } from "@/hooks/useGetEndpointQueryClient";
+import { useStableSelectOptions } from "@/hooks/useStableSelectOptions";
 import { post, patch } from "@/lib/services/apiService";
 import { AreaType } from "@/lib/definitions";
 import { toast } from "sonner";
@@ -37,7 +38,6 @@ const AreaSelect = ({
   user_id,
 }: AreaSelectProps) => {
   const [searchTerm, setSearchTerm] = useState("");
-  const [areaOptions, setAreaOptions] = useState<AreaOption[]>([]);
   const [isCreatingArea, setIsCreatingArea] = useState(false);
   const [value, setValue] = useState<number | undefined>(initial_value);
 
@@ -49,6 +49,18 @@ const AreaSelect = ({
 
   const areas = useMemo(() => data?.data || [], [data]);
 
+  const fetchedOptions: AreaOption[] = useMemo(
+    () =>
+      areas.map((area: AreaType) => ({
+        value: area.id as number,
+        label: area.name,
+      })),
+    [areas]
+  );
+
+  const { options: areaOptions, pinOption } =
+    useStableSelectOptions<AreaOption>(fetchedOptions);
+
   const debouncedSearch = debounce((value: string) => {
     setSearchTerm(value);
   }, 500);
@@ -58,16 +70,6 @@ const AreaSelect = ({
       debouncedSearch(inputValue);
     }
   };
-
-  useEffect(() => {
-    if (areas && areas.length > 0) {
-      const options = areas.map((area: AreaType) => ({
-        value: area.id as number,
-        label: area.name,
-      }));
-      setAreaOptions(options);
-    }
-  }, [areas]);
 
   const handleCreateArea = async (inputValue: string) => {
     if (isCreatingArea || !inputValue.trim()) return;
@@ -81,13 +83,13 @@ const AreaSelect = ({
       });
 
       if (response.ok && response.data) {
-        // Add the new area to the options
+        // Fijamos la opción para que sobreviva a refetches posteriores.
         const newOption = {
           value: response.data.id as number,
           label: response.data.name,
         };
 
-        setAreaOptions((prev) => [...prev, newOption]);
+        pinOption(newOption);
 
         // Select the newly created area
         const areaId = response.data.id as number;
@@ -150,6 +152,7 @@ const AreaSelect = ({
         required={required}
         value={areaOptions.find((option) => option.value === value)}
         onChange={(selectedOption) => {
+          pinOption(selectedOption ?? undefined);
           const areaId = selectedOption?.value;
           setValue(areaId);
           if (onChange) onChange(areaId);

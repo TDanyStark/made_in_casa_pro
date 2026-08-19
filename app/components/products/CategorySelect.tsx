@@ -80,6 +80,12 @@ export default function CategorySelect({
       isDisabled={disabled}
       isClearable
       classNamePrefix="react-select"
+      // Sin portal ni menuPosition="fixed": ver comentario en
+      // ManagerSelect.tsx. Este select puede vivir dentro de un Dialog
+      // (CreateProductModal/EditProductModal), así que se mantiene
+      // consistente con el resto de selects usados en diálogos.
+      menuPlacement="bottom"
+      maxMenuHeight={240}
       loadingMessage={() => "Cargando categorías..."}
       noOptionsMessage={({ inputValue }) =>
         inputValue ? "No se encontraron categorías" : "Escribe para buscar o crear"

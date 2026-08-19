@@ -291,4 +291,52 @@ describe('TransferManagerDialog', () => {
     });
     expect(mockPost).not.toHaveBeenCalled();
   });
+
+  // This dialog renders a dynamic number of ManagerSelects (one per brand +
+  // one per project) — content can be genuinely long. Unlike
+  // CreateBrandModal/CreateClientModal (short, fixed content — clipping was
+  // simply removed there), this dialog still needs a height limit + scroll,
+  // but that scroll must NOT live on DialogContent itself (which would clip
+  // react-select's in-flow menus the same way `overflow-y-auto` did before).
+  // The scroll instead lives on a dedicated inner body, with the
+  // header/footer outside it (same pattern as TaskCompleteDialog).
+  describe('layout — non-clipping DialogContent with an inner scroll region', () => {
+    it('keeps DialogContent overflow-free (flex flex-col, no overflow-y-auto) with header/footer outside the scrollable body', () => {
+      renderDialog();
+
+      const dialogContent = document.querySelector('[data-slot="dialog-content"]');
+      expect(dialogContent).not.toBeNull();
+      expect(dialogContent?.className).toEqual(expect.stringContaining('flex'));
+      expect(dialogContent?.className).toEqual(expect.stringContaining('flex-col'));
+      expect(dialogContent?.className).not.toEqual(
+        expect.stringContaining('overflow-y-auto')
+      );
+
+      const header = document.querySelector('[data-slot="dialog-header"]');
+      const footer = document.querySelector('[data-slot="dialog-footer"]');
+      const scrollBody = dialogContent?.querySelector('.overflow-y-auto');
+      expect(header).not.toBeNull();
+      expect(footer).not.toBeNull();
+      expect(scrollBody).not.toBeNull();
+
+      // Header/footer must live OUTSIDE the scrollable region so they stay
+      // put (don't scroll away) while the form body scrolls independently.
+      expect(scrollBody?.contains(header)).toBe(false);
+      expect(scrollBody?.contains(footer)).toBe(false);
+
+      // The submit button lives in the non-scrolling footer, wired to the
+      // scrollable <form> purely via the HTML `form` attribute (not by
+      // being a DOM descendant of it).
+      const submitButton = screen.getByRole('button', { name: /trasladar gerente/i });
+      expect(submitButton.getAttribute('form')).toBe('transfer-manager');
+      expect(scrollBody?.contains(submitButton)).toBe(false);
+      expect(footer?.contains(submitButton)).toBe(true);
+
+      // The form (and its ManagerSelect/ClientSelect fields) DOES live
+      // inside the scrollable body.
+      const form = document.getElementById('transfer-manager');
+      expect(form).not.toBeNull();
+      expect(scrollBody?.contains(form)).toBe(true);
+    });
+  });
 });

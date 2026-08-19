@@ -184,11 +184,13 @@ export function CreateCountrySelect({ field }: CreateCountrySelectProps) {
       formatOptionLabel={formatOptionLabel}
       className="react-select-container"
       classNamePrefix="react-select"
-      menuPortalTarget={typeof document !== "undefined" ? document.body : undefined}
-      menuPosition="fixed"
+      // Sin portal ni menuPosition="fixed": ver el comentario en
+      // ManagerSelect.tsx. Este select vive dentro de CreateClientModal
+      // (Dialog), y portalar a document.body con posición fija rompía tanto
+      // el scroll (react-remove-scroll) como el cálculo de posición
+      // (DialogContent es containing block por su translate-x/y).
       menuPlacement="bottom"
       maxMenuHeight={240}
-      styles={{ menuPortal: (base) => ({ ...base, zIndex: 9999 }) }}
       loadingMessage={() => "Cargando países..."}
       noOptionsMessage={({ inputValue }) =>
         inputValue

@@ -101,8 +101,12 @@ export function CreateClientModal({ modalControl, onSuccess, initialName = "" }:
           <Button variant="default">Crear Cliente</Button>
         </DialogTrigger>
       )}
-      <DialogContent 
-        className="sm:max-w-[425px] max-h-[90vh] overflow-y-auto"
+      <DialogContent
+        // Sin max-h/overflow-y-auto a propósito: el contenido de este modal
+        // es corto (Nombre + País) y CreateCountrySelect necesita que este
+        // DialogContent no recorte su menú (ver comentarios en
+        // CreateCountrySelect.tsx y ManagerSelect.tsx).
+        className="sm:max-w-[425px]"
         tabIndex={undefined}
         aria-describedby={undefined}
         >

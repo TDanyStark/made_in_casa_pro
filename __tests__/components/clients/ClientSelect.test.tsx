@@ -143,4 +143,25 @@ describe("ClientSelect — persistent selection across refetches", () => {
       )
     );
   });
+
+  // No portal: ClientSelect can live inside a Dialog (e.g. CreateManagerModal),
+  // and a react-select menu portaled to document.body with menuPosition="fixed"
+  // breaks both wheel-scrolling (blocked by Radix's react-remove-scroll shard,
+  // which only exempts the DialogContent node itself) and positioning
+  // (DialogContent's translate-x/y centering makes it a CSS containing block
+  // for position:fixed descendants, which react-select's viewport-relative
+  // math doesn't account for). Rendering in-flow (react-select's default)
+  // sidesteps both problems entirely.
+  it("does not portal or force fixed positioning; keeps placement/height bounded", async () => {
+    mockGet.mockResolvedValue(makeClientsResponse([{ id: 1, name: "Cliente Uno" }]));
+
+    renderClientSelect();
+    await waitFor(() => expect(latestSelectProps).toBeDefined());
+
+    expect(latestSelectProps.menuPortalTarget).toBeUndefined();
+    expect(latestSelectProps.menuPosition).toBeUndefined();
+    expect(latestSelectProps.styles).toBeUndefined();
+    expect(latestSelectProps.menuPlacement).toBe("bottom");
+    expect(latestSelectProps.maxMenuHeight).toBe(240);
+  });
 });

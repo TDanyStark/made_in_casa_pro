@@ -227,8 +227,22 @@ export function TransferManagerDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[640px] max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
+      {/*
+        Sin overflow-y-auto en el propio DialogContent a propósito: este
+        diálogo renderiza un ManagerSelect por CADA marca/proyecto del
+        gerente (cantidad dinámica, puede ser larga), así que a diferencia
+        de CreateBrandModal/CreateClientModal (contenido corto, se les quitó
+        el recorte) aquí SÍ hace falta limitar la altura — pero el scroll
+        vive en un div interno (`flex-1 overflow-y-auto`), no en
+        DialogContent, con Header/Footer fuera de esa región (patrón ya
+        usado en TaskCompleteDialog/TaskHistoryDialog/AdjustmentWizard).
+        Los ManagerSelect/ClientSelect ya no portan ni usan
+        menuPosition="fixed" (ver comentarios en ManagerSelect.tsx), así que
+        su menú es un descendiente DOM normal — sigue el scroll del
+        contenedor que lo alberga sin necesidad de portal.
+      */}
+      <DialogContent className="sm:max-w-[640px] max-h-[90vh] flex flex-col p-0">
+        <DialogHeader className="p-6 pb-0">
           <DialogTitle>Trasladar a otro cliente</DialogTitle>
           <DialogDescription>
             El gerente conserva su historial. Sus marcas y proyectos se quedan en{" "}
@@ -237,181 +251,185 @@ export function TransferManagerDialog({
           </DialogDescription>
         </DialogHeader>
 
-        {isLoading && (
-          <div className="space-y-3 py-2" data-testid="transfer-preview-loading">
-            <Skeleton className="h-10 w-full" />
-            <Skeleton className="h-10 w-full" />
-            <Skeleton className="h-24 w-full" />
-          </div>
-        )}
+        <div className="flex-1 overflow-y-auto px-6 py-4">
+          {isLoading && (
+            <div className="space-y-3 py-2" data-testid="transfer-preview-loading">
+              <Skeleton className="h-10 w-full" />
+              <Skeleton className="h-10 w-full" />
+              <Skeleton className="h-24 w-full" />
+            </div>
+          )}
 
-        {isError && (
-          <p className="text-sm text-destructive py-4">
-            No se pudo cargar la información del gerente.
-          </p>
-        )}
+          {isError && (
+            <p className="text-sm text-destructive py-4">
+              No se pudo cargar la información del gerente.
+            </p>
+          )}
+
+          {!isLoading && !isError && preview && (
+            <Form {...form}>
+              <form id="transfer-manager" onSubmit={handleSubmit} className="space-y-6">
+                <ClientSelect
+                  control={form.control}
+                  name="client_id"
+                  label="Cliente destino"
+                  placeholder="Selecciona el nuevo cliente"
+                  excludeClientId={currentClientId}
+                />
+
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <FormField
+                    control={form.control}
+                    name="email"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Correo corporativo nuevo</FormLabel>
+                        <FormControl>
+                          <Input
+                            type="email"
+                            placeholder={preview.manager.email}
+                            {...field}
+                          />
+                        </FormControl>
+                        <p className="text-xs text-muted-foreground">
+                          Actual: {preview.manager.email}. Déjalo vacío para
+                          conservarlo.
+                        </p>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="phone"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Teléfono</FormLabel>
+                        <FormControl>
+                          <Input
+                            placeholder={preview.manager.phone || "Sin teléfono"}
+                            {...field}
+                          />
+                        </FormControl>
+                        <p className="text-xs text-muted-foreground">
+                          Déjalo vacío para conservar el actual.
+                        </p>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="started_at"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Fecha de inicio</FormLabel>
+                        <FormControl>
+                          <Input type="date" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="reason"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Motivo</FormLabel>
+                        <FormControl>
+                          <Textarea
+                            rows={2}
+                            placeholder="Opcional — queda en el historial"
+                            {...field}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
+                {brands.length > 0 && (
+                  <section className="space-y-3">
+                    <h3 className="text-sm font-semibold">
+                      Marcas en {preview.current_client?.name ?? "el cliente actual"}
+                    </h3>
+                    {brands.map((brand) => (
+                      <ManagerSelect
+                        key={brand.id}
+                        form={form}
+                        control={form.control}
+                        name={
+                          `brand_reassignments.${brand.id}` as FieldPath<TransferFormValues>
+                        }
+                        label={brand.name}
+                        placeholder="Sin sucesor — se traslada con el gerente"
+                        clientId={currentClientId}
+                        isClearable
+                      />
+                    ))}
+                  </section>
+                )}
+
+                {projects.length > 0 && (
+                  <section className="space-y-3">
+                    <h3 className="text-sm font-semibold">Proyectos activos</h3>
+                    {projects.map((project) => (
+                      <ManagerSelect
+                        key={project.id}
+                        form={form}
+                        control={form.control}
+                        name={
+                          `project_reassignments.${project.id}` as FieldPath<TransferFormValues>
+                        }
+                        label={project.title}
+                        placeholder="Sin sucesor — se traslada con el gerente"
+                        clientId={currentClientId}
+                        isClearable
+                      />
+                    ))}
+                  </section>
+                )}
+
+                {(brandsMoving > 0 || projectsMoving > 0) && (
+                  <p
+                    className="flex gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-xs text-amber-900 dark:text-amber-200"
+                    role="status"
+                  >
+                    <AlertTriangle className="h-4 w-4 shrink-0" />
+                    <span>
+                      {brandsMoving} marca(s) y {projectsMoving} proyecto(s) sin
+                      sucesor asignado se trasladarán junto al gerente al nuevo
+                      cliente.
+                    </span>
+                  </p>
+                )}
+              </form>
+            </Form>
+          )}
+        </div>
 
         {!isLoading && !isError && preview && (
-          <Form {...form}>
-            <form onSubmit={handleSubmit} className="space-y-6 mt-2">
-              <ClientSelect
-                control={form.control}
-                name="client_id"
-                label="Cliente destino"
-                placeholder="Selecciona el nuevo cliente"
-                excludeClientId={currentClientId}
-              />
-
-              <div className="grid gap-4 sm:grid-cols-2">
-                <FormField
-                  control={form.control}
-                  name="email"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Correo corporativo nuevo</FormLabel>
-                      <FormControl>
-                        <Input
-                          type="email"
-                          placeholder={preview.manager.email}
-                          {...field}
-                        />
-                      </FormControl>
-                      <p className="text-xs text-muted-foreground">
-                        Actual: {preview.manager.email}. Déjalo vacío para
-                        conservarlo.
-                      </p>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="phone"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Teléfono</FormLabel>
-                      <FormControl>
-                        <Input
-                          placeholder={preview.manager.phone || "Sin teléfono"}
-                          {...field}
-                        />
-                      </FormControl>
-                      <p className="text-xs text-muted-foreground">
-                        Déjalo vacío para conservar el actual.
-                      </p>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="started_at"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Fecha de inicio</FormLabel>
-                      <FormControl>
-                        <Input type="date" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="reason"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Motivo</FormLabel>
-                      <FormControl>
-                        <Textarea
-                          rows={2}
-                          placeholder="Opcional — queda en el historial"
-                          {...field}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-
-              {brands.length > 0 && (
-                <section className="space-y-3">
-                  <h3 className="text-sm font-semibold">
-                    Marcas en {preview.current_client?.name ?? "el cliente actual"}
-                  </h3>
-                  {brands.map((brand) => (
-                    <ManagerSelect
-                      key={brand.id}
-                      form={form}
-                      control={form.control}
-                      name={
-                        `brand_reassignments.${brand.id}` as FieldPath<TransferFormValues>
-                      }
-                      label={brand.name}
-                      placeholder="Sin sucesor — se traslada con el gerente"
-                      clientId={currentClientId}
-                      isClearable
-                    />
-                  ))}
-                </section>
+          <DialogFooter className="p-6 pt-4 border-t">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => onOpenChange(false)}
+              disabled={isSubmitting}
+            >
+              Cancelar
+            </Button>
+            <Button type="submit" form="transfer-manager" disabled={isSubmitting}>
+              {isSubmitting && (
+                <Loader2 className="animate-spin mr-2 h-4 w-4" />
               )}
-
-              {projects.length > 0 && (
-                <section className="space-y-3">
-                  <h3 className="text-sm font-semibold">Proyectos activos</h3>
-                  {projects.map((project) => (
-                    <ManagerSelect
-                      key={project.id}
-                      form={form}
-                      control={form.control}
-                      name={
-                        `project_reassignments.${project.id}` as FieldPath<TransferFormValues>
-                      }
-                      label={project.title}
-                      placeholder="Sin sucesor — se traslada con el gerente"
-                      clientId={currentClientId}
-                      isClearable
-                    />
-                  ))}
-                </section>
-              )}
-
-              {(brandsMoving > 0 || projectsMoving > 0) && (
-                <p
-                  className="flex gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-xs text-amber-900 dark:text-amber-200"
-                  role="status"
-                >
-                  <AlertTriangle className="h-4 w-4 shrink-0" />
-                  <span>
-                    {brandsMoving} marca(s) y {projectsMoving} proyecto(s) sin
-                    sucesor asignado se trasladarán junto al gerente al nuevo
-                    cliente.
-                  </span>
-                </p>
-              )}
-
-              <DialogFooter>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => onOpenChange(false)}
-                  disabled={isSubmitting}
-                >
-                  Cancelar
-                </Button>
-                <Button type="submit" disabled={isSubmitting}>
-                  {isSubmitting && (
-                    <Loader2 className="animate-spin mr-2 h-4 w-4" />
-                  )}
-                  Trasladar gerente
-                </Button>
-              </DialogFooter>
-            </form>
-          </Form>
+              Trasladar gerente
+            </Button>
+          </DialogFooter>
         )}
       </DialogContent>
     </Dialog>

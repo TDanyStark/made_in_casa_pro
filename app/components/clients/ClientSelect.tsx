@@ -190,15 +190,14 @@ export function ClientSelect<T extends FieldValues>({
                 filterOption={filterOption}
                 isDisabled={disabled}
                 classNamePrefix="react-select"
-                menuPortalTarget={
-                  typeof document !== "undefined" ? document.body : undefined
-                }
-                menuPosition="fixed"
+                // Sin portal ni menuPosition="fixed": ver el comentario en
+                // ManagerSelect.tsx — dentro de un Dialog (Radix), portalar
+                // a document.body con posición fija rompe el scroll (queda
+                // fuera del shard de react-remove-scroll) y el cálculo de
+                // posición (DialogContent usa translate-x/y, que lo vuelve
+                // containing block de sus descendientes fixed).
                 menuPlacement="bottom"
                 maxMenuHeight={240}
-                styles={{
-                  menuPortal: (base) => ({ ...base, zIndex: 9999 }),
-                }}
                 loadingMessage={() => "Cargando clientes..."}
                 noOptionsMessage={({ inputValue }) =>
                   inputValue

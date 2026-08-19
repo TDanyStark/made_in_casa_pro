@@ -101,7 +101,11 @@ export default function EditProductModal({ product }: Props) {
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent
-          className="sm:max-w-[480px] max-h-[90vh] overflow-y-auto"
+          // Sin max-h/overflow-y-auto a propósito: el contenido es corto
+          // (Nombre + Descripción + Categoría + Activo) y CategorySelect
+          // necesita que este DialogContent no recorte su menú (ver
+          // comentarios en ManagerSelect.tsx / CategorySelect.tsx).
+          className="sm:max-w-[480px]"
           tabIndex={undefined}
           aria-describedby={undefined}
         >

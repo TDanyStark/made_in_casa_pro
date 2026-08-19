@@ -138,7 +138,11 @@ export function CreateBrandModal({
     <>
       <Dialog open={openModal} onOpenChange={handleModal}>
         <DialogContent
-          className="sm:max-w-[525px] max-h-[90vh] overflow-y-auto"
+          // Sin max-h/overflow-y-auto a propósito: el contenido de este
+          // modal es corto (Gerente + Nombre + Unidad de Negocio opcional) y
+          // ManagerSelect necesita que este DialogContent no recorte su menú
+          // (ver comentarios en ManagerSelect.tsx).
+          className="sm:max-w-[525px]"
           tabIndex={undefined}
           aria-describedby={undefined}
         >

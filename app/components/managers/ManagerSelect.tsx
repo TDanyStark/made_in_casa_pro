@@ -152,15 +152,21 @@ export function ManagerSelect<T extends FieldValues>({
                 formatOptionLabel={formatOptionLabel}
                 isDisabled={disabled}
                 classNamePrefix="react-select"
-                menuPortalTarget={
-                  typeof document !== "undefined" ? document.body : undefined
-                }
-                menuPosition="fixed"
+                // Sin menuPortalTarget/menuPosition="fixed" a propósito: el
+                // menú se renderiza en flujo normal (position:absolute
+                // relativo al propio control), lo que lo mantiene dentro del
+                // DOM del Dialog (Radix) que lo contiene. Portalar a
+                // document.body con posición "fixed" rompía dos cosas dentro
+                // de un Dialog modal: (1) Radix envuelve el Overlay en
+                // react-remove-scroll con `shards: [DialogContent]`, así que
+                // cualquier wheel/touchmove fuera de ese shard se bloqueaba
+                // — el menú no hacía scroll aunque pointer-events estuviera
+                // arreglado; y (2) `DialogContent` usa `translate-x/y` para
+                // centrarse, lo que lo convierte en containing block de sus
+                // descendientes `position:fixed`, rompiendo el cálculo de
+                // posición (viewport-relative) que hace react-select.
                 menuPlacement="bottom"
                 maxMenuHeight={240}
-                styles={{
-                  menuPortal: (base) => ({ ...base, zIndex: 9999 }),
-                }}
                 loadingMessage={() => "Cargando gerentes..."}
                 noOptionsMessage={({ inputValue }) =>
                   inputValue
