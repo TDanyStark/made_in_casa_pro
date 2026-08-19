@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import CreatableSelect from "react-select/creatable";
 import { debounce } from "lodash";
 import { useGetEndpointQueryClient } from "@/hooks/useGetEndpointQueryClient";
+import { useStableSelectOptions } from "@/hooks/useStableSelectOptions";
 import {
   FormControl,
   FormItem,
@@ -67,9 +68,6 @@ export function BusinessUnitBrandSelect(props: BusinessUnitBrandSelectProps) {
   } = props;
 
   const [searchTerm, setSearchTerm] = useState("");
-  const [businessUnitOptions, setBusinessUnitOptions] = useState<
-    BusinessUnitOption[]
-  >([]);
   const [isCreatingBusinessUnit, setIsCreatingBusinessUnit] = useState(false);
   const [selectedValue, setSelectedValue] = useState<number | undefined>(props.standalone && props.value ? props.value : undefined);
   const queryClient = useQueryClient();
@@ -81,6 +79,18 @@ export function BusinessUnitBrandSelect(props: BusinessUnitBrandSelectProps) {
 
   const businessUnits = useMemo(() => data?.data || [], [data]);
 
+  const fetchedOptions: BusinessUnitOption[] = useMemo(
+    () =>
+      businessUnits.map((businessUnit: BusinessUnitType) => ({
+        value: businessUnit.id,
+        label: businessUnit.name,
+      })),
+    [businessUnits]
+  );
+
+  const { options: businessUnitOptions, pinOption } =
+    useStableSelectOptions<BusinessUnitOption>(fetchedOptions);
+
   const debouncedSearch = debounce((value: string) => {
     setSearchTerm(value);
   }, 500);
@@ -90,16 +100,6 @@ export function BusinessUnitBrandSelect(props: BusinessUnitBrandSelectProps) {
       debouncedSearch(inputValue);
     }
   };
-
-  useEffect(() => {
-    if (businessUnits) {
-      const options = businessUnits.map((businessUnit: BusinessUnitType) => ({
-        value: businessUnit.id,
-        label: businessUnit.name,
-      }));
-      setBusinessUnitOptions(options);
-    }
-  }, [businessUnits]);
 
   // Handle selecting an existing business unit for a brand
   const handleSelectBusinessUnit = async (businessUnitId: number) => {
@@ -150,11 +150,8 @@ export function BusinessUnitBrandSelect(props: BusinessUnitBrandSelectProps) {
 
       const newBusinessUnit = response.data as BusinessUnitType;
 
-      // Update the options
-      setBusinessUnitOptions((prev) => [
-        ...prev,
-        { value: newBusinessUnit.id, label: newBusinessUnit.name },
-      ]);
+      // Fijar la nueva unidad de negocio para que sobreviva a refetches
+      pinOption({ value: newBusinessUnit.id, label: newBusinessUnit.name });
 
       // Actualizar el valor según el modo (formulario o independiente)
       if (!standalone && props.form) {
@@ -231,6 +228,7 @@ export function BusinessUnitBrandSelect(props: BusinessUnitBrandSelectProps) {
             (option) => option.value === selectedValue
           )}
           onChange={(selectedOption) => {
+            pinOption(selectedOption ?? undefined);
             setSelectedValue(selectedOption?.value);
             if (onChange) onChange(selectedOption?.value);
             if (brandId && selectedOption?.value) {
@@ -279,6 +277,7 @@ export function BusinessUnitBrandSelect(props: BusinessUnitBrandSelectProps) {
                 (option) => option.value === field.value
               )}
               onChange={(selectedOption) => {
+                pinOption(selectedOption ?? undefined);
                 field.onChange(selectedOption?.value);
                 if (onChange) onChange(selectedOption?.value);
                 if (brandId && selectedOption?.value) {

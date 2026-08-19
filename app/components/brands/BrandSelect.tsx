@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import CreatableSelect from "react-select/creatable";
 import { debounce } from "lodash";
 import { useGetEndpointQueryClient } from "@/hooks/useGetEndpointQueryClient";
+import { useStableSelectOptions } from "@/hooks/useStableSelectOptions";
 import { 
   FormControl, 
   FormItem, 
@@ -53,7 +54,6 @@ export function BrandSelect({
   onChange,
 }: BrandSelectProps) {
   const [searchTerm, setSearchTerm] = useState("");
-  const [brandOptions, setBrandOptions] = useState<BrandOption[]>([]);
   const [isCreatingBrand, setIsCreatingBrand] = useState(false);
   const [newBrandName, setNewBrandName] = useState<string>("");
 
@@ -78,17 +78,19 @@ export function BrandSelect({
     setSearchTerm("");
   };
 
-  useEffect(() => {
-    if (brands) {
-      const options = brands.map((brand: BrandsAndManagersType) => ({
+  const fetchedOptions: BrandOption[] = useMemo(
+    () =>
+      brands.map((brand: BrandsAndManagersType) => ({
         value: brand.id as number,
         label: brand.brand_name,
         managerId: brand.manager_id,
         managerName: brand.manager_name,
-      }));
-      setBrandOptions(options);
-    }
-  }, [brands]);
+      })),
+    [brands]
+  );
+
+  const { options: brandOptions, pinOption } =
+    useStableSelectOptions<BrandOption>(fetchedOptions);
 
   const handleCreateBrand = (inputValue: string) => {
     setIsCreatingBrand(true);
@@ -96,12 +98,12 @@ export function BrandSelect({
   };
 
   const handleBrandCreated = (newBrand: BrandType) => {
-    // Add the new brand to the options
+    // Fijar la nueva marca para que sobreviva a refetches posteriores
     const newOption = {
       value: newBrand.id as number,
       label: newBrand.name,
     };
-    setBrandOptions((prevOptions) => [...prevOptions, newOption]);
+    pinOption(newOption);
 
     // Select the newly created manager and notify parent
     if (onChange) {
@@ -145,6 +147,7 @@ export function BrandSelect({
                   (option) => option.value === field.value
                 )}
                 onChange={(selectedOption) => {
+                  pinOption(selectedOption ?? undefined);
                   field.onChange(selectedOption?.value);
                   if (onChange) onChange(selectedOption?.value);
                 }}

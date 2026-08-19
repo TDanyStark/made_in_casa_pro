@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import CreatableSelect from "react-select/creatable";
 import { debounce } from "lodash";
 import { useGetEndpointQueryClient } from "@/hooks/useGetEndpointQueryClient";
+import { useStableSelectOptions } from "@/hooks/useStableSelectOptions";
 import {
   FormControl,
   FormItem,
@@ -55,7 +56,6 @@ export function ManagerSelect<T extends FieldValues>({
   onChange,
 }: ManagerSelectProps<T>) {
   const [searchTerm, setSearchTerm] = useState("");
-  const [managerOptions, setManagerOptions] = useState<ManagerOption[]>([]);
   const [isCreatingManager, setIsCreatingManager] = useState(false);
   const [newManagerName, setNewManagerName] = useState("");
 
@@ -72,6 +72,14 @@ export function ManagerSelect<T extends FieldValues>({
 
   const managers = useMemo(() => data?.data || [], [data]);
 
+  const fetchedOptions: ManagerOption[] = useMemo(
+    () => managers.map(toManagerOption),
+    [managers]
+  );
+
+  const { options: managerOptions, pinOption } =
+    useStableSelectOptions<ManagerOption>(fetchedOptions);
+
   const debouncedSearch = debounce((value: string) => {
     setSearchTerm(value);
   }, 500);
@@ -81,12 +89,6 @@ export function ManagerSelect<T extends FieldValues>({
       debouncedSearch(inputValue);
     }
   };
-
-  useEffect(() => {
-    if (managers && managers.length > 0) {
-      setManagerOptions(managers.map(toManagerOption));
-    }
-  }, [managers]);
 
   const formatOptionLabel = useMemo(
     () => createManagerOptionFormatter({ clientNames, showClient }),
@@ -103,7 +105,7 @@ export function ManagerSelect<T extends FieldValues>({
   };
 
   const handleManagerCreated = (newManager: ManagerType) => {
-    setManagerOptions((prev) => [...prev, toManagerOption(newManager)]);
+    pinOption(toManagerOption(newManager));
 
     // Select the newly created manager and notify parent
     if (onChange) {
@@ -137,6 +139,7 @@ export function ManagerSelect<T extends FieldValues>({
                   ) ?? null
                 }
                 onChange={(selectedOption) => {
+                  pinOption(selectedOption ?? undefined);
                   field.onChange(selectedOption?.value);
                   if (onChange) onChange(selectedOption?.value);
                 }}
@@ -149,6 +152,15 @@ export function ManagerSelect<T extends FieldValues>({
                 formatOptionLabel={formatOptionLabel}
                 isDisabled={disabled}
                 classNamePrefix="react-select"
+                menuPortalTarget={
+                  typeof document !== "undefined" ? document.body : undefined
+                }
+                menuPosition="fixed"
+                menuPlacement="bottom"
+                maxMenuHeight={240}
+                styles={{
+                  menuPortal: (base) => ({ ...base, zIndex: 9999 }),
+                }}
                 loadingMessage={() => "Cargando gerentes..."}
                 noOptionsMessage={({ inputValue }) =>
                   inputValue

@@ -186,6 +186,7 @@ export function CreateCountrySelect({ field }: CreateCountrySelectProps) {
       classNamePrefix="react-select"
       menuPortalTarget={typeof document !== "undefined" ? document.body : undefined}
       menuPosition="fixed"
+      menuPlacement="bottom"
       maxMenuHeight={240}
       styles={{ menuPortal: (base) => ({ ...base, zIndex: 9999 }) }}
       loadingMessage={() => "Cargando países..."}

@@ -5,6 +5,7 @@ import * as DialogPrimitive from "@radix-ui/react-dialog"
 import { XIcon } from "lucide-react"
 
 import { cn } from "@/lib/utils"
+import { isReactSelectPortalTarget } from "@/lib/reactSelectPortal"
 
 function Dialog({
   ...props
@@ -49,6 +50,8 @@ function DialogOverlay({
 function DialogContent({
   className,
   children,
+  onPointerDownOutside,
+  onInteractOutside,
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Content>) {
   return (
@@ -60,6 +63,25 @@ function DialogContent({
           "bg-background data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 fixed top-[50%] left-[50%] z-50 grid w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] gap-4 rounded-lg border p-6 shadow-lg duration-200 sm:max-w-lg",
           className
         )}
+        onPointerDownOutside={(event) => {
+          // Los menús de react-select portalados a document.body viven
+          // fuera del árbol DOM de este Dialog. Sin este guard, un Dialog
+          // anidado (crear gerente/cliente/país dentro de crear marca) se
+          // cerraría al hacer clic en una opción del select en vez de
+          // registrar la selección.
+          if (isReactSelectPortalTarget(event.target)) {
+            event.preventDefault();
+            return;
+          }
+          onPointerDownOutside?.(event);
+        }}
+        onInteractOutside={(event) => {
+          if (isReactSelectPortalTarget(event.target)) {
+            event.preventDefault();
+            return;
+          }
+          onInteractOutside?.(event);
+        }}
         {...props}
       >
         {children}

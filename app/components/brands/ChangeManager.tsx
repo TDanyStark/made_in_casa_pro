@@ -3,7 +3,7 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { debounce } from "lodash";
 import { toast } from "sonner";
 
@@ -25,6 +25,7 @@ import {
   toManagerOption,
 } from "@/components/managers/managerOption";
 import { useGetEndpointQueryClient } from "@/hooks/useGetEndpointQueryClient";
+import { useStableSelectOptions } from "@/hooks/useStableSelectOptions";
 import { patch } from "@/lib/services/apiService";
 import { useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
@@ -50,7 +51,6 @@ export function ChangeManager({ brandId, managerId, clientId, onSuccess }: Props
     },
   });
 
-  const [managerOptions, setManagerOptions] = useState<ManagerOption[]>([]);
   const [isCreatingManager, setIsCreatingManager] = useState(false);
   const [newManagerName, setNewManagerName] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
@@ -69,12 +69,13 @@ export function ChangeManager({ brandId, managerId, clientId, onSuccess }: Props
 
   const managers = useMemo(() => data?.data || [], [data]);
 
-  // Actualizar las opciones cuando cambian los datos de managers
-  useEffect(() => {
-    if (managers && managers.length > 0) {
-      setManagerOptions(managers.map(toManagerOption));
-    }
-  }, [managers]);
+  const fetchedOptions: ManagerOption[] = useMemo(
+    () => managers.map(toManagerOption),
+    [managers]
+  );
+
+  const { options: managerOptions, pinOption } =
+    useStableSelectOptions<ManagerOption>(fetchedOptions);
 
   // El select ya está filtrado por cliente, así que basta el correo para
   // distinguir gerentes con el mismo nombre.
@@ -142,8 +143,8 @@ export function ChangeManager({ brandId, managerId, clientId, onSuccess }: Props
   };
 
   const handleManagerCreated = (manager: ManagerType) => {
-    // Agregar el nuevo gerente a las opciones
-    setManagerOptions((prev) => [...prev, toManagerOption(manager)]);
+    // Fijar el nuevo gerente para que sobreviva a refetches posteriores
+    pinOption(toManagerOption(manager));
 
     // Seleccionar el gerente recién creado
     form.setValue("manager_id", manager.id as number);
@@ -179,6 +180,7 @@ export function ChangeManager({ brandId, managerId, clientId, onSuccess }: Props
                         (option) => option.value === field.value
                       )}
                       onChange={(selectedOption) => {
+                        pinOption(selectedOption ?? undefined);
                         field.onChange(selectedOption?.value);
                       }}
                       onInputChange={handleInputChange}
@@ -189,6 +191,15 @@ export function ChangeManager({ brandId, managerId, clientId, onSuccess }: Props
                       formatOptionLabel={formatOptionLabel}
                       className="react-select-container min-w-72"
                       classNamePrefix="react-select"
+                      menuPortalTarget={
+                        typeof document !== "undefined" ? document.body : undefined
+                      }
+                      menuPosition="fixed"
+                      menuPlacement="bottom"
+                      maxMenuHeight={240}
+                      styles={{
+                        menuPortal: (base) => ({ ...base, zIndex: 9999 }),
+                      }}
                       loadingMessage={() => "Cargando gerentes..."}
                       noOptionsMessage={({ inputValue }) =>
                         inputValue

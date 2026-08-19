@@ -1,10 +1,11 @@
 /* eslint-disable @next/next/no-img-element */
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import CreatableSelect from "react-select/creatable";
 import { debounce } from "lodash";
 import { useGetEndpointQueryClient } from "@/hooks/useGetEndpointQueryClient";
+import { useStableSelectOptions } from "@/hooks/useStableSelectOptions";
 import { API_FLAG_URL, IMG_FLAG_EXT } from "@/config/constants";
 import CreateClientModal from "./CreateClientModal";
 import { 
@@ -56,7 +57,6 @@ export function ClientSelect<T extends FieldValues>({
   onChange,
 }: ClientSelectProps<T>) {
   const [searchTerm, setSearchTerm] = useState("");
-  const [clientOptions, setClientOptions] = useState<ClientOption[]>([]);
   const [isCreatingClient, setIsCreatingClient] = useState(false);
   const [newClientName, setNewClientName] = useState("");
   // Referencia al onChange del field del formulario para poder escribir el
@@ -70,6 +70,24 @@ export function ClientSelect<T extends FieldValues>({
 
   const clients: ClientType[] = useMemo(() => data?.data || [], [data]);
 
+  const fetchedOptions: ClientOption[] = useMemo(
+    () =>
+      clients
+        .filter((client: ClientType) => client.id !== excludeClientId)
+        .map((client: ClientType) => ({
+          value: client.id,
+          label: client.name,
+          countryFlag: client.country
+            ? `${API_FLAG_URL}${client.country.flag}${IMG_FLAG_EXT}`
+            : undefined,
+          countryName: client.country?.name,
+        })),
+    [clients, excludeClientId]
+  );
+
+  const { options: clientOptions, pinOption } =
+    useStableSelectOptions<ClientOption>(fetchedOptions);
+
   const debouncedSearch = debounce((value: string) => {
     setSearchTerm(value);
   }, 500);
@@ -79,22 +97,6 @@ export function ClientSelect<T extends FieldValues>({
       debouncedSearch(inputValue);
     }
   };
-
-  useEffect(() => {
-    if (clients) {
-      const options = clients
-        .filter((client: ClientType) => client.id !== excludeClientId)
-        .map((client: ClientType) => ({
-          value: client.id,
-          label: client.name,
-          countryFlag: client.country
-            ? `${API_FLAG_URL}${client.country.flag}${IMG_FLAG_EXT}`
-            : undefined,
-          countryName: client.country?.name,
-        }));
-      setClientOptions(options);
-    }
-  }, [clients, excludeClientId]);
 
   const handleCreateClient = (inputValue: string) => {
     setIsCreatingClient(true);
@@ -106,7 +108,8 @@ export function ClientSelect<T extends FieldValues>({
   };
 
   const handleClientCreated = (newClient: ClientType) => {
-    // Add the new client to the options
+    // Fijamos la opción para que sobreviva a cualquier refetch posterior
+    // que no la incluya en su página de resultados.
     const newOption = {
       value: newClient.id,
       label: newClient.name,
@@ -116,7 +119,7 @@ export function ClientSelect<T extends FieldValues>({
       countryName: newClient.country?.name,
     };
 
-    setClientOptions((prev) => [...prev, newOption]);
+    pinOption(newOption);
 
     // Seleccionar el cliente recién creado en el campo del formulario.
     // Antes solo se notificaba al padre (onChange) y, como CreateManagerModal
@@ -173,6 +176,7 @@ export function ClientSelect<T extends FieldValues>({
                   (option) => option.value === field.value
                 )}
                 onChange={(selectedOption) => {
+                  pinOption(selectedOption ?? undefined);
                   field.onChange(selectedOption?.value);
                   if (onChange) onChange(selectedOption?.value);
                 }}
@@ -186,6 +190,15 @@ export function ClientSelect<T extends FieldValues>({
                 filterOption={filterOption}
                 isDisabled={disabled}
                 classNamePrefix="react-select"
+                menuPortalTarget={
+                  typeof document !== "undefined" ? document.body : undefined
+                }
+                menuPosition="fixed"
+                menuPlacement="bottom"
+                maxMenuHeight={240}
+                styles={{
+                  menuPortal: (base) => ({ ...base, zIndex: 9999 }),
+                }}
                 loadingMessage={() => "Cargando clientes..."}
                 noOptionsMessage={({ inputValue }) =>
                   inputValue
