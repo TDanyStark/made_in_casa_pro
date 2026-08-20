@@ -18,12 +18,16 @@ jest.mock('next/cache', () => ({
 import { db } from '@/lib/db';
 import {
   createProject,
+  clearProjectDriveAccessFailure,
+  getProjectDriveAccessFailures,
+  getProjectExpectedDriveRecipients,
   getProjectById,
   getProjectManagerHistory,
   getProjectStakeholderEmails,
   getProjectsWithPagination,
   recalculateProjectProgress,
   updateProject,
+  upsertProjectDriveAccessFailure,
 } from '@/lib/queries/projects';
 
 const mockExecute = db.execute as jest.MockedFunction<typeof db.execute>;
@@ -53,22 +57,55 @@ beforeEach(() => {
 
 describe('project queries metadata fields', () => {
 
-  it('loads current Drive stakeholders across leadership, creator, managers, and task assignees', async () => {
+  it('normalizes and deduplicates Drive stakeholders while preserving all sources', async () => {
     mockExecute.mockResolvedValueOnce(makeResult([
-      { email: 'admin@test.com' },
-      { email: 'manager@test.com' },
-      { email: 'collaborator@test.com' },
+      { email: ' Admin@Test.com ', name: 'Admin', source: 'leadership' },
+      { email: 'admin@test.com', name: 'Admin', source: 'creator' },
+      { email: 'manager@test.com', name: 'Manager', source: 'manager' },
+      { email: 'manager@test.com', name: 'Manager', source: 'co_manager' },
+      { email: 'invalid', name: 'Invalid', source: 'task_assignee' },
     ]));
 
-    await expect(getProjectStakeholderEmails(15)).resolves.toEqual([
-      'admin@test.com',
-      'manager@test.com',
-      'collaborator@test.com',
+    await expect(getProjectExpectedDriveRecipients(15)).resolves.toEqual([
+      { email: 'admin@test.com', name: 'Admin', sources: ['leadership', 'creator'] },
+      { email: 'manager@test.com', name: 'Manager', sources: ['manager', 'co_manager'] },
     ]);
     const call = mockExecute.mock.calls[0]?.[0] as { sql: string; args: unknown[] };
     expect(call.args[0]).toBe(15);
-    expect(call.sql).toContain('SELECT DISTINCT assigned_user_id FROM project_tasks');
-    expect(call.sql).toContain('SELECT manager_id FROM project_managers');
+    expect(call.args).toEqual([15, 1, 2, 5]);
+    expect(call.sql).toContain("'task_assignee' AS source");
+    expect(call.sql).toContain("'co_manager' AS source");
+    expect(call.sql).not.toContain('m.client_id');
+  });
+
+  it('keeps the email-only stakeholder API normalized', async () => {
+    mockExecute.mockResolvedValueOnce(makeResult([
+      { email: ' Person@Test.com ', name: 'Person', source: 'task_assignee' },
+    ]));
+    await expect(getProjectStakeholderEmails(15)).resolves.toEqual(['person@test.com']);
+  });
+
+  it('reads, upserts, and clears sanitized Drive failures by normalized email', async () => {
+    mockExecute.mockResolvedValueOnce(makeResult([
+      { email: 'person@test.com', failure_code: 'NO_GOOGLE_ACCOUNT', last_attempt_at: '2026-08-19T12:00:00Z' },
+    ]));
+    await expect(getProjectDriveAccessFailures(15)).resolves.toEqual([{
+      email: 'person@test.com',
+      failureCode: 'NO_GOOGLE_ACCOUNT',
+      lastAttemptAt: '2026-08-19T12:00:00Z',
+    }]);
+
+    await upsertProjectDriveAccessFailure(15, ' Person@Test.com ', 'POLICY_OR_RESTRICTION');
+    expect(mockExecute).toHaveBeenNthCalledWith(2, expect.objectContaining({
+      sql: expect.stringContaining('ON CONFLICT (project_id, email) DO UPDATE'),
+      args: [15, 'person@test.com', 'POLICY_OR_RESTRICTION'],
+    }));
+
+    await clearProjectDriveAccessFailure(15, ' Person@Test.com ');
+    expect(mockExecute).toHaveBeenNthCalledWith(3, expect.objectContaining({
+      sql: expect.stringContaining('DELETE FROM project_drive_access_failures'),
+      args: [15, 'person@test.com'],
+    }));
   });
 
   it('getProjectById selects the new metadata columns', async () => {

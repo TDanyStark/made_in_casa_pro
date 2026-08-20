@@ -202,20 +202,37 @@ Ambas acciones requieren rol `PROJECT_EDIT_ROLES`.
 ### Control de acceso de Drive
 
 Google Drive es la fuente de verdad de los permisos; no se replica la ACL en la
-base de datos. En Información del proyecto se consultan los permisos reales con
+base de datos. La tabla `project_drive_access_failures` conserva únicamente el
+código sanitizado y la fecha del último intento fallido por proyecto/correo,
+porque esa causa no puede reconstruirse desde `permissions.list`. En Información
+del proyecto se consultan los permisos reales con
 `GET /api/projects/[id]/drive/permissions`, incluyendo accesos de usuario, grupo,
 dominio o enlace y la capacidad `canShare`. Los usuarios con acceso al proyecto
 pueden ver la lista. `PROJECT_EDIT_ROLES` puede agregar un correo como lector o
 editor y quitar permisos directos; nunca se permite quitar al propietario,
 permisos heredados ni a la cuenta OAuth conectada.
 
+Solo `PROJECT_EDIT_ROLES` con acceso al proyecto recibe además el estado de los
+destinatarios esperados: liderazgo activo (admin, directivo y financiero),
+creador activo, asignados activos y los gerente/co-gerentes vinculados al
+proyecto. Un permiso efectivo directo, heredado, de dominio o público evita un
+falso "sin acceso"; un rol inferior a editor se muestra como insuficiente. Drive
+no permite comprobar la membresía individual de grupos, por lo que la interfaz
+lo comunica como una limitación y no afirma acceso o ausencia con certeza.
+
+Los fallos solo se clasifican como `NO_GOOGLE_ACCOUNT` si el mensaje de Google lo
+indica explícitamente. Un dominio corporativo o `invalidSharingRequest` genérico
+no permite inferirlo. Los demás códigos persistidos son
+`POLICY_OR_RESTRICTION` y `TRANSIENT_OR_UNKNOWN`.
+
 Al asignar colaboradores, aceptar cotizaciones, instanciar plantillas/ajustes o
 agregar/cambiar responsables, el sistema sincroniza de forma secuencial y
 aditiva el conjunto actual de interesados como `writer`. Nunca revoca
 automáticamente a antiguos asignados. Si Drive falla, la mutación de negocio se
 mantiene exitosa y la respuesta incluye `driveWarning`; el reintento no vuelve a
-crear la tarea o asignación. La recreación comparte con administradores,
-directivos, creador, gerente principal, co-gerentes y asignados actuales.
+crear la tarea o asignación. La creación y la recreación comparten con
+administradores, directivos, financieros, creador, gerente principal, co-gerentes
+y asignados actuales.
 
 ## Auditoría e historial
 

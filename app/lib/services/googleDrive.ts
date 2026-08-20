@@ -1,6 +1,7 @@
 import { google } from "googleapis";
 import { getAppSettings } from "@/lib/queries/settings";
 import type {
+  ProjectDriveFailureCode,
   DriveSyncWarning,
   ProjectDrivePermissionsResponse,
 } from "@/lib/definitions";
@@ -115,36 +116,104 @@ function normalizeEmails(emails: string[]): string[] {
   return [...normalized.values()];
 }
 
-export async function shareFolderWithEmails(
+function getProviderMessages(error: unknown): string[] {
+  const candidate = error as {
+    message?: unknown;
+    errors?: Array<{ message?: unknown }>;
+    response?: {
+      data?: {
+        error?: { message?: unknown; errors?: Array<{ message?: unknown }> };
+      };
+    };
+  };
+  return [
+    candidate?.message,
+    ...(candidate?.errors?.map((item) => item.message) ?? []),
+    candidate?.response?.data?.error?.message,
+    ...(candidate?.response?.data?.error?.errors?.map((item) => item.message) ?? []),
+  ].filter((message): message is string => typeof message === "string");
+}
+
+export function classifyDrivePermissionFailure(error: unknown): ProjectDriveFailureCode {
+  const message = getProviderMessages(error).join(" ");
+  if (
+    /\bdoes not have (?:a )?google account\b/i.test(message) ||
+    /\bno google account\b/i.test(message) ||
+    /\bnot (?:a |an )?(?:valid )?google account\b/i.test(message) ||
+    /\bnot associated with (?:a )?google account\b/i.test(message)
+  ) {
+    return "NO_GOOGLE_ACCOUNT";
+  }
+  if (
+    /\bacl change not allowed\b/i.test(message) ||
+    /\bsharing polic(?:y|ies) (?:prohibit|restrict|block|do not allow|does not allow)/i.test(message) ||
+    /\b(?:sharing )?(?:restricted|restriction)\b/i.test(message) ||
+    /\bnot allowed to share\b/i.test(message) ||
+    /\bexternal sharing (?:is )?disabled\b/i.test(message)
+  ) {
+    return "POLICY_OR_RESTRICTION";
+  }
+  return "TRANSIENT_OR_UNKNOWN";
+}
+
+export type DrivePermissionSyncAttempt = {
+  email: string;
+  failureCode: ProjectDriveFailureCode | null;
+};
+
+export type DrivePermissionSyncResult = {
+  warning: DriveSyncWarning | null;
+  attempts: DrivePermissionSyncAttempt[];
+};
+
+function grantsWriter(role: string): boolean {
+  return ["owner", "organizer", "fileOrganizer", "writer"].includes(role);
+}
+
+async function shareFolderWithEmailsDetailed(
   drive: Awaited<ReturnType<typeof getDriveClient>>,
   folderId: string,
   emails: string[]
-): Promise<void> {
+): Promise<DrivePermissionSyncAttempt[]> {
   const existing = await listDriveFolderPermissionsWithClient(drive, folderId);
   if (!existing.canShare) {
-    throw new Error("La cuenta de Google conectada no puede administrar el acceso a esta carpeta.");
+    throw new Error("ACL change not allowed: connected account cannot manage folder access.");
   }
 
-  const byEmail = new Map(
+  const directByEmail = new Map(
     existing.permissions
-      .filter((permission) => permission.emailAddress)
+      .filter((permission) => permission.type === "user" && permission.emailAddress)
       .map((permission) => [permission.emailAddress!.toLowerCase(), permission])
   );
+  const domainPermissions = existing.permissions.filter(
+    (permission) => permission.type === "domain" && permission.domain
+  );
+  const anyoneGrantsWriter = existing.permissions.some(
+    (permission) => permission.type === "anyone" && grantsWriter(permission.role)
+  );
 
-  const failures: string[] = [];
+  const attempts: DrivePermissionSyncAttempt[] = [];
   for (const email of normalizeEmails(emails)) {
     try {
-      const current = byEmail.get(email);
-      if (current) {
-        if (current.role === "reader" && current.canDelete) {
+      const direct = directByEmail.get(email);
+      const domain = email.slice(email.lastIndexOf("@") + 1);
+      const hasEffectiveWriter =
+        (direct && grantsWriter(direct.role)) ||
+        anyoneGrantsWriter ||
+        domainPermissions.some(
+          (permission) => permission.domain?.toLowerCase() === domain && grantsWriter(permission.role)
+        );
+
+      if (!hasEffectiveWriter) {
+        if (direct && direct.canDelete) {
           await drive.permissions.update({
             fileId: folderId,
-            permissionId: current.id,
+            permissionId: direct.id,
             supportsAllDrives: true,
             requestBody: { role: "writer" },
             fields: "id,role",
           });
-        } else if (current.role === "reader" && current.inherited) {
+        } else {
           await drive.permissions.create({
             fileId: folderId,
             supportsAllDrives: true,
@@ -157,27 +226,26 @@ export async function shareFolderWithEmails(
             },
           });
         }
-      } else {
-        await drive.permissions.create({
-          fileId: folderId,
-          supportsAllDrives: true,
-          sendNotificationEmail: false,
-          fields: "id",
-          requestBody: {
-            type: "user",
-            role: "writer",
-            emailAddress: email,
-          },
-        });
       }
+      attempts.push({ email, failureCode: null });
     } catch (error) {
-      failures.push(email);
-      console.warn(`Could not share folder ${folderId} with ${email}:`, error);
+      const failureCode = classifyDrivePermissionFailure(error);
+      attempts.push({ email, failureCode });
+      console.warn("DRIVE_PERMISSION_GRANT_FAILED", { folderId, email, failureCode });
     }
   }
+  return attempts;
+}
 
-  if (failures.length > 0) {
-    throw new Error(`No se pudieron sincronizar ${failures.length} acceso(s) de Google Drive.`);
+export async function shareFolderWithEmails(
+  drive: Awaited<ReturnType<typeof getDriveClient>>,
+  folderId: string,
+  emails: string[]
+): Promise<void> {
+  const attempts = await shareFolderWithEmailsDetailed(drive, folderId, emails);
+  const failureCount = attempts.filter((attempt) => attempt.failureCode).length;
+  if (failureCount > 0) {
+    throw new Error(`No se pudieron sincronizar ${failureCount} acceso(s) de Google Drive.`);
   }
 }
 
@@ -300,11 +368,44 @@ async function shareFolderSafely(
     await shareFolderWithEmails(drive, folderId, emails);
     return null;
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Error desconocido de Google Drive";
-    console.warn("DRIVE_ACCESS_SYNC_FAILED", { folderId, message });
+    console.warn("DRIVE_ACCESS_SYNC_FAILED", {
+      folderId,
+      failureCode: classifyDrivePermissionFailure(error),
+    });
     return {
       code: "DRIVE_ACCESS_SYNC_FAILED",
       message: "No se pudieron sincronizar todos los accesos de Google Drive.",
+    };
+  }
+}
+
+async function shareFolderSafelyDetailed(
+  drive: Awaited<ReturnType<typeof getDriveClient>>,
+  folderId: string,
+  emails: string[]
+): Promise<DrivePermissionSyncResult> {
+  const normalized = normalizeEmails(emails);
+  try {
+    const attempts = await shareFolderWithEmailsDetailed(drive, folderId, normalized);
+    const hasFailures = attempts.some((attempt) => attempt.failureCode);
+    return {
+      attempts,
+      warning: hasFailures
+        ? {
+            code: "DRIVE_ACCESS_SYNC_FAILED",
+            message: "No se pudieron sincronizar todos los accesos de Google Drive.",
+          }
+        : null,
+    };
+  } catch (error) {
+    const failureCode = classifyDrivePermissionFailure(error);
+    console.warn("DRIVE_ACCESS_SYNC_FAILED", { folderId, failureCode });
+    return {
+      attempts: normalized.map((email) => ({ email, failureCode })),
+      warning: {
+        code: "DRIVE_ACCESS_SYNC_FAILED",
+        message: "No se pudieron sincronizar todos los accesos de Google Drive.",
+      },
     };
   }
 }
@@ -314,6 +415,13 @@ export async function syncDriveFolderAccess(
   emails: string[]
 ): Promise<DriveSyncWarning | null> {
   return shareFolderSafely(await getDriveClient(), folderId, emails);
+}
+
+export async function syncDriveFolderAccessDetailed(
+  folderId: string,
+  emails: string[]
+): Promise<DrivePermissionSyncResult> {
+  return shareFolderSafelyDetailed(await getDriveClient(), folderId, emails);
 }
 
 export interface DriveProjectFolders {

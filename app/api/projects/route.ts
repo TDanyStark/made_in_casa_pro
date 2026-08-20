@@ -13,6 +13,7 @@ import {
   normalizeOptionalProjectText,
   normalizeProjectDateTime,
 } from "@/lib/utils/project-date-time";
+import { syncProjectDriveAccess } from "@/lib/services/projectDriveAccess";
 
 const projectDateTimeSchema = z
   .string()
@@ -114,7 +115,13 @@ export async function POST(request: NextRequest) {
       ...validation.data,
       created_by: createdBy,
     });
-    return NextResponse.json(project, { status: 201 });
+    const driveWarning = project.drive_folder_id
+      ? await syncProjectDriveAccess(project.id)
+      : null;
+    return NextResponse.json(
+      { ...project, ...(driveWarning ? { driveWarning } : {}) },
+      { status: 201 }
+    );
   } catch (error) {
     const domain = domainErrorResponse(error);
     if (domain) return domain;

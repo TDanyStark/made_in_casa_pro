@@ -73,4 +73,38 @@ describe("ProjectDriveAccessManager", () => {
       { email: "new@test.com", role: "writer" }
     ));
   });
+
+  it("shows missing expected recipients in red with exact sanitized Spanish reasons", async () => {
+    mockGet.mockResolvedValue({ ok: true, data: {
+      canShare: true,
+      permissions: [{ id: "group", type: "group", role: "writer", emailAddress: "team@abbott.com", displayName: null, domain: null, inherited: false, isConnectedAccount: false, canDelete: true }],
+      expectedRecipients: [
+        { email: "daniel.test@abbott.com", name: "Daniel", sources: ["manager"], expectedRole: "writer", status: "missing", actualRole: null, accessVia: null, failureCode: "NO_GOOGLE_ACCOUNT", lastAttemptAt: "now", hasUnverifiableGroupAccess: true },
+        { email: "policy@test.com", name: null, sources: ["leadership"], expectedRole: "writer", status: "missing", actualRole: null, accessVia: null, failureCode: "POLICY_OR_RESTRICTION", lastAttemptAt: "now", hasUnverifiableGroupAccess: true },
+        { email: "unknown@test.com", name: null, sources: ["task_assignee"], expectedRole: "writer", status: "missing", actualRole: null, accessVia: null, failureCode: "TRANSIENT_OR_UNKNOWN", lastAttemptAt: "now", hasUnverifiableGroupAccess: true },
+      ],
+    } });
+    renderManager(true);
+
+    expect(await screen.findByText("Google indicó que este correo no está asociado a una cuenta de Google.")).toBeInTheDocument();
+    expect(screen.getByText("Google rechazó el acceso por una política o restricción de uso compartido.")).toBeInTheDocument();
+    expect(screen.getByText("No aparece con acceso en Drive.")).toBeInTheDocument();
+    expect(screen.getByText(/Drive no permite confirmar cada miembro de un grupo/i)).toBeInTheDocument();
+    expect(screen.getByText("daniel.test@abbott.com").closest("div.rounded-md"))
+      .toHaveClass("border-destructive");
+  });
+
+  it("shows a weaker role as non-red insufficient access", async () => {
+    mockGet.mockResolvedValue({ ok: true, data: {
+      canShare: true,
+      permissions: [],
+      expectedRecipients: [
+        { email: "reader@test.com", name: null, sources: ["creator"], expectedRole: "writer", status: "insufficient_role", actualRole: "reader", accessVia: "domain", failureCode: null, lastAttemptAt: null, hasUnverifiableGroupAccess: false },
+      ],
+    } });
+    renderManager(true);
+    const email = await screen.findByText("reader@test.com");
+    expect(screen.getByText("Rol insuficiente")).toBeInTheDocument();
+    expect(email.closest("div.rounded-md")).not.toHaveClass("border-destructive");
+  });
 });

@@ -4,6 +4,8 @@ import {
   ProjectType,
   ProjectDetailType,
   ProjectManagerHistoryEntry,
+  ProjectDriveFailureCode,
+  ProjectDriveRecipientSource,
   ProjectStatus,
   UserRole,
 } from "../definitions";
@@ -141,33 +143,107 @@ export async function getProjectDetail(id: number): Promise<ProjectDetailType | 
   }
 }
 
+export type ProjectDriveRecipient = {
+  email: string;
+  name: string | null;
+  sources: ProjectDriveRecipientSource[];
+};
+
 /** Current people who should receive additive access to the project folder. */
-export async function getProjectStakeholderEmails(projectId: number): Promise<string[]> {
+export async function getProjectExpectedDriveRecipients(
+  projectId: number
+): Promise<ProjectDriveRecipient[]> {
   const result = await db.execute({
     sql: `
-      SELECT email FROM users
-      WHERE is_active = 1 AND email IS NOT NULL AND (
-        rol_id IN ($2, $3) OR
-        id = (SELECT created_by FROM projects WHERE id = $1) OR
-        id IN (
-          SELECT DISTINCT assigned_user_id FROM project_tasks
-          WHERE project_id = $1 AND assigned_user_id IS NOT NULL
-        )
-      )
-      UNION
-      SELECT email FROM managers
-      WHERE email IS NOT NULL AND id IN (
-        SELECT manager_id FROM projects WHERE id = $1
-        UNION
-        SELECT manager_id FROM project_managers WHERE project_id = $1
-      )
+      SELECT email, name, 'leadership' AS source FROM users
+      WHERE is_active = 1 AND email IS NOT NULL AND rol_id IN ($2, $3, $4)
+      UNION ALL
+      SELECT u.email, u.name, 'creator' AS source
+      FROM projects p JOIN users u ON u.id = p.created_by
+      WHERE p.id = $1 AND u.is_active = 1 AND u.email IS NOT NULL
+      UNION ALL
+      SELECT u.email, u.name, 'task_assignee' AS source
+      FROM project_tasks pt JOIN users u ON u.id = pt.assigned_user_id
+      WHERE pt.project_id = $1 AND u.is_active = 1 AND u.email IS NOT NULL
+      UNION ALL
+      SELECT m.email, m.name, 'manager' AS source
+      FROM projects p JOIN managers m ON m.id = p.manager_id
+      WHERE p.id = $1 AND m.email IS NOT NULL
+      UNION ALL
+      SELECT m.email, m.name, 'co_manager' AS source
+      FROM project_managers pm JOIN managers m ON m.id = pm.manager_id
+      WHERE pm.project_id = $1 AND m.email IS NOT NULL
     `,
-    args: [projectId, UserRole.ADMIN, UserRole.DIRECTIVO],
+    args: [projectId, UserRole.ADMIN, UserRole.DIRECTIVO, UserRole.FINANCIERO],
   });
 
-  return result.rows
-    .map((row) => String(row.email ?? "").trim())
-    .filter(Boolean);
+  const recipients = new Map<string, ProjectDriveRecipient>();
+  for (const row of result.rows) {
+    const email = String(row.email ?? "").trim().toLowerCase();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) continue;
+    const source = String(row.source) as ProjectDriveRecipientSource;
+    const existing = recipients.get(email);
+    if (existing) {
+      if (!existing.sources.includes(source)) existing.sources.push(source);
+    } else {
+      recipients.set(email, {
+        email,
+        name: row.name ? String(row.name) : null,
+        sources: [source],
+      });
+    }
+  }
+  return [...recipients.values()];
+}
+
+export async function getProjectStakeholderEmails(projectId: number): Promise<string[]> {
+  return (await getProjectExpectedDriveRecipients(projectId)).map((recipient) => recipient.email);
+}
+
+export type ProjectDriveAccessFailure = {
+  email: string;
+  failureCode: ProjectDriveFailureCode;
+  lastAttemptAt: string;
+};
+
+export async function getProjectDriveAccessFailures(
+  projectId: number
+): Promise<ProjectDriveAccessFailure[]> {
+  const result = await db.execute({
+    sql: `SELECT email, failure_code, last_attempt_at
+          FROM project_drive_access_failures WHERE project_id = $1`,
+    args: [projectId],
+  });
+  return result.rows.map((row) => ({
+    email: String(row.email),
+    failureCode: String(row.failure_code) as ProjectDriveFailureCode,
+    lastAttemptAt: String(row.last_attempt_at),
+  }));
+}
+
+export async function upsertProjectDriveAccessFailure(
+  projectId: number,
+  email: string,
+  failureCode: ProjectDriveFailureCode
+): Promise<void> {
+  await db.execute({
+    sql: `INSERT INTO project_drive_access_failures (project_id, email, failure_code, last_attempt_at)
+          VALUES ($1, $2, $3, CURRENT_TIMESTAMP)
+          ON CONFLICT (project_id, email) DO UPDATE SET
+            failure_code = EXCLUDED.failure_code,
+            last_attempt_at = EXCLUDED.last_attempt_at`,
+    args: [projectId, email.trim().toLowerCase(), failureCode],
+  });
+}
+
+export async function clearProjectDriveAccessFailure(
+  projectId: number,
+  email: string
+): Promise<void> {
+  await db.execute({
+    sql: `DELETE FROM project_drive_access_failures WHERE project_id = $1 AND email = $2`,
+    args: [projectId, email.trim().toLowerCase()],
+  });
 }
 
 export async function getProjectsWithPagination({

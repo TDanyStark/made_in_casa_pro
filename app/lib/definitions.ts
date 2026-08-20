@@ -356,9 +356,35 @@ export type ProjectDrivePermission = {
   canDelete: boolean;
 };
 
+export type ProjectDriveFailureCode =
+  | "NO_GOOGLE_ACCOUNT"
+  | "POLICY_OR_RESTRICTION"
+  | "TRANSIENT_OR_UNKNOWN";
+
+export type ProjectDriveRecipientSource =
+  | "leadership"
+  | "creator"
+  | "task_assignee"
+  | "manager"
+  | "co_manager";
+
+export type ProjectDriveExpectedRecipient = {
+  email: string;
+  name: string | null;
+  sources: ProjectDriveRecipientSource[];
+  expectedRole: "writer";
+  status: "has_access" | "insufficient_role" | "missing";
+  actualRole: DrivePermissionRole | null;
+  accessVia: "direct" | "domain" | "anyone" | null;
+  failureCode: ProjectDriveFailureCode | null;
+  lastAttemptAt: string | null;
+  hasUnverifiableGroupAccess: boolean;
+};
+
 export type ProjectDrivePermissionsResponse = {
   canShare: boolean;
   permissions: ProjectDrivePermission[];
+  expectedRecipients?: ProjectDriveExpectedRecipient[];
 };
 
 export type DriveSyncWarning = {

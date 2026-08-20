@@ -54,6 +54,7 @@ import {
   deleteDriveFolderPermission,
   listDriveFolderPermissions,
   syncDriveFolderAccess,
+  classifyDrivePermissionFailure,
 } from "@/lib/services/googleDrive";
 import { getAppSettings } from "@/lib/queries/settings";
 
@@ -94,6 +95,43 @@ describe("googleDrive service", () => {
   });
 
   describe("folder permissions", () => {
+    it.each([
+      [new Error("User does not have a Google account"), "NO_GOOGLE_ACCOUNT"],
+      [new Error("Email is not associated with a Google account"), "NO_GOOGLE_ACCOUNT"],
+      [new Error("The recipient is not a valid Google account"), "NO_GOOGLE_ACCOUNT"],
+      [new Error("invalidSharingRequest"), "TRANSIENT_OR_UNKNOWN"],
+      [new Error("ACL change not allowed"), "POLICY_OR_RESTRICTION"],
+      [new Error("Unable to read sharing policy due to timeout"), "TRANSIENT_OR_UNKNOWN"],
+      [new Error("backend timeout"), "TRANSIENT_OR_UNKNOWN"],
+    ])("classifies provider failure %p as %s", (error, expected) => {
+      expect(classifyDrivePermissionFailure(error)).toBe(expected);
+    });
+
+    it("never infers a Google account status from a corporate domain", () => {
+      expect(classifyDrivePermissionFailure(new Error("invalidSharingRequest for daniel.test@abbott.com")))
+        .toBe("TRANSIENT_OR_UNKNOWN");
+    });
+
+    it("uses Google's nested provider message rather than the generic HTTP error", () => {
+      const error = Object.assign(new Error("Bad Request"), {
+        response: { data: { error: { errors: [
+          { reason: "invalidSharingRequest", message: "This email does not have a Google account" },
+        ] } } },
+      });
+      expect(classifyDrivePermissionFailure(error)).toBe("NO_GOOGLE_ACCOUNT");
+    });
+
+    it("does not create a redundant direct grant when a domain writer is effective", async () => {
+      const { filesGetMock, permissionsListMock, permissionsCreateMock } = await getMocks();
+      filesGetMock.mockResolvedValue({ data: { capabilities: { canShare: true } } });
+      permissionsListMock.mockResolvedValue({ data: { permissions: [
+        { id: "domain", type: "domain", role: "writer", domain: "abbott.com" },
+      ] } });
+
+      await expect(syncDriveFolderAccess("folder-1", ["daniel.test@abbott.com"]))
+        .resolves.toBeNull();
+      expect(permissionsCreateMock).not.toHaveBeenCalled();
+    });
     it("paginates ACL entries and protects owner, inherited, and connected-account permissions", async () => {
       const { filesGetMock, permissionsListMock } = await getMocks();
       filesGetMock.mockResolvedValue({ data: { capabilities: { canShare: true } } });

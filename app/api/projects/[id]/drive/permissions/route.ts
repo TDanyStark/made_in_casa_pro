@@ -2,12 +2,21 @@ import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { z } from "zod";
 import { decrypt } from "@/lib/session";
-import { getProjectById, userCanAccessProject } from "@/lib/queries/projects";
+import {
+  clearProjectDriveAccessFailure,
+  getProjectById,
+  getProjectDriveAccessFailures,
+  getProjectExpectedDriveRecipients,
+  upsertProjectDriveAccessFailure,
+  userCanAccessProject,
+} from "@/lib/queries/projects";
 import {
   addDriveFolderPermission,
+  classifyDrivePermissionFailure,
   deleteDriveFolderPermission,
   listDriveFolderPermissions,
 } from "@/lib/services/googleDrive";
+import { buildExpectedDriveRecipientStatuses } from "@/lib/services/projectDriveAccess";
 import { validateApiRole, validateHttpMethod } from "@/lib/services/api-auth";
 import { AUTHENTICATED_ROLES, PROJECT_EDIT_ROLES } from "@/lib/role-groups";
 
@@ -48,7 +57,12 @@ async function getAuthorizedProject(request: NextRequest, id: string, mutate: bo
   if (!project.drive_folder_id) {
     return { response: NextResponse.json({ error: "El proyecto no tiene una carpeta de Drive vinculada" }, { status: 409 }) };
   }
-  return { project };
+  return {
+    project,
+    canViewExpectedRecipients: PROJECT_EDIT_ROLES.some(
+      (role) => role === roleValidation.userRole
+    ),
+  };
 }
 
 function driveError() {
@@ -65,9 +79,24 @@ export async function GET(request: NextRequest, { params }: Params) {
   const authorized = await getAuthorizedProject(request, id, false);
   if ("response" in authorized) return authorized.response;
   try {
-    return NextResponse.json(await listDriveFolderPermissions(authorized.project.drive_folder_id!));
-  } catch (error) {
-    console.error("Error listing project Drive permissions:", error);
+    const drivePermissions = await listDriveFolderPermissions(authorized.project.drive_folder_id!);
+    if (!authorized.canViewExpectedRecipients) {
+      return NextResponse.json(drivePermissions);
+    }
+    const [recipients, failures] = await Promise.all([
+      getProjectExpectedDriveRecipients(Number(authorized.project.id)),
+      getProjectDriveAccessFailures(Number(authorized.project.id)),
+    ]);
+    return NextResponse.json({
+      ...drivePermissions,
+      expectedRecipients: buildExpectedDriveRecipientStatuses(
+        recipients,
+        drivePermissions.permissions,
+        failures
+      ),
+    });
+  } catch {
+    console.error("PROJECT_DRIVE_PERMISSIONS_LIST_FAILED", { projectId: id });
     return driveError();
   }
 }
@@ -88,9 +117,30 @@ export async function POST(request: NextRequest, { params }: Params) {
       parsed.data.email,
       parsed.data.role
     );
+    try {
+      await clearProjectDriveAccessFailure(Number(authorized.project.id), parsed.data.email);
+    } catch {
+      console.error("PROJECT_DRIVE_FAILURE_CLEAR_FAILED", {
+        projectId: authorized.project.id,
+      });
+    }
     return NextResponse.json({ success: true }, { status: 201 });
   } catch (error) {
-    console.error("Error adding project Drive permission:", error);
+    try {
+      await upsertProjectDriveAccessFailure(
+        Number(authorized.project.id),
+        parsed.data.email,
+        classifyDrivePermissionFailure(error)
+      );
+    } catch {
+      console.error("PROJECT_DRIVE_FAILURE_PERSIST_FAILED", {
+        projectId: authorized.project.id,
+      });
+    }
+    console.error("PROJECT_DRIVE_PERMISSION_ADD_FAILED", {
+      projectId: authorized.project.id,
+      failureCode: classifyDrivePermissionFailure(error),
+    });
     return driveError();
   }
 }
@@ -108,8 +158,10 @@ export async function DELETE(request: NextRequest, { params }: Params) {
   try {
     await deleteDriveFolderPermission(authorized.project.drive_folder_id!, parsed.data.permissionId);
     return NextResponse.json({ success: true });
-  } catch (error) {
-    console.error("Error deleting project Drive permission:", error);
+  } catch {
+    console.error("PROJECT_DRIVE_PERMISSION_DELETE_FAILED", {
+      projectId: authorized.project.id,
+    });
     return driveError();
   }
 }
