@@ -274,9 +274,16 @@ Al final, con la lista de tareas ya definitiva, el wizard llama una sola vez a
 `POST /api/projects/[id]/tasks/notify-created` (`OPERATIONS_ROLES`). Este
 endpoint envía `task.assigned` a cada tarea de la versión base (v1) que tiene
 responsable y después `task.ready` a las que están en `not_started`, así que el
-primer colaborador recibe los dos correos. Responde
-`{ notified: { assigned, ready } }` y omite las tareas que ya tienen ese evento
-registrado, así que llamarlo dos veces no duplica correos. Si falla, el
+primer colaborador recibe los dos correos. Luego envía `quote.requested`
+("Te invitaron a cotizar") a cada invitación de cotización pendiente de esas
+tareas: las plantillas registran invitados en `task_quote_invitations` sin
+enviarles correo. Una invitación está pendiente si la tarea no está
+`completed` y el invitado aún no envió su cotización. Responde
+`{ notified: { assigned, ready, quoteRequested } }`. Omite las tareas que ya
+tienen ese evento registrado y, para cotizaciones, el par tarea/invitado que ya
+tiene un `quote.requested` con ese `invitee_user_id` (por ejemplo, las tareas
+extra del wizard, que ya lo enviaron al crearse). Por eso, llamarlo dos veces
+no duplica correos. Si falla, el
 proyecto queda creado y el wizard solo muestra un aviso.
 
 ## Auditoría e historial
