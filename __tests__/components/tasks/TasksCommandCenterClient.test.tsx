@@ -1,10 +1,18 @@
 import React from "react";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, within } from "@testing-library/react";
 import { TasksCommandCenterClient } from "@/components/tasks/TasksCommandCenterClient";
 import { UserRole } from "@/lib/definitions";
 
 const mockReplace = jest.fn();
 const mockGet = jest.fn();
+
+jest.mock("lucide-react", () => new Proxy({}, {
+  get: (_, iconName: string) => {
+    const MockIcon = () => <svg data-testid={`icon-${iconName}`} />;
+    MockIcon.displayName = iconName;
+    return MockIcon;
+  },
+}));
 
 jest.mock("next/navigation", () => ({
   usePathname: () => "/tasks",
@@ -84,7 +92,20 @@ jest.mock("@/components/ui/switch", () => ({
 }));
 
 jest.mock("@/components/ui/searchable-select", () => ({
-  SearchableSelect: ({ placeholder }: { placeholder?: string }) => <div>{placeholder}</div>,
+  SearchableSelect: ({
+    placeholder,
+    options,
+  }: {
+    placeholder?: string;
+    options: Array<{ value: string; label: string }>;
+  }) => (
+    <div data-testid={`searchable-select-${placeholder}`}>
+      <span>{placeholder}</span>
+      {options.map((option) => (
+        <span key={option.value}>{option.label}</span>
+      ))}
+    </div>
+  ),
 }));
 
 jest.mock("sonner", () => ({
@@ -99,26 +120,6 @@ jest.mock("@/components/ui/select", () => {
   const SelectItem = ({ children }: { children: React.ReactNode }) => <div>{children}</div>;
   return { Select, SelectTrigger, SelectValue, SelectContent, SelectItem };
 });
-
-jest.mock("@/components/ui/checkbox", () => ({
-  Checkbox: ({
-    id,
-    checked,
-    onCheckedChange,
-  }: {
-    id: string;
-    checked?: boolean;
-    onCheckedChange?: (v: boolean) => void;
-  }) => (
-    <input
-      id={id}
-      data-testid={id}
-      type="checkbox"
-      checked={checked}
-      onChange={(e) => onCheckedChange?.(e.target.checked)}
-    />
-  ),
-}));
 
 jest.mock("@/components/ui/label", () => ({
   Label: ({ children, htmlFor }: { children: React.ReactNode; htmlFor?: string }) => (
@@ -181,7 +182,13 @@ describe("TasksCommandCenterClient", () => {
     expect(screen.getByText("Tarea")).toBeInTheDocument();
     expect(screen.getByText("Proyecto demo")).toBeInTheDocument();
     expect(screen.getByText("Producto demo")).toBeInTheDocument();
-    expect(screen.getAllByText("Financiero Tres").length).toBeGreaterThan(0);
+    // Creator filter only lists CREATOR_FILTER_ROLES (admin, directivo, financiero, comercial)
+    const creatorSelect = within(screen.getByTestId("searchable-select-Usuario creador"));
+    expect(creatorSelect.getByText("Usuario creador: todos")).toBeInTheDocument();
+    expect(creatorSelect.getByText("Admin Uno")).toBeInTheDocument();
+    expect(creatorSelect.getByText("Directivo Dos")).toBeInTheDocument();
+    expect(creatorSelect.getByText("Financiero Tres")).toBeInTheDocument();
+    expect(creatorSelect.queryByText("Colaborador")).not.toBeInTheDocument();
   });
 
   it("renders explicit date labels", () => {
@@ -193,13 +200,31 @@ describe("TasksCommandCenterClient", () => {
     expect(screen.getByLabelText("Completada hasta")).toBeInTheDocument();
   });
 
-  it("shows status checkboxes selected by default and updates URL when toggled", () => {
+  it("shows status pills selected by default and updates URL when toggled", () => {
     render(<TasksCommandCenterClient userRole={1 as UserRole} />);
 
-    const statusCompleted = screen.getByTestId("status-completed") as HTMLInputElement;
-    expect(statusCompleted.checked).toBe(true);
+    const statusCompleted = screen.getByRole("button", { name: "Completada" });
+    expect(statusCompleted).not.toHaveClass("opacity-50");
+    expect(screen.getByRole("button", { name: "Todos" })).not.toHaveClass("opacity-50");
 
     fireEvent.click(statusCompleted);
-    expect(mockReplace).toHaveBeenCalled();
+    expect(mockReplace).toHaveBeenCalledTimes(1);
+
+    const url = mockReplace.mock.calls[0][0] as string;
+    expect(url.startsWith("/tasks?")).toBe(true);
+    const params = new URLSearchParams(url.split("?")[1]);
+    expect(params.get("page")).toBe("1");
+    expect(params.getAll("status").sort()).toEqual(["blocked", "in_progress", "not_started", "waiting"]);
+  });
+
+  it("double click on a status pill selects only that status", () => {
+    render(<TasksCommandCenterClient userRole={1 as UserRole} />);
+
+    fireEvent.doubleClick(screen.getByRole("button", { name: "Bloqueada" }));
+
+    const url = mockReplace.mock.calls[mockReplace.mock.calls.length - 1][0] as string;
+    const params = new URLSearchParams(url.split("?")[1]);
+    expect(params.get("page")).toBe("1");
+    expect(params.getAll("status")).toEqual(["blocked"]);
   });
 });

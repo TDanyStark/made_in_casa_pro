@@ -82,12 +82,13 @@ describe('getUserByEmail()', () => {
 
 describe('createUser()', () => {
   it('calls db.execute with INSERT INTO users and 4 args', async () => {
-    mockExecute.mockResolvedValueOnce(makeResult([], 10));
-    await createUser('Maria', 'maria@test.com', 'hashedpw', 3);
+    mockExecute.mockResolvedValueOnce(makeResult([{ id: 10 }]));
+    const result = await createUser('Maria', 'maria@test.com', 'hashedpw', 3);
     expect(mockExecute).toHaveBeenCalledWith({
       sql: expect.stringContaining('INSERT INTO users'),
       args: ['Maria', 'maria@test.com', 'hashedpw', 3],
     });
+    expect(result.rows[0]).toEqual({ id: 10 });
   });
 
   it('throws "No se pudo crear el usuario" when db fails', async () => {

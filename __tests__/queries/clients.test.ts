@@ -48,12 +48,13 @@ describe('getClients()', () => {
 
 describe('createClient()', () => {
   it('calls db.execute with INSERT SQL and correct args', async () => {
-    mockExecute.mockResolvedValueOnce(makeResult([], 5));
-    await createClient('Test Client', 1);
+    mockExecute.mockResolvedValueOnce(makeResult([{ id: 5 }]));
+    const result = await createClient('Test Client', 1);
     expect(mockExecute).toHaveBeenCalledWith({
       sql: expect.stringContaining('INSERT INTO clients'),
       args: ['Test Client', 1],
     });
+    expect(result.rows[0]).toEqual({ id: 5 });
   });
 
   it('re-throws errors from db', async () => {

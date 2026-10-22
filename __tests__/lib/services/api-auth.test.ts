@@ -33,7 +33,7 @@ describe("validateApiRole Gmail guard", () => {
     mockCookies.mockResolvedValue({
       get: jest.fn().mockReturnValue({ value: "session-token" }),
     } as never);
-    mockDecrypt.mockResolvedValue({ id: 7, email: "user@test.com", rol_id: UserRole.ADMIN } as never);
+    mockDecrypt.mockResolvedValue({ id: 7, email: "user@test.com", rol_id: UserRole.COMERCIAL } as never);
     mockIsGmailConnectionRequired.mockReturnValue(true);
     mockGetUserConnectedEmailStatus.mockResolvedValue(true);
   });
@@ -43,18 +43,34 @@ describe("validateApiRole Gmail guard", () => {
 
     const result = await validateApiRole(
       new NextRequest("http://localhost/api/projects"),
-      [UserRole.ADMIN]
+      [UserRole.COMERCIAL]
     );
 
     expect(result.isAuthorized).toBe(false);
     expect(result.response?.status).toBe(428);
     expect(await result.response?.json()).toEqual({ error: "Debes conectar Gmail para continuar" });
+    expect(mockGetUserConnectedEmailStatus).toHaveBeenCalledWith(7);
+  });
+
+  it("lets ADMIN through even when Gmail is required and not connected", async () => {
+    mockDecrypt.mockResolvedValueOnce({ id: 7, email: "user@test.com", rol_id: UserRole.ADMIN } as never);
+    mockGetUserConnectedEmailStatus.mockResolvedValue(false);
+
+    const result = await validateApiRole(
+      new NextRequest("http://localhost/api/projects"),
+      [UserRole.ADMIN]
+    );
+
+    expect(result.isAuthorized).toBe(true);
+    expect(result.userRole).toBe(UserRole.ADMIN);
+    expect(result.response).toBeUndefined();
+    expect(mockGetUserConnectedEmailStatus).not.toHaveBeenCalled();
   });
 
   it("allows user-email API routes without checking Gmail status", async () => {
     const result = await validateApiRole(
       new NextRequest("http://localhost/api/user-email/status"),
-      [UserRole.ADMIN]
+      [UserRole.COMERCIAL]
     );
 
     expect(result.isAuthorized).toBe(true);
@@ -64,7 +80,7 @@ describe("validateApiRole Gmail guard", () => {
   it("allows settings API routes so admins can configure OAuth before Gmail is connected", async () => {
     const result = await validateApiRole(
       new NextRequest("http://localhost/api/settings"),
-      [UserRole.ADMIN]
+      [UserRole.COMERCIAL]
     );
 
     expect(result.isAuthorized).toBe(true);
@@ -76,7 +92,7 @@ describe("validateApiRole Gmail guard", () => {
 
     const result = await validateApiRole(
       new NextRequest("http://localhost/api/projects"),
-      [UserRole.ADMIN]
+      [UserRole.COMERCIAL]
     );
 
     expect(result.isAuthorized).toBe(true);

@@ -136,17 +136,9 @@ describe('POST /start — success cases', () => {
     expect(mockStartTask).toHaveBeenCalledWith(10, 5);
   });
 
-  it('returns 200 when admin user who is project creator starts a task', async () => {
-    setupAuthMocks(1, 1); // userId=1, role=ADMIN
+  it('returns 200 when an override role (ADMIN) starts a task assigned to someone else, without checking project creator', async () => {
+    setupAuthMocks(1, 1); // userId=1, role=ADMIN (TASK_OVERRIDE_ROLES)
     mockGetProjectTaskById.mockResolvedValue(makeTask({ assigned_user_id: 99 }) as never); // different user assigned
-    // db.execute returns project with created_by = 1
-    mockDbExecute.mockResolvedValueOnce({
-      rows: [{ created_by: 1 }],
-      columns: [],
-      columnTypes: [],
-      rowsAffected: 1,
-      toJSON: () => ({}),
-    } as never);
     mockStartTask.mockResolvedValue({ success: true });
 
     const req = makeRequest();
@@ -154,30 +146,25 @@ describe('POST /start — success cases', () => {
     const data = await res.json();
 
     expect(res.status).toBe(200);
-    expect(data.message).toMatch(/iniciada/i);
-    expect(mockDbExecute).toHaveBeenCalledWith(
-      expect.objectContaining({
-        sql: expect.stringContaining('SELECT created_by FROM projects'),
-      })
-    );
+    expect(data.message).toBe('Tarea iniciada correctamente');
+    expect(mockStartTask).toHaveBeenCalledWith(10, 1);
+    expect(mockDbExecute).not.toHaveBeenCalled();
   });
 
-  it('returns 200 when financiero user who is project creator starts a task', async () => {
-    setupAuthMocks(8, 5); // userId=8, role=FINANCIERO
+  it.each([
+    ['DIRECTIVO', 2],
+    ['COMERCIAL', 3],
+    ['FINANCIERO', 5],
+  ])('returns 200 when override role %s (not assigned) starts a task', async (_name, role) => {
+    setupAuthMocks(8, role);
     mockGetProjectTaskById.mockResolvedValue(makeTask({ assigned_user_id: 99 }) as never);
-    mockDbExecute.mockResolvedValueOnce({
-      rows: [{ created_by: 8 }],
-      columns: [],
-      columnTypes: [],
-      rowsAffected: 1,
-      toJSON: () => ({}),
-    } as never);
     mockStartTask.mockResolvedValue({ success: true });
 
     const res = await callPost(makeRequest(), makeParams());
 
     expect(res.status).toBe(200);
     expect(mockStartTask).toHaveBeenCalledWith(10, 8);
+    expect(mockDbExecute).not.toHaveBeenCalled();
   });
 });
 
@@ -216,27 +203,9 @@ describe('POST /start — error cases', () => {
     const data = await res.json();
 
     expect(res.status).toBe(403);
-    expect(data.error).toMatch(/permiso/i);
-  });
-
-  it('returns 403 when manager is NOT the project creator', async () => {
-    setupAuthMocks(2, 1); // userId=2, role=ADMIN
-    mockGetProjectTaskById.mockResolvedValue(makeTask({ assigned_user_id: 5 }) as never);
-    // db.execute returns project with created_by = 99 (not userId=2)
-    mockDbExecute.mockResolvedValueOnce({
-      rows: [{ created_by: 99 }],
-      columns: [],
-      columnTypes: [],
-      rowsAffected: 1,
-      toJSON: () => ({}),
-    } as never);
-
-    const req = makeRequest();
-    const res = await callPost(req, makeParams());
-    const data = await res.json();
-
-    expect(res.status).toBe(403);
-    expect(data.error).toMatch(/permiso/i);
+    expect(data.error).toBe('No tienes permiso para iniciar esta tarea');
+    expect(mockStartTask).not.toHaveBeenCalled();
+    expect(mockDbExecute).not.toHaveBeenCalled();
   });
 
   it('returns 400 when startTask returns error (e.g. wrong status)', async () => {

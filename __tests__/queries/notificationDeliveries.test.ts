@@ -225,20 +225,30 @@ describe('getDeliveryCountByEventAndRecipient() — idempotency', () => {
 
 describe('resetDeliveryForRetry()', () => {
   it('resets status to pending and clears error for a failed delivery', async () => {
-    mockExecute.mockResolvedValueOnce(makeResult([]));
-    await resetDeliveryForRetry(42);
+    mockExecute.mockResolvedValueOnce(makeResult([{ id: 42 }]));
+    await expect(resetDeliveryForRetry(42)).resolves.toBeUndefined();
     expect(mockExecute).toHaveBeenCalledWith(expect.objectContaining({
-      sql: expect.stringContaining("SET status = 'pending'"),
+      sql: expect.stringContaining("SET status = 'pending', error = NULL"),
       args: [42],
     }));
   });
 
   it('only resets if status is failed', async () => {
-    mockExecute.mockResolvedValueOnce(makeResult([]));
+    mockExecute.mockResolvedValueOnce(makeResult([{ id: 42 }]));
     await resetDeliveryForRetry(42);
     expect(mockExecute).toHaveBeenCalledWith(expect.objectContaining({
       sql: expect.stringContaining("AND status = 'failed'"),
     }));
+  });
+
+  it('throws when no failed delivery row was updated (not in failed state)', async () => {
+    const errorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    mockExecute.mockResolvedValueOnce(makeResult([]));
+    await expect(resetDeliveryForRetry(42)).rejects.toThrow(
+      "Delivery 42 was not in 'failed' state — reset skipped. It may already be pending or sent."
+    );
+    expect(mockExecute).toHaveBeenCalledTimes(1);
+    errorSpy.mockRestore();
   });
 
   it('throws on DB error', async () => {

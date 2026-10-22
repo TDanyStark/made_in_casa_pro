@@ -71,7 +71,7 @@ describe("GET /api/projects/[id]/quote-view", () => {
       { id: 202, title: "Contexto", status: "waiting" },
     ] as never);
 
-    const response = await callGet();
+    const response = (await callGet())!;
     const data = await response.json();
 
     expect(response.status).toBe(200);
@@ -87,7 +87,7 @@ describe("GET /api/projects/[id]/quote-view", () => {
   it("rejects access when the collaborator has no invitation in the project", async () => {
     mockGetTasksForQuoteView.mockResolvedValue([] as never);
 
-    const response = await callGet();
+    const response = (await callGet())!;
     const data = await response.json();
 
     expect(response.status).toBe(403);

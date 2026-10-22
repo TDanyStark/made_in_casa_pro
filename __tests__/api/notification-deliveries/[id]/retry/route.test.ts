@@ -10,15 +10,38 @@ jest.mock("@/lib/services/api-auth", () => ({
 jest.mock("@/lib/queries/notificationDeliveries", () => ({
   getDeliveryById: jest.fn(),
   MAX_RETRY_COUNT: 3,
-  resetDeliveryForRetry: jest.fn(),
 }));
 
 jest.mock("@/lib/queries/notificationEvents", () => ({
   getNotificationEventById: jest.fn(),
 }));
 
-jest.mock("@/lib/services/notificationEngine", () => ({
-  dispatchNotification: jest.fn().mockResolvedValue(undefined),
+jest.mock("@/lib/services/email/emailService", () => ({
+  resendExistingDelivery: jest.fn(),
+}));
+
+jest.mock("@/lib/queries/projects", () => ({
+  getProjectById: jest.fn(),
+}));
+
+jest.mock("@/lib/queries/projectTasks", () => ({
+  getProjectTaskById: jest.fn(),
+  getTaskDriveFolderUrl: jest.fn(),
+}));
+
+jest.mock("@/lib/queries/notificationRecipients", () => ({
+  getTaskAssignee: jest.fn(),
+  getTaskProjectCreator: jest.fn(),
+  getQuoteInvitee: jest.fn(),
+  getQuoteReceivedRecipient: jest.fn(),
+  getAcceptedQuoteCollaborator: jest.fn(),
+  getActorName: jest.fn(),
+  getUserNotificationRecipient: jest.fn(),
+  getProjectStakeholders: jest.fn(),
+}));
+
+jest.mock("@/lib/queries/projectEmailThreads", () => ({
+  resolveProjectVersionThreadKey: jest.fn(),
 }));
 
 jest.mock("@/lib/services/notificationLogger", () => ({
@@ -28,16 +51,25 @@ jest.mock("@/lib/services/notificationLogger", () => ({
 import { NextRequest } from "next/server";
 import { POST } from "@/api/notification-deliveries/[id]/retry/route";
 import { validateApiRole, validateHttpMethod } from "@/lib/services/api-auth";
-import { getDeliveryById, resetDeliveryForRetry } from "@/lib/queries/notificationDeliveries";
+import { getDeliveryById } from "@/lib/queries/notificationDeliveries";
 import { getNotificationEventById } from "@/lib/queries/notificationEvents";
-import { dispatchNotification } from "@/lib/services/notificationEngine";
+import { resendExistingDelivery } from "@/lib/services/email/emailService";
+import { getProjectById } from "@/lib/queries/projects";
+import { getProjectTaskById, getTaskDriveFolderUrl } from "@/lib/queries/projectTasks";
+import { getActorName, getUserNotificationRecipient } from "@/lib/queries/notificationRecipients";
+import { resolveProjectVersionThreadKey } from "@/lib/queries/projectEmailThreads";
 
 const mockValidateHttpMethod = validateHttpMethod as jest.MockedFunction<typeof validateHttpMethod>;
 const mockValidateApiRole = validateApiRole as jest.MockedFunction<typeof validateApiRole>;
 const mockGetDeliveryById = getDeliveryById as jest.MockedFunction<typeof getDeliveryById>;
-const mockResetDeliveryForRetry = resetDeliveryForRetry as jest.MockedFunction<typeof resetDeliveryForRetry>;
 const mockGetNotificationEventById = getNotificationEventById as jest.MockedFunction<typeof getNotificationEventById>;
-const mockDispatchNotification = dispatchNotification as jest.MockedFunction<typeof dispatchNotification>;
+const mockResendExistingDelivery = resendExistingDelivery as jest.MockedFunction<typeof resendExistingDelivery>;
+const mockGetProjectById = getProjectById as jest.MockedFunction<typeof getProjectById>;
+const mockGetProjectTaskById = getProjectTaskById as jest.MockedFunction<typeof getProjectTaskById>;
+const mockGetTaskDriveFolderUrl = getTaskDriveFolderUrl as jest.MockedFunction<typeof getTaskDriveFolderUrl>;
+const mockGetActorName = getActorName as jest.MockedFunction<typeof getActorName>;
+const mockGetUserNotificationRecipient = getUserNotificationRecipient as jest.MockedFunction<typeof getUserNotificationRecipient>;
+const mockResolveThreadKey = resolveProjectVersionThreadKey as jest.MockedFunction<typeof resolveProjectVersionThreadKey>;
 
 const ADMIN = { isAuthorized: true, userRole: 1, response: undefined } as never;
 const FORBIDDEN = {
@@ -93,13 +125,33 @@ const baseEvent = {
   created_at: "2026-01-01",
 };
 
+const task = {
+  id: 9,
+  project_id: 7,
+  title: "Task Y",
+  description: "Diseñar piezas",
+  task_type: "execution",
+  task_flag: "new",
+  adjustment_id: null,
+};
+
+const project = {
+  id: 7,
+  title: "Project X",
+  ideal_delivery_at: null,
+};
+
 describe("POST /api/notification-deliveries/[id]/retry", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockValidateHttpMethod.mockReturnValue({ isValidMethod: true, response: undefined });
     mockValidateApiRole.mockResolvedValue(ADMIN);
-    mockResetDeliveryForRetry.mockResolvedValue(undefined);
-    mockDispatchNotification.mockResolvedValue(undefined);
+    mockResendExistingDelivery.mockResolvedValue({
+      deliveryId: 42,
+      provider: "gmail",
+      gmailThreadId: "thread-1",
+      messageId: "msg-1",
+    });
   });
 
   it("returns 400 for non-numeric id", async () => {
@@ -149,26 +201,41 @@ describe("POST /api/notification-deliveries/[id]/retry", () => {
     } as unknown as never);
     const res = await callPost("42");
     expect(res!.status).toBe(422);
-    expect((await res!.json()).error).toContain("no soporta reintento automático");
+    expect((await res!.json()).error).toBe(
+      "No se pudo reconstruir el mensaje para el tipo de evento 'quote.requested'"
+    );
+    expect(mockResendExistingDelivery).not.toHaveBeenCalled();
   });
 
   it("initiates retry and returns ok=true for a valid failed delivery", async () => {
     mockGetDeliveryById.mockResolvedValue(failedDelivery as unknown as never);
     mockGetNotificationEventById.mockResolvedValue(baseEvent as unknown as never);
+    mockGetProjectTaskById.mockResolvedValue(task as unknown as never);
+    mockGetProjectById.mockResolvedValue(project as unknown as never);
+    mockGetUserNotificationRecipient.mockResolvedValue({ id: 5, name: "Ana", email: "to@example.com" } as never);
+    mockGetActorName.mockResolvedValue("Alice");
+    mockGetTaskDriveFolderUrl.mockResolvedValue(null as never);
+    mockResolveThreadKey.mockResolvedValue("project:7:version:base");
 
     const res = await callPost("42");
     const body = await res!.json();
 
     expect(res!.status).toBe(200);
-    expect(body.ok).toBe(true);
-    expect(body.retrying).toBe(true);
-    expect(body.attempt).toBe(2); // retry_count was 1
+    expect(body).toEqual({ ok: true, retrying: false, sent: true, attempt: 2 }); // retry_count was 1
 
-    expect(mockResetDeliveryForRetry).toHaveBeenCalledWith(42);
-    // dispatchNotification is called async (fire-and-forget), give event loop a tick
-    await new Promise((r) => setTimeout(r, 10));
-    expect(mockDispatchNotification).toHaveBeenCalledWith(
-      expect.objectContaining({ eventType: "task.assigned", taskId: 9, projectId: 7 })
+    expect(mockGetProjectTaskById).toHaveBeenCalledWith(9);
+    expect(mockGetProjectById).toHaveBeenCalledWith(7);
+    expect(mockGetUserNotificationRecipient).toHaveBeenCalledWith(5);
+    expect(mockResendExistingDelivery).toHaveBeenCalledTimes(1);
+    expect(mockResendExistingDelivery).toHaveBeenCalledWith(
+      42,
+      expect.objectContaining({
+        to: { email: "to@example.com", name: "Ana" },
+        subject: expect.stringContaining("Task Y"),
+        html: expect.any(String),
+        text: expect.any(String),
+      }),
+      { projectId: 7, adjustmentId: null, threadKey: "project:7:version:base" }
     );
   });
 

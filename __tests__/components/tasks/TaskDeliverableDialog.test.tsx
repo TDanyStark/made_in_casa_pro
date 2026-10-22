@@ -73,12 +73,35 @@ describe("TaskDeliverableDialog", () => {
       <TaskDeliverableDialog
         open={true}
         onOpenChange={jest.fn()}
+        task={makeTask({ progress_minutes: 0 })}
+      />
+    );
+
+    expect(screen.getByText("Sin entregable registrado")).toBeInTheDocument();
+    expect(
+      screen.getByText("Esta tarea todavía no tiene enlace, notas de entrega ni tiempo registrado.")
+    ).toBeInTheDocument();
+    expect(screen.queryByText("Enlace de entrega")).not.toBeInTheDocument();
+    expect(screen.queryByText("Notas de entrega")).not.toBeInTheDocument();
+  });
+
+  it("shows per-field empty messages when only time was registered", () => {
+    render(
+      <TaskDeliverableDialog
+        open={true}
+        onOpenChange={jest.fn()}
         task={makeTask()}
       />
     );
 
-    expect(screen.getByText(/sin entregable registrado/i)).toBeInTheDocument();
-    expect(screen.getByText(/todavía no tiene enlace ni notas de entrega/i)).toBeInTheDocument();
+    expect(screen.queryByText("Sin entregable registrado")).not.toBeInTheDocument();
+    expect(screen.getByText("Tiempo invertido")).toBeInTheDocument();
+    expect(screen.getByText("Enlace de entrega")).toBeInTheDocument();
+    expect(screen.getByText("No se registró enlace de entrega.")).toBeInTheDocument();
+    expect(screen.getByText("Notas de entrega")).toBeInTheDocument();
+    expect(screen.getByText("No se registraron notas de entrega.")).toBeInTheDocument();
+    expect(screen.queryByText("No se registró tiempo invertido.")).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /abrir enlace/i })).not.toBeInTheDocument();
   });
 
   it("shows delivery link and notes in read-only mode", () => {

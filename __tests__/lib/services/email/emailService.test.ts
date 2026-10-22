@@ -8,8 +8,13 @@ jest.mock("@/lib/queries/userEmailConnections", () => ({
 
 jest.mock("@/lib/queries/notificationDeliveries", () => ({
   createNotificationDelivery: jest.fn(),
+  getDeliveryCountByEventAndRecipient: jest.fn(),
   markDeliverySent: jest.fn(),
   markDeliveryFailed: jest.fn(),
+}));
+
+jest.mock("@/lib/services/notificationLogger", () => ({
+  notifLog: { info: jest.fn(), warn: jest.fn(), error: jest.fn() },
 }));
 
 jest.mock("@/lib/queries/projectEmailThreads", () => ({
@@ -34,6 +39,7 @@ import { sendEmail } from "@/lib/services/email/emailService";
 import { getUserEmailConnection } from "@/lib/queries/userEmailConnections";
 import {
   createNotificationDelivery,
+  getDeliveryCountByEventAndRecipient,
   markDeliverySent,
   markDeliveryFailed,
 } from "@/lib/queries/notificationDeliveries";
@@ -43,6 +49,7 @@ import { SystemEmailProvider } from "@/lib/services/email/systemEmailProvider";
 
 const mockGetUserEmailConnection = getUserEmailConnection as jest.MockedFunction<typeof getUserEmailConnection>;
 const mockCreateDelivery = createNotificationDelivery as jest.MockedFunction<typeof createNotificationDelivery>;
+const mockGetDeliveryCount = getDeliveryCountByEventAndRecipient as jest.MockedFunction<typeof getDeliveryCountByEventAndRecipient>;
 const mockMarkSent = markDeliverySent as jest.MockedFunction<typeof markDeliverySent>;
 const mockMarkFailed = markDeliveryFailed as jest.MockedFunction<typeof markDeliveryFailed>;
 const mockGetOrCreateThread = getOrCreateThread as jest.MockedFunction<typeof getOrCreateThread>;
@@ -70,6 +77,7 @@ describe("sendEmail()", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockCreateDelivery.mockResolvedValue({ id: 42 } as never);
+    mockGetDeliveryCount.mockResolvedValue(0);
     mockMarkSent.mockResolvedValue(undefined);
     mockMarkFailed.mockResolvedValue(undefined);
     mockGetOrCreateThread.mockResolvedValue(baseThread);
@@ -156,5 +164,25 @@ describe("sendEmail()", () => {
       1,
       expect.objectContaining({ gmail_thread_id: "gmail-thread-id" })
     );
+  });
+
+  it("skips sending a duplicate (event, recipient) delivery and returns a sentinel result", async () => {
+    mockGetUserEmailConnection.mockResolvedValue(connectedConnection);
+    mockGetDeliveryCount.mockResolvedValue(1);
+
+    const result = await sendEmail({ senderUserId: 7, message: baseMessage, eventId: 10 });
+
+    expect(mockGetDeliveryCount).toHaveBeenCalledWith(10, "recipient@test.com");
+    expect(result).toEqual({
+      deliveryId: -1,
+      provider: "gmail",
+      gmailThreadId: null,
+      messageId: null,
+    });
+    expect(mockCreateDelivery).not.toHaveBeenCalled();
+    expect(GmailEmailProvider).not.toHaveBeenCalled();
+    expect(SystemEmailProvider).not.toHaveBeenCalled();
+    expect(mockMarkSent).not.toHaveBeenCalled();
+    expect(mockMarkFailed).not.toHaveBeenCalled();
   });
 });

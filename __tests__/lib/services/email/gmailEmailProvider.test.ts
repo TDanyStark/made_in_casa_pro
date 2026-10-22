@@ -152,7 +152,9 @@ describe("GmailEmailProvider", () => {
           html: "<p>Test</p>",
         },
       })
-    ).rejects.toThrow("expiró o fue revocada");
+    ).rejects.toThrow(
+      "La autorización de Gmail no es válida. El usuario debe reconectar Gmail desde /connect-email."
+    );
 
     expect(mockMarkEmailConnectionInvalid).toHaveBeenCalledWith(7, expect.stringContaining("invalid_grant"));
   });

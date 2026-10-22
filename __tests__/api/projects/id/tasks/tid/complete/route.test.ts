@@ -71,7 +71,7 @@ const mockCookies = cookies as jest.MockedFunction<typeof cookies>;
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
-function makeRequest(body: Record<string, unknown> = { progress_minutes: 0 }, projectId = '1', taskId = '10') {
+function makeRequest(body: Record<string, unknown> = { progress_minutes: 30 }, projectId = '1', taskId = '10') {
   const url = `http://localhost/api/projects/${projectId}/tasks/${taskId}/complete`;
   return new NextRequest(url, {
     method: 'POST',
@@ -138,7 +138,11 @@ describe('POST /complete — role override', () => {
     const data = await res.json();
 
     expect(res.status).toBe(200);
-    expect(mockCompleteTask).toHaveBeenCalledWith(10, 99, undefined, expect.any(Object));
+    expect(mockCompleteTask).toHaveBeenCalledWith(10, 99, undefined, {
+      progress_minutes: 30,
+      delivery_url: undefined,
+      completion_cost: undefined,
+    });
     expect(data.task).toBeDefined();
   });
 
@@ -178,5 +182,35 @@ describe('POST /complete — role override', () => {
 
     expect(res.status).toBe(404);
     expect(mockCompleteTask).not.toHaveBeenCalled();
+  });
+});
+
+describe('POST /complete — mandatory time tracking', () => {
+  it('returns 400 when progress_minutes is missing', async () => {
+    setupAuthMocks(UserRole.COLABORADOR, 5);
+    mockGetProjectTaskById.mockResolvedValue(makeTask() as never);
+
+    const res = await callPost(makeRequest({}), makeParams());
+    const data = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(data.error).toBe('Debes registrar el tiempo invertido en la tarea');
+    expect(mockCompleteTask).not.toHaveBeenCalled();
+    expect(mockRecalculate).not.toHaveBeenCalled();
+    expect(mockDispatch).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 when progress_minutes is 0', async () => {
+    setupAuthMocks(UserRole.COLABORADOR, 5);
+    mockGetProjectTaskById.mockResolvedValue(makeTask() as never);
+
+    const res = await callPost(makeRequest({ progress_minutes: 0 }), makeParams());
+    const data = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(data.error).toBe('Debes registrar al menos 1 minuto de tiempo invertido');
+    expect(mockCompleteTask).not.toHaveBeenCalled();
+    expect(mockRecalculate).not.toHaveBeenCalled();
+    expect(mockDispatch).not.toHaveBeenCalled();
   });
 });

@@ -27,13 +27,25 @@ function makeResult(rows: Record<string, unknown>[]) {
   };
 }
 
+const ORIGINAL_REQUIRE_GMAIL = process.env.REQUIRE_GMAIL_CONNECTION;
+
 beforeEach(() => {
   jest.clearAllMocks();
   delete process.env.REQUIRE_GMAIL_CONNECTION;
 });
 
+afterAll(() => {
+  if (ORIGINAL_REQUIRE_GMAIL === undefined) delete process.env.REQUIRE_GMAIL_CONNECTION;
+  else process.env.REQUIRE_GMAIL_CONNECTION = ORIGINAL_REQUIRE_GMAIL;
+});
+
 describe('isGmailConnectionRequired()', () => {
-  it('is enabled by default', () => {
+  it('is disabled by default (REQUIRE_GMAIL_CONNECTION unset)', () => {
+    expect(isGmailConnectionRequired()).toBe(false);
+  });
+
+  it('is enabled only with REQUIRE_GMAIL_CONNECTION=true', () => {
+    process.env.REQUIRE_GMAIL_CONNECTION = 'true';
     expect(isGmailConnectionRequired()).toBe(true);
   });
 
@@ -77,16 +89,29 @@ describe('getUserConnectedEmailStatus()', () => {
     expect(mockExecute).not.toHaveBeenCalled();
   });
 
+  it('returns true without querying DB by default (requirement unset)', async () => {
+    const result = await getUserConnectedEmailStatus(5);
+
+    expect(result).toBe(true);
+    expect(mockExecute).not.toHaveBeenCalled();
+  });
+
   it('returns true when user has valid connected gmail', async () => {
+    process.env.REQUIRE_GMAIL_CONNECTION = 'true';
     mockExecute.mockResolvedValueOnce(makeResult([{ '1': 1 }]));
     const result = await getUserConnectedEmailStatus(5);
     expect(result).toBe(true);
   });
 
-  it('returns false when user has no gmail connection', async () => {
+  it('returns false when Gmail is required and user has no gmail connection', async () => {
+    process.env.REQUIRE_GMAIL_CONNECTION = 'true';
     mockExecute.mockResolvedValueOnce(makeResult([]));
     const result = await getUserConnectedEmailStatus(5);
     expect(result).toBe(false);
+    expect(mockExecute).toHaveBeenCalledWith(expect.objectContaining({
+      sql: expect.stringContaining('user_email_connections'),
+      args: [5],
+    }));
   });
 });
 

@@ -134,26 +134,6 @@ jest.mock("@/components/ui/dropdown-menu", () => {
   return { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent };
 });
 
-jest.mock("@/components/ui/checkbox", () => ({
-  Checkbox: ({
-    id,
-    checked,
-    onCheckedChange,
-  }: {
-    id: string;
-    checked?: boolean;
-    onCheckedChange?: (v: boolean) => void;
-  }) => (
-    <input
-      id={id}
-      data-testid={id}
-      type="checkbox"
-      checked={checked}
-      onChange={(e) => onCheckedChange?.(e.target.checked)}
-    />
-  ),
-}));
-
 jest.mock("@/components/ui/label", () => ({
   Label: ({ children, htmlFor }: { children: React.ReactNode; htmlFor?: string }) => (
     <label htmlFor={htmlFor}>{children}</label>
@@ -242,28 +222,51 @@ describe("MyTasksClient", () => {
   it("updates URL when status filter changes", () => {
     render(<MyTasksClient />);
 
-    const checkbox = screen.getByTestId("my-task-status-not_started") as HTMLInputElement;
-    expect(checkbox.checked).toBe(true);
+    const pill = screen.getByRole("button", { name: "Sin iniciar" });
+    // Selected by default (not_started is part of the default statuses)
+    expect(pill).not.toHaveClass("opacity-50");
 
-    fireEvent.click(checkbox);
-    expect(mockReplace).toHaveBeenCalled();
+    fireEvent.click(pill);
+    expect(mockReplace).toHaveBeenCalledTimes(1);
 
     const lastCall = mockReplace.mock.calls[mockReplace.mock.calls.length - 1][0] as string;
-    expect(lastCall).toContain("page=1");
-    expect(lastCall).toContain("status=in_progress");
+    const params = new URLSearchParams(lastCall.split("?")[1]);
+    expect(lastCall.startsWith("/my-tasks?")).toBe(true);
+    expect(params.get("page")).toBe("1");
+    expect(params.getAll("status").sort()).toEqual(["blocked", "in_progress", "waiting"]);
   });
 
   it("allows enabling completed status explicitly", () => {
     render(<MyTasksClient />);
 
-    const checkbox = screen.getByTestId("my-task-status-completed") as HTMLInputElement;
-    expect(checkbox.checked).toBe(false);
+    const pill = screen.getByRole("button", { name: "Completada" });
+    // Not selected by default (completed is excluded from the default statuses)
+    expect(pill).toHaveClass("opacity-50");
 
-    fireEvent.click(checkbox);
-    expect(mockReplace).toHaveBeenCalled();
+    fireEvent.click(pill);
+    expect(mockReplace).toHaveBeenCalledTimes(1);
 
     const lastCall = mockReplace.mock.calls[mockReplace.mock.calls.length - 1][0] as string;
-    expect(lastCall).toContain("status=completed");
+    const params = new URLSearchParams(lastCall.split("?")[1]);
+    expect(params.get("page")).toBe("1");
+    expect(params.getAll("status").sort()).toEqual([
+      "blocked",
+      "completed",
+      "in_progress",
+      "not_started",
+      "waiting",
+    ]);
+  });
+
+  it("double click on a status pill selects only that status", () => {
+    render(<MyTasksClient />);
+
+    fireEvent.doubleClick(screen.getByRole("button", { name: "Completada" }));
+
+    const lastCall = mockReplace.mock.calls[mockReplace.mock.calls.length - 1][0] as string;
+    const params = new URLSearchParams(lastCall.split("?")[1]);
+    expect(params.get("page")).toBe("1");
+    expect(params.getAll("status")).toEqual(["completed"]);
   });
 
   it("opens report flow with URL flag when notification CTA is clicked", () => {

@@ -3,8 +3,19 @@ import { render, screen } from "@testing-library/react";
 
 const mockUseQuery = jest.fn();
 
+jest.mock("lucide-react", () => new Proxy({}, {
+  get: (_, iconName: string) => {
+    const MockIcon = () => <svg data-testid={`icon-${iconName}`} />;
+    MockIcon.displayName = iconName;
+    return MockIcon;
+  },
+}));
+
+const mockInvalidateQueries = jest.fn();
+
 jest.mock("@tanstack/react-query", () => ({
   useQuery: (...args: unknown[]) => mockUseQuery(...args),
+  useQueryClient: () => ({ invalidateQueries: mockInvalidateQueries }),
 }));
 
 jest.mock("@/lib/services/apiService", () => ({
@@ -24,8 +35,14 @@ jest.mock("@/components/projects/ProjectInfoTab", () => ({
 }));
 
 jest.mock("@/components/projects/CollaboratorTasksList", () => ({
-  CollaboratorTasksList: ({ tasks }: { tasks: Array<{ title: string }> }) => (
-    <div>
+  CollaboratorTasksList: ({
+    tasks,
+    invitedTaskIds,
+  }: {
+    tasks: Array<{ title: string }>;
+    invitedTaskIds: number[];
+  }) => (
+    <div data-testid="collaborator-tasks-list" data-invited={invitedTaskIds.join(",")}>
       {tasks.map((task) => (
         <div key={task.title}>{task.title}</div>
       ))}
@@ -51,12 +68,28 @@ jest.mock("@/components/ui/skeleton", () => ({
 import { CollaboratorProjectView } from "@/components/projects/CollaboratorProjectView";
 import { UserRole } from "@/lib/definitions";
 
+const v1Adjustment = {
+  id: 1,
+  project_id: 15,
+  version_number: 1,
+  status: "active",
+  notes: null,
+  drive_folder_url: null,
+  created_at: "2026-04-01T00:00:00.000Z",
+  completed_at: null,
+};
+
 describe("CollaboratorProjectView", () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    mockUseQuery.mockReturnValue({
-      data: { quotes: [] },
-      isLoading: false,
+    mockUseQuery.mockImplementation(({ queryKey }: { queryKey: unknown[] }) => {
+      if (queryKey[0] === "project-adjustments") {
+        return { data: [v1Adjustment], isLoading: false };
+      }
+      if (queryKey[0] === "collaborator-project-quotes") {
+        return { data: { quotes: [] }, isLoading: false };
+      }
+      return { data: undefined, isLoading: false };
     });
   });
 
@@ -70,11 +103,13 @@ describe("CollaboratorProjectView", () => {
             id: 101,
             title: "Tarea visible",
             status: "completed",
+            adjustment_id: 1,
           },
           {
             id: 202,
             title: "Tarea solo contexto",
             status: "in_progress",
+            adjustment_id: 1,
           },
         ] as never}
         invitedTaskIds={[101]}
@@ -83,9 +118,16 @@ describe("CollaboratorProjectView", () => {
       />
     );
 
+    expect(screen.getByText("Versión 1 (Original)")).toBeInTheDocument();
     expect(screen.getByText("Tarea visible")).toBeInTheDocument();
     expect(screen.getByText("Tarea solo contexto")).toBeInTheDocument();
+    expect(screen.getByTestId("collaborator-tasks-list")).toHaveAttribute("data-invited", "101");
     expect(screen.getByRole("button", { name: /tareas \(2\)/i })).toBeInTheDocument();
-    expect(mockUseQuery).toHaveBeenCalledTimes(1);
+    expect(mockUseQuery).toHaveBeenCalledWith(
+      expect.objectContaining({ queryKey: ["project-adjustments", 15] })
+    );
+    expect(mockUseQuery).toHaveBeenCalledWith(
+      expect.objectContaining({ queryKey: ["collaborator-project-quotes", 15, 9] })
+    );
   });
 });
