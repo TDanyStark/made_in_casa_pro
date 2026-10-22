@@ -739,6 +739,11 @@ export async function completeTask(
                 progress_minutes = $2,
                 delivery_url = $3,
                 completion_cost = $4,
+                completion_hourly_rate = (
+                  SELECT CASE WHEN u.is_internal = 1 THEN u.hourly_rate END
+                  FROM users u
+                  WHERE u.id = project_tasks.assigned_user_id
+                ),
                 progress_percent = 100
             WHERE id = $1`,
       args: [

@@ -44,7 +44,7 @@ export default async function UserPage({ params }: Props) {
     is_internal,
     area_id,
     skills,
-    monthly_salary
+    hourly_rate
   } = user;
 
   return (
@@ -124,7 +124,7 @@ export default async function UserPage({ params }: Props) {
                 is_internal={is_internal}
                 area_id={Number(area_id)}
                 skills={skills}
-                monthly_salary={monthly_salary}
+                hourly_rate={hourly_rate}
               />
             </CardContent>
           </Card>

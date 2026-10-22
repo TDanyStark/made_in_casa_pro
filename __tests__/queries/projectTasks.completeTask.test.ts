@@ -283,4 +283,23 @@ describe('completeTask()', () => {
       'Esta tarea ya está completada y no puede modificarse'
     );
   });
+
+  // S5: the internal hourly rate in force is frozen on the task at completion.
+  it('freezes the assignee internal hourly rate on the completed task', async () => {
+    mockExecute.mockResolvedValueOnce(
+      makeResult([makeTaskRow({ id: 1, status: 'in_progress', project_id: 1, adjustment_id: null })])
+    );
+    mockTransaction.execute
+      .mockResolvedValueOnce(makeResult([]))
+      .mockResolvedValueOnce(makeResult([]))
+      .mockResolvedValueOnce(makeResult([]));
+    mockExecute.mockResolvedValueOnce(makeResult([makeTaskRow({ id: 1, status: 'completed' })]));
+
+    await completeTask(1, 5, null, { progress_minutes: 90 });
+
+    const update = mockTransaction.execute.mock.calls[0][0] as { sql: string };
+    expect(update.sql).toMatch(/completion_hourly_rate\s*=\s*\(\s*SELECT CASE WHEN u\.is_internal = 1 THEN u\.hourly_rate END/);
+    expect(update.sql).toContain('u.id = project_tasks.assigned_user_id');
+  });
 });
+

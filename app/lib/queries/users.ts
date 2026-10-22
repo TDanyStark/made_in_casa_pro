@@ -85,7 +85,7 @@ export async function getUserById(userId: number) {
       area_id: row.area_id,
       is_internal: Boolean(row.is_internal),
       is_active: Boolean(row.is_active),
-      monthly_salary: row.monthly_salary,
+      hourly_rate: row.hourly_rate == null ? null : Number(row.hourly_rate),
       must_change_password: Boolean(row.must_change_password),
       last_login: row.last_login,
       created_at: row.created_at,
@@ -227,12 +227,12 @@ export async function updateUser(userId: string, data: {
   must_change_password?: boolean;
   is_internal?: boolean;
   area_id?: number;
-  monthly_salary?: number;
+  hourly_rate?: number | null;
 }) {
   try {
     // Construir la consulta SQL dinámicamente basada en los campos proporcionados
     const updateFields: string[] = [];
-    const args: (string | number | boolean)[] = [];
+    const args: (string | number | boolean | null)[] = [];
 
     if (data.name !== undefined) {
       args.push(data.name);
@@ -273,9 +273,9 @@ export async function updateUser(userId: string, data: {
       args.push(data.must_change_password ? 1 : 0);
       updateFields.push(`must_change_password = $${args.length}`);
     }
-    if (data.monthly_salary !== undefined) {
-      args.push(data.monthly_salary);
-      updateFields.push(`monthly_salary = $${args.length}`);
+    if (data.hourly_rate !== undefined) {
+      args.push(data.hourly_rate);
+      updateFields.push(`hourly_rate = $${args.length}`);
     }
     
     
@@ -287,10 +287,32 @@ export async function updateUser(userId: string, data: {
     // Añadir el ID al final de los argumentos
     args.push(userId);
     
-    const query = `
+    const userUpdate = `
       UPDATE users 
       SET ${updateFields.join(', ')} 
       WHERE id = $${args.length}
+    `;
+
+    // Setting the hourly rate freezes it, once, on the collaborator's completed
+    // internal tasks that have no frozen rate yet (completed before any rate
+    // existed). Tasks with an external price or accepted quote are left alone,
+    // and already-frozen tasks never change. One statement keeps it atomic.
+    const query = data.hourly_rate === undefined
+      ? userUpdate
+      : `
+      WITH updated AS (${userUpdate} RETURNING id, is_internal, hourly_rate)
+      UPDATE project_tasks pt
+      SET completion_hourly_rate = updated.hourly_rate
+      FROM updated
+      WHERE pt.assigned_user_id = updated.id
+        AND updated.is_internal = 1
+        AND updated.hourly_rate IS NOT NULL
+        AND pt.status = 'completed'
+        AND pt.completion_hourly_rate IS NULL
+        AND pt.completion_cost IS NULL
+        AND NOT EXISTS (
+          SELECT 1 FROM task_quotes tq WHERE tq.task_id = pt.id AND tq.status = 'accepted'
+        )
     `;
     
     await db.execute({

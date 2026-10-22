@@ -36,6 +36,7 @@ export type UserType = {
   last_login?: string;
   is_active?: boolean;
   created_at?: string;
+  hourly_rate?: number | null; // valor de la hora (solo internos)
 }
 
 export type ColaboradorType = UserType & {
@@ -43,7 +44,6 @@ export type ColaboradorType = UserType & {
   area_id?: number;
   skills?: string[];
   is_internal: boolean;
-  monthly_salary?: number;
 }
 
 export enum UserRole {

@@ -1,0 +1,22 @@
+# Project financials: sale price, invested hours and money
+Directivos and the project's commercial record the sale price; the project detail shows cards with charts of team hours and money invested.
+Internal collaborators get an hourly rate (replaces monthly salary); each completed task freezes the rate in force, so past projects never show new rates.
+
+## Specs
+S1. "quiero que los directivos y el comercial del proyecto, pueda anotar en cuanto se vendio el proyecto" — edit: admin, directivo and the commercial who created the project; financiero read-only; collaborators see nothing (user: "Sí, como propones").
+S2. "que aparezca unos cards con graficos bonitos arriba que diga cuantas horas del equipo se han invertido, y cuanto dinero" — charts with recharts (shadcn charts) (user: "Agregar recharts (shadcn charts)").
+S3. "debo poder configurar cuanto vale la hora de los internos, en lugar del mes" — per collaborator, in their profile, replacing the monthly salary (user: "Por colaborador, en su ficha (reemplaza el mensual)").
+S4. "como los externos ponen el precio deberia sumar eso" — external cost = the price they declare at completion, or the accepted quote price.
+S5. "si desarrollo un proyecto este año y un colaborador cobra 30mil la hora pero el otro año en otro proyecto cobra 40mil la hora no quiero que si vuelvoa ver proyectos de años anteriores se vea ese valor nuevo" — each completed task freezes the internal hourly rate at completion.
+S6. Already-completed tasks without a frozen rate: "Congelarlas con la tarifa vigente al migrar" — when a collaborator's hourly rate is set, their completed internal tasks with no frozen rate take that rate once; later changes never touch them.
+
+## Tasks
+T1 | S3,S5,S6 | inline: migration 019 (users.hourly_rate, project_tasks.completion_hourly_rate, projects.sale_price), freeze rate in completeTask, hourly_rate in users API/query with backfill, profile UI + tests | done | commit 1 (feat(users): hourly rate frozen on task completion)
+T2 | S1,S2,S4,S5 | inline: financials computation + GET/PATCH /api/projects/[id]/financials + tests | pending |
+T3 | S1,S2 | inline: recharts chart component, financial cards above tabs, sale price editor, README + tests | pending |
+
+## Log
+L1. User: "quiero que los directivos y el comercial del proyecto, pueda anotar en cuanto se vendio el proyecto, y tambien que aparezca unos cards con graficos bonitos arriba que diga cuantas horas del equipo se han invertido, y cuanto dinero, para esto en la parte de configuraciones debo poder configurar cuanto vale la hora de los internos, en lugar del mes, y como los externos ponen el precio deberia sumar eso / es iompoirtate tener en cuenta esto y es que claro si desarrollo un proyecto este año y un colaborador cobra 30mil la hora pero el otro año en otro proyecto cobra 40mil la hora no quiero que si vuelvoa ver proyectos de años anteriores se vea ese valor nuevo, pues no tiene sentido"
+L2. User answers: rate "Por colaborador, en su ficha (reemplaza el mensual)"; past data "Congelarlas con la tarifa vigente al migrar"; charts "Agregar recharts (shadcn charts)"; visibility "Sí, como propones".
+L3. Exploration: time is project_tasks.progress_minutes; external cost is project_tasks.completion_cost (TaskCompleteDialog) or accepted task_quotes.price; monthly salary lives in users.monthly_salary edited in DetailsCollaborator (admin-only PATCH /api/users/[id]). Decision: users.monthly_salary column is kept in the DB (no stored data deleted) but no code uses it anymore. No persistent-memory tools callable: Engram mirror unavailable.
+L4. RED/GREEN T1: 7 new tests failed (hourly_rate missing, no freeze in completeTask, API schema) -> green; full jest 105 suites / 859 tests, tsc clean. Real PostgreSQL check on scratch DB mic_fin_check (all 19 migrations + 019): setting Ana's rate 30000 froze her completed task (30000), raising to 40000 kept it at 30000, external task with completion_cost and quoted task untouched, completing her in-progress task froze 40000, name-only update changed nothing. Risk: item 1 (backfill writes stored task rates) -> own commit.
