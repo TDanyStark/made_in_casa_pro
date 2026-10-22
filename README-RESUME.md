@@ -263,6 +263,32 @@ administrativos ven en qué está trabajando en este momento. El resto queda en
   ya estaban en progreso no se modifican; la regla se aplica la próxima vez que el
   colaborador toma o reanuda una tarea.
 
+## Inversión y precio de venta del proyecto
+
+El detalle de un proyecto muestra arriba tres cards con gráficos: **Horas del
+equipo**, **Dinero invertido** y **Precio de venta** (con el margen).
+
+| Qué | Dónde | Quién |
+| --- | --- | --- |
+| Valor de la hora de un interno | Ficha del colaborador (`PATCH /api/users/[id]` con `hourly_rate`) | Admin |
+| Ver horas, dinero y margen | `GET /api/projects/[id]/financials` | Admin, directivo, financiero y el comercial que creó el proyecto |
+| Anotar en cuánto se vendió | `PATCH /api/projects/[id]/financials` con `{ "sale_price": number \| null }` | Admin, directivo y el comercial que creó el proyecto |
+
+Cómo se calcula el dinero invertido:
+
+- **Internos**: minutos registrados × valor de la hora. Al completar una tarea se
+  congela la tarifa vigente en `project_tasks.completion_hourly_rate`; si luego
+  cambia la tarifa, los proyectos anteriores conservan la suya. Las tareas aún
+  sin completar se valoran con la tarifa actual.
+- **Externos**: el costo que declaran al completar la tarea o, si no hay, el
+  precio de la cotización aceptada.
+- Al configurar la tarifa de un interno, sus tareas ya completadas que no tenían
+  tarifa congelada toman esa tarifa una sola vez.
+- El valor de la hora reemplaza al antiguo sueldo mensual. La columna
+  `users.monthly_salary` sigue en la base, pero la aplicación ya no la usa.
+- Los gráficos usan `recharts` a través del componente `chart` de shadcn.
+- Migración: `019_project_financials.sql`.
+
 ## Notificaciones por correo
 
 `dispatchNotification` (`app/lib/services/notificationEngine.ts`) registra cada

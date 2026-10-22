@@ -14,7 +14,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
-import { PROJECT_EDIT_ROLES } from "@/lib/role-groups";
+import {
+  PROJECT_EDIT_ROLES,
+  PROJECT_FINANCIALS_VIEW_ROLES,
+  PROJECT_SALE_PRICE_EDIT_ROLES,
+} from "@/lib/role-groups";
+import { ProjectFinancialCards } from "./ProjectFinancialCards";
 import { EmailHistoryTable } from "@/components/notifications/EmailHistoryTable";
 
 interface Props {
@@ -25,6 +30,8 @@ interface Props {
 
 export function ProjectDetailClient({ projectId, userRole, currentUserId }: Props) {
   const canEdit = PROJECT_EDIT_ROLES.includes(userRole);
+  const canViewFinancials = PROJECT_FINANCIALS_VIEW_ROLES.includes(userRole);
+  const canEditSalePrice = PROJECT_SALE_PRICE_EDIT_ROLES.includes(userRole);
 
   const { data: project, isLoading, isError } = useQuery({
     queryKey: ["project", projectId],
@@ -60,6 +67,10 @@ export function ProjectDetailClient({ projectId, userRole, currentUserId }: Prop
   return (
     <div className="space-y-8">
       <ProjectHeader project={project} />
+
+      {canViewFinancials && (
+        <ProjectFinancialCards projectId={projectId} canEditSalePrice={canEditSalePrice} />
+      )}
 
       <Tabs defaultValue="tasks">
         <TabsList>
