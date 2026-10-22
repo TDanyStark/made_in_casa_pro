@@ -1,6 +1,48 @@
 import { db } from "../db";
-import { ProjectAdjustmentType } from "../definitions";
+import {
+  ProjectAdjustmentType,
+  TaskVersionError,
+  TASK_VERSION_FOREIGN_MESSAGE,
+  TASK_VERSION_MISSING_MESSAGE,
+} from "../definitions";
 import { revalidatePath } from "next/cache";
+import type { DbTransaction } from "../db/types";
+
+type DbExecutor = Pick<DbTransaction, "execute">;
+
+/**
+ * Resolves the version (project_adjustments.id) a new project task must belong to.
+ * - Explicit id: must belong to the project, otherwise throws TaskVersionError.
+ * - No id: the project's base version (lowest version_number, i.e. v1).
+ * - Project without versions: throws TaskVersionError.
+ * Every INSERT INTO project_tasks must go through this helper.
+ */
+export async function resolveTaskAdjustmentId(
+  projectId: number,
+  adjustmentId?: number | null,
+  executor: DbExecutor = db,
+  /** Version used when no adjustment id is given: the base version (V1) or the latest one. */
+  fallback: "base" | "latest" = "base"
+): Promise<number> {
+  if (adjustmentId !== undefined && adjustmentId !== null) {
+    const owned = await executor.execute({
+      sql: `SELECT id FROM project_adjustments WHERE id = $1 AND project_id = $2`,
+      args: [adjustmentId, projectId],
+    });
+    if (owned.rows.length === 0) throw new TaskVersionError(TASK_VERSION_FOREIGN_MESSAGE);
+    return Number((owned.rows[0] as unknown as { id: number }).id);
+  }
+
+  const base = await executor.execute({
+    sql:
+      fallback === "latest"
+        ? `SELECT id FROM project_adjustments WHERE project_id = $1 ORDER BY version_number DESC, id DESC LIMIT 1`
+        : `SELECT id FROM project_adjustments WHERE project_id = $1 ORDER BY version_number ASC, id ASC LIMIT 1`,
+    args: [projectId],
+  });
+  if (base.rows.length === 0) throw new TaskVersionError(TASK_VERSION_MISSING_MESSAGE);
+  return Number((base.rows[0] as unknown as { id: number }).id);
+}
 
 export async function getAdjustmentsByProject(projectId: number): Promise<ProjectAdjustmentType[]> {
   try {

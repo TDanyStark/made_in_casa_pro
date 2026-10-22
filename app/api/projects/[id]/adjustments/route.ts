@@ -2,7 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { validateApiRole, validateHttpMethod } from "@/lib/services/api-auth";
 import { getProjectById, recalculateProjectProgress } from "@/lib/queries/projects";
-import { createProjectAdjustment, getAdjustmentsByProject } from "@/lib/queries/adjustments";
+import {
+  createProjectAdjustment,
+  getAdjustmentsByProject,
+  resolveTaskAdjustmentId,
+} from "@/lib/queries/adjustments";
+import { TaskVersionError } from "@/lib/definitions";
 import { findLeastLoadedInternalCollaborator } from "@/lib/queries/projectTasks";
 import { createSubFolder } from "@/lib/services/googleDrive";
 import { getAdminAndLeadershipEmails } from "@/lib/queries/users";
@@ -182,6 +187,8 @@ export async function POST(
     if (taskList.length > 0) {
       const transaction = await db.transaction("write");
       try {
+        // Same invariant as every other task insert: the version must belong to this project
+        const taskAdjustmentId = await resolveTaskAdjustmentId(projectId, adjustment.id, transaction);
         for (let i = 0; i < taskList.length; i++) {
           const t = taskList[i];
 
@@ -229,7 +236,7 @@ export async function POST(
               t.assign_to_commercial ?? 0,
               i,             // order_index = position in the final list
               assignedAt,
-              adjustment.id,
+              taskAdjustmentId,
             ],
           });
 
@@ -320,6 +327,9 @@ export async function POST(
       { status: 201 }
     );
   } catch (error) {
+    if (error instanceof TaskVersionError) {
+      return NextResponse.json({ error: error.message }, { status: 400 });
+    }
     console.error("Error al crear ajuste:", error);
     return NextResponse.json({ error: "Error interno al crear ajuste" }, { status: 500 });
   }

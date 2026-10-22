@@ -15,6 +15,7 @@ jest.mock("@/lib/queries/projects", () => ({
 jest.mock("@/lib/queries/adjustments", () => ({
   createProjectAdjustment: jest.fn(),
   getAdjustmentsByProject: jest.fn(),
+  resolveTaskAdjustmentId: jest.fn(async (_projectId: number, adjustmentId?: number | null) => adjustmentId),
 }));
 
 jest.mock("@/lib/queries/projectTasks", () => ({
@@ -62,7 +63,8 @@ import { NextRequest } from "next/server";
 import { POST } from "@/api/projects/[id]/adjustments/route";
 import { validateApiRole, validateHttpMethod } from "@/lib/services/api-auth";
 import { getProjectById, recalculateProjectProgress } from "@/lib/queries/projects";
-import { createProjectAdjustment, getAdjustmentsByProject } from "@/lib/queries/adjustments";
+import { createProjectAdjustment, getAdjustmentsByProject, resolveTaskAdjustmentId } from "@/lib/queries/adjustments";
+import { TaskVersionError } from "@/lib/definitions";
 import { db } from "@/lib/db";
 import { cookies } from "next/headers";
 import { decrypt } from "@/lib/session";
@@ -158,5 +160,25 @@ describe("POST /api/projects/[id]/adjustments task notifications", () => {
     const types = mockDispatch.mock.calls.map(([input]) => input.eventType);
     expect(types).not.toContain("task.ready");
     expect(types).toContain("task.assigned");
+  });
+
+  it("passes the new version to the shared version helper and inserts every task with it", async () => {
+    const res = await callPost({ tasks: [{ title: "Primera", assigned_user_id: 7 }] });
+
+    expect(res.status).toBe(201);
+    expect(resolveTaskAdjustmentId).toHaveBeenCalledWith(15, 50, expect.anything());
+    const tx = await mockDbTransaction.mock.results[0].value;
+    const insert = (tx.execute as jest.Mock).mock.calls.find(([q]) => q.sql.includes("INSERT INTO project_tasks"));
+    expect(insert[0].args[11]).toBe(50);
+  });
+
+  it("returns 400 with the exact message when the version cannot be used for tasks", async () => {
+    const message = "La versión indicada no pertenece al proyecto.";
+    (resolveTaskAdjustmentId as jest.Mock).mockRejectedValueOnce(new TaskVersionError(message));
+
+    const res = await callPost({ tasks: [{ title: "Primera", assigned_user_id: 7 }] });
+
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: message });
   });
 });

@@ -10,7 +10,9 @@ import {
   TaskCommandCenterRow,
   MyTaskRowPaginated,
   MyTasksFilters,
+  CreateProjectTaskInput,
 } from "../definitions";
+import { resolveTaskAdjustmentId } from "./adjustments";
 import { buildPaginationArgs, buildWhereClause, parseTotal } from "../db/query-helpers";
 import { ITEMS_PER_PAGE } from "@/config/constants";
 import { CREATOR_FILTER_ROLES } from "@/lib/role-groups";
@@ -185,25 +187,13 @@ export async function getTaskTransitions(taskId: number): Promise<TaskTransition
 
 // ─── Create ───────────────────────────────────────────────────────────────────
 
-export async function createProjectTask(data: {
-  project_id: number;
-  template_id?: number | null;
-  title: string;
-  description?: string | null;
-  area_id?: number | null;
-  assigned_user_id?: number | null;
-  status?: ProjectTaskStatus;
-  task_type?: TaskType;
-  task_flag?: TaskFlag;
-  requires_quote?: number;
-  assign_to_commercial?: number;
-  order_index: number;
-  adjustment_id?: number | null;
-}): Promise<ProjectTaskType> {
+export async function createProjectTask(data: CreateProjectTaskInput): Promise<ProjectTaskType> {
   if (data.task_type === "validation" && data.order_index === 0) {
     throw new Error("Una tarea de validación no puede ser la primera tarea del proyecto.");
   }
   try {
+    // A task never exists without a version: default to the project's base version.
+    const adjustmentId = await resolveTaskAdjustmentId(data.project_id, data.adjustment_id);
     const status = data.status ?? (data.order_index === 0 ? "not_started" : "waiting");
     const assignedUserId = data.assigned_user_id ?? null;
     const assignedAt = (status === "not_started" && assignedUserId) ? new Date() : null;
@@ -231,7 +221,7 @@ export async function createProjectTask(data: {
         data.assign_to_commercial ?? 0,
         data.order_index,
         assignedAt,
-        data.adjustment_id ?? null,
+        adjustmentId,
       ],
     });
     const id = Number(result.rows[0]?.id);
@@ -777,6 +767,9 @@ export async function createRejectionLoopTasks(
   const rangeTasks = rangeResult.rows as unknown as ProjectTaskType[];
     const K = rangeTasks.length;
 
+    // Clones stay in task N's version (base version for legacy tasks without one).
+    const cloneAdjustmentId = await resolveTaskAdjustmentId(projectId, taskN.adjustment_id);
+
     const adjustmentFilter = taskN.adjustment_id === null ? "AND adjustment_id IS NULL" : "AND adjustment_id = $4";
     const shiftArgs = [K, projectId, taskN.order_index];
     if (taskN.adjustment_id !== null) shiftArgs.push(taskN.adjustment_id);
@@ -823,7 +816,7 @@ export async function createRejectionLoopTasks(
           original.assign_to_commercial ?? 0,
           newOrderIndex,
           (newStatus === "not_started" && original.assigned_user_id) ? new Date() : null,
-          taskN.adjustment_id ?? null,
+          cloneAdjustmentId,
         ],
       });
       const newTaskId = Number(cloneInsert.rows[0]?.id);
@@ -1051,6 +1044,8 @@ export async function instantiateTasksFromTemplates(
   invitedBy?: number | null
 ): Promise<void> {
   try {
+    const taskAdjustmentId = await resolveTaskAdjustmentId(projectId, adjustmentId);
+
     const templates = await db.execute({
       sql: `
         SELECT id, title, description, area_id, assigned_user_id,
@@ -1123,7 +1118,7 @@ export async function instantiateTasksFromTemplates(
             tpl.assign_to_commercial ?? 0,
             tpl.order_index,
             assignedAt,
-            adjustmentId ?? null,
+            taskAdjustmentId,
           ],
         });
 

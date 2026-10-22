@@ -3,6 +3,8 @@ import { z } from "zod";
 import { validateApiRole, validateHttpMethod } from "@/lib/services/api-auth";
 import { getTasksByProject, createProjectTask, resolveProjectTaskAssignment } from "@/lib/queries/projectTasks";
 import { recalculateProjectProgress } from "@/lib/queries/projects";
+import { resolveTaskAdjustmentId } from "@/lib/queries/adjustments";
+import { TaskVersionError } from "@/lib/definitions";
 import { db } from "@/lib/db";
 import { cookies } from "next/headers";
 import { decrypt } from "@/lib/session";
@@ -74,17 +76,8 @@ export async function POST(request: NextRequest, { params }: Params) {
       );
     }
 
-    // 1. Get adjustment ID if not provided (default to latest)
-    let adjustmentId = validation.data.adjustment_id;
-    if (!adjustmentId) {
-      const adjResult = await db.execute({
-        sql: `SELECT id FROM project_adjustments WHERE project_id = $1 ORDER BY version_number DESC LIMIT 1`,
-        args: [projectId],
-      });
-      if (adjResult.rows.length > 0) {
-        adjustmentId = Number((adjResult.rows[0] as unknown as { id: number }).id);
-      }
-    }
+    // 1. Resolve the task's version (latest version when not provided); a task never exists without one
+    const adjustmentId = await resolveTaskAdjustmentId(projectId, validation.data.adjustment_id, db, "latest");
 
     // 2. Get next order_index for this project and adjustment
     const orderResult = await db.execute({
@@ -215,6 +208,9 @@ export async function POST(request: NextRequest, { params }: Params) {
 
     return NextResponse.json({ ...task, ...(driveWarning ? { driveWarning } : {}) }, { status: 201 });
   } catch (error) {
+    if (error instanceof TaskVersionError) {
+      return NextResponse.json({ error: error.message }, { status: 400 });
+    }
     console.error("Error creating project task:", error);
     return NextResponse.json({ error: "Error al crear tarea" }, { status: 500 });
   }

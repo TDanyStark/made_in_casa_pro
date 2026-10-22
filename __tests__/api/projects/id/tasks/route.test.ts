@@ -17,6 +17,10 @@ jest.mock("@/lib/queries/projects", () => ({
   recalculateProjectProgress: jest.fn(),
 }));
 
+jest.mock("@/lib/queries/adjustments", () => ({
+  resolveTaskAdjustmentId: jest.fn(),
+}));
+
 jest.mock("@/lib/db", () => ({
   db: {
     execute: jest.fn(),
@@ -50,6 +54,8 @@ import { POST } from "@/api/projects/[id]/tasks/route";
 import { validateApiRole, validateHttpMethod } from "@/lib/services/api-auth";
 import { createProjectTask, resolveProjectTaskAssignment } from "@/lib/queries/projectTasks";
 import { recalculateProjectProgress } from "@/lib/queries/projects";
+import { resolveTaskAdjustmentId } from "@/lib/queries/adjustments";
+import { TaskVersionError } from "@/lib/definitions";
 import { db } from "@/lib/db";
 import { cookies } from "next/headers";
 import { decrypt } from "@/lib/session";
@@ -69,6 +75,12 @@ const mockDbTransaction = db.transaction as jest.MockedFunction<typeof db.transa
 const mockCookies = cookies as jest.MockedFunction<typeof cookies>;
 const mockDecrypt = decrypt as jest.MockedFunction<typeof decrypt>;
 const mockDispatchNotification = dispatchNotification as jest.MockedFunction<typeof dispatchNotification>;
+const mockResolveTaskAdjustmentId = resolveTaskAdjustmentId as jest.MockedFunction<typeof resolveTaskAdjustmentId>;
+
+beforeEach(() => {
+  // Default: an explicit adjustment_id belongs to the project and is kept as-is.
+  mockResolveTaskAdjustmentId.mockImplementation(async (_projectId, adjustmentId) => adjustmentId ?? 1);
+});
 
 async function callPost(body: Record<string, unknown>, projectId = "15", query = "") {
   const response = await POST(
@@ -336,5 +348,74 @@ describe("POST /api/projects/[id]/tasks — canonical initial status", () => {
     expect(mockCreateProjectTask).toHaveBeenCalledWith(
       expect.objectContaining({ status: "in_progress" })
     );
+  });
+});
+
+describe("POST /api/projects/[id]/tasks — version is mandatory", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockValidateHttpMethod.mockReturnValue({ isValidMethod: true, response: undefined });
+    mockValidateApiRole.mockResolvedValue({ isAuthorized: true, userRole: 1 as never, response: undefined } as never);
+    mockRecalculateProjectProgress.mockResolvedValue(undefined as never);
+    mockCookies.mockResolvedValue({ get: jest.fn().mockReturnValue(undefined) } as never);
+    mockDecrypt.mockResolvedValue(null as never);
+    mockResolveProjectTaskAssignment.mockResolvedValue(null);
+  });
+
+  it("returns 400 with the exact message and creates nothing when the project has no version", async () => {
+    const message = "El proyecto no tiene una versión. No se puede crear la tarea sin versión.";
+    mockResolveTaskAdjustmentId.mockRejectedValue(new TaskVersionError(message));
+
+    const res = await callPost({ title: "Sin versión" });
+
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: message });
+    expect(mockCreateProjectTask).not.toHaveBeenCalled();
+    expect(mockDbExecute).not.toHaveBeenCalled();
+  });
+
+  it("returns 400 with the exact message and creates nothing when the version belongs to another project", async () => {
+    const message = "La versión indicada no pertenece al proyecto.";
+    mockResolveTaskAdjustmentId.mockRejectedValue(new TaskVersionError(message));
+
+    const res = await callPost({ title: "Versión ajena", adjustment_id: 999 });
+
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: message });
+    expect(mockResolveTaskAdjustmentId).toHaveBeenCalledWith(15, 999, expect.anything(), "latest");
+    expect(mockCreateProjectTask).not.toHaveBeenCalled();
+  });
+
+  it("returns 201 using the latest version (previous behavior) when adjustment_id is omitted", async () => {
+    mockResolveTaskAdjustmentId.mockResolvedValue(4);
+    mockDbExecute.mockResolvedValueOnce({ rows: [{ next_order: 0 }] } as never);
+    mockCreateProjectTask.mockResolvedValue({ id: 120, project_id: 15, status: "not_started", adjustment_id: 4 } as never);
+
+    const res = await callPost({ title: "Sin adjustment_id" });
+
+    expect(res.status).toBe(201);
+    expect(mockResolveTaskAdjustmentId).toHaveBeenCalledWith(15, undefined, expect.anything(), "latest");
+    expect(mockDbExecute).toHaveBeenNthCalledWith(1, expect.objectContaining({ args: [15, 4] }));
+    expect(mockCreateProjectTask).toHaveBeenCalledWith(expect.objectContaining({ adjustment_id: 4 }));
+  });
+
+  it("keeps an explicit adjustment_id unchanged (previous behavior)", async () => {
+    mockDbExecute.mockResolvedValueOnce({ rows: [{ next_order: 0 }] } as never);
+    mockCreateProjectTask.mockResolvedValue({ id: 121, project_id: 15, status: "not_started", adjustment_id: 9 } as never);
+
+    const res = await callPost({ title: "Con versión", adjustment_id: 9 });
+
+    expect(res.status).toBe(201);
+    expect(mockResolveTaskAdjustmentId).toHaveBeenCalledWith(15, 9, expect.anything(), "latest");
+    expect(mockCreateProjectTask).toHaveBeenCalledWith(expect.objectContaining({ adjustment_id: 9 }));
+  });
+
+  it("still returns 500 for unrelated errors", async () => {
+    mockDbExecute.mockRejectedValueOnce(new Error("db down"));
+
+    const res = await callPost({ title: "Falla", adjustment_id: 9 });
+
+    expect(res.status).toBe(500);
+    expect(await res.json()).toEqual({ error: "Error al crear tarea" });
   });
 });

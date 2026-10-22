@@ -405,7 +405,39 @@ export type ProjectAdjustmentType = {
   task_count?: number;
 };
 
+export const TASK_VERSION_MISSING_MESSAGE =
+  "El proyecto no tiene una versión. No se puede crear la tarea sin versión.";
+export const TASK_VERSION_FOREIGN_MESSAGE = "La versión indicada no pertenece al proyecto.";
+
+/** Raised when a task cannot be attached to a version of its project; API routes map it to 400. */
+export class TaskVersionError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "TaskVersionError";
+  }
+}
+
 export type ProjectTaskStatus = 'not_started' | 'waiting' | 'in_progress' | 'completed' | 'blocked';
+
+/**
+ * Input to create a project task. `adjustment_id` is optional here: when omitted
+ * it is resolved to the project's base version (v1), so every stored task has one.
+ */
+export type CreateProjectTaskInput = {
+  project_id: number;
+  template_id?: number | null;
+  title: string;
+  description?: string | null;
+  area_id?: number | null;
+  assigned_user_id?: number | null;
+  status?: ProjectTaskStatus;
+  task_type?: TaskType;
+  task_flag?: TaskFlag;
+  requires_quote?: number;
+  assign_to_commercial?: number;
+  order_index: number;
+  adjustment_id?: number | null;
+};
 
 export type ProjectTaskType = {
   id: number;

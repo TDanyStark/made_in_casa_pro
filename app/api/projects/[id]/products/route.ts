@@ -6,8 +6,9 @@ import {
   updateProject,
   recalculateProjectProgress,
 } from "@/lib/queries/projects";
-import { getAdjustmentsByProject } from "@/lib/queries/adjustments";
+import { resolveTaskAdjustmentId } from "@/lib/queries/adjustments";
 import { instantiateTasksFromTemplates } from "@/lib/queries/projectTasks";
+import { TaskVersionError } from "@/lib/definitions";
 import { cookies } from "next/headers";
 import { decrypt } from "@/lib/session";
 import { OPERATIONS_ROLES } from "@/lib/role-groups";
@@ -52,19 +53,19 @@ export async function POST(request: NextRequest, { params }: Params) {
       );
     }
 
+    // Template tasks go to the base version (V1); resolve it before mutating anything
+    const baseAdjustmentId = await resolveTaskAdjustmentId(projectId);
+
     // Set product on the project
     await updateProject(projectId, { product_id });
 
-    // Instantiate task templates for V1
-    const adjustments = await getAdjustmentsByProject(projectId);
-    const v1 = adjustments.find(a => a.version_number === 1);
-    
+
     const cookie = (await cookies()).get("session")?.value;
     const session = cookie ? await decrypt(cookie) : null;
     const currentUserId = session?.id ? Number(session.id) : null;
 
     const commercialUserId = project.created_by ?? null;
-    await instantiateTasksFromTemplates(projectId, product_id, commercialUserId, v1?.id, currentUserId);
+    await instantiateTasksFromTemplates(projectId, product_id, commercialUserId, baseAdjustmentId, currentUserId);
     const driveWarning = await syncProjectDriveAccess(projectId);
 
     // Recalculate progress
@@ -76,6 +77,9 @@ export async function POST(request: NextRequest, { params }: Params) {
       { status: 201 }
     );
   } catch (error) {
+    if (error instanceof TaskVersionError) {
+      return NextResponse.json({ error: error.message }, { status: 400 });
+    }
     console.error("Error adding product to project:", error);
     return NextResponse.json({ error: "Error al agregar producto al proyecto" }, { status: 500 });
   }

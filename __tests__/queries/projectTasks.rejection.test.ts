@@ -110,6 +110,8 @@ describe('createRejectionLoopTasks()', () => {
         makeTargetTaskRow({ id: 7, order_index: 2 }), // task M
         makeTaskRow({ id: 10, order_index: 3 }),       // task N
       ]));
+    // version lookup (resolveTaskAdjustmentId): task N has no version -> base version
+    mockExecute.mockResolvedValueOnce(makeResult([{ id: 1 }]));
 
     // transaction.execute calls (K=2):
     // 1. shift order_index UPDATE (+K=2)
@@ -149,6 +151,8 @@ describe('createRejectionLoopTasks()', () => {
         makeTargetTaskRow({ id: 7, order_index: 2 }),
         makeTaskRow({ id: 10, order_index: 3 }),
       ]));
+    // version lookup (resolveTaskAdjustmentId): task N has no version -> base version
+    mockExecute.mockResolvedValueOnce(makeResult([{ id: 1 }]));
 
     mockTransaction.execute
       .mockResolvedValueOnce(makeResult([]))            // shift
@@ -180,6 +184,8 @@ describe('createRejectionLoopTasks()', () => {
         makeTargetTaskRow({ id: 7, order_index: 2 }),
         makeTaskRow({ id: 10, order_index: 3 }),
       ]));
+    // version lookup (resolveTaskAdjustmentId): task N has no version -> base version
+    mockExecute.mockResolvedValueOnce(makeResult([{ id: 1 }]));
 
     mockTransaction.execute
       .mockResolvedValueOnce(makeResult([]))            // shift
@@ -210,6 +216,8 @@ describe('createRejectionLoopTasks()', () => {
         makeTargetTaskRow({ id: 7, order_index: 2 }),
         makeTaskRow({ id: 10, order_index: 3 }),
       ]));
+    // version lookup (resolveTaskAdjustmentId): task N has no version -> base version
+    mockExecute.mockResolvedValueOnce(makeResult([{ id: 1 }]));
 
     mockTransaction.execute
       .mockResolvedValueOnce(makeResult([]))            // shift
@@ -240,6 +248,8 @@ describe('createRejectionLoopTasks()', () => {
         makeTargetTaskRow({ id: 7, order_index: 2 }),
         makeTaskRow({ id: 10, order_index: 3 }),
       ]));
+    // version lookup (resolveTaskAdjustmentId): task N has no version -> base version
+    mockExecute.mockResolvedValueOnce(makeResult([{ id: 1 }]));
 
     mockTransaction.execute
       .mockResolvedValue(makeResult([{ id: 99 }]));
