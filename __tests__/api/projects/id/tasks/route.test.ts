@@ -19,6 +19,7 @@ jest.mock("@/lib/queries/projects", () => ({
 
 jest.mock("@/lib/queries/adjustments", () => ({
   resolveTaskAdjustmentId: jest.fn(),
+  assertLatestTaskVersion: jest.fn(),
 }));
 
 jest.mock("@/lib/db", () => ({
@@ -55,7 +56,7 @@ import { POST } from "@/api/projects/[id]/tasks/route";
 import { validateApiRole, validateHttpMethod } from "@/lib/services/api-auth";
 import { createProjectTask, resolveProjectTaskAssignment } from "@/lib/queries/projectTasks";
 import { recalculateProjectProgress } from "@/lib/queries/projects";
-import { resolveTaskAdjustmentId } from "@/lib/queries/adjustments";
+import { resolveTaskAdjustmentId, assertLatestTaskVersion } from "@/lib/queries/adjustments";
 import { TaskVersionError } from "@/lib/definitions";
 import { db } from "@/lib/db";
 import { cookies } from "next/headers";
@@ -110,6 +111,17 @@ describe("POST /api/projects/[id]/tasks — canonical initial status", () => {
     mockCookies.mockResolvedValue({ get: jest.fn().mockReturnValue(undefined) } as never);
     mockDecrypt.mockResolvedValue(null as never);
     mockDispatchNotification.mockResolvedValue(undefined as never);
+  });
+
+  it("rejects adding a task to a historical version without writing or notifying", async () => {
+    jest.mocked(assertLatestTaskVersion).mockRejectedValueOnce(new TaskVersionError("Solo se pueden agregar tareas a la última versión del proyecto."));
+    const res = await callPost({ title: "Nueva tarea", adjustment_id: 9 });
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: "Solo se pueden agregar tareas a la última versión del proyecto." });
+    expect(mockCreateProjectTask).not.toHaveBeenCalled();
+    expect(mockDbExecute).not.toHaveBeenCalled();
+    expect(recalculateProgressAndNotify).not.toHaveBeenCalled();
+    expect(mockDispatchNotification).not.toHaveBeenCalled();
   });
 
   it("resolves to not_started when the task queue for the adjustment has no active tasks, even without an explicit status in the request (UI must not send a hardcoded 'waiting')", async () => {

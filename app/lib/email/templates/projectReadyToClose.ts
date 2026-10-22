@@ -14,12 +14,12 @@ export interface ProjectReadyToCloseContext {
 
 /**
  * Sent to the project's commercial (projects.created_by) every time the
- * project's progress reaches 100%: all tasks are done and it can be closed
- * with "Marcar como completado".
+ * project's progress reaches 100%: all tasks are done and it has been completed automatically.
+ * The historical event/template identifier is retained for delivery retries.
  */
 export const projectReadyToClose = {
   subject(ctx: ProjectReadyToCloseContext): string {
-    return `[${ctx.projectTitle}] Tu proyecto está al 100%, listo para cerrar`;
+    return `[${ctx.projectTitle}] Tu proyecto se completó al 100%`;
   },
 
   html(ctx: ProjectReadyToCloseContext): string {
@@ -34,18 +34,18 @@ export const projectReadyToClose = {
 
     const body = [
       heading(`Hola, ${escapeHtml(ctx.recipientName)}`),
-      subheading(`Tu proyecto está al 100%, listo para cerrar`),
+      subheading(`Tu proyecto se completó al 100%`),
       paragraph(
         `Se completaron todas las tareas del proyecto <strong>${escapeHtml(ctx.projectTitle)}</strong>.`
       ),
       infoCard(rows),
       primaryButton("Ver proyecto", projectUrl),
       divider(),
-      muted(`Revisa el proyecto y, si todo está en orden, entra a Made in Casa Pro para marcarlo como completado.`),
+      muted(`El proyecto se marcó automáticamente como completado. Puedes agregar tareas en la última versión para reabrirlo o crear un ajuste.`),
     ].join("\n");
 
     return emailLayout({
-      previewText: `Tu proyecto está al 100%, listo para cerrar: ${escapeHtml(ctx.projectTitle)}`,
+      previewText: `Tu proyecto se completó al 100%: ${escapeHtml(ctx.projectTitle)}`,
       body,
     });
   },
@@ -54,13 +54,13 @@ export const projectReadyToClose = {
     return [
       `Hola, ${ctx.recipientName}`,
       ``,
-      `Tu proyecto "${ctx.projectTitle}" está al 100%: se completaron todas las tareas y está listo para cerrar.`,
+      `Tu proyecto "${ctx.projectTitle}" está al 100%: se completaron todas las tareas.`,
       ...(ctx.clientName ? [`Cliente: ${ctx.clientName}`] : []),
       ...(ctx.brandName ? [`Marca: ${ctx.brandName}`] : []),
       ``,
       `Ver proyecto: ${appUrl()}/projects/${ctx.projectId}`,
       ``,
-      `Revisa el proyecto y, si todo está en orden, entra a Made in Casa Pro para marcarlo como completado.`,
+      `El proyecto se marcó automáticamente como completado. Puedes agregar tareas en la última versión para reabrirlo o crear un ajuste.`,
     ].join("\n");
   },
 };

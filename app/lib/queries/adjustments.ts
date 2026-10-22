@@ -44,6 +44,13 @@ export async function resolveTaskAdjustmentId(
   return Number((base.rows[0] as unknown as { id: number }).id);
 }
 
+export async function assertLatestTaskVersion(projectId: number, adjustmentId: number): Promise<void> {
+  const latest = await resolveTaskAdjustmentId(projectId, undefined, db, "latest");
+  if (adjustmentId !== latest) {
+    throw new TaskVersionError("Solo se pueden agregar tareas a la última versión del proyecto.");
+  }
+}
+
 export async function getAdjustmentsByProject(projectId: number): Promise<ProjectAdjustmentType[]> {
   try {
     const result = await db.execute({

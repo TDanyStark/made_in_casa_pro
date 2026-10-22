@@ -60,15 +60,12 @@ describe("POST /api/projects/[id]/complete notifications", () => {
     mockDispatchNotification.mockResolvedValue(undefined);
   });
 
-  it("dispatches project.completed after completing the project", async () => {
+  it("completes the project without a second completion email", async () => {
     const response = await callPost();
 
     expect(response.status).toBe(200);
     expect(mockCompleteProject).toHaveBeenCalledWith(15);
-    expect(mockDispatchNotification).toHaveBeenCalledWith({
-      eventType: "project.completed",
-      actorUserId: 7,
-      projectId: 15,
-    });
+    expect(mockDispatchNotification).not.toHaveBeenCalled();
+
   });
 });

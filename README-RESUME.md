@@ -260,24 +260,37 @@ El correo incluye la descripción de la tarea, el enlace al proyecto y, si exist
 la carpeta de Drive. Las tareas en `waiting` o `blocked`, o sin responsable, no
 lo reciben.
 
-### Proyecto listo para cerrar (`project.ready_to_close`)
+### Cierre automático y nuevas tareas
 
-Avisa al **comercial del proyecto** (`projects.created_by`) con el asunto
-`[<proyecto>] Tu proyecto está al 100%, listo para cerrar` y un botón
-"Ver proyecto". Se envía **cada vez** que el progreso pasa de menos de 100 (o
-vacío) a 100: completar, validar, editar o eliminar tareas, agregar tareas o
-producto, aceptar cotizaciones y `POST /api/projects/[id]/recalculate`. El
-remitente es el usuario cuya acción provocó el cambio.
+Cuando todas las tareas de la **última versión** están completadas, el proyecto
+y esa versión pasan automáticamente a `completed`. Una versión vacía no se
+completa, y el progreso se limita a 99% mientras quede alguna tarea pendiente.
 
-No se envía si el progreso ya estaba en 100, si el proyecto ya está
-`completed`, si no tiene tareas o si no tiene comercial. Si el progreso baja
-(por ejemplo, un ajuste agrega tareas) y vuelve a llegar a 100, se envía de
-nuevo. La transición se detecta en el mismo `UPDATE` que guarda el progreso
-(fila bloqueada), así que dos recálculos simultáneos no duplican el correo.
-Las peticiones del wizard con `?notify=false` no lo envían.
+En un proyecto completado siguen disponibles dos acciones independientes:
+- **Agregar tarea**: agrega trabajo a la última versión. Si queda trabajo pendiente,
+  el proyecto vuelve a **Activo**, esa versión se reabre y se recalcula el avance.
+  Las tareas ya completadas no cambian de estado.
+- **Crear ajuste**: crea una nueva versión; las anteriores conservan su historial.
 
-Es distinto de `project.completed`, que llega a todos los interesados cuando
-alguien marca el proyecto como completado.
+Solo la última versión admite tareas nuevas desde `POST /api/projects/[id]/tasks`.
+El selector muestra el estado completado, pero el cierre ya no requiere un botón manual.
+Los estados se sincronizan dentro de una transacción, bloqueando el proyecto antes
+ de contar las tareas. No se aplica ninguna migración retroactiva.
+
+### Aviso de cierre al comercial (`project.ready_to_close`)
+
+Se conserva el identificador del evento para compatibilidad con historial y reintentos.
+El asunto es `[<proyecto>] Tu proyecto se completó al 100%`, con un botón "Ver proyecto".
+Se envía al **comercial** (`projects.created_by`) cada vez que el proyecto pasa a
+completado, incluido después de reabrirlo y terminar nuevas tareas. El remitente
+sigue siendo quien provocó la transición. Recalcular un proyecto ya completado no
+repite el aviso. Sin comercial no hay destinatario.
+
+`?notify=false` suprime el correo, no la actualización de estados. Se retiró el
+correo `project.completed`: solo queda el aviso del 100% al comercial. El endpoint
+de cierre manual se conserva para compatibilidad, pero ya no envía correos.
+Los envíos antiguos siguen en el historial; reintentar un `project.completed`
+fallido responde 410 sin enviar ni incrementar su contador de reintentos.
 
 ### Creación de proyectos con el wizard
 

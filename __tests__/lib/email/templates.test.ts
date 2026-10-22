@@ -10,7 +10,6 @@ import { quoteRequested } from "@/lib/email/templates/quoteRequested";
 import { quoteReceived } from "@/lib/email/templates/quoteReceived";
 import { quoteAccepted } from "@/lib/email/templates/quoteAccepted";
 import { projectAdjustmentCreated } from "@/lib/email/templates/projectAdjustmentCreated";
-import { projectCompleted } from "@/lib/email/templates/projectCompleted";
 import { projectReadyToClose } from "@/lib/email/templates/projectReadyToClose";
 
 beforeAll(() => {
@@ -379,47 +378,6 @@ describe("projectAdjustmentCreated template", () => {
 
 // ── projectCompleted ──────────────────────────────────────────────────────
 
-describe("projectCompleted template", () => {
-  const ctx = {
-    recipientName: "Todo el equipo",
-    completedByName: "Daniel Amado",
-    projectTitle: "Campaña Q2",
-    projectId: 15,
-    completedAt: "24/04/2026",
-    clientName: "Acme Corp",
-    brandName: "Acme",
-    totalTasks: 12,
-  };
-
-  it("subject includes project title and completed word", () => {
-    const subject = projectCompleted.subject(ctx);
-    expect(subject).toContain("Campaña Q2");
-    expect(subject).toContain("completado");
-  });
-
-  it("html shows green completed badge and celebration", () => {
-    const html = projectCompleted.html(ctx);
-    assertValidHtml(html);
-    assertNoUndefined(html);
-    expect(html).toContain("Completado");
-    expect(html).toContain("#059669");
-    expect(html).toContain("🎉");
-  });
-
-  it("html includes client and brand when provided", () => {
-    const html = projectCompleted.html(ctx);
-    expect(html).toContain("Acme Corp");
-    expect(html).toContain("Acme");
-  });
-
-  it("html omits client/brand rows when not provided", () => {
-    const html = projectCompleted.html({ ...ctx, clientName: undefined, brandName: undefined });
-    expect(html).not.toContain("Acme Corp");
-  });
-});
-
-// ── projectReadyToClose ───────────────────────────────────────────────────
-
 describe("projectReadyToClose template", () => {
   const ctx = {
     recipientName: "Daniel Amado",
@@ -431,7 +389,7 @@ describe("projectReadyToClose template", () => {
 
   it("subject announces the project is at 100% and ready to close", () => {
     expect(projectReadyToClose.subject(ctx)).toBe(
-      "[Campaña Q2] Tu proyecto está al 100%, listo para cerrar"
+      "[Campaña Q2] Tu proyecto se completó al 100%"
     );
   });
 
@@ -445,7 +403,7 @@ describe("projectReadyToClose template", () => {
     expect(html).toContain("Acme Brand");
     expect(html).toContain("Ver proyecto");
     expect(html).toContain('href="https://app.madeincasa.com/projects/15"');
-    expect(html).toContain("marcarlo como completado");
+    expect(html).toContain("se marcó automáticamente como completado");
   });
 
   it("html omits client/brand rows when not provided and escapes the title", () => {
@@ -468,6 +426,6 @@ describe("projectReadyToClose template", () => {
     expect(text).toContain("100%");
     expect(text).toContain("Cliente: Acme Corp");
     expect(text).toContain("Ver proyecto: https://app.madeincasa.com/projects/15");
-    expect(text).toContain("marcarlo como completado");
+    expect(text).toContain("se marcó automáticamente como completado");
   });
 });

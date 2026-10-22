@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { validateApiRole, validateHttpMethod } from "@/lib/services/api-auth";
 import { getTasksByProject, createProjectTask, resolveProjectTaskAssignment } from "@/lib/queries/projectTasks";
-import { resolveTaskAdjustmentId } from "@/lib/queries/adjustments";
+import { resolveTaskAdjustmentId, assertLatestTaskVersion } from "@/lib/queries/adjustments";
 import { TaskVersionError } from "@/lib/definitions";
 import { db } from "@/lib/db";
 import { cookies } from "next/headers";
@@ -81,6 +81,8 @@ export async function POST(request: NextRequest, { params }: Params) {
 
     // 1. Resolve the task's version (latest version when not provided); a task never exists without one
     const adjustmentId = await resolveTaskAdjustmentId(projectId, validation.data.adjustment_id, db, "latest");
+
+    await assertLatestTaskVersion(projectId, adjustmentId);
 
     // 2. Get next order_index for this project and adjustment
     const orderResult = await db.execute({

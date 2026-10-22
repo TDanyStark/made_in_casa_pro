@@ -244,133 +244,76 @@ describe('project queries metadata fields', () => {
     expect((mockExecute.mock.calls[1]?.[0] as { sql: string }).sql).not.toContain('completed_at');
   });
 
-  // Desde que el cierre pasó a su flujo dedicado (`completeProject`), llegar al
-  // 100% ya NO completa el proyecto solo: recalcular únicamente mueve `progress`.
-  it('recalculateProjectProgress updates progress without completing the project', async () => {
-    mockExecute
-      .mockResolvedValueOnce(makeResult([{ id: 33 }]))
-      .mockResolvedValueOnce(makeResult([{ total: '4', completed: '4' }]))
-      .mockResolvedValueOnce(makeResult([]));
-
-    const progress = await recalculateProjectProgress(33);
-
-    expect(progress).toBe(100);
-    expect(mockExecute).toHaveBeenNthCalledWith(
-      3,
-      expect.objectContaining({
-        sql: expect.stringContaining('UPDATE projects SET progress = $1'),
-        args: [100, 33],
-      })
-    );
-
-    const finalUpdateSql = (mockExecute.mock.calls[2]?.[0] as { sql: string }).sql;
-    expect(finalUpdateSql).not.toContain('completed_at');
-    expect(finalUpdateSql).not.toContain('billing_closed_at');
-  });
 });
 
-// Llegar al 100% dispara `project.ready_to_close`: la transición se detecta en el
-// mismo UPDATE (fila bloqueada con FOR UPDATE) que mueve `progress`.
-describe('recalculateProjectProgressWithTransition — detección de llegada al 100%', () => {
-  /** Encola: versión activa, conteo de tareas y la fila previa que devuelve el UPDATE. */
-  function queueRecalc(
-    counts: { total: number; completed: number } | null,
-    previous: { previous_progress: number | null; previous_status: string | null } | null
-  ) {
-    if (counts === null) {
-      mockExecute.mockResolvedValueOnce(makeResult([])); // sin versión activa
-    } else {
-      mockExecute
-        .mockResolvedValueOnce(makeResult([{ id: 70 }]))
-        .mockResolvedValueOnce(
-          makeResult([{ total: String(counts.total), completed: String(counts.completed) }])
-        );
+describe('automatic completion of the latest version', () => {
+  function queue(total: number, completed: number, status = 'active') {
+    mockTransaction.execute
+      .mockResolvedValueOnce(makeResult([{ status, progress: status === 'completed' ? 100 : 50 }]))
+      .mockResolvedValueOnce(makeResult([{ id: 70 }]))
+      .mockResolvedValueOnce(makeResult([{ total: String(total), completed: String(completed) }]));
+  }
+
+  it('completes project and latest version together when all tasks finish', async () => {
+    queue(4, 4);
+    await expect(recalculateProjectProgressWithTransition(33)).resolves.toEqual({ progress: 100, reachedCompletion: true });
+    expect(mockTransaction.execute).toHaveBeenCalledWith(expect.objectContaining({ sql: expect.stringContaining('FOR UPDATE') }));
+    expect(mockTransaction.execute).toHaveBeenCalledWith(expect.objectContaining({ sql: expect.stringContaining('UPDATE projects'), args: [100, 'completed', 33] }));
+    expect(mockTransaction.execute).toHaveBeenCalledWith(expect.objectContaining({ sql: expect.stringContaining('UPDATE project_adjustments'), args: ['completed', 70] }));
+    expect(mockTransaction.commit).toHaveBeenCalledTimes(1);
+  });
+
+  it('reopens the completed project and same version after a pending task is added', async () => {
+    queue(5, 4, 'completed');
+    await expect(recalculateProjectProgressWithTransition(33)).resolves.toEqual({ progress: 80, reachedCompletion: false });
+    expect(mockTransaction.execute).toHaveBeenCalledWith(expect.objectContaining({ args: [80, 'active', 33] }));
+    expect(mockTransaction.execute).toHaveBeenCalledWith(expect.objectContaining({ args: ['active', 70] }));
+    expect(mockTransaction.execute.mock.calls.some(([q]) => /UPDATE project_tasks/.test(q.sql))).toBe(false);
+  });
+
+  it('keeps a completed version at 100 without sending another notice', async () => {
+    queue(4, 4, 'completed');
+    await expect(recalculateProjectProgressWithTransition(33)).resolves.toEqual({ progress: 100, reachedCompletion: false });
+    const versionQuery = mockTransaction.execute.mock.calls[1][0].sql;
+    expect(versionQuery).not.toContain("status = 'active'");
+    expect(versionQuery).toContain('version_number DESC');
+  });
+
+  it('never rounds unfinished tasks up to 100', async () => {
+    queue(200, 199);
+    await expect(recalculateProjectProgressWithTransition(33)).resolves.toEqual({ progress: 99, reachedCompletion: false });
+  });
+
+  it('does not complete an empty version', async () => {
+    queue(0, 0);
+    await expect(recalculateProjectProgressWithTransition(33)).resolves.toEqual({ progress: 0, reachedCompletion: false });
+  });
+
+  it('notifies again after reopening and completing the version', async () => {
+    queue(5, 4, 'completed');
+    await recalculateProjectProgressWithTransition(33);
+    queue(5, 5);
+    await expect(recalculateProjectProgressWithTransition(33)).resolves.toEqual({ progress: 100, reachedCompletion: true });
+  });
+
+  it('preserves paused and archived states while recalculating pending tasks', async () => {
+    for (const status of ['paused', 'archived']) {
+      queue(4, 3, status);
+      await recalculateProjectProgressWithTransition(33);
+      expect(mockTransaction.execute).toHaveBeenCalledWith(expect.objectContaining({ args: [75, status, 33] }));
     }
-    mockExecute.mockResolvedValueOnce(makeResult(previous ? [previous] : []));
-  }
-
-  function lastUpdate() {
-    const calls = mockExecute.mock.calls;
-    return calls[calls.length - 1]?.[0] as { sql: string; args: unknown[] };
-  }
-
-  it('99 → 100 reporta la transición', async () => {
-    queueRecalc({ total: 4, completed: 4 }, { previous_progress: 99, previous_status: 'active' });
-
-    const result = await recalculateProjectProgressWithTransition(33);
-
-    expect(result).toEqual({ progress: 100, reachedCompletion: true });
-    const update = lastUpdate();
-    expect(update.sql).toContain('UPDATE projects SET progress = $1');
-    expect(update.sql).toContain('FOR UPDATE');
-    expect(update.args).toEqual([100, 33]);
   });
 
-  it('100 → 100 no reporta la transición', async () => {
-    queueRecalc({ total: 4, completed: 4 }, { previous_progress: 100, previous_status: 'active' });
-
-    await expect(recalculateProjectProgressWithTransition(33)).resolves.toEqual({
-      progress: 100,
-      reachedCompletion: false,
-    });
+  it('rolls back if updating the version fails', async () => {
+    queue(4, 4);
+    mockTransaction.execute.mockResolvedValueOnce(makeResult([])).mockRejectedValueOnce(new Error('version update failed'));
+    await expect(recalculateProjectProgressWithTransition(33)).rejects.toThrow('version update failed');
+    expect(mockTransaction.rollback).toHaveBeenCalledTimes(1);
+    expect(mockTransaction.commit).not.toHaveBeenCalled();
   });
 
-  it('NULL → 100 reporta la transición', async () => {
-    queueRecalc({ total: 2, completed: 2 }, { previous_progress: null, previous_status: 'active' });
-
-    await expect(recalculateProjectProgressWithTransition(33)).resolves.toEqual({
-      progress: 100,
-      reachedCompletion: true,
-    });
-  });
-
-  it('un proyecto ya completado no reporta la transición', async () => {
-    queueRecalc({ total: 4, completed: 4 }, { previous_progress: 75, previous_status: 'completed' });
-
-    await expect(recalculateProjectProgressWithTransition(33)).resolves.toEqual({
-      progress: 100,
-      reachedCompletion: false,
-    });
-  });
-
-  it('sin tareas (0 de 0) no reporta la transición', async () => {
-    queueRecalc(null, { previous_progress: 50, previous_status: 'active' });
-
-    await expect(recalculateProjectProgressWithTransition(33)).resolves.toEqual({
-      progress: 0,
-      reachedCompletion: false,
-    });
-    expect(lastUpdate().args).toEqual([0, 33]);
-  });
-
-  it('si el progreso baja y vuelve a llegar al 100% reporta otra vez', async () => {
-    // Un ajuste agrega tareas: 100 → 75
-    queueRecalc({ total: 4, completed: 3 }, { previous_progress: 100, previous_status: 'active' });
-    await expect(recalculateProjectProgressWithTransition(33)).resolves.toEqual({
-      progress: 75,
-      reachedCompletion: false,
-    });
-
-    // Se completan de nuevo: 75 → 100
-    queueRecalc({ total: 4, completed: 4 }, { previous_progress: 75, previous_status: 'active' });
-    await expect(recalculateProjectProgressWithTransition(33)).resolves.toEqual({
-      progress: 100,
-      reachedCompletion: true,
-    });
-  });
-
-  it('un proyecto inexistente (UPDATE sin filas) no reporta la transición', async () => {
-    queueRecalc({ total: 1, completed: 1 }, null);
-
-    await expect(recalculateProjectProgressWithTransition(33)).resolves.toEqual({
-      progress: 100,
-      reachedCompletion: false,
-    });
-  });
-
-  it('recalculateProjectProgress mantiene su contrato: devuelve solo el número', async () => {
-    queueRecalc({ total: 4, completed: 4 }, { previous_progress: 99, previous_status: 'active' });
-
+  it('preserves the numeric return contract', async () => {
+    queue(4, 4);
     await expect(recalculateProjectProgress(33)).resolves.toBe(100);
   });
 });

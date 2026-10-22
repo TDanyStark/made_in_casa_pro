@@ -413,7 +413,7 @@ describe("dispatchNotification()", () => {
 
   // ── project.completed ────────────────────────────────────────────────────
 
-  it("project.completed: notifies all stakeholders using system sender", async () => {
+  it("project.completed: ignores the retired event", async () => {
     const stakeholders = [
       { userId: 3, email: "daniel@test.com", name: "Daniel Amado" },
       { userId: 5, email: "ana@test.com", name: "Ana García" },
@@ -427,11 +427,7 @@ describe("dispatchNotification()", () => {
       projectId: 1,
     });
 
-    expect(mockSendEmail).toHaveBeenCalledTimes(2);
-    // project.completed always uses system sender
-    for (const call of mockSendEmail.mock.calls) {
-      expect(call[0].forceSystemSender).toBe(true);
-    }
+    expect(mockSendEmail).not.toHaveBeenCalled();
   });
 
   // ── project.ready_to_close ───────────────────────────────────────────────
@@ -464,7 +460,7 @@ describe("dispatchNotification()", () => {
     );
     expect(call.forceSystemSender).toBeFalsy();
     expect(call.message.to).toEqual({ email: "daniel@test.com", name: "Daniel Amado" });
-    expect(call.message.subject).toBe("[Campaña Q2] Tu proyecto está al 100%, listo para cerrar");
+    expect(call.message.subject).toBe("[Campaña Q2] Tu proyecto se completó al 100%");
     expect(call.message.html).toContain("https://app.madeincasa.com/projects/1");
     expect(call.message.text).toContain("https://app.madeincasa.com/projects/1");
   });

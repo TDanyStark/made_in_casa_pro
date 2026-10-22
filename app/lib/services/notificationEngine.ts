@@ -44,7 +44,6 @@ import { quoteRequested } from "@/lib/email/templates/quoteRequested";
 import { quoteReceived } from "@/lib/email/templates/quoteReceived";
 import { quoteAccepted } from "@/lib/email/templates/quoteAccepted";
 import { projectAdjustmentCreated } from "@/lib/email/templates/projectAdjustmentCreated";
-import { projectCompleted } from "@/lib/email/templates/projectCompleted";
 import { projectReadyToClose } from "@/lib/email/templates/projectReadyToClose";
 
 // ── Supported event types ──────────────────────────────────────────────────
@@ -228,6 +227,8 @@ function buildEventMetadata(input: DispatchInput): Record<string, unknown> {
 // ── Main dispatcher ────────────────────────────────────────────────────────
 
 export async function dispatchNotification(input: DispatchInput): Promise<void> {
+  // Retired event: tolerate legacy callers without creating events or deliveries.
+  if (input.eventType === NOTIFICATION_EVENTS.PROJECT_COMPLETED) return;
   try {
     // Build metadata: merge event-specific fields so retries can reconstruct the message
     const eventMetadata = buildEventMetadata(input);
@@ -570,33 +571,6 @@ export async function dispatchNotification(input: DispatchInput): Promise<void> 
             text: projectAdjustmentCreated.text({ recipientName: r.name, createdByName, projectTitle: project.title, projectId: project.id, adjustmentId: input.adjustmentId, versionNumber: input.versionNumber }),
           }),
           { projectId: input.projectId, adjustmentId: input.adjustmentId, threadKey }
-        );
-        break;
-      }
-
-      // ── project.completed ──────────────────────────────────────────────
-      case "project.completed": {
-        const [project, stakeholders] = await Promise.all([
-          getProjectById(input.projectId),
-          getProjectStakeholders(input.projectId, null),
-        ]);
-        if (!project || stakeholders.length === 0) break;
-
-        const threadKey = await resolveProjectVersionThreadKey(input.projectId, null);
-        const completedAt = formatDate(project.completed_at ?? undefined);
-
-        const completedByName = await getActorName(input.actorUserId);
-
-        await sendToRecipients(
-          stakeholders,
-          input.actorUserId,
-          eventId,
-          (r) => ({
-            subject: projectCompleted.subject({ recipientName: r.name, completedByName, projectTitle: project.title, projectId: project.id, completedAt }),
-            html: projectCompleted.html({ recipientName: r.name, completedByName, projectTitle: project.title, projectId: project.id, completedAt, clientName: project.client_name ?? undefined, brandName: project.brand_name ?? undefined }),
-            text: projectCompleted.text({ recipientName: r.name, completedByName, projectTitle: project.title, projectId: project.id, completedAt }),
-          }),
-          { projectId: input.projectId, adjustmentId: null, threadKey, forceSystemSender: true }
         );
         break;
       }

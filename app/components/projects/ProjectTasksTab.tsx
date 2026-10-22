@@ -272,6 +272,7 @@ interface Props {
   projectId: number;
   productName: string | null;
   canEdit: boolean;
+  canCreateTask?: boolean;
   currentUserId?: number;
   currentUserRole?: number;
   adjustmentId?: number | null;
@@ -290,6 +291,7 @@ export function ProjectTasksTab({
   projectId,
   productName,
   canEdit,
+  canCreateTask = canEdit,
   currentUserId,
   currentUserRole,
   adjustmentId = null,
@@ -583,7 +585,7 @@ export function ProjectTasksTab({
               <span className="text-xs text-muted-foreground">Actualizando...</span>
             )}
           </div>
-          {canEdit && (
+          {canCreateTask && (
             <Button size="sm" onClick={openCreate}>
               <Plus className="h-3.5 w-3.5 mr-1" />
               Agregar tarea

@@ -298,7 +298,7 @@ describe("POST /api/notification-deliveries/[id]/retry", () => {
       42,
       expect.objectContaining({
         to: { email: "to@example.com", name: "Ana" },
-        subject: "[Project X] Tu proyecto est\u00e1 al 100%, listo para cerrar",
+        subject: "[Project X] Tu proyecto se completó al 100%",
         html: expect.stringContaining("/projects/7\""),
         text: expect.stringContaining("Acme Corp"),
       }),
@@ -334,4 +334,18 @@ describe("POST /api/notification-deliveries/[id]/retry", () => {
     const res = await callPost("42");
     expect(res!.status).toBe(500);
   });
+});
+
+
+it("does not retry retired project.completed deliveries", async () => {
+  mockValidateHttpMethod.mockReturnValue({ isValidMethod: true, response: undefined });
+  mockValidateApiRole.mockResolvedValue(ADMIN);
+  mockGetDeliveryById.mockResolvedValue(failedDelivery as never);
+  mockGetNotificationEventById.mockResolvedValue({ ...baseEvent, event_type: "project.completed" } as never);
+  mockResendExistingDelivery.mockClear();
+  const response = await callPost("42");
+  if (!response) throw new Error("POST handler returned undefined");
+  expect(response.status).toBe(410);
+  expect(await response.json()).toEqual({ error: "Este correo fue retirado. Solo se envía el aviso del 100% al comercial." });
+  expect(mockResendExistingDelivery).not.toHaveBeenCalled();
 });

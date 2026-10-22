@@ -30,7 +30,6 @@ import { quoteRequested } from "@/lib/email/templates/quoteRequested";
 import { quoteReceived } from "@/lib/email/templates/quoteReceived";
 import { quoteAccepted } from "@/lib/email/templates/quoteAccepted";
 import { projectAdjustmentCreated } from "@/lib/email/templates/projectAdjustmentCreated";
-import { projectCompleted } from "@/lib/email/templates/projectCompleted";
 import { projectReadyToClose } from "@/lib/email/templates/projectReadyToClose";
 import type { NotificationEventType } from "@/lib/services/notificationEngine";
 
@@ -75,6 +74,13 @@ export async function POST(
     const event = await getNotificationEventById(delivery.event_id);
     if (!event) {
       return NextResponse.json({ error: "Evento de notificación no encontrado" }, { status: 404 });
+    }
+
+    if (event.event_type === "project.completed") {
+      return NextResponse.json(
+        { error: "Este correo fue retirado. Solo se envía el aviso del 100% al comercial." },
+        { status: 410 }
+      );
     }
 
     // Build the email message for the original recipient using the stored event data
@@ -378,29 +384,6 @@ async function buildRetryMessage(
           text: projectAdjustmentCreated.text({ recipientName: r.name, createdByName, projectTitle: project.title, projectId: project.id, adjustmentId: event.adjustment_id, versionNumber }),
         },
         opts: { projectId: event.project_id, adjustmentId: event.adjustment_id, threadKey },
-      };
-    }
-
-    // ── project.completed ────────────────────────────────────────────────
-    case "project.completed": {
-      if (!event.project_id) return null;
-      const [project, stakeholders] = await Promise.all([
-        getProjectById(event.project_id),
-        getProjectStakeholders(event.project_id, null),
-      ]);
-      if (!project || stakeholders.length === 0) return null;
-      const r = stakeholders.find((s) => s.email === recipientEmail) ?? stakeholders[0];
-      const completedByName = await getActorName(actorUserId);
-      const completedAt = formatDate(project.completed_at);
-      const threadKey = await resolveProjectVersionThreadKey(event.project_id, null);
-      return {
-        message: {
-          to: { email: recipientEmail, name: r.name },
-          subject: projectCompleted.subject({ recipientName: r.name, completedByName, projectTitle: project.title, projectId: project.id, completedAt }),
-          html: projectCompleted.html({ recipientName: r.name, completedByName, projectTitle: project.title, projectId: project.id, completedAt, clientName: project.client_name ?? undefined, brandName: project.brand_name ?? undefined }),
-          text: projectCompleted.text({ recipientName: r.name, completedByName, projectTitle: project.title, projectId: project.id, completedAt }),
-        },
-        opts: { projectId: event.project_id, adjustmentId: null, threadKey, forceSystemSender: true },
       };
     }
 

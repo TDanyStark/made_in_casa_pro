@@ -102,7 +102,7 @@ export function ProjectAdjustmentsTab({
           {canEdit && canCreateNew && (
             <Button onClick={() => setWizardOpen(true)} size="sm">
               <Plus className="mr-2 h-4 w-4" />
-              Nuevo Ajuste
+              Crear ajuste
             </Button>
           )}
         </div>
@@ -260,6 +260,7 @@ function VersionAccordion({
               projectId={projectId}
               productName={productName}
               canEdit={canEdit && versionCanEdit}
+              canCreateTask={canEdit && isLatest && (projectIsEditable || projectStatus === "completed")}
               currentUserId={currentUserId}
               currentUserRole={currentUserRole}
               adjustmentId={adjustment.id}

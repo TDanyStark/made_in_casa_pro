@@ -627,75 +627,67 @@ export async function recalculateProjectProgress(projectId: number): Promise<num
   return progress;
 }
 
-/**
- * Same recalculation as `recalculateProjectProgress`, plus atomic detection of
- * the < 100 → 100 transition. The UPDATE reads the previous progress/status from
- * a `FOR UPDATE` subquery in the same statement, so two concurrent
- * recalculations serialize on the row lock and only the first one sees the
- * previous value below 100.
+/** Recalculate the latest version and synchronize its lifecycle with the project.
+ * Lock before counting: concurrent recalculations observe the committed state
+ * of the previous recalculation, rather than publishing stale counts.
  */
 export async function recalculateProjectProgressWithTransition(
   projectId: number
 ): Promise<ProjectProgressRecalculation> {
+  const tx = await db.transaction("write");
+  let progress = 0;
+  let reachedCompletion = false;
   try {
-    // Get the active adjustment (the current version being worked on)
-    const activeAdjResult = await db.execute({
-      sql: `SELECT id FROM project_adjustments WHERE project_id = $1 AND status = 'active' ORDER BY version_number DESC LIMIT 1`,
+    const projectResult = await tx.execute({
+      sql: `SELECT status, progress FROM projects WHERE id = $1 FOR UPDATE`,
       args: [projectId],
     });
-
-    let total = 0;
-    let completed = 0;
-
-    if (activeAdjResult.rows.length > 0) {
-      const activeAdjId = Number((activeAdjResult.rows[0] as unknown as { id: number }).id);
-      const result = await db.execute({
-        sql: `
-          SELECT
-            COUNT(*)                                         AS total,
-            COUNT(*) FILTER (WHERE status = 'completed')    AS completed
-          FROM project_tasks
-          WHERE project_id = $1 AND adjustment_id = $2
-        `,
-        args: [projectId, activeAdjId],
+    const project = projectResult.rows[0] as unknown as { status: string } | undefined;
+    if (project) {
+      const versionResult = await tx.execute({
+        sql: `SELECT id FROM project_adjustments WHERE project_id = $1 ORDER BY version_number DESC, id DESC LIMIT 1 FOR UPDATE`,
+        args: [projectId],
       });
-      const row = result.rows[0] as unknown as { total: string; completed: string };
-      total = Number(row.total);
-      completed = Number(row.completed);
+      const version = versionResult.rows[0] as unknown as { id: number } | undefined;
+      let total = 0;
+      let completed = 0;
+      if (version) {
+        const counts = await tx.execute({
+          sql: `SELECT COUNT(*) AS total, COUNT(*) FILTER (WHERE status = 'completed') AS completed
+                FROM project_tasks WHERE project_id = $1 AND adjustment_id = $2`,
+          args: [projectId, Number(version.id)],
+        });
+        const row = counts.rows[0] as unknown as { total: string; completed: string };
+        total = Number(row.total);
+        completed = Number(row.completed);
+      }
+      const allCompleted = total > 0 && completed === total;
+      progress = allCompleted ? 100 : total === 0 ? 0 : Math.min(99, Math.round(completed / total * 100));
+      const status = allCompleted ? "completed" : project.status === "completed" ? "active" : project.status;
+      reachedCompletion = allCompleted && project.status !== "completed";
+      await tx.execute({
+        sql: `UPDATE projects SET progress = $1, status = $2,
+              completed_at = CASE WHEN $2 = 'completed' THEN COALESCE(completed_at, CURRENT_TIMESTAMP) ELSE NULL END,
+              updated_at = CURRENT_TIMESTAMP WHERE id = $3`,
+        args: [progress, status, projectId],
+      });
+      if (version) {
+        await tx.execute({
+          sql: `UPDATE project_adjustments SET status = $1,
+                completed_at = CASE WHEN $1 = 'completed' THEN COALESCE(completed_at, CURRENT_TIMESTAMP) ELSE NULL END
+                WHERE id = $2`,
+          args: [allCompleted ? "completed" : "active", Number(version.id)],
+        });
+      }
     }
-
-    const progress = total === 0 ? 0 : Math.round((completed / total) * 100);
-
-    const updateResult = await db.execute({
-      sql: `UPDATE projects SET progress = $1, updated_at = CURRENT_TIMESTAMP
-            FROM (
-              SELECT id, progress AS previous_progress, status AS previous_status
-              FROM projects WHERE id = $2 FOR UPDATE
-            ) AS previous
-            WHERE projects.id = previous.id
-            RETURNING previous.previous_progress, previous.previous_status`,
-      args: [progress, projectId],
-    });
-
-    const previous = updateResult?.rows?.[0] as unknown as
-      | { previous_progress: number | string | null; previous_status: string | null }
-      | undefined;
-    const previousProgress =
-      previous?.previous_progress == null ? null : Number(previous.previous_progress);
-    const reachedCompletion =
-      progress === 100 &&
-      total > 0 &&
-      previous !== undefined &&
-      (previousProgress === null || previousProgress < 100) &&
-      previous.previous_status !== "completed";
-
-    revalidatePath(`/projects/${projectId}`);
-    revalidatePath("/projects");
-    return { progress, reachedCompletion };
+    await tx.commit();
   } catch (error) {
-    console.error("Error recalculating project progress:", error);
+    await tx.rollback();
     throw error;
   }
+  revalidatePath(`/projects/${projectId}`);
+  revalidatePath("/projects");
+  return { progress, reachedCompletion };
 }
 
 // ─── Manual completion ───────────────────────────────────────────────────────

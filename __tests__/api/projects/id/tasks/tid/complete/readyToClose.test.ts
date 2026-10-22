@@ -130,7 +130,7 @@ describe('POST /complete — project.ready_to_close', () => {
     expect(readyEmails.length).toBeGreaterThanOrEqual(1);
     const readyEmail = mockSendEmail.mock.calls
       .map(([c]) => c)
-      .find((c) => c.message.subject === '[Campaña Q2] Tu proyecto está al 100%, listo para cerrar');
+      .find((c) => c.message.subject === '[Campaña Q2] Tu proyecto se completó al 100%');
     expect(readyEmail).toBeDefined();
     expect(readyEmail.message.to).toEqual({ email: 'comercial@test.com', name: 'Daniel Amado' });
     expect(readyEmail.message.html).toContain('https://app.madeincasa.com/projects/1');
@@ -144,7 +144,7 @@ describe('POST /complete — project.ready_to_close', () => {
     expect(res!.status).toBe(200);
     expect(readyToCloseEvents()).toHaveLength(0);
     expect(
-      mockSendEmail.mock.calls.filter(([c]) => String(c.message.subject).includes('listo para cerrar'))
+      mockSendEmail.mock.calls.filter(([c]) => String(c.message.subject).includes('se completó al 100%'))
     ).toHaveLength(0);
   });
 });

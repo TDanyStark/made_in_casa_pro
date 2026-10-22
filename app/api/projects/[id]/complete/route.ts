@@ -2,10 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { validateApiRole, validateHttpMethod } from "@/lib/services/api-auth";
 import { PROJECT_EDIT_ROLES } from "@/lib/role-groups";
 import { completeProject } from "@/lib/queries/projects";
-import { cookies } from "next/headers";
-import { decrypt } from "@/lib/session";
-import { dispatchNotification, NOTIFICATION_EVENTS } from "@/lib/services/notificationEngine";
-
 type Params = { params: Promise<{ id: string }> };
 
 export async function POST(request: NextRequest, { params }: Params) {
@@ -19,15 +15,6 @@ export async function POST(request: NextRequest, { params }: Params) {
     const { id } = await params;
     const projectId = parseInt(id);
     await completeProject(projectId);
-    const cookie = (await cookies()).get("session")?.value;
-    const session = cookie ? await decrypt(cookie) : null;
-    if (session?.id) {
-      await dispatchNotification({
-        eventType: NOTIFICATION_EVENTS.PROJECT_COMPLETED,
-        actorUserId: session.id,
-        projectId,
-      });
-    }
     return NextResponse.json({ success: true });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Error al completar proyecto";

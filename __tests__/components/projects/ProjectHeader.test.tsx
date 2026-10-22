@@ -5,7 +5,6 @@ import { ProjectHeader } from "@/components/projects/ProjectHeader";
 import { ProjectDetailType } from "@/lib/definitions";
 
 const mockPatch = jest.fn();
-const mockPost = jest.fn();
 const mockSetQueryData = jest.fn();
 const mockInvalidateQueries = jest.fn();
 const mockToastSuccess = jest.fn();
@@ -28,7 +27,6 @@ jest.mock("@tanstack/react-query", () => ({
 
 jest.mock("@/lib/services/apiService", () => ({
   patch: (...args: unknown[]) => mockPatch(...args),
-  post: (...args: unknown[]) => mockPost(...args),
 }));
 
 jest.mock("sonner", () => ({
@@ -58,20 +56,6 @@ jest.mock("@/components/ui/select", () => ({
   SelectValue: () => <span />,
   SelectContent: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
   SelectItem: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-}));
-
-jest.mock("@/components/ui/alert-dialog", () => ({
-  AlertDialog: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-  AlertDialogTrigger: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-  AlertDialogContent: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-  AlertDialogHeader: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-  AlertDialogTitle: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-  AlertDialogDescription: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-  AlertDialogFooter: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-  AlertDialogCancel: ({ children }: { children: React.ReactNode }) => <button>{children}</button>,
-  AlertDialogAction: ({ children, onClick }: { children: React.ReactNode; onClick: () => void }) => (
-    <button onClick={onClick}>{children}</button>
-  ),
 }));
 
 const project: ProjectDetailType = {
@@ -109,22 +93,9 @@ describe("ProjectHeader", () => {
     jest.clearAllMocks();
   });
 
-  it("updates project cache and adjustment versions after completion", async () => {
-    const user = userEvent.setup();
-    mockPost.mockResolvedValue({ ok: true, data: { success: true } });
-
+  it("does not ask for manual completion at 100 percent", () => {
     render(<ProjectHeader project={project} />);
-
-    await user.click(screen.getByRole("button", { name: "Completar proyecto" }));
-
-    await waitFor(() => {
-      expect(mockPost).toHaveBeenCalledWith("projects/6/complete", {});
-    });
-
-    expect(mockSetQueryData).toHaveBeenCalledWith(["project", 6], expect.any(Function));
-    expect(mockInvalidateQueries).toHaveBeenCalledWith({ queryKey: ["project", 6] });
-    expect(mockInvalidateQueries).toHaveBeenCalledWith({ queryKey: ["project-adjustments", 6] });
-    expect(mockInvalidateQueries).toHaveBeenCalledWith({ queryKey: ["projects"] });
+    expect(screen.queryByRole("button", { name: /Completar/ })).not.toBeInTheDocument();
   });
 
   it("persists in-adjustments status changes from the selector", async () => {
@@ -140,5 +111,6 @@ describe("ProjectHeader", () => {
     });
 
     expect(mockSetQueryData).toHaveBeenCalledWith(["project", 6], expect.any(Function));
+    expect(mockInvalidateQueries).toHaveBeenCalledWith({ queryKey: ["project-adjustments", 6] });
   });
 });

@@ -37,7 +37,7 @@ const EVENT_TYPE_LABELS: Record<string, string> = {
   "quote.accepted": "Cotización aceptada",
   "project.adjustment.created": "Ajuste creado",
   "project.completed": "Proyecto completado",
-  "project.ready_to_close": "Proyecto listo para cerrar",
+  "project.ready_to_close": "Proyecto completado (aviso comercial)",
 };
 
 function formatDate(dateStr: string | null) {
