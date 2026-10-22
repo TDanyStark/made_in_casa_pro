@@ -333,3 +333,60 @@ describe("DELETE /api/projects/[id]/tasks/[tid] task.ready notifications", () =>
     expect(mockDispatchNotification).not.toHaveBeenCalled();
   });
 });
+
+describe("PATCH /api/projects/[id]/tasks/[tid] — pause/resume permissions (S7)", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockValidateHttpMethod.mockReturnValue({ isValidMethod: true, response: undefined });
+    mockCookies.mockResolvedValue({ get: jest.fn().mockReturnValue({ value: "session-token" }) } as never);
+    mockUpdateProjectTask.mockResolvedValue({ ...existingTask } as never);
+  });
+
+  it.each([
+    ["paused", "in_progress"],
+    ["in_progress", "paused"],
+  ])("rejects a collaborator who is not the assignee setting %s", async (status, from) => {
+    mockValidateApiRole.mockResolvedValue({ isAuthorized: true, userRole: 4, response: undefined } as never);
+    mockDecrypt.mockResolvedValue({ id: 99 } as never);
+    mockGetProjectTaskById.mockResolvedValue({ ...existingTask, status: from } as never);
+
+    const response = await callPatch({ status });
+
+    expect(response.status).toBe(403);
+    expect(await response.json()).toEqual({ error: "No tienes permiso para pausar o reanudar esta tarea" });
+    expect(mockUpdateProjectTask).not.toHaveBeenCalled();
+  });
+
+  it("lets the assignee pause their own task", async () => {
+    mockValidateApiRole.mockResolvedValue({ isAuthorized: true, userRole: 4, response: undefined } as never);
+    mockDecrypt.mockResolvedValue({ id: 4 } as never);
+    mockGetProjectTaskById.mockResolvedValue({ ...existingTask, status: "in_progress" } as never);
+
+    const response = await callPatch({ status: "paused" });
+
+    expect(response.status).toBe(200);
+    expect(mockUpdateProjectTask).toHaveBeenCalledWith(10, expect.objectContaining({ status: "paused" }), 4);
+  });
+
+  it("lets a collaborator edit other fields without the pause/resume check (previous behavior)", async () => {
+    mockValidateApiRole.mockResolvedValue({ isAuthorized: true, userRole: 4, response: undefined } as never);
+    mockDecrypt.mockResolvedValue({ id: 99 } as never);
+    mockGetProjectTaskById.mockResolvedValue({ ...existingTask, status: "in_progress" } as never);
+
+    const response = await callPatch({ title: "Nuevo título" });
+
+    expect(response.status).toBe(200);
+  });
+
+  it("rejects pausing a task that is not in progress and updates nothing", async () => {
+    mockValidateApiRole.mockResolvedValue({ isAuthorized: true, userRole: 1, response: undefined } as never);
+    mockDecrypt.mockResolvedValue({ id: 3 } as never);
+    mockGetProjectTaskById.mockResolvedValue({ ...existingTask, status: "not_started" } as never);
+
+    const response = await callPatch({ status: "paused" });
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({ error: "Solo se pueden pausar tareas en progreso" });
+    expect(mockUpdateProjectTask).not.toHaveBeenCalled();
+  });
+});

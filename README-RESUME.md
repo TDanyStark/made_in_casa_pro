@@ -245,10 +245,12 @@ administrativos ven en qué está trabajando en este momento. El resto queda en
 | Tomar tarea | `POST /api/projects/[id]/tasks/[tid]/start` | `not_started` → `in_progress`; las demás tareas en progreso del asignado pasan a `paused` |
 | Pausar | `POST /api/projects/[id]/tasks/[tid]/pause` | `in_progress` → `paused` (sirve también para pausar la única activa) |
 | Reanudar | `POST /api/projects/[id]/tasks/[tid]/resume` | `paused` → `in_progress`; la tarea en progreso del asignado se pausa sola |
-| Editar estado | `PATCH /api/projects/[id]/tasks/[tid]` | Poner `in_progress` a mano aplica la misma pausa automática |
+| Editar estado | `PATCH /api/projects/[id]/tasks/[tid]` | Poner `in_progress` a mano aplica la misma pausa automática; `paused` solo se acepta desde `in_progress` |
+| Crear tarea | `POST /api/projects/[id]/tasks` | Crearla en `in_progress` pausa las demás del asignado; no se puede crear en `paused` |
 
 - Pueden pausar y reanudar el colaborador asignado y los roles de liderazgo
-  (`TASK_OVERRIDE_ROLES`), igual que al tomar una tarea.
+  (`TASK_OVERRIDE_ROLES`), igual que al tomar una tarea. La regla también aplica
+  cuando se pausa o reanuda desde `PATCH`.
 - Una tarea pausada no admite reportar avance, completar ni validar: primero hay
   que reanudarla.
 - Cada pausa queda en `task_transitions`. Las pausas automáticas se registran con

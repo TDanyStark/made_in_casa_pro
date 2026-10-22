@@ -191,6 +191,9 @@ export async function createProjectTask(data: CreateProjectTaskInput): Promise<P
   if (data.task_type === "validation" && data.order_index === 0) {
     throw new Error("Una tarea de validación no puede ser la primera tarea del proyecto.");
   }
+  if (data.status === "paused") {
+    throw new Error("Una tarea nueva no puede crearse pausada");
+  }
   try {
     // A task never exists without a version: default to the project's base version.
     const adjustmentId = await resolveTaskAdjustmentId(data.project_id, data.adjustment_id);
@@ -198,7 +201,7 @@ export async function createProjectTask(data: CreateProjectTaskInput): Promise<P
     const assignedUserId = data.assigned_user_id ?? null;
     const assignedAt = (status === "not_started" && assignedUserId) ? new Date() : null;
 
-    const result = await db.execute({
+    const insert = {
       sql: `
         INSERT INTO project_tasks
           (project_id, template_id, title, description,
@@ -223,9 +226,30 @@ export async function createProjectTask(data: CreateProjectTaskInput): Promise<P
         assignedAt,
         adjustmentId,
       ],
-    });
-    const id = Number(result.rows[0]?.id);
+    };
+
+    let id: number;
+    let pausedProjectIds: number[] = [];
+    if (status === "in_progress" && assignedUserId) {
+      // Single in-progress rule: a task created in progress pauses the
+      // assignee's other in-progress tasks atomically with the insert.
+      const tx = await db.transaction("write");
+      try {
+        const result = await tx.execute(insert);
+        id = Number(result.rows[0]?.id);
+        const paused = await pauseOtherInProgressTasks(tx, assignedUserId, id, null);
+        await tx.commit();
+        pausedProjectIds = paused.map((p) => p.project_id);
+      } catch (error) {
+        await tx.rollback();
+        throw error;
+      }
+    } else {
+      const result = await db.execute(insert);
+      id = Number(result.rows[0]?.id);
+    }
     revalidatePath(`/projects/${data.project_id}`);
+    new Set(pausedProjectIds).forEach((pid) => revalidatePath(`/projects/${pid}`));
     const created = await getProjectTaskById(id);
     return created!;
   } catch (error) {
@@ -323,6 +347,14 @@ export async function updateProjectTask(
     if (entersInProgress && finalAssignee) {
       const tx = await db.transaction("write");
       try {
+        // Same lock order as changeTaskStatus (task row, then user row) so a
+        // concurrent start/resume of this task cannot deadlock with PATCH.
+        await tx.execute({
+          sql: `SELECT id FROM project_tasks
+                WHERE id = $1
+                FOR UPDATE`,
+          args: [id],
+        });
         const paused = await pauseOtherInProgressTasks(tx, finalAssignee, id, movedByUserId);
         await tx.execute({ sql: updateSql, args });
         await tx.commit();

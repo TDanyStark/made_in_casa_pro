@@ -10,7 +10,7 @@ import {
 import { db } from "@/lib/db";
 import { cookies } from "next/headers";
 import { decrypt } from "@/lib/session";
-import { AUTHENTICATED_ROLES, OPERATIONS_ROLES } from "@/lib/role-groups";
+import { AUTHENTICATED_ROLES, OPERATIONS_ROLES, TASK_OVERRIDE_ROLES } from "@/lib/role-groups";
 import {
   dispatchNotification,
   NOTIFICATION_EVENTS,
@@ -77,6 +77,30 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     const existingTask = await getProjectTaskById(taskId);
     if (!existingTask) return NextResponse.json({ error: "Tarea no encontrada" }, { status: 404 });
 
+    const cookie = (await cookies()).get("session")?.value;
+    const session = cookie ? await decrypt(cookie) : null;
+    const currentUserId = session?.id ? Number(session.id) : null;
+
+    // Pausing/resuming (paused <-> in_progress) follows the pause/resume
+    // routes: only the assignee or a leadership role.
+    const requestedStatus = validation.data.status;
+    if (requestedStatus === "paused" && existingTask.status !== "paused" && existingTask.status !== "in_progress") {
+      return NextResponse.json({ error: "Solo se pueden pausar tareas en progreso" }, { status: 400 });
+    }
+    const isPauseOrResume =
+      requestedStatus !== existingTask.status &&
+      ((requestedStatus === "paused" && existingTask.status === "in_progress") ||
+        (requestedStatus === "in_progress" && existingTask.status === "paused"));
+    if (isPauseOrResume) {
+      const isAssigned = currentUserId !== null && existingTask.assigned_user_id === currentUserId;
+      if (!isAssigned && !TASK_OVERRIDE_ROLES.includes(roleValidation.userRole)) {
+        return NextResponse.json(
+          { error: "No tienes permiso para pausar o reanudar esta tarea" },
+          { status: 403 }
+        );
+      }
+    }
+
     const updateData = { ...validation.data };
 
     // Re-resolve assignment if mode or area changes
@@ -99,10 +123,6 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     if (Number(finalRequiresQuote) === 1 && !finalAssignedUser && validation.data.status === undefined) {
       updateData.status = "blocked";
     }
-
-    const cookie = (await cookies()).get("session")?.value;
-    const session = cookie ? await decrypt(cookie) : null;
-    const currentUserId = session?.id ? Number(session.id) : null;
 
     const updated = await updateProjectTask(taskId, updateData, currentUserId);
     if (!updated) return NextResponse.json({ error: "Tarea no encontrada" }, { status: 404 });

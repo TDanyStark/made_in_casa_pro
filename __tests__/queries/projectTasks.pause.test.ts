@@ -27,6 +27,10 @@ jest.mock('next/cache', () => ({
   revalidatePath: jest.fn(),
 }));
 
+jest.mock('@/lib/queries/adjustments', () => ({
+  resolveTaskAdjustmentId: jest.fn().mockResolvedValue(3),
+}));
+
 import { db } from '@/lib/db';
 import { revalidatePath } from 'next/cache';
 import { startTask, pauseTask, resumeTask } from '@/lib/queries/projectTasks';
@@ -258,6 +262,63 @@ describe('completeTask() — paused task must be resumed first (S6)', () => {
     });
 
     await expect(completeTask(10, 5)).rejects.toThrow('Solo se pueden completar tareas en progreso');
+    expect(db.transaction).not.toHaveBeenCalled();
+  });
+});
+
+describe('lock order (no deadlock between start/resume and PATCH)', () => {
+  it('updateProjectTask locks the task row before the user row', async () => {
+    const { updateProjectTask } = jest.requireActual('@/lib/queries/projectTasks');
+    (db.execute as jest.Mock).mockResolvedValue({
+      rows: [{ id: 10, project_id: 1, status: 'paused', assigned_user_id: 5, order_index: 1, quoter_ids: '[]' }],
+    });
+    setupTransaction(null, []);
+
+    await updateProjectTask(10, { status: 'in_progress' }, 7);
+
+    const sqls = sqlCalls().map((c) => c.sql);
+    const taskLock = sqls.findIndex((q) => /FROM project_tasks\s+WHERE id = \$1\s+FOR UPDATE/.test(q));
+    const userLock = sqls.findIndex((q) => /FROM users WHERE id = \$1 FOR UPDATE/.test(q));
+    expect(taskLock).toBeGreaterThanOrEqual(0);
+    expect(userLock).toBeGreaterThan(taskLock);
+  });
+});
+
+describe('createProjectTask() — a task created in_progress keeps the rule', () => {
+  it('pauses the assignee\'s other in-progress tasks in the same transaction as the insert', async () => {
+    const { createProjectTask } = jest.requireActual('@/lib/queries/projectTasks');
+    mockTransaction.execute.mockImplementation(async (query: { sql: string }) => {
+      if (/INSERT INTO project_tasks/.test(query.sql)) return { rows: [{ id: 55 }] };
+      if (/SET status = 'paused'/.test(query.sql)) return { rows: [{ id: 20, project_id: 2, task_flag: 'new' }] };
+      return { rows: [] };
+    });
+    (db.execute as jest.Mock).mockResolvedValue({ rows: [{ id: 55, project_id: 1, status: 'in_progress', quoter_ids: '[]' }] });
+
+    await createProjectTask({ project_id: 1, title: 'X', assigned_user_id: 7, status: 'in_progress', order_index: 2 });
+
+    expect(sqlCalls()).toContainEqual(
+      expect.objectContaining({ sql: expect.stringMatching(/SET status = 'paused'/), args: [7, 55] })
+    );
+    expect(mockTransaction.commit).toHaveBeenCalledTimes(1);
+    expect(revalidatePath).toHaveBeenCalledWith('/projects/2');
+  });
+
+  it('keeps the previous single insert for any other status', async () => {
+    const { createProjectTask } = jest.requireActual('@/lib/queries/projectTasks');
+    (db.execute as jest.Mock).mockResolvedValue({ rows: [{ id: 56, project_id: 1, status: 'not_started', quoter_ids: '[]' }] });
+
+    await createProjectTask({ project_id: 1, title: 'Y', assigned_user_id: 7, status: 'not_started', order_index: 0 });
+
+    expect(db.transaction).not.toHaveBeenCalled();
+  });
+
+  it('rejects creating a paused task without writing', async () => {
+    const { createProjectTask } = jest.requireActual('@/lib/queries/projectTasks');
+
+    await expect(
+      createProjectTask({ project_id: 1, title: 'Z', assigned_user_id: 7, status: 'paused', order_index: 1 })
+    ).rejects.toThrow('Una tarea nueva no puede crearse pausada');
+    expect(db.execute).not.toHaveBeenCalled();
     expect(db.transaction).not.toHaveBeenCalled();
   });
 });

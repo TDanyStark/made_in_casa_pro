@@ -450,3 +450,16 @@ describe("POST /api/projects/[id]/tasks — version is mandatory", () => {
     expect(await res.json()).toEqual({ error: "Error al crear tarea" });
   });
 });
+
+describe("POST /api/projects/[id]/tasks — paused cannot be created", () => {
+  it("returns 400 and creates nothing for status paused", async () => {
+    jest.clearAllMocks();
+    mockValidateHttpMethod.mockReturnValue({ isValidMethod: true, response: undefined });
+    mockValidateApiRole.mockResolvedValue({ isAuthorized: true, userRole: 1 as never, response: undefined } as never);
+
+    const res = await callPost({ title: "Pausada", adjustment_id: 9, status: "paused" });
+
+    expect(res.status).toBe(400);
+    expect(mockCreateProjectTask).not.toHaveBeenCalled();
+  });
+});
