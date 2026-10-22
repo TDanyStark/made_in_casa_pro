@@ -7,7 +7,7 @@ import {
   getAdjustmentsByProject,
   resolveTaskAdjustmentId,
 } from "@/lib/queries/adjustments";
-import { TaskVersionError } from "@/lib/definitions";
+import { canCreateAdjustmentAfter, TaskVersionError } from "@/lib/definitions";
 import { findLeastLoadedInternalCollaborator } from "@/lib/queries/projectTasks";
 import { createSubFolder } from "@/lib/services/googleDrive";
 import { getAdminAndLeadershipEmails } from "@/lib/queries/users";
@@ -97,18 +97,12 @@ export async function POST(
       return NextResponse.json({ error: "Proyecto no encontrado" }, { status: 404 });
     }
 
-    if (project.status !== "completed") {
-      return NextResponse.json(
-        { error: "No se puede crear un ajuste si el proyecto no está completado." },
-        { status: 400 }
-      );
-    }
-
+    // Only the real tasks of the latest version decide (never stored status/progress).
     const existingAdjustments = await getAdjustmentsByProject(projectId);
     const lastAdjustment = existingAdjustments[existingAdjustments.length - 1];
-    if (lastAdjustment && lastAdjustment.status !== "completed") {
+    if (!canCreateAdjustmentAfter(lastAdjustment)) {
       return NextResponse.json(
-        { error: "No se puede crear un ajuste si la versión anterior no está completada." },
+        { error: "No se puede crear un ajuste hasta que todas las tareas de la última versión estén completadas." },
         { status: 400 }
       );
     }

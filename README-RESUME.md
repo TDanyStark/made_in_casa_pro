@@ -365,6 +365,11 @@ En un proyecto completado siguen disponibles dos acciones independientes:
   el proyecto vuelve a **Activo**, esa versión se reabre y se recalcula el avance.
   Las tareas ya completadas no cambian de estado.
 - **Crear ajuste**: crea una nueva versión; las anteriores conservan su historial.
+  Solo se permite (botón y `POST /api/projects/[id]/adjustments`) cuando la última
+  versión tiene al menos una tarea y todas sus tareas reales están completadas,
+  sin importar el estado o el progreso guardado del proyecto o de la versión.
+  Una versión vacía o inexistente no habilita el ajuste; el rechazo (400) ocurre
+  antes de crear carpetas en Drive o escribir datos.
 
 Solo la última versión admite tareas nuevas desde `POST /api/projects/[id]/tasks`.
 El selector muestra el estado completado, pero el cierre ya no requiere un botón manual.

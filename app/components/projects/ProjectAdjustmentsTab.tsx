@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { del, get, post } from "@/lib/services/apiService";
-import { ProjectAdjustmentType, ProjectDetailType, UserRole } from "@/lib/definitions";
+import { canCreateAdjustmentAfter, ProjectAdjustmentType, ProjectDetailType, UserRole } from "@/lib/definitions";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
@@ -58,9 +58,7 @@ export function ProjectAdjustmentsTab({
   });
 
   const lastAdjustment = adjustments.length > 0 ? adjustments[adjustments.length - 1] : null;
-  const canCreateNew =
-    projectStatus === "completed" ||
-    (lastAdjustment && lastAdjustment.status === "completed");
+  const canCreateNew = canCreateAdjustmentAfter(lastAdjustment);
 
   const handleConfirm = async (data: {
     notes: string;

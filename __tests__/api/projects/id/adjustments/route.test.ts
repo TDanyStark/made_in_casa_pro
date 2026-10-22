@@ -70,6 +70,10 @@ import { db } from "@/lib/db";
 import { cookies } from "next/headers";
 import { decrypt } from "@/lib/session";
 import { dispatchNotification } from "@/lib/services/notificationEngine";
+import { createSubFolder } from "@/lib/services/googleDrive";
+import { getAdminAndLeadershipEmails } from "@/lib/queries/users";
+import { NextResponse } from "next/server";
+import { OPERATIONS_ROLES } from "@/lib/role-groups";
 
 const mockValidateHttpMethod = validateHttpMethod as jest.MockedFunction<typeof validateHttpMethod>;
 const mockValidateApiRole = validateApiRole as jest.MockedFunction<typeof validateApiRole>;
@@ -107,7 +111,9 @@ describe("POST /api/projects/[id]/adjustments task notifications", () => {
       product_id: null,
       created_by: 3,
     } as never);
-    mockGetAdjustments.mockResolvedValue([{ id: 1, version_number: 1, status: "completed" }] as never);
+    mockGetAdjustments.mockResolvedValue([
+      { id: 1, version_number: 1, status: "completed", task_count: 2, completed_task_count: 2 },
+    ] as never);
     mockCreateAdjustment.mockResolvedValue({ id: 50, version_number: 2, notes: null } as never);
     mockRecalculate.mockResolvedValue(undefined as never);
     mockCookies.mockResolvedValue({ get: jest.fn().mockReturnValue({ value: "session-token" }) } as never);
@@ -181,5 +187,99 @@ describe("POST /api/projects/[id]/adjustments task notifications", () => {
 
     expect(res.status).toBe(400);
     expect(await res.json()).toEqual({ error: message });
+  });
+});
+
+describe("POST /api/projects/[id]/adjustments eligibility from real latest-version tasks", () => {
+  const INELIGIBLE = "No se puede crear un ajuste hasta que todas las tareas de la última versión estén completadas.";
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockValidateHttpMethod.mockReturnValue({ isValidMethod: true, response: undefined });
+    mockValidateApiRole.mockResolvedValue({ isAuthorized: true, userRole: 1, response: undefined } as never);
+    mockGetProjectById.mockResolvedValue({
+      id: 15,
+      status: "completed",
+      drive_folder_id: "drive-root",
+      product_id: null,
+      created_by: 3,
+    } as never);
+    mockCreateAdjustment.mockResolvedValue({ id: 50, version_number: 2, notes: null } as never);
+    mockCookies.mockResolvedValue({ get: jest.fn().mockReturnValue({ value: "session-token" }) } as never);
+    mockDecrypt.mockResolvedValue({ id: 3, email: "admin@test.com", rol_id: 1 } as never);
+    (getAdminAndLeadershipEmails as jest.Mock).mockResolvedValue([]);
+    (createSubFolder as jest.Mock).mockResolvedValue({ folderId: "f2", folderUrl: "https://drive/f2" });
+  });
+
+  function expectNoSideEffects() {
+    expect(createSubFolder).not.toHaveBeenCalled();
+    expect(getAdminAndLeadershipEmails).not.toHaveBeenCalled();
+    expect(mockCreateAdjustment).not.toHaveBeenCalled();
+    expect(mockDbTransaction).not.toHaveBeenCalled();
+    expect(db.execute).not.toHaveBeenCalled();
+    expect(mockDispatch).not.toHaveBeenCalled();
+  }
+
+  it.each(["active", "in_adjustments", "completed"])(
+    "creates the adjustment in a %s project when every latest task is completed, whatever the stored statuses",
+    async (projectStatus) => {
+      mockGetProjectById.mockResolvedValueOnce({
+        id: 15, status: projectStatus, drive_folder_id: "drive-root", product_id: null, created_by: 3,
+      } as never);
+      mockGetAdjustments.mockResolvedValue([
+        { id: 1, version_number: 1, status: "active", task_count: "3", completed_task_count: "3" },
+      ] as never);
+
+      const res = await callPost({});
+
+      expect(res.status).toBe(201);
+      expect(createSubFolder).toHaveBeenCalledWith(expect.objectContaining({ folderName: "v2" }));
+      expect(mockCreateAdjustment).toHaveBeenCalledTimes(1);
+    }
+  );
+
+  it.each([
+    ["unfinished latest tasks despite completed statuses", [{ id: 1, version_number: 1, status: "completed", task_count: 3, completed_task_count: 2 }]],
+    ["an empty latest version", [{ id: 1, version_number: 1, status: "completed", task_count: 0, completed_task_count: 0 }]],
+    ["no version at all", []],
+    [
+      "an older completed version and an unfinished latest one",
+      [
+        { id: 1, version_number: 1, status: "completed", task_count: 2, completed_task_count: 2 },
+        { id: 2, version_number: 2, status: "completed", task_count: 2, completed_task_count: 1 },
+      ],
+    ],
+  ])("rejects %s with 400 before any write or Drive call", async (_label, versions) => {
+    mockGetAdjustments.mockResolvedValue(versions as never);
+
+    const res = await callPost({ tasks: [{ title: "Primera", assigned_user_id: 7 }] });
+
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: INELIGIBLE });
+    expectNoSideEffects();
+  });
+
+  it("uses the latest version even when an older one is unfinished", async () => {
+    mockGetAdjustments.mockResolvedValue([
+      { id: 1, version_number: 1, status: "active", task_count: 2, completed_task_count: 1 },
+      { id: 2, version_number: 2, status: "completed", task_count: 1, completed_task_count: 1 },
+    ] as never);
+
+    const res = await callPost({});
+
+    expect(res.status).toBe(201);
+    expect(createSubFolder).toHaveBeenCalledWith(expect.objectContaining({ folderName: "v3" }));
+  });
+
+  it("keeps the operations role check before anything else", async () => {
+    const denied = NextResponse.json({ error: "No autorizado" }, { status: 403 });
+    mockValidateApiRole.mockResolvedValueOnce({ isAuthorized: false, response: denied } as never);
+
+    const res = await callPost({});
+
+    expect(res.status).toBe(403);
+    expect(mockValidateApiRole).toHaveBeenCalledWith(expect.anything(), OPERATIONS_ROLES);
+    expect(mockGetProjectById).not.toHaveBeenCalled();
+    expectNoSideEffects();
   });
 });

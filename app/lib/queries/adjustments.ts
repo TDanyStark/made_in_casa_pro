@@ -58,7 +58,8 @@ export async function getAdjustmentsByProject(projectId: number): Promise<Projec
         SELECT 
           pa.id, pa.project_id, pa.version_number, pa.drive_folder_id, 
           pa.drive_folder_url, pa.status, pa.notes, pa.created_at, pa.completed_at,
-          COUNT(pt.id) as task_count
+          COUNT(pt.id) as task_count,
+          COUNT(pt.id) FILTER (WHERE pt.status = 'completed') as completed_task_count
         FROM project_adjustments pa
         LEFT JOIN project_tasks pt ON pt.adjustment_id = pa.id
         WHERE pa.project_id = $1
