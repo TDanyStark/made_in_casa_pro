@@ -137,6 +137,15 @@ describe('PATCH /api/projects/[id]/financials', () => {
     expect(mockUpdate).not.toHaveBeenCalled();
   });
 
+  it('rejects a commercial who did not create the project with 403 even for an invalid body', async () => {
+    as(UserRole.COMERCIAL);
+    mockAccess.mockResolvedValue(false);
+    const res = await run(PATCH, req('PATCH', { sale_price: -1 }));
+    expect(res.status).toBe(403);
+    expect(await res.json()).toEqual({ error: 'No tienes acceso a este proyecto' });
+    expect(mockUpdate).not.toHaveBeenCalled();
+  });
+
   it('returns 404 when the project does not exist', async () => {
     as(UserRole.ADMIN);
     mockUpdate.mockResolvedValue(false);

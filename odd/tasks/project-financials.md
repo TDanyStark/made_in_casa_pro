@@ -13,6 +13,7 @@ S6. Already-completed tasks without a frozen rate: "Congelarlas con la tarifa vi
 ## Tasks
 T1 | S3,S5,S6 | inline: migration 019 (users.hourly_rate, project_tasks.completion_hourly_rate, projects.sale_price), freeze rate in completeTask, hourly_rate in users API/query with backfill, profile UI + tests | done | commit 1 (feat(users): hourly rate frozen on task completion)
 T2 | S1,S2,S4,S5 | inline: financials computation + GET/PATCH /api/projects/[id]/financials + tests | done | commit 2 (feat(projects): sale price and investment API)
+T4 | S5,S1 | inline: freeze rate on every completion path (rejected validation), creator check before body in PATCH, drop unused cn dependency + tests | done | commit 4 (fix(projects): freeze rate on rejected validations)
 T3 | S1,S2 | inline: recharts chart component, financial cards above tabs, sale price editor, README + tests | done | commit 3 (feat(projects): investment cards with charts)
 
 ## Log
@@ -24,3 +25,6 @@ L5. RED/GREEN T2: 3 new suites failed (modules missing) -> 25 new tests green; f
 L6. Slice boundary: commits 1-2 already exceed ~400 lines together; each commit is its own reviewable slice (T1 data/rates, T2 API, T3 UI).
 L7. RED/GREEN T3: ProjectFinancialCards test failed (module missing) -> 6 passed; ProjectDetailClient role visibility 5 passed (colaborador hidden, financiero read-only). shadcn chart added recharts ^3.8.0 and app/components/ui/chart.tsx (generated import "cn" fixed to "@/lib/utils"; existing card.tsx kept). README-RESUME.md documents the feature. Full: tsc clean, jest 110 suites / 895, eslint clean on changed files, git diff --check clean.
 L8. next build succeeded (/projects/[id] 137 kB first-load, includes recharts). Not performed: browser check with a logged-in session.
+L9. assess: nativeRisk medium; agent escalation item 1 (migration + rate backfill) -> independent verify. Native review START: host consent resolved "declined_this_candidate" (no lineage created).
+L10. Independent verify mvjwo336-1-w5sn: S1, S2 (unit level), S3, S4, S6 met; S5 not met - createRejectionLoopTasks step 6 (projectTasks.ts:993) completed the rejected validation task without freezing the rate, so a later rate change backfilled the new rate. Advisories: unused "cn" npm dependency added by shadcn; PATCH validated body before creator check; huge sale_price -> DB 500 (not handled, unrealistic); browser check not done.
+L11. Fix T4: RED rejection-freeze test failed -> green via shared FREEZE_HOURLY_RATE_SQL used by both completion UPDATEs (PATCH already refuses status completed). RED 403-before-400 test failed -> green. cn uninstalled. Real PostgreSQL: rejected validation task froze the rate in force (40000) and stayed 40000 after raising to 50000. Full jest 110 suites / 897. Scratch DB mic_fin_check dropped.

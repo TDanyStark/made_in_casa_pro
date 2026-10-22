@@ -253,6 +253,16 @@ describe("createRejectionLoopTasks() — clones keep the version", () => {
     }
   });
 
+  // S5: the rejected validation task is completed here too, so it must freeze the internal rate.
+  it("freezes the assignee internal hourly rate on the rejected validation task", async () => {
+    routeRejection(9);
+    await createRejectionLoopTasks(1, 10, 7, 5);
+    const sqls = [...(mockExecute as unknown as jest.Mock).mock.calls, ...mockTransaction.execute.mock.calls]
+      .map(([q]) => sqlOf(q as Query));
+    const complete = sqls.find((sql) => /SET status = 'completed'/.test(sql));
+    expect(complete).toMatch(/completion_hourly_rate\s*=\s*\(\s*SELECT CASE WHEN u\.is_internal = 1 THEN u\.hourly_rate END/);
+  });
+
   it("throws the exact message and inserts nothing when the project has no version", async () => {
     routeRejection(null, []);
     await expect(createRejectionLoopTasks(1, 10, 7, 5)).rejects.toThrow(MISSING_VERSION);

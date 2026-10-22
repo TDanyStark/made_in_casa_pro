@@ -701,6 +701,17 @@ export async function resumeTask(taskId: number, movedByUserId: number): Promise
   return changeTaskStatus(taskId, movedByUserId, "paused", "in_progress", "Solo se pueden reanudar tareas pausadas");
 }
 
+/**
+ * Freezes the assignee's internal hourly rate on a task being completed, so a
+ * later rate change never alters past projects (odd/tasks/project-financials.md S5).
+ * Every UPDATE that sets status = 'completed' must use it.
+ */
+const FREEZE_HOURLY_RATE_SQL = `(
+                  SELECT CASE WHEN u.is_internal = 1 THEN u.hourly_rate END
+                  FROM users u
+                  WHERE u.id = project_tasks.assigned_user_id
+                )`;
+
 // ─── Complete task (execution flow) ──────────────────────────────────────────
 
 /**
@@ -739,11 +750,7 @@ export async function completeTask(
                 progress_minutes = $2,
                 delivery_url = $3,
                 completion_cost = $4,
-                completion_hourly_rate = (
-                  SELECT CASE WHEN u.is_internal = 1 THEN u.hourly_rate END
-                  FROM users u
-                  WHERE u.id = project_tasks.assigned_user_id
-                ),
+                completion_hourly_rate = ${FREEZE_HOURLY_RATE_SQL},
                 progress_percent = 100
             WHERE id = $1`,
       args: [
@@ -990,7 +997,12 @@ export async function createRejectionLoopTasks(
 
     // Step 6: Mark task N as completed
     await transaction.execute({
-      sql: `UPDATE project_tasks SET status = 'completed', completed_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id = $1`,
+      sql: `UPDATE project_tasks
+            SET status = 'completed',
+                completed_at = CURRENT_TIMESTAMP,
+                updated_at = CURRENT_TIMESTAMP,
+                completion_hourly_rate = ${FREEZE_HOURLY_RATE_SQL}
+            WHERE id = $1`,
       args: [rejectedValidationTaskId],
     });
 

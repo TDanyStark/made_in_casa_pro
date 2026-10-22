@@ -72,18 +72,18 @@ export async function PATCH(request: NextRequest, { params }: Params) {
   const projectId = parseProjectId((await params).id);
   if (!projectId) return NextResponse.json({ error: "ID de proyecto inválido" }, { status: 400 });
 
-  let body: unknown;
-  try {
-    body = await request.json();
-  } catch {
-    return NextResponse.json({ error: SALE_PRICE_ERROR }, { status: 400 });
-  }
-  const parsed = patchSchema.safeParse(body);
-  if (!parsed.success) return NextResponse.json({ error: SALE_PRICE_ERROR }, { status: 400 });
-
   try {
     const forbidden = await forbidUnlessAllowed(projectId, roleValidation.userRole);
     if (forbidden) return forbidden;
+
+    let body: unknown;
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json({ error: SALE_PRICE_ERROR }, { status: 400 });
+    }
+    const parsed = patchSchema.safeParse(body);
+    if (!parsed.success) return NextResponse.json({ error: SALE_PRICE_ERROR }, { status: 400 });
 
     const updated = await updateProjectSalePrice(projectId, parsed.data.sale_price);
     if (!updated) return NextResponse.json({ error: "Proyecto no encontrado" }, { status: 404 });
