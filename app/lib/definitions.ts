@@ -403,7 +403,24 @@ export type ProjectAdjustmentType = {
   created_at: string;
   completed_at?: string;
   task_count?: number;
+  /** Real number of completed tasks of the version (never the stored, rounded progress). */
+  completed_task_count?: number;
 };
+
+/**
+ * A new adjustment may be created only when the latest version has at least one
+ * task and every one of its tasks is completed. Stored project/version status
+ * and progress are ignored; a missing or empty version is never eligible.
+ * Counts may arrive as strings (PostgreSQL COUNT).
+ */
+export function canCreateAdjustmentAfter(
+  latest: Pick<ProjectAdjustmentType, "task_count" | "completed_task_count"> | null | undefined
+): boolean {
+  if (!latest) return false;
+  const total = Number(latest.task_count ?? 0);
+  const completed = Number(latest.completed_task_count ?? 0);
+  return total > 0 && completed === total;
+}
 
 export const TASK_VERSION_MISSING_MESSAGE =
   "El proyecto no tiene una versión. No se puede crear la tarea sin versión.";
