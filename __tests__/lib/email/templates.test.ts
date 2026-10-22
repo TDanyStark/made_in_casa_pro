@@ -78,6 +78,43 @@ describe("taskAssigned template", () => {
     expect(text).toContain("Campaña Q2");
     expect(text).toContain("https://app.madeincasa.com/projects/15");
   });
+
+  const withDetails = {
+    ...ctx,
+    taskDescription: "Banner 300x250 con <logo> & CTA",
+    driveFolderUrl: "https://drive.google.com/drive/folders/abc123",
+  };
+
+  it("html includes escaped task description and Drive link when provided", () => {
+    const html = taskAssigned.html(withDetails);
+    assertNoUndefined(html);
+    expect(html).toContain("Descripción");
+    expect(html).toContain("Banner 300x250 con &lt;logo&gt; &amp; CTA");
+    expect(html).toContain('href="https://drive.google.com/drive/folders/abc123"');
+    expect(html).toContain("Abrir carpeta de Drive");
+  });
+
+  it("text includes task description and Drive link when provided", () => {
+    const text = taskAssigned.text(withDetails);
+    expect(text).toContain("Descripción: Banner 300x250 con <logo> & CTA");
+    expect(text).toContain("Carpeta de Drive: https://drive.google.com/drive/folders/abc123");
+  });
+
+  it("omits description and Drive sections when not provided", () => {
+    const html = taskAssigned.html({ ...ctx, taskDescription: null, driveFolderUrl: null });
+    const text = taskAssigned.text({ ...ctx, taskDescription: null, driveFolderUrl: null });
+    expect(html).not.toContain("Descripción");
+    expect(html).not.toContain("Abrir carpeta de Drive");
+    expect(text).not.toContain("Descripción");
+    expect(text).not.toContain("Carpeta de Drive");
+  });
+
+  it("ignores a Drive link that is not http(s)", () => {
+    const html = taskAssigned.html({ ...ctx, driveFolderUrl: "javascript:alert(1)" });
+    const text = taskAssigned.text({ ...ctx, driveFolderUrl: "javascript:alert(1)" });
+    expect(html).not.toContain("javascript:");
+    expect(text).not.toContain("javascript:");
+  });
 });
 
 // ── taskReassigned ─────────────────────────────────────────────────────────

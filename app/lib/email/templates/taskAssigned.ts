@@ -1,7 +1,7 @@
 import { emailLayout } from "./layout";
 import {
   heading, subheading, paragraph, infoCard,
-  primaryButton, divider, muted, badge, noteBlock, appUrl,
+  primaryButton, secondaryButton, divider, muted, badge, noteBlock, appUrl, escapeHtml,
 } from "./components";
 
 export interface TaskAssignedContext {
@@ -16,6 +16,14 @@ export interface TaskAssignedContext {
   dueDate?: string | null;
   deliveryDays?: number | null;
   notes?: string | null;
+  taskDescription?: string | null;
+  driveFolderUrl?: string | null;
+}
+
+/** Only http(s) links are rendered, so a malformed value never becomes a clickable href. */
+function safeDriveUrl(url: string | null | undefined): string | null {
+  const trimmed = url?.trim();
+  return trimmed && /^https?:\/\//i.test(trimmed) ? trimmed : null;
 }
 
 const FLAG_LABELS: Record<string, string> = {
@@ -36,6 +44,8 @@ export const taskAssigned = {
 
   html(ctx: TaskAssignedContext): string {
     const projectUrl = `${appUrl()}/projects/${ctx.projectId}`;
+    const description = ctx.taskDescription?.trim();
+    const driveUrl = safeDriveUrl(ctx.driveFolderUrl);
 
     const rows = [
       { label: "Proyecto", value: ctx.projectTitle },
@@ -53,9 +63,16 @@ export const taskAssigned = {
       subheading(`${ctx.assignedByName} te asignó una nueva tarea`),
       paragraph(`Tienes una nueva tarea pendiente en el proyecto <strong>${ctx.projectTitle}</strong>.`),
       `<p style="margin:0 0 16px;font-size:20px;font-weight:700;">${ctx.taskTitle} ${badge(FLAG_LABELS[ctx.taskFlag] ?? ctx.taskFlag)}</p>`,
+      ...(description
+        ? [
+            `<p style="margin:0 0 6px;color:#6b7280;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">Descripción</p>`,
+            `<p style="margin:0 0 16px;color:#4b5563;font-size:14px;line-height:1.6;white-space:pre-line;">${escapeHtml(description)}</p>`,
+          ]
+        : []),
       infoCard(rows),
       ...(ctx.notes ? [divider(), noteBlock(ctx.notes)] : []),
       primaryButton("Ver proyecto", projectUrl),
+      ...(driveUrl ? [secondaryButton("Abrir carpeta de Drive", escapeHtml(driveUrl))] : []),
       divider(),
       muted(`Entra a Made in Casa Pro para gestionar tu tarea y marcarla como completada cuando termines.`),
     ].join("\n");
@@ -67,6 +84,8 @@ export const taskAssigned = {
   },
 
   text(ctx: TaskAssignedContext): string {
+    const description = ctx.taskDescription?.trim();
+    const driveUrl = safeDriveUrl(ctx.driveFolderUrl);
     return [
       `Hola, ${ctx.recipientName}`,
       ``,
@@ -76,8 +95,10 @@ export const taskAssigned = {
       `Bandera: ${FLAG_LABELS[ctx.taskFlag] ?? ctx.taskFlag}`,
       ...(ctx.dueDate ? [`Fecha límite: ${ctx.dueDate}`] : []),
       ...(ctx.deliveryDays != null ? [`Días estimados: ${ctx.deliveryDays}`] : []),
+      ...(description ? [``, `Descripción: ${description}`] : []),
       ``,
       `Ver proyecto: ${appUrl()}/projects/${ctx.projectId}`,
+      ...(driveUrl ? [`Carpeta de Drive: ${driveUrl}`] : []),
     ].join("\n");
   },
 };

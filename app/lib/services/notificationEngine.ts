@@ -32,7 +32,7 @@ import {
   type NotificationRecipient,
 } from "@/lib/queries/notificationRecipients";
 import { getProjectById } from "@/lib/queries/projects";
-import { getProjectTaskById } from "@/lib/queries/projectTasks";
+import { getProjectTaskById, getTaskDriveFolderUrl } from "@/lib/queries/projectTasks";
 import { sendEmail } from "@/lib/services/email/emailService";
 
 import { taskAssigned } from "@/lib/email/templates/taskAssigned";
@@ -233,6 +233,8 @@ export async function dispatchNotification(input: DispatchInput): Promise<void> 
         ]);
         if (!assignee || !task || !project) break;
 
+        const driveFolderUrl = await getTaskDriveFolderUrl(task.id);
+
         const threadKey = await resolveProjectVersionThreadKey(input.projectId, task.adjustment_id ?? null);
         const assignedByName = await getActorName(input.actorUserId);
 
@@ -262,6 +264,8 @@ export async function dispatchNotification(input: DispatchInput): Promise<void> 
               taskId: task.id,
               dueDate: project.ideal_delivery_at ? formatDate(project.ideal_delivery_at) : null,
               deliveryDays: null,
+              taskDescription: task.description,
+              driveFolderUrl,
             }),
             text: taskAssigned.text({
               recipientName: r.name,
@@ -272,6 +276,8 @@ export async function dispatchNotification(input: DispatchInput): Promise<void> 
               projectTitle: project.title,
               projectId: project.id,
               taskId: task.id,
+              taskDescription: task.description,
+              driveFolderUrl,
             }),
           }),
           { projectId: input.projectId, adjustmentId: task.adjustment_id ?? null, threadKey }
@@ -330,6 +336,7 @@ export async function dispatchNotification(input: DispatchInput): Promise<void> 
 
         if (newRecipient) {
           const assignedByName = changedByName;
+          const driveFolderUrl = await getTaskDriveFolderUrl(task.id);
           await sendToRecipients(
             [newRecipient],
             input.actorUserId,
@@ -356,6 +363,8 @@ export async function dispatchNotification(input: DispatchInput): Promise<void> 
                 taskId: task.id,
                 dueDate: project.ideal_delivery_at ? formatDate(project.ideal_delivery_at) : null,
                 deliveryDays: null,
+                taskDescription: task.description,
+                driveFolderUrl,
               }),
               text: taskAssigned.text({
                 recipientName: r.name,
@@ -366,6 +375,8 @@ export async function dispatchNotification(input: DispatchInput): Promise<void> 
                 projectTitle: project.title,
                 projectId: project.id,
                 taskId: task.id,
+                taskDescription: task.description,
+                driveFolderUrl,
               }),
             }),
             { projectId: input.projectId, adjustmentId: task.adjustment_id ?? null, threadKey }

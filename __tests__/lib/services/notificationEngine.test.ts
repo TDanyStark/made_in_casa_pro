@@ -29,6 +29,7 @@ jest.mock("@/lib/queries/projects", () => ({
 
 jest.mock("@/lib/queries/projectTasks", () => ({
   getProjectTaskById: jest.fn(),
+  getTaskDriveFolderUrl: jest.fn(),
 }));
 
 jest.mock("@/lib/services/email/emailService", () => ({
@@ -47,7 +48,7 @@ import {
   getProjectStakeholders,
 } from "@/lib/queries/notificationRecipients";
 import { getProjectById } from "@/lib/queries/projects";
-import { getProjectTaskById } from "@/lib/queries/projectTasks";
+import { getProjectTaskById, getTaskDriveFolderUrl } from "@/lib/queries/projectTasks";
 import { sendEmail } from "@/lib/services/email/emailService";
 
 const mockCreateEvent = createNotificationEvent as jest.Mock;
@@ -60,6 +61,7 @@ const mockGetUserNotificationRecipient = getUserNotificationRecipient as jest.Mo
 const mockGetProjectStakeholders = getProjectStakeholders as jest.Mock;
 const mockGetProjectById = getProjectById as jest.Mock;
 const mockGetProjectTaskById = getProjectTaskById as jest.Mock;
+const mockGetTaskDriveFolderUrl = getTaskDriveFolderUrl as jest.Mock;
 const mockSendEmail = sendEmail as jest.Mock;
 
 const project = { id: 1, title: "Campaña Q2", brand_name: "Acme", client_name: "Acme Corp", notes: null, ideal_delivery_at: null, completed_at: null };
@@ -74,6 +76,7 @@ describe("dispatchNotification()", () => {
     mockCreateEvent.mockResolvedValue({ id: 99 });
     mockGetProjectById.mockResolvedValue(project);
     mockGetProjectTaskById.mockResolvedValue(task);
+    mockGetTaskDriveFolderUrl.mockResolvedValue(null);
     mockGetTaskAssignee.mockResolvedValue(assignee);
     mockGetTaskProjectCreator.mockResolvedValue(creator);
     mockGetUserNotificationRecipient.mockImplementation((userId: number) => {
@@ -106,6 +109,25 @@ describe("dispatchNotification()", () => {
         recipientUserId: 5,
       })
     );
+  });
+
+  it("task.assigned: includes task description and Drive folder link", async () => {
+    mockGetProjectTaskById.mockResolvedValueOnce({ ...task, description: "Banner principal" });
+    mockGetTaskDriveFolderUrl.mockResolvedValueOnce("https://drive.google.com/drive/folders/v2");
+
+    await dispatchNotification({
+      eventType: NOTIFICATION_EVENTS.TASK_ASSIGNED,
+      actorUserId: 3,
+      taskId: 10,
+      projectId: 1,
+    });
+
+    expect(mockGetTaskDriveFolderUrl).toHaveBeenCalledWith(10);
+    const { message } = mockSendEmail.mock.calls[0][0];
+    expect(message.html).toContain("Banner principal");
+    expect(message.html).toContain("https://drive.google.com/drive/folders/v2");
+    expect(message.text).toContain("Descripción: Banner principal");
+    expect(message.text).toContain("Carpeta de Drive: https://drive.google.com/drive/folders/v2");
   });
 
   it("task.assigned: skips email when assignee is not found", async () => {
@@ -146,6 +168,26 @@ describe("dispatchNotification()", () => {
       message: expect.objectContaining({ to: { email: "ana@test.com", name: "Ana García" } }),
       recipientUserId: 5,
     }));
+  });
+
+  it("task.reassigned: new assignee email includes description and Drive link", async () => {
+    mockGetProjectTaskById.mockResolvedValueOnce({ ...task, description: "Banner principal" });
+    mockGetTaskDriveFolderUrl.mockResolvedValueOnce("https://drive.google.com/drive/folders/p1");
+
+    await dispatchNotification({
+      eventType: NOTIFICATION_EVENTS.TASK_REASSIGNED,
+      actorUserId: 3,
+      taskId: 10,
+      projectId: 1,
+      previousUserId: 4,
+      newUserId: 5,
+    });
+
+    const previous = mockSendEmail.mock.calls[0][0].message;
+    const next = mockSendEmail.mock.calls[1][0].message;
+    expect(next.html).toContain("Banner principal");
+    expect(next.html).toContain("https://drive.google.com/drive/folders/p1");
+    expect(previous.html).not.toContain("https://drive.google.com/drive/folders/p1");
   });
 
   it("task.reassigned: only notifies previous assignee when task is unassigned", async () => {

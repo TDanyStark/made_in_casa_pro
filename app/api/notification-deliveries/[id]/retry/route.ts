@@ -9,7 +9,7 @@ import { getNotificationEventById } from "@/lib/queries/notificationEvents";
 import { resendExistingDelivery } from "@/lib/services/email/emailService";
 import { notifLog } from "@/lib/services/notificationLogger";
 import { getProjectById } from "@/lib/queries/projects";
-import { getProjectTaskById } from "@/lib/queries/projectTasks";
+import { getProjectTaskById, getTaskDriveFolderUrl } from "@/lib/queries/projectTasks";
 import {
   getTaskAssignee,
   getTaskProjectCreator,
@@ -163,14 +163,15 @@ async function buildRetryMessage(
       ]);
       if (!task || !project || !assignee) return null;
       const assignedByName = await getActorName(actorUserId);
+      const driveFolderUrl = await getTaskDriveFolderUrl(task.id);
       const threadKey = await resolveProjectVersionThreadKey(event.project_id, task.adjustment_id ?? null);
       const r = assignee;
       return {
         message: {
           to: { email: recipientEmail, name: r.name },
           subject: taskAssigned.subject({ recipientName: r.name, assignedByName, taskTitle: task.title, taskType: task.task_type, taskFlag: task.task_flag, projectTitle: project.title, projectId: project.id, taskId: task.id }),
-          html: taskAssigned.html({ recipientName: r.name, assignedByName, taskTitle: task.title, taskType: task.task_type, taskFlag: task.task_flag, projectTitle: project.title, projectId: project.id, taskId: task.id, dueDate: project.ideal_delivery_at ? formatDate(project.ideal_delivery_at) : null, deliveryDays: null }),
-          text: taskAssigned.text({ recipientName: r.name, assignedByName, taskTitle: task.title, taskType: task.task_type, taskFlag: task.task_flag, projectTitle: project.title, projectId: project.id, taskId: task.id }),
+          html: taskAssigned.html({ recipientName: r.name, assignedByName, taskTitle: task.title, taskType: task.task_type, taskFlag: task.task_flag, projectTitle: project.title, projectId: project.id, taskId: task.id, dueDate: project.ideal_delivery_at ? formatDate(project.ideal_delivery_at) : null, deliveryDays: null, taskDescription: task.description, driveFolderUrl }),
+          text: taskAssigned.text({ recipientName: r.name, assignedByName, taskTitle: task.title, taskType: task.task_type, taskFlag: task.task_flag, projectTitle: project.title, projectId: project.id, taskId: task.id, taskDescription: task.description, driveFolderUrl }),
         },
         opts: { projectId: event.project_id, adjustmentId: task.adjustment_id ?? null, threadKey },
       };
@@ -196,12 +197,13 @@ async function buildRetryMessage(
       const r = isNewAssignee ? newRecipient : previousRecipient;
 
       if (isNewAssignee) {
+        const driveFolderUrl = await getTaskDriveFolderUrl(task.id);
         return {
           message: {
             to: { email: recipientEmail, name: r.name },
             subject: taskAssigned.subject({ recipientName: r.name, assignedByName: changedByName, taskTitle: task.title, taskType: task.task_type, taskFlag: task.task_flag, projectTitle: project.title, projectId: project.id, taskId: task.id }),
-            html: taskAssigned.html({ recipientName: r.name, assignedByName: changedByName, taskTitle: task.title, taskType: task.task_type, taskFlag: task.task_flag, projectTitle: project.title, projectId: project.id, taskId: task.id, dueDate: project.ideal_delivery_at ? formatDate(project.ideal_delivery_at) : null, deliveryDays: null }),
-            text: taskAssigned.text({ recipientName: r.name, assignedByName: changedByName, taskTitle: task.title, taskType: task.task_type, taskFlag: task.task_flag, projectTitle: project.title, projectId: project.id, taskId: task.id }),
+            html: taskAssigned.html({ recipientName: r.name, assignedByName: changedByName, taskTitle: task.title, taskType: task.task_type, taskFlag: task.task_flag, projectTitle: project.title, projectId: project.id, taskId: task.id, dueDate: project.ideal_delivery_at ? formatDate(project.ideal_delivery_at) : null, deliveryDays: null, taskDescription: task.description, driveFolderUrl }),
+            text: taskAssigned.text({ recipientName: r.name, assignedByName: changedByName, taskTitle: task.title, taskType: task.task_type, taskFlag: task.task_flag, projectTitle: project.title, projectId: project.id, taskId: task.id, taskDescription: task.description, driveFolderUrl }),
           },
           opts: { projectId: event.project_id, adjustmentId: task.adjustment_id ?? null, threadKey },
         };

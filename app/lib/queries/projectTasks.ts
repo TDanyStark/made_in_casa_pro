@@ -99,6 +99,30 @@ export async function getProjectTaskById(id: number): Promise<ProjectTaskType | 
   }
 }
 
+/**
+ * Drive folder link shown to the task assignee: the folder of the task's
+ * adjustment (version) when it has one, otherwise the project folder.
+ */
+export async function getTaskDriveFolderUrl(taskId: number): Promise<string | null> {
+  try {
+    const result = await db.execute({
+      sql: `
+        SELECT COALESCE(NULLIF(pa.drive_folder_url, ''), NULLIF(p.drive_folder_url, '')) AS drive_folder_url
+        FROM project_tasks pt
+        JOIN projects p ON p.id = pt.project_id
+        LEFT JOIN project_adjustments pa ON pa.id = pt.adjustment_id
+        WHERE pt.id = $1
+      `,
+      args: [taskId],
+    });
+    const row = result.rows[0] as unknown as { drive_folder_url: string | null } | undefined;
+    return row?.drive_folder_url ?? null;
+  } catch (error) {
+    console.error("Error fetching task drive folder URL:", error);
+    return null;
+  }
+}
+
 export async function getTasksByProject(projectId: number, adjustmentId?: number | null): Promise<ProjectTaskType[]> {
   try {
     let whereSQL = `pt.project_id = $1`;
