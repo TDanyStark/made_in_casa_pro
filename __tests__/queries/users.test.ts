@@ -37,7 +37,7 @@ describe('getUserById()', () => {
     mockExecute.mockResolvedValueOnce(makeResult([{
       id: 1, name: 'Juan', email: 'juan@test.com', password: 'hash',
       rol_id: 4, area_id: null, is_internal: 1, is_active: 1,
-      hourly_rate: null, must_change_password: 0,
+      monthly_salary: null, must_change_password: 0,
       last_login: null, created_at: '2024-01-01',
     }]));
     const result = await getUserById(1);
@@ -49,7 +49,7 @@ describe('getUserById()', () => {
     mockExecute.mockResolvedValueOnce(makeResult([{
       id: 1, name: 'Test', email: 't@t.com', password: '', rol_id: 1,
       area_id: null, is_internal: 1, is_active: 0,
-      hourly_rate: null, must_change_password: 1, last_login: null, created_at: null,
+      monthly_salary: null, must_change_password: 1, last_login: null, created_at: null,
     }]));
     const result = await getUserById(1) as ColaboradorType;
     expect(result.is_internal).toBe(true);
@@ -172,7 +172,7 @@ describe('updateUser()', () => {
       .mockResolvedValueOnce(makeResult([]))  // UPDATE
       .mockResolvedValueOnce(makeResult([{   // SELECT after update
         id: 1, name: 'Updated', email: 'u@test.com', password: '', rol_id: 1,
-        area_id: null, is_internal: 0, is_active: 1, hourly_rate: null,
+        area_id: null, is_internal: 0, is_active: 1, monthly_salary: null,
         must_change_password: 0, last_login: null, created_at: null,
       }]));
     await updateUser('1', { name: 'Updated' });
@@ -189,7 +189,7 @@ describe('updateUser()', () => {
   it('returns the updated user row after a successful update', async () => {
     const updatedRow = {
       id: 1, name: 'New Name', email: 'u@test.com', password: '', rol_id: 1,
-      area_id: null, is_internal: 0, is_active: 1, hourly_rate: null,
+      area_id: null, is_internal: 0, is_active: 1, monthly_salary: null,
       must_change_password: 0, last_login: null, created_at: null,
     };
     mockExecute

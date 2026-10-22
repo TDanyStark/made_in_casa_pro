@@ -17,6 +17,8 @@ import { buildPaginationArgs, buildWhereClause, parseTotal } from "../db/query-h
 import { ITEMS_PER_PAGE } from "@/config/constants";
 import { CREATOR_FILTER_ROLES } from "@/lib/role-groups";
 import type { DbTransaction } from "../db/types";
+import { completionFreeze, type CompletionFreeze } from "../internal-rate";
+import { WEEKLY_WORK_HOURS_SQL } from "./settings";
 
 // ─── Shared SELECT fragments ──────────────────────────────────────────────────
 
@@ -702,15 +704,32 @@ export async function resumeTask(taskId: number, movedByUserId: number): Promise
 }
 
 /**
- * Freezes the assignee's internal hourly rate on a task being completed, so a
- * later rate change never alters past projects (odd/tasks/project-financials.md S5).
- * Every UPDATE that sets status = 'completed' must use it.
+ * Values to freeze on a task being completed now: the internal assignee's
+ * monthly salary, the working minutes of the current month and the resulting
+ * rate, so later salary or weekly-hours changes never alter past projects
+ * (odd/tasks/project-financials.md S13). Every UPDATE that sets
+ * status = 'completed' must store them, reading inside its transaction.
  */
-const FREEZE_HOURLY_RATE_SQL = `(
-                  SELECT CASE WHEN u.is_internal = 1 THEN u.hourly_rate END
-                  FROM users u
-                  WHERE u.id = project_tasks.assigned_user_id
-                )`;
+async function readCompletionFreeze(transaction: DbTransaction, taskId: number): Promise<CompletionFreeze> {
+  const result = await transaction.execute({
+    sql: `SELECT u.is_internal, u.monthly_salary, ${WEEKLY_WORK_HOURS_SQL} AS weekly_work_hours
+          FROM project_tasks pt
+          LEFT JOIN users u ON u.id = pt.assigned_user_id
+          WHERE pt.id = $1`,
+    args: [taskId],
+  });
+  const row = (result.rows[0] ?? {}) as {
+    is_internal?: number | string | null;
+    monthly_salary?: number | string | null;
+    weekly_work_hours?: string | null;
+  };
+  return completionFreeze({
+    is_internal: row.is_internal ?? null,
+    monthly_salary: row.monthly_salary ?? null,
+    weekly_work_hours: row.weekly_work_hours ?? null,
+    at: new Date(),
+  });
+}
 
 // ─── Complete task (execution flow) ──────────────────────────────────────────
 
@@ -741,6 +760,8 @@ export async function completeTask(
 
   const transaction = await db.transaction("write");
   try {
+    const freeze = await readCompletionFreeze(transaction, taskId);
+
     // 1. Mark current task as completed (with optional enrichment fields)
     await transaction.execute({
       sql: `UPDATE project_tasks
@@ -750,7 +771,9 @@ export async function completeTask(
                 progress_minutes = $2,
                 delivery_url = $3,
                 completion_cost = $4,
-                completion_hourly_rate = ${FREEZE_HOURLY_RATE_SQL},
+                completion_hourly_rate = $5,
+                completion_monthly_salary = $6,
+                completion_month_minutes = $7,
                 progress_percent = 100
             WHERE id = $1`,
       args: [
@@ -758,6 +781,9 @@ export async function completeTask(
         options?.progress_minutes ?? 0,
         options?.delivery_url ?? null,
         options?.completion_cost ?? null,
+        freeze.completion_hourly_rate,
+        freeze.completion_monthly_salary,
+        freeze.completion_month_minutes,
       ],
     });
 
@@ -995,15 +1021,23 @@ export async function createRejectionLoopTasks(
       });
     }
 
-    // Step 6: Mark task N as completed
+    // Step 6: Mark task N as completed, freezing the internal cost values
+    const freeze = await readCompletionFreeze(transaction, rejectedValidationTaskId);
     await transaction.execute({
       sql: `UPDATE project_tasks
             SET status = 'completed',
                 completed_at = CURRENT_TIMESTAMP,
                 updated_at = CURRENT_TIMESTAMP,
-                completion_hourly_rate = ${FREEZE_HOURLY_RATE_SQL}
+                completion_hourly_rate = $2,
+                completion_monthly_salary = $3,
+                completion_month_minutes = $4
             WHERE id = $1`,
-      args: [rejectedValidationTaskId],
+      args: [
+        rejectedValidationTaskId,
+        freeze.completion_hourly_rate,
+        freeze.completion_monthly_salary,
+        freeze.completion_month_minutes,
+      ],
     });
 
     // Step 7: Log transition for task N (status → completed)

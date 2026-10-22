@@ -1,5 +1,7 @@
 import { db } from "../db";
 import { computeTaskCost, type ProjectFinancialRow } from "../project-financials";
+import { withCurrentHourlyRates, type SalaryRateFields } from "../internal-rate";
+import { WEEKLY_WORK_HOURS_SQL } from "./settings";
 
 export type TaskCostSource = "frozen_rate" | "current_rate" | "declared" | "quote" | "none";
 
@@ -43,7 +45,8 @@ export async function getTaskCost(projectId: number, taskId: number): Promise<Ta
         pt.assigned_user_id,
         u.name           AS assigned_user_name,
         u.is_internal    AS assignee_is_internal,
-        u.hourly_rate    AS assignee_hourly_rate,
+        u.monthly_salary AS assignee_monthly_salary,
+        ${WEEKLY_WORK_HOURS_SQL} AS weekly_work_hours,
         pt.status,
         pt.progress_minutes,
         pt.completion_hourly_rate,
@@ -62,7 +65,7 @@ export async function getTaskCost(projectId: number, taskId: number): Promise<Ta
   });
   if (result.rows.length === 0) return null;
 
-  const row = result.rows[0] as unknown as ProjectFinancialRow;
+  const [row] = withCurrentHourlyRates([result.rows[0] as unknown as ProjectFinancialRow & SalaryRateFields]);
   const { internal, cost } = computeTaskCost(row);
   return {
     cost: Math.round(cost * 100) / 100,

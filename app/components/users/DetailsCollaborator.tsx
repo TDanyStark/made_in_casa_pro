@@ -15,22 +15,22 @@ interface DetailsCollaboratorProps {
   is_internal: boolean;
   area_id: number;
   skills?: string[];
-  hourly_rate?: number | null;
+  monthly_salary?: number | null;
 }
 
 const DetailsCollaborator = ({
   user_id,
   is_internal,
   area_id,
-  hourly_rate,
+  monthly_salary,
 }: DetailsCollaboratorProps) => {
   const [isInternal, setIsInternal] = useState<boolean>(is_internal);
-  // Mantener un estado para el valor actual de la hora después de actualizaciones
-  const initialRate = hourly_rate ?? 0;
-  const [currentRate, setCurrentRate] = useState<number>(initialRate);
-  const [rate, setRate] = useState<number | undefined>(initialRate);
-  const [displayRate, setDisplayRate] = useState<string>(
-    initialRate ? initialRate.toLocaleString("es-CO") : ""
+  // Mantener un estado para el sueldo actual después de actualizaciones
+  const initialSalary = monthly_salary ?? 0;
+  const [currentSalary, setCurrentSalary] = useState<number>(initialSalary);
+  const [salary, setSalary] = useState<number | undefined>(initialSalary);
+  const [displaySalary, setDisplaySalary] = useState<string>(
+    initialSalary ? initialSalary.toLocaleString("es-CO") : ""
   );
   const [isSaving, setIsSaving] = useState<boolean>(false);
   const [isEditing, setIsEditing] = useState<boolean>(false);
@@ -46,49 +46,49 @@ const DetailsCollaborator = ({
     return isNaN(number) ? "" : number.toLocaleString("es-CO");
   };
 
-  const handleRateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleSalaryChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const inputValue = e.target.value;
     const cleanValue = inputValue.replace(/[^0-9]/g, "");
 
     // Actualiza el valor numérico para guardar
-    setRate(cleanValue ? Number(cleanValue) : undefined);
+    setSalary(cleanValue ? Number(cleanValue) : undefined);
 
     // Actualiza el valor formateado para mostrar
-    setDisplayRate(formatNumberWithCommas(cleanValue));
+    setDisplaySalary(formatNumberWithCommas(cleanValue));
 
     // Indica que el usuario está editando
-    setIsEditing(cleanValue ? Number(cleanValue) !== currentRate : false);
+    setIsEditing(cleanValue ? Number(cleanValue) !== currentSalary : false);
   };
 
-  const updateRate = async () => {
-    if (rate === currentRate || rate === undefined) return;
+  const updateSalary = async () => {
+    if (salary === currentSalary || salary === undefined) return;
 
     setIsSaving(true);
 
     try {
       const promise = patch<ColaboradorType>(`users/${user_id}`, {
-        hourly_rate: rate,
+        monthly_salary: salary,
       });
 
       toast.promise(promise, {
-        loading: "Actualizando valor de la hora...",
+        loading: "Actualizando sueldo mensual...",
         success: (data) => {
           const res = data.data;
-          // Actualizar el valor actual de la hora después de una actualización exitosa
-          if (rate !== undefined) {
-            setCurrentRate(Number(res?.hourly_rate) || 0);
+          // Actualizar el sueldo actual después de una actualización exitosa
+          if (salary !== undefined) {
+            setCurrentSalary(Number(res?.monthly_salary) || 0);
           }
           setIsEditing(false);
-          return "Valor de la hora actualizado correctamente";
+          return "Sueldo mensual actualizado correctamente";
         },
         error: (err) => {
-          setRate(currentRate);
-          setDisplayRate(
-            currentRate ? currentRate.toLocaleString("es-CO") : ""
+          setSalary(currentSalary);
+          setDisplaySalary(
+            currentSalary ? currentSalary.toLocaleString("es-CO") : ""
           );
           return err instanceof Error
             ? err.message
-            : "Error al actualizar el valor de la hora";
+            : "Error al actualizar el sueldo mensual";
         },
       });
       // aqui esperamos a que la promesa se resuelva para que el finally se ejecute despues si no se coloca el setIsSaving(false) se ejecuta antes, y el input siempre estaria disponible
@@ -101,7 +101,7 @@ const DetailsCollaborator = ({
   const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter") {
       e.preventDefault();
-      updateRate();
+      updateSalary();
     }
   };
 
@@ -118,23 +118,23 @@ const DetailsCollaborator = ({
       {isInternal && (
         <div className="mt-4">
           <label
-            htmlFor="hourly-rate"
+            htmlFor="monthly-salary"
             className="text-sm font-medium mb-2 block"
           >
-            Valor de la hora
+            Sueldo mensual
           </label>
           <div className="relative">
             <span className="absolute md:text-xl left-3 top-1/2 transform -translate-y-1/2 text-gray-500">
               $
             </span>
             <Input
-              id="hourly-rate"
+              id="monthly-salary"
               type="text"
               inputMode="numeric"
-              placeholder="Ingresa cuánto vale la hora"
+              placeholder="Ingresa el sueldo mensual"
               className="w-full pl-7 font-medium md:text-xl"
-              value={displayRate}
-              onChange={handleRateChange}
+              value={displaySalary}
+              onChange={handleSalaryChange}
               onKeyDown={handleKeyDown}
               disabled={isSaving}
             />
@@ -148,7 +148,7 @@ const DetailsCollaborator = ({
             )}
           </div>
           <p className="mt-1 text-xs text-muted-foreground">
-            Las tareas ya completadas conservan el valor de la hora con el que se cerraron.
+            Las tareas ya completadas conservan el valor con el que se cerraron.
           </p>
         </div>
       )}

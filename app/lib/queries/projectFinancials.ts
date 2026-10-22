@@ -5,6 +5,8 @@ import {
   type ProjectFinancialRow,
   type ProjectFinancials,
 } from "../project-financials";
+import { withCurrentHourlyRates, type SalaryRateFields } from "../internal-rate";
+import { WEEKLY_WORK_HOURS_SQL } from "./settings";
 
 export interface ProjectVersion {
   id: number;
@@ -43,7 +45,8 @@ export async function getProjectFinancials(
         pt.assigned_user_id,
         u.name           AS assigned_user_name,
         u.is_internal    AS assignee_is_internal,
-        u.hourly_rate    AS assignee_hourly_rate,
+        u.monthly_salary AS assignee_monthly_salary,
+        ${WEEKLY_WORK_HOURS_SQL} AS weekly_work_hours,
         pt.status,
         pt.progress_minutes,
         pt.completion_hourly_rate,
@@ -62,7 +65,7 @@ export async function getProjectFinancials(
   });
 
   const financials = computeProjectFinancials(
-    tasks.rows as unknown as ProjectFinancialRow[],
+    withCurrentHourlyRates(tasks.rows as unknown as (ProjectFinancialRow & SalaryRateFields)[]),
     (project.rows[0] as { sale_price: number | string | null }).sale_price
   );
   return {

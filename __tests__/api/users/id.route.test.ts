@@ -1,7 +1,7 @@
 /**
  * @jest-environment node
  */
-// S3: PATCH /api/users/[id] accepts hourly_rate instead of monthly_salary.
+// S11: PATCH /api/users/[id] accepts monthly_salary again; hourly_rate is gone.
 jest.mock('@/lib/services/api-auth', () => ({
   validateHttpMethod: jest.fn(() => ({ isValidMethod: true })),
   validateApiRole: jest.fn(async () => ({ isAuthorized: true, userRole: 1 })),
@@ -37,26 +37,33 @@ async function call(body: unknown) {
 
 beforeEach(() => {
   jest.clearAllMocks();
-  mockGetUserById.mockResolvedValue({ id: 3, email: 'a@test.com', hourly_rate: null });
+  mockGetUserById.mockResolvedValue({ id: 3, email: 'a@test.com', monthly_salary: null });
 });
 
-describe('PATCH /api/users/[id] hourly_rate', () => {
-  it('updates hourly_rate', async () => {
-    mockUpdateUser.mockResolvedValue({ id: 3, hourly_rate: 40000 });
-    const res = await call({ hourly_rate: 40000 });
+describe('PATCH /api/users/[id] monthly_salary', () => {
+  it('updates monthly_salary', async () => {
+    mockUpdateUser.mockResolvedValue({ id: 3, monthly_salary: 5040000 });
+    const res = await call({ monthly_salary: 5040000 });
     expect(res.status).toBe(200);
-    expect(mockUpdateUser).toHaveBeenCalledWith('3', { hourly_rate: 40000 });
-    expect(await res.json()).toEqual({ id: 3, hourly_rate: 40000 });
+    expect(mockUpdateUser).toHaveBeenCalledWith('3', { monthly_salary: 5040000 });
+    expect(await res.json()).toEqual({ id: 3, monthly_salary: 5040000 });
   });
 
-  it('rejects a negative hourly_rate with 400 and does not update', async () => {
-    const res = await call({ hourly_rate: -1 });
+  it('accepts monthly_salary 0', async () => {
+    mockUpdateUser.mockResolvedValue({ id: 3, monthly_salary: 0 });
+    const res = await call({ monthly_salary: 0 });
+    expect(res.status).toBe(200);
+    expect(mockUpdateUser).toHaveBeenCalledWith('3', { monthly_salary: 0 });
+  });
+
+  it('rejects a negative monthly_salary with 400 and does not update', async () => {
+    const res = await call({ monthly_salary: -1 });
     expect(res.status).toBe(400);
     expect(mockUpdateUser).not.toHaveBeenCalled();
   });
 
-  it('ignores monthly_salary (no longer configurable)', async () => {
-    const res = await call({ monthly_salary: 5000000 });
+  it('ignores hourly_rate (no longer configurable)', async () => {
+    const res = await call({ hourly_rate: 40000 });
     expect(res.status).toBe(200);
     expect(mockUpdateUser).not.toHaveBeenCalled();
   });

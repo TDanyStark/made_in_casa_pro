@@ -36,7 +36,7 @@ export type UserType = {
   last_login?: string;
   is_active?: boolean;
   created_at?: string;
-  hourly_rate?: number | null; // valor de la hora (solo internos)
+  monthly_salary?: number | null; // sueldo mensual (solo internos)
 }
 
 export type ColaboradorType = UserType & {

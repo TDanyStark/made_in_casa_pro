@@ -2,6 +2,9 @@ import {db} from '../db';
 import { UserRole, UserType } from '../definitions';
 import { ITEMS_PER_PAGE } from "@/config/constants";
 import { LEADERSHIP_ROLES } from '@/lib/role-groups';
+import type { DbTransaction } from '../db/types';
+import { completionFreeze } from '../internal-rate';
+import { getWeeklyWorkHours } from './settings';
 
 export interface GetUsersParams {
   page?: number;
@@ -85,7 +88,7 @@ export async function getUserById(userId: number) {
       area_id: row.area_id,
       is_internal: Boolean(row.is_internal),
       is_active: Boolean(row.is_active),
-      hourly_rate: row.hourly_rate == null ? null : Number(row.hourly_rate),
+      monthly_salary: row.monthly_salary == null ? null : Number(row.monthly_salary),
       must_change_password: Boolean(row.must_change_password),
       last_login: row.last_login,
       created_at: row.created_at,
@@ -227,7 +230,7 @@ export async function updateUser(userId: string, data: {
   must_change_password?: boolean;
   is_internal?: boolean;
   area_id?: number;
-  hourly_rate?: number | null;
+  monthly_salary?: number | null;
 }) {
   try {
     // Construir la consulta SQL dinámicamente basada en los campos proporcionados
@@ -273,9 +276,9 @@ export async function updateUser(userId: string, data: {
       args.push(data.must_change_password ? 1 : 0);
       updateFields.push(`must_change_password = $${args.length}`);
     }
-    if (data.hourly_rate !== undefined) {
-      args.push(data.hourly_rate);
-      updateFields.push(`hourly_rate = $${args.length}`);
+    if (data.monthly_salary !== undefined) {
+      args.push(data.monthly_salary);
+      updateFields.push(`monthly_salary = $${args.length}`);
     }
     
     
@@ -293,32 +296,26 @@ export async function updateUser(userId: string, data: {
       WHERE id = $${args.length}
     `;
 
-    // Setting the hourly rate freezes it, once, on the collaborator's completed
-    // internal tasks that have no frozen rate yet (completed before any rate
-    // existed). Tasks with an external price or accepted quote are left alone,
-    // and already-frozen tasks never change. One statement keeps it atomic.
-    const query = data.hourly_rate === undefined
-      ? userUpdate
-      : `
-      WITH updated AS (${userUpdate} RETURNING id, is_internal, hourly_rate)
-      UPDATE project_tasks pt
-      SET completion_hourly_rate = updated.hourly_rate
-      FROM updated
-      WHERE pt.assigned_user_id = updated.id
-        AND updated.is_internal = 1
-        AND updated.hourly_rate IS NOT NULL
-        AND pt.status = 'completed'
-        AND pt.completion_hourly_rate IS NULL
-        AND pt.completion_cost IS NULL
-        AND NOT EXISTS (
-          SELECT 1 FROM task_quotes tq WHERE tq.task_id = pt.id AND tq.status = 'accepted'
-        )
-    `;
-    
-    await db.execute({
-      sql: query,
-      args,
-    });
+    if (data.monthly_salary === undefined) {
+      await db.execute({ sql: userUpdate, args });
+    } else {
+      // Setting the monthly salary recalculates, once and in the same
+      // transaction, the collaborator's completed tasks not yet frozen under the
+      // monthly model (S14).
+      const transaction = await db.transaction('write');
+      try {
+        const updated = await transaction.execute({
+          sql: `${userUpdate} RETURNING id, is_internal, monthly_salary`,
+          args,
+        });
+        const user = updated.rows[0];
+        if (user) await recalculateCompletedTasks(transaction, user);
+        await transaction.commit();
+      } catch (error) {
+        await transaction.rollback();
+        throw error;
+      }
+    }
     
     // Obtener el usuario actualizado
     const result = await db.execute({
@@ -334,6 +331,55 @@ export async function updateUser(userId: string, data: {
   } catch (error) {
     console.error(`Error al actualizar el usuario con ID ${userId}:`, error);
     throw new Error('No se pudo actualizar el usuario');
+  }
+}
+
+/**
+ * Freezes salary, month minutes and rate on an internal collaborator's completed
+ * tasks that are not frozen under the monthly model yet, using the month each
+ * task was completed in. Tasks with an external price, an accepted quote or no
+ * completion date are left alone; frozen tasks are never touched again.
+ */
+async function recalculateCompletedTasks(
+  transaction: DbTransaction,
+  user: { id?: unknown; is_internal?: unknown; monthly_salary?: unknown }
+) {
+  if (Number(user.is_internal) !== 1 || !(Number(user.monthly_salary) > 0)) return;
+
+  const weeklyWorkHours = await getWeeklyWorkHours(transaction);
+  const tasks = await transaction.execute({
+    sql: `
+      SELECT pt.id, pt.completed_at
+      FROM project_tasks pt
+      WHERE pt.assigned_user_id = $1
+        AND pt.status = 'completed'
+        AND pt.completed_at IS NOT NULL
+        AND pt.completion_monthly_salary IS NULL
+        AND pt.completion_cost IS NULL
+        AND NOT EXISTS (
+          SELECT 1 FROM task_quotes tq WHERE tq.task_id = pt.id AND tq.status = 'accepted'
+        )
+    `,
+    args: [user.id],
+  });
+
+  for (const task of tasks.rows) {
+    const freeze = completionFreeze({
+      is_internal: 1,
+      monthly_salary: user.monthly_salary as number | string,
+      weekly_work_hours: weeklyWorkHours,
+      at: new Date(task.completed_at as string | Date),
+    });
+    await transaction.execute({
+      sql: `
+        UPDATE project_tasks
+        SET completion_hourly_rate = $2,
+            completion_monthly_salary = $3,
+            completion_month_minutes = $4
+        WHERE id = $1 AND completion_monthly_salary IS NULL
+      `,
+      args: [task.id, freeze.completion_hourly_rate, freeze.completion_monthly_salary, freeze.completion_month_minutes],
+    });
   }
 }
 

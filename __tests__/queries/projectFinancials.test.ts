@@ -19,7 +19,7 @@ describe('getProjectFinancials()', () => {
   });
 
   const anaRow = {
-    assigned_user_id: 1, assigned_user_name: 'Ana', assignee_is_internal: 1, assignee_hourly_rate: '99',
+    assigned_user_id: 1, assigned_user_name: 'Ana', assignee_is_internal: 1, assignee_monthly_salary: '9900000', weekly_work_hours: null,
     status: 'completed', progress_minutes: 60, completion_hourly_rate: '300', completion_cost: null, accepted_quote_price: null,
   };
   const versionRows = [{ id: '4', version_number: '1' }, { id: 7, version_number: 2 }];
@@ -36,6 +36,29 @@ describe('getProjectFinancials()', () => {
     expect(sql.sql).not.toContain('pt.adjustment_id');
     expect(sql.args).toEqual([9]);
     expect(r).toMatchObject({ sale_price: 1000, internal_cost: 300, margin: 700, adjustment_id: null });
+  });
+
+  // S11, S13: unfinished internal work at the current salary and month; completed keeps its frozen rate.
+  it('costs unfinished internal work with the current monthly salary over the current month minutes', async () => {
+    jest.useFakeTimers({ now: new Date('2026-03-10T15:00:00Z'), doNotFake: ['nextTick', 'setImmediate', 'queueMicrotask'] });
+    try {
+      mockExecute
+        .mockResolvedValueOnce(res([{ sale_price: null }]))
+        .mockResolvedValueOnce(res([]))
+        .mockResolvedValueOnce(res([
+          anaRow,
+          { ...anaRow, status: 'in_progress', progress_minutes: 60, completion_hourly_rate: null, assignee_monthly_salary: '5040000' },
+        ]));
+      const r = await getProjectFinancials(9);
+      const sql = (mockExecute.mock.calls[2][0] as { sql: string }).sql;
+      expect(sql).toContain('u.monthly_salary');
+      expect(sql).toContain("key = 'weekly_work_hours'");
+      expect(sql).not.toContain('u.hourly_rate');
+      // March 2026: 21 days x 504 min = 10584 -> 28571.43/h; frozen task keeps 300/h.
+      expect(r?.internal_cost).toBeCloseTo(300 + 28571.43, 2);
+    } finally {
+      jest.useRealTimers();
+    }
   });
 
   // S9: versions list and version filter.
