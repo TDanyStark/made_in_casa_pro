@@ -692,30 +692,63 @@ export async function recalculateProjectProgressWithTransition(
 
 // ─── Manual completion ───────────────────────────────────────────────────────
 
+/** Manual fallback for automatic completion. Validates the real task counts of
+ * the latest version (never the stored, rounded progress) under the same lock
+ * order as `recalculateProjectProgressWithTransition` (project, then version),
+ * and closes the project and that version together.
+ */
 export async function completeProject(projectId: number): Promise<void> {
+  const tx = await db.transaction("write");
   try {
-    const project = await getProjectById(projectId);
+    const projectResult = await tx.execute({
+      sql: `SELECT status FROM projects WHERE id = $1 FOR UPDATE`,
+      args: [projectId],
+    });
+    const project = projectResult.rows[0] as unknown as { status: string } | undefined;
     if (!project) throw new Error("Proyecto no encontrado");
     if (project.status === "completed") throw new Error("El proyecto ya está completado");
-    if (project.progress < 100) throw new Error("El proyecto no tiene todas las tareas completadas");
 
-    await db.execute({
-      sql: `UPDATE projects SET status = 'completed', completed_at = COALESCE(completed_at, CURRENT_TIMESTAMP), updated_at = CURRENT_TIMESTAMP WHERE id = $1`,
+    const versionResult = await tx.execute({
+      sql: `SELECT id FROM project_adjustments WHERE project_id = $1 ORDER BY version_number DESC, id DESC LIMIT 1 FOR UPDATE`,
       args: [projectId],
     });
+    const version = versionResult.rows[0] as unknown as { id: number } | undefined;
+    let total = 0;
+    let completed = 0;
+    if (version) {
+      const counts = await tx.execute({
+        sql: `SELECT COUNT(*) AS total, COUNT(*) FILTER (WHERE status = 'completed') AS completed
+              FROM project_tasks WHERE project_id = $1 AND adjustment_id = $2`,
+        args: [projectId, Number(version.id)],
+      });
+      const row = counts.rows[0] as unknown as { total: string; completed: string };
+      total = Number(row.total);
+      completed = Number(row.completed);
+    }
+    if (!version || total === 0 || completed !== total) {
+      throw new Error("El proyecto no tiene todas las tareas completadas");
+    }
 
-    // Mark the active adjustment as completed too
-    await db.execute({
-      sql: `UPDATE project_adjustments SET status = 'completed', completed_at = CURRENT_TIMESTAMP WHERE project_id = $1 AND status = 'active'`,
+    await tx.execute({
+      sql: `UPDATE projects SET progress = 100, status = 'completed',
+            completed_at = COALESCE(completed_at, CURRENT_TIMESTAMP),
+            updated_at = CURRENT_TIMESTAMP WHERE id = $1`,
       args: [projectId],
     });
-
-    revalidatePath(`/projects/${projectId}`);
-    revalidatePath("/projects");
+    await tx.execute({
+      sql: `UPDATE project_adjustments SET status = 'completed',
+            completed_at = COALESCE(completed_at, CURRENT_TIMESTAMP)
+            WHERE id = $1`,
+      args: [Number(version.id)],
+    });
+    await tx.commit();
   } catch (error) {
+    await tx.rollback();
     console.error("Error completing project:", error);
     throw error;
   }
+  revalidatePath(`/projects/${projectId}`);
+  revalidatePath("/projects");
 }
 
 // ─── Co-managers ─────────────────────────────────────────────────────────────

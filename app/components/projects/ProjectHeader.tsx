@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/select";
 import { ProjectDetailType, ProjectStatus } from "@/lib/definitions";
 import { ProjectProgressBar } from "./ProjectProgressBar";
-import { patch } from "@/lib/services/apiService";
+import { patch, post } from "@/lib/services/apiService";
 import EditableText from "@/components/input/EditableText";
 
 const STATUS_OPTIONS: { value: ProjectStatus; label: string }[] = [
@@ -33,16 +33,36 @@ interface Props {
 export function ProjectHeader({ project }: Props) {
   const queryClient = useQueryClient();
 
+  const refreshProjectQueries = () => {
+    queryClient.invalidateQueries({ queryKey: ["project", project.id] });
+    queryClient.invalidateQueries({ queryKey: ["projects"] });
+    queryClient.invalidateQueries({ queryKey: ["project-adjustments", project.id] });
+  };
+
+  // Manual fallback: the server validates the latest version's tasks and
+  // closes project + version together; its rejection is shown as-is.
+  const handleComplete = async () => {
+    const res = await post(`projects/${project.id}/complete`, {});
+    if (!res.ok) {
+      toast.error(res.error ?? "Error al completar proyecto");
+      return;
+    }
+    queryClient.setQueryData<ProjectDetailType>(["project", project.id], (current) =>
+      current ? { ...current, status: "completed" } : current
+    );
+    refreshProjectQueries();
+    toast.success("Proyecto completado");
+  };
+
   const handleStatusChange = async (newStatus: ProjectStatus) => {
+    if (newStatus === "completed") return handleComplete();
     try {
       const res = await patch(`projects/${project.id}`, { status: newStatus });
       if (!res.ok) throw new Error(res.error);
       queryClient.setQueryData<ProjectDetailType>(["project", project.id], (current) =>
         current ? { ...current, status: newStatus } : current
       );
-      queryClient.invalidateQueries({ queryKey: ["project", project.id] });
-      queryClient.invalidateQueries({ queryKey: ["projects"] });
-      queryClient.invalidateQueries({ queryKey: ["project-adjustments", project.id] });
+      refreshProjectQueries();
       toast.success("Estado actualizado");
     } catch {
       toast.error("Error al actualizar el estado");
@@ -86,7 +106,7 @@ export function ProjectHeader({ project }: Props) {
             </SelectTrigger>
             <SelectContent>
               {STATUS_OPTIONS.map((opt) => (
-                <SelectItem key={opt.value} value={opt.value} disabled={opt.value === "completed"} className="text-xs">
+                <SelectItem key={opt.value} value={opt.value} className="text-xs">
                   {opt.label}
                 </SelectItem>
               ))}

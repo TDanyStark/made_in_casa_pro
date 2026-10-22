@@ -68,4 +68,18 @@ describe("POST /api/projects/[id]/complete notifications", () => {
     expect(mockDispatchNotification).not.toHaveBeenCalled();
 
   });
+
+  it.each([
+    ["Proyecto no encontrado", 404],
+    ["El proyecto ya está completado", 409],
+    ["El proyecto no tiene todas las tareas completadas", 422],
+  ])("maps %s to %i without notifications", async (message, status) => {
+    mockCompleteProject.mockRejectedValue(new Error(message));
+
+    const response = await callPost();
+
+    expect(response.status).toBe(status);
+    await expect(response.json()).resolves.toEqual({ error: message });
+    expect(mockDispatchNotification).not.toHaveBeenCalled();
+  });
 });
