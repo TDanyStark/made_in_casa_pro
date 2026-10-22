@@ -45,3 +45,8 @@ tmpclaude-*
 
 .vercel
 .env*
+
+# local AI/dev tooling artifacts
+.atl/
+.codegraph/
+.playwright-mcp/
