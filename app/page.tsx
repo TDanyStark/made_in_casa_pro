@@ -1,8 +1,17 @@
 import { ModeToggle } from "./components/ModeToggle"
 import { UserLoginForm } from "./components/login/UserLoginForm";
 import MICLogo from "./components/icons/MICLogo";
+import { getSafeRedirectPath, LOGIN_REDIRECT_PARAM } from "./lib/utils/safe-redirect";
 
-export default function LoginPage() {
+type LoginPageProps = {
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
+};
+
+export default async function LoginPage({ searchParams }: LoginPageProps) {
+  const params = await searchParams;
+  const rawNext = params?.[LOGIN_REDIRECT_PARAM];
+  const redirectTo = getSafeRedirectPath(typeof rawNext === "string" ? rawNext : null);
+
   return (
     <>
       <div className="container relative h-[800px] flex-col items-center justify-center md:grid lg:max-w-none lg:h-screen lg:grid-cols-2 lg:px-0">
@@ -31,7 +40,7 @@ export default function LoginPage() {
               <h1 className="text-2xl font-semibold tracking-tight mb-6">
                 Login
               </h1>
-              <UserLoginForm />
+              <UserLoginForm redirectTo={redirectTo} />
             </div>
           </div>
         </div>

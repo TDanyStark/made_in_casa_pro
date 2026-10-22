@@ -3,6 +3,7 @@ import { decrypt } from "@/lib/session";
 import { cookies } from "next/headers";
 import { UserRole } from "@/lib/definitions";
 import { checkRoutePermission, publicRoutes } from "@/lib/permissions";
+import { getSafeRedirectPath, LOGIN_REDIRECT_PARAM } from "@/lib/utils/safe-redirect";
 
 // Changed publicRoute from a single route to an array of public routes
 
@@ -36,8 +37,10 @@ export default async function middleware(req: NextRequest) {
     : UserRole.NO_AUTHENTICADO;
 
   // 1. Si es ruta pública y el usuario está autenticado, redirigir a dashboard
+  //    (o a la ruta guardada en ?next= si es una ruta interna segura)
   if (isPublicRoute && session?.id) {
-    return NextResponse.redirect(new URL("/dashboard", req.nextUrl));
+    const target = getSafeRedirectPath(req.nextUrl.searchParams.get(LOGIN_REDIRECT_PARAM));
+    return NextResponse.redirect(new URL(target ?? "/dashboard", req.nextUrl));
   }
 
   if (isEmailConnectionRoute) {
@@ -53,7 +56,11 @@ export default async function middleware(req: NextRequest) {
       // return NextResponse.next();
       return NextResponse.json({ error: "No autorizado" }, { status: 401 });
     }
-    return NextResponse.redirect(new URL("/", req.nextUrl));
+    // Guardar la ruta solicitada para volver a ella después del login
+    const loginUrl = new URL("/", req.nextUrl);
+    const requested = getSafeRedirectPath(`${path}${req.nextUrl.search}`);
+    if (requested) loginUrl.searchParams.set(LOGIN_REDIRECT_PARAM, requested);
+    return NextResponse.redirect(loginUrl);
   }
 
   // 3. Si el usuario está autenticado, verificar permisos para la ruta (excluyendo APIs que se manejarán en los endpoints)

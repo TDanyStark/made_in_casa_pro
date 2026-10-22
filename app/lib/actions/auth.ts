@@ -7,6 +7,7 @@ import { redirect } from "next/navigation";
 import bcrypt from "bcrypt";
 import { getUserByEmail } from "../queries/users";
 import { getUserConnectedEmailStatus } from "../queries/userEmailConnections";
+import { getSafeRedirectPath, LOGIN_REDIRECT_PARAM } from "../utils/safe-redirect";
 
 
 export async function login(state: FormState, formData: FormData) {
@@ -72,6 +73,14 @@ export async function login(state: FormState, formData: FormData) {
   }
   // 3. Create a session
   await createSession({name: user.name, email: user.email, id: user.id, rol_id: user.rol_id });
+
+  // Volver a la ruta que el usuario intentó abrir antes del login (p. ej. link de un correo).
+  // En ese caso se omite /connect-email para no desviarlo de su destino.
+  const returnTo = getSafeRedirectPath(formData.get(LOGIN_REDIRECT_PARAM) as string | null);
+  if (returnTo) {
+    redirect(returnTo);
+  }
+
   const hasConnectedGmail = await getUserConnectedEmailStatus(user.id);
 
   if (!hasConnectedGmail) {

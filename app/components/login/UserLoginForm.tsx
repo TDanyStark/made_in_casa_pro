@@ -6,12 +6,19 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Icons } from "@/components/icons";
 import { login } from "@/lib/actions/auth";
+import { LOGIN_REDIRECT_PARAM } from "@/lib/utils/safe-redirect";
 
-export function UserLoginForm() {
+type UserLoginFormProps = {
+  /** Safe internal path to return to after login (validated again on the server). */
+  redirectTo?: string | null;
+};
+
+export function UserLoginForm({ redirectTo = null }: UserLoginFormProps) {
   const [state, action, pending] = useActionState(login, {errors: {}, submittedData: {email: "", password: ""}});
   return (
     <div className="grid gap-6">
       <form action={action}>
+        {redirectTo ? <input type="hidden" name={LOGIN_REDIRECT_PARAM} value={redirectTo} /> : null}
         <div className="grid gap-4">
           <div className="grid gap-4">
             <div>
