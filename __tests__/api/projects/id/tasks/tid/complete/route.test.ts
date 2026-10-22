@@ -289,7 +289,7 @@ describe('POST /complete — external cost required (S8)', () => {
   it.each([
     ['is_internal NULL, no cost', null, { progress_minutes: 30 }],
     ['is_internal NULL, cost null', null, { progress_minutes: 30, completion_cost: null }],
-    ['is_internal 0, cost 0', 0, { progress_minutes: 30, completion_cost: 0 }],
+    ['is_internal 0, no cost', 0, { progress_minutes: 30 }],
   ])('rejects an external colaborador (%s) with 400 and writes nothing', async (_label, isInternal, body) => {
     setupAuthMocks(UserRole.COLABORADOR, 5);
     mockGetProjectTaskById.mockResolvedValue(
@@ -319,6 +319,24 @@ describe('POST /complete — external cost required (S8)', () => {
       progress_minutes: 30,
       delivery_url: undefined,
       completion_cost: 500000,
+    });
+  });
+
+  // Externals may declare 0 for free work (reviews, adjustments); only a missing cost is rejected.
+  it('completes an external colaborador task declared as free (cost 0)', async () => {
+    setupAuthMocks(UserRole.COLABORADOR, 5);
+    mockGetProjectTaskById.mockResolvedValue(
+      makeTask({ assigned_user_rol_id: UserRole.COLABORADOR, assigned_user_is_internal: 0, requires_quote: 0 }) as never
+    );
+    mockCompleteTask.mockResolvedValue(completed());
+
+    const res = await callPost(makeRequest({ progress_minutes: 30, completion_cost: 0 }), makeParams());
+
+    expect(res.status).toBe(200);
+    expect(mockCompleteTask).toHaveBeenCalledWith(10, 5, undefined, {
+      progress_minutes: 30,
+      delivery_url: undefined,
+      completion_cost: 0,
     });
   });
 

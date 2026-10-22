@@ -293,7 +293,10 @@ Cómo se calcula el dinero invertido:
   las tareas terminadas conservan su histórico; solo las tareas aún sin
   completar se valoran con el sueldo actual y los minutos del mes actual.
 - **Externos**: el costo que declaran al completar la tarea o, si no hay, el
-  precio de la cotización aceptada.
+  precio de la cotización aceptada. Declarar el costo es obligatorio (también
+  para colaboradores sin la casilla de interno marcada), pero 0 es válido: así se
+  registra el trabajo gratis, como revisiones o ajustes. Solo se rechaza un costo
+  ausente o negativo.
 - **Recálculo único**: al guardar el sueldo mensual de un interno (mayor que 0),
   sus tareas ya completadas que aún no estaban congeladas con sueldo mensual (sin
   precio externo ni cotización aceptada) se recalculan una sola vez con el mes en

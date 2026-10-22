@@ -146,7 +146,7 @@ export function TaskCompleteDialog({
     // External collaborator must declare their cost (unless it's fixed by quote)
     if (isExternalCollaborator && !isReadOnlyCost) {
       const parsed = parseFloat(completionCost);
-      if (!completionCost || isNaN(parsed) || parsed <= 0) {
+      if (!completionCost || isNaN(parsed) || parsed < 0) {
         toast.error("Debes ingresar el costo del trabajo antes de completar.");
         return;
       }
@@ -381,6 +381,9 @@ export function TaskCompleteDialog({
                   />
                   <p className="text-[11px] text-muted-foreground">
                     Ingresa el costo final del trabajo realizado.
+                  </p>
+                  <p className="text-[11px] text-muted-foreground">
+                    Si el trabajo fue gratis (revisión o ajuste), escribe 0.
                   </p>
                 </>
               )}

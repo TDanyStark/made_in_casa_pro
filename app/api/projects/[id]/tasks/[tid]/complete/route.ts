@@ -87,11 +87,12 @@ export async function POST(request: NextRequest, { params }: Params) {
     const body = parsed.data;
 
     // External collaborators (is_internal 0 or never set) must declare their cost,
-    // unless the price comes from an accepted quote.
+    // unless the price comes from an accepted quote. 0 is valid: free work such as
+    // reviews or adjustments (negative values are rejected by the schema).
     const isExternalAssignee =
       Number(task.assigned_user_rol_id) === UserRole.COLABORADOR &&
       Number(task.assigned_user_is_internal) !== 1;
-    if (isExternalAssignee && task.requires_quote !== 1 && !(Number(body.completion_cost) > 0)) {
+    if (isExternalAssignee && task.requires_quote !== 1 && (body.completion_cost === undefined || body.completion_cost === null)) {
       return NextResponse.json(
         { error: "Debes ingresar el costo del trabajo antes de completar." },
         { status: 400 }

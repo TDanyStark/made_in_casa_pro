@@ -105,6 +105,33 @@ describe("TaskCompleteDialog — external cost (S8)", () => {
     expect(mockPost).not.toHaveBeenCalled();
   });
 
+  it("accepts 0 as the declared cost of free work", async () => {
+    renderDialog({ assigned_user_is_internal: 0 });
+
+    expect(screen.getByText("Si el trabajo fue gratis (revisión o ajuste), escribe 0.")).toBeInTheDocument();
+    fireEvent.change(document.getElementById("task-completion-cost")!, { target: { value: "0" } });
+    fireEvent.click(screen.getByRole("button", { name: /completar y entregar/i }));
+
+    await waitFor(() => expect(mockPost).toHaveBeenCalledTimes(1));
+    expect(mockToastError).not.toHaveBeenCalled();
+    expect(mockPost).toHaveBeenCalledWith("projects/65/tasks/141/complete", {
+      notes: "<p>Listo</p>",
+      progress_minutes: 30,
+      delivery_url: null,
+      completion_cost: 0,
+    });
+  });
+
+  it("rejects a negative cost and sends nothing", async () => {
+    renderDialog({ assigned_user_is_internal: 0 });
+
+    fireEvent.change(document.getElementById("task-completion-cost")!, { target: { value: "-5" } });
+    fireEvent.click(screen.getByRole("button", { name: /completar y entregar/i }));
+
+    await waitFor(() => expect(mockToastError).toHaveBeenCalledWith(COST_ERROR));
+    expect(mockPost).not.toHaveBeenCalled();
+  });
+
   it("sends the declared cost for an external colaborador", async () => {
     renderDialog({ assigned_user_is_internal: null });
 
