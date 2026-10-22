@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { validateApiRole, validateHttpMethod } from "@/lib/services/api-auth";
-import { getAppSettings, upsertSettings } from "@/lib/queries/settings";
+import { getAppSettings, getWeeklyWorkHours, upsertSettings } from "@/lib/queries/settings";
 import { ADMIN_ONLY_ROLES } from "@/lib/role-groups";
+import { MAX_WEEKLY_WORK_HOURS, WEEKLY_HOURS_ERROR } from "@/lib/work-time";
 
 const patchSchema = z.object({
   google_oauth_client_id: z.string().min(1).optional(),
@@ -12,6 +13,11 @@ const patchSchema = z.object({
   daily_report_time: z
     .string()
     .regex(/^([01]\d|2[0-3]):([0-5]\d)$/, "Formato inválido. Usa HH:MM")
+    .optional(),
+  weekly_work_hours: z
+    .number({ invalid_type_error: WEEKLY_HOURS_ERROR })
+    .gt(0, WEEKLY_HOURS_ERROR)
+    .max(MAX_WEEKLY_WORK_HOURS, WEEKLY_HOURS_ERROR)
     .optional(),
 });
 
@@ -23,7 +29,7 @@ export async function GET(request: NextRequest) {
   if (!roleValidation.isAuthorized) return roleValidation.response;
 
   try {
-    const settings = await getAppSettings();
+    const [settings, weeklyWorkHours] = await Promise.all([getAppSettings(), getWeeklyWorkHours()]);
     // Never expose the refresh token or full secret to the client
     return NextResponse.json({
       google_oauth_client_id: settings.google_oauth_client_id,
@@ -33,6 +39,7 @@ export async function GET(request: NextRequest) {
       google_oauth_connected_email: settings.google_oauth_connected_email,
       google_oauth_connected: !!settings.google_oauth_refresh_token,
       daily_report_time: settings.daily_report_time,
+      weekly_work_hours: weeklyWorkHours,
     });
   } catch (error) {
     console.error("Error fetching settings:", error);

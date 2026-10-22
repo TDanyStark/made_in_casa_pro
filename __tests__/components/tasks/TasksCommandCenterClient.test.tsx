@@ -171,6 +171,12 @@ jest.mock("@/components/pagination/Pagination", () => ({
   default: () => <div>Paginación</div>,
 }));
 
+jest.mock("@/components/tasks/TaskDeliverableDialog", () => ({
+  TaskDeliverableDialog: ({ showCost }: { showCost?: boolean }) => (
+    <div data-testid="deliverable-dialog" data-show-cost={String(Boolean(showCost))} />
+  ),
+}));
+
 describe("TasksCommandCenterClient", () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -226,5 +232,17 @@ describe("TasksCommandCenterClient", () => {
     const params = new URLSearchParams(url.split("?")[1]);
     expect(params.get("page")).toBe("1");
     expect(params.getAll("status")).toEqual(["blocked"]);
+  });
+
+  // S7: the eye dialog shows the task cost only to admin, directivo and financiero.
+  it.each([
+    [UserRole.ADMIN, "true"],
+    [UserRole.DIRECTIVO, "true"],
+    [UserRole.FINANCIERO, "true"],
+    [UserRole.COMERCIAL, "false"],
+  ])("passes showCost to the deliverable dialog for role %i -> %s", (role, expected) => {
+    render(<TasksCommandCenterClient userRole={role} />);
+
+    expect(screen.getByTestId("deliverable-dialog")).toHaveAttribute("data-show-cost", expected);
   });
 });

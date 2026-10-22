@@ -1,17 +1,76 @@
 "use client";
 
 import { useLayoutEffect, useRef, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { ProjectTaskType } from "@/lib/definitions";
 import { formatProgressMinutes } from "@/lib/task-progress";
+import { get } from "@/lib/services/apiService";
+import type { TaskCost } from "@/lib/queries/taskCost";
 import { TaskStatusBadge } from "./TaskStatusBadge";
-import { Clock, Eye, ExternalLink, FileText, Link as LinkIcon, User } from "lucide-react";
+import { Clock, Eye, ExternalLink, FileText, Link as LinkIcon, User, Wallet } from "lucide-react";
 
 interface TaskDeliverableDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   task: ProjectTaskType | null;
+  /** Shows how much the task cost; only for admin, directivo and financiero. */
+  showCost?: boolean;
+}
+
+const money = new Intl.NumberFormat("es-CO", {
+  style: "currency",
+  currency: "COP",
+  maximumFractionDigits: 0,
+});
+
+function describeTaskCost(data: TaskCost) {
+  switch (data.source) {
+    case "frozen_rate":
+    case "current_rate":
+      return `Interno · ${formatProgressMinutes(data.minutes)} × ${money.format(data.hourly_rate ?? 0)}/h`;
+    case "declared":
+      return "Externo · costo declarado";
+    case "quote":
+      return "Externo · cotización aceptada";
+    default:
+      return null;
+  }
+}
+
+function TaskCostSection({ projectId, taskId }: { projectId: number; taskId: number }) {
+  const { data, isLoading, isError } = useQuery({
+    queryKey: ["task-cost", projectId, taskId],
+    queryFn: async () => {
+      const res = await get<TaskCost>(`projects/${projectId}/tasks/${taskId}/cost`);
+      if (!res.ok || !res.data) throw new Error(res.error || "Error al obtener el costo de la tarea");
+      return res.data;
+    },
+  });
+
+  const detail = data ? describeTaskCost(data) : null;
+
+  return (
+    <div className="flex items-start gap-2 border-t pt-4 text-sm">
+      <Wallet className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+      <div className="flex flex-col gap-0.5">
+        <span className="text-muted-foreground">Costo de la tarea</span>
+        {isLoading ? (
+          <span className="text-muted-foreground">Cargando…</span>
+        ) : isError || !data ? (
+          <span className="text-muted-foreground">No se pudo cargar el costo</span>
+        ) : data.source === "none" ? (
+          <span className="text-muted-foreground">Sin costo registrado</span>
+        ) : (
+          <>
+            <span className="font-medium">{money.format(data.cost)}</span>
+            {detail && <span className="text-xs text-muted-foreground">{detail}</span>}
+          </>
+        )}
+      </div>
+    </div>
+  );
 }
 
 // Fallback used when the paragraph has no layout (hidden / not measured yet).
@@ -82,6 +141,7 @@ export function TaskDeliverableDialog({
   open,
   onOpenChange,
   task,
+  showCost = false,
 }: TaskDeliverableDialogProps) {
   if (!task) return null;
 
@@ -116,6 +176,8 @@ export function TaskDeliverableDialog({
         ) : (
           <p className="text-sm italic text-muted-foreground">Sin descripción</p>
         )}
+
+        {showCost && open && <TaskCostSection projectId={task.project_id} taskId={task.id} />}
 
         {isCompleted && (
           <div className="flex flex-col gap-3 border-t pt-4">

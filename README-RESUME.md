@@ -265,29 +265,51 @@ administrativos ven en qué está trabajando en este momento. El resto queda en
 
 ## Inversión y precio de venta del proyecto
 
-El detalle de un proyecto muestra arriba tres cards con gráficos: **Horas del
-equipo**, **Dinero invertido** y **Precio de venta** (con el margen).
+El detalle de un proyecto muestra arriba un panel compacto con mini gráficos:
+**Horas**, **Invertido** (con el detalle por colaborador), **Venta** y
+**Margen**. Un selector pequeño filtra por versión (por defecto, todas).
 
 | Qué | Dónde | Quién |
 | --- | --- | --- |
-| Valor de la hora de un interno | Ficha del colaborador (`PATCH /api/users/[id]` con `hourly_rate`) | Admin |
-| Ver horas, dinero y margen | `GET /api/projects/[id]/financials` | Admin, directivo, financiero y el comercial que creó el proyecto |
+| Sueldo mensual de un interno | Ficha del colaborador (`PATCH /api/users/[id]` con `monthly_salary`, número >= 0) | Admin |
+| Horas semanales de trabajo (ley) | Configuración → General (`PATCH /api/settings` con `weekly_work_hours`, mayor que 0 y máximo 60; por defecto 42) | Admin |
+| Ver horas, dinero y margen | `GET /api/projects/[id]/financials` (opcional `?adjustment_id=<id>` para una versión) | Admin, directivo, financiero y el comercial que creó el proyecto |
 | Anotar en cuánto se vendió | `PATCH /api/projects/[id]/financials` con `{ "sale_price": number \| null }` | Admin, directivo y el comercial que creó el proyecto |
 
 Cómo se calcula el dinero invertido:
 
-- **Internos**: minutos registrados × valor de la hora. Al completar una tarea se
-  congela la tarifa vigente en `project_tasks.completion_hourly_rate`; si luego
-  cambia la tarifa, los proyectos anteriores conservan la suya. Las tareas aún
-  sin completar se valoran con la tarifa actual.
+- **Internos**: minutos registrados × valor del minuto del mes. El valor del
+  minuto es `sueldo mensual / minutos laborables del mes`: días de lunes a
+  viernes del mes, sin festivos de Colombia (fijos, Ley Emiliani y los de
+  Semana Santa), × minutos por día (`horas semanales × 60 / 5`; 42 h → 504 min).
+  Por eso un mes con menos días laborables (febrero) sale más caro por minuto.
+  Ejemplo con 42 h: febrero de 2026 tiene 20 días (10.080 min) y marzo de 2026,
+  21 días por el festivo del 23 (10.584 min).
+- **Mes de la tarea**: se usa el mes en que se completa (hora de Bogotá). Al
+  completarla se congelan en `project_tasks` el sueldo
+  (`completion_monthly_salary`), los minutos del mes
+  (`completion_month_minutes`) y la tarifa por hora resultante
+  (`completion_hourly_rate`). Si luego cambian el sueldo o las horas semanales,
+  las tareas terminadas conservan su histórico; solo las tareas aún sin
+  completar se valoran con el sueldo actual y los minutos del mes actual.
 - **Externos**: el costo que declaran al completar la tarea o, si no hay, el
   precio de la cotización aceptada.
-- Al configurar la tarifa de un interno, sus tareas ya completadas que no tenían
-  tarifa congelada toman esa tarifa una sola vez.
-- El valor de la hora reemplaza al antiguo sueldo mensual. La columna
-  `users.monthly_salary` sigue en la base, pero la aplicación ya no la usa.
+- **Recálculo único**: al guardar el sueldo mensual de un interno (mayor que 0),
+  sus tareas ya completadas que aún no estaban congeladas con sueldo mensual (sin
+  precio externo ni cotización aceptada) se recalculan una sola vez con el mes en
+  que se completaron. Las tareas ya congeladas con sueldo mensual no vuelven a
+  cambiar.
+- El sueldo mensual reemplaza al valor de la hora por colaborador. La columna
+  `users.hourly_rate` sigue en la base, pero la aplicación ya no la usa.
+- **Filtro por versión**: `?adjustment_id` (id de `project_adjustments`) cuenta solo
+  las tareas de esa versión. Un valor que no es entero positivo responde `400
+  { "error": "Versión inválida" }`; una versión de otro proyecto, `404
+  { "error": "Versión no encontrada" }`. La respuesta siempre incluye
+  `versions: [{ id, version_number }]` y `adjustment_id` (el filtro o `null`).
+- El precio de venta y el margen son de todo el proyecto: con un filtro de
+  versión, `sale_price` sigue siendo el del proyecto y `margin` es `null`.
 - Los gráficos usan `recharts` a través del componente `chart` de shadcn.
-- Migración: `019_project_financials.sql`.
+- Migraciones: `019_project_financials.sql` y `020_monthly_salary_cost.sql`.
 
 ## Notificaciones por correo
 

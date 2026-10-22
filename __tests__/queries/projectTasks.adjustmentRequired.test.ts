@@ -253,14 +253,49 @@ describe("createRejectionLoopTasks() — clones keep the version", () => {
     }
   });
 
-  // S5: the rejected validation task is completed here too, so it must freeze the internal rate.
-  it("freezes the assignee internal hourly rate on the rejected validation task", async () => {
-    routeRejection(9);
-    await createRejectionLoopTasks(1, 10, 7, 5);
-    const sqls = [...(mockExecute as unknown as jest.Mock).mock.calls, ...mockTransaction.execute.mock.calls]
-      .map(([q]) => sqlOf(q as Query));
-    const complete = sqls.find((sql) => /SET status = 'completed'/.test(sql));
-    expect(complete).toMatch(/completion_hourly_rate\s*=\s*\(\s*SELECT CASE WHEN u\.is_internal = 1 THEN u\.hourly_rate END/);
+  // S13: the rejected validation task is completed here too, so it freezes the
+  // assignee's salary, the month's working minutes and the resulting rate.
+  describe("freezes the monthly-salary values on the rejected validation task", () => {
+    beforeEach(() => {
+      jest.useFakeTimers({ now: new Date("2026-02-15T15:00:00Z"), doNotFake: ["nextTick", "setImmediate", "queueMicrotask"] });
+    });
+    afterEach(() => jest.useRealTimers());
+
+    async function rejectWith(assignee: Record<string, unknown>[]) {
+      routeRejection(9);
+      const fallback = mockTransaction.execute.getMockImplementation()!;
+      mockTransaction.execute.mockImplementation(async (q: Query) =>
+        sqlOf(q).includes("u.monthly_salary") ? result(assignee) : fallback(q)
+      );
+      await createRejectionLoopTasks(1, 10, 7, 5);
+      const calls = mockTransaction.execute.mock.calls.map(([q]) => q as Query);
+      const readIndex = calls.findIndex((q) => sqlOf(q).includes("u.monthly_salary"));
+      const completeIndex = calls.findIndex((q) => /SET status = 'completed'/.test(sqlOf(q)));
+      expect(readIndex).toBeGreaterThanOrEqual(0);
+      expect(readIndex).toBeLessThan(completeIndex);
+      expect(sqlOf(calls[readIndex])).toContain("key = 'weekly_work_hours'");
+      expect(argsOf(calls[readIndex])).toEqual([10]);
+      const complete = calls[completeIndex];
+      expect(sqlOf(complete)).toMatch(/completion_hourly_rate = \$2/);
+      expect(sqlOf(complete)).toMatch(/completion_monthly_salary = \$3/);
+      expect(sqlOf(complete)).toMatch(/completion_month_minutes = \$4/);
+      return argsOf(complete);
+    }
+
+    it("stores rate, salary and month minutes for an internal with salary", async () => {
+      expect(await rejectWith([{ is_internal: 1, monthly_salary: "5040000.00", weekly_work_hours: null }]))
+        .toEqual([10, 30000, 5040000, 10080]);
+    });
+
+    it("stores nothing for an internal without salary", async () => {
+      expect(await rejectWith([{ is_internal: 1, monthly_salary: null, weekly_work_hours: null }]))
+        .toEqual([10, null, null, null]);
+    });
+
+    it("stores nothing for an external collaborator", async () => {
+      expect(await rejectWith([{ is_internal: 0, monthly_salary: "5040000", weekly_work_hours: null }]))
+        .toEqual([10, null, null, null]);
+    });
   });
 
   it("throws the exact message and inserts nothing when the project has no version", async () => {

@@ -39,6 +39,13 @@ function parseProjectId(id: string) {
   return Number.isInteger(projectId) && projectId > 0 ? projectId : null;
 }
 
+/** Optional ?adjustment_id: null when absent, NaN when present but not a positive integer. */
+function parseAdjustmentId(request: NextRequest) {
+  const raw = request.nextUrl.searchParams.get("adjustment_id");
+  if (raw === null) return null;
+  return /^[1-9]\d*$/.test(raw) ? Number(raw) : NaN;
+}
+
 export async function GET(request: NextRequest, { params }: Params) {
   const methodValidation = validateHttpMethod(request, ["GET"]);
   if (!methodValidation.isValidMethod) return methodValidation.response;
@@ -53,8 +60,16 @@ export async function GET(request: NextRequest, { params }: Params) {
     const forbidden = await forbidUnlessAllowed(projectId, roleValidation.userRole);
     if (forbidden) return forbidden;
 
-    const financials = await getProjectFinancials(projectId);
+    const adjustmentId = parseAdjustmentId(request);
+    if (Number.isNaN(adjustmentId)) {
+      return NextResponse.json({ error: "Versión inválida" }, { status: 400 });
+    }
+
+    const financials = await getProjectFinancials(projectId, adjustmentId);
     if (!financials) return NextResponse.json({ error: "Proyecto no encontrado" }, { status: 404 });
+    if (adjustmentId !== null && !financials.versions.some((v) => v.id === adjustmentId)) {
+      return NextResponse.json({ error: "Versión no encontrada" }, { status: 404 });
+    }
     return NextResponse.json(financials);
   } catch (error) {
     console.error("Error fetching project financials:", error);

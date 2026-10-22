@@ -119,14 +119,16 @@ describe('createRejectionLoopTasks()', () => {
     // 3. Transition N+1 (null -> not_started)
     // 4. INSERT N+2 (clone of N) -> returns 102
     // 5. Transition N+2 (null -> waiting)
-    // 6. UPDATE task N to completed
-    // 7. Transition task N (in_progress -> completed)
+    // 6. Read the assignee salary + weekly hours (completion freeze)
+    // 7. UPDATE task N to completed
+    // 8. Transition task N (in_progress -> completed)
     mockTransaction.execute
       .mockResolvedValueOnce(makeResult([]))            // shift
       .mockResolvedValueOnce(makeResult([{ id: 101 }])) // INSERT N+1
       .mockResolvedValueOnce(makeResult([]))            // transition N+1
       .mockResolvedValueOnce(makeResult([{ id: 102 }])) // INSERT N+2
       .mockResolvedValueOnce(makeResult([]))            // transition N+2
+      .mockResolvedValueOnce(makeResult([]))            // read assignee salary + weekly hours
       .mockResolvedValueOnce(makeResult([]))            // UPDATE N
       .mockResolvedValueOnce(makeResult([]));           // transition N
 
@@ -160,6 +162,7 @@ describe('createRejectionLoopTasks()', () => {
       .mockResolvedValueOnce(makeResult([]))            // transition N+1
       .mockResolvedValueOnce(makeResult([{ id: 102 }])) // INSERT N+2
       .mockResolvedValueOnce(makeResult([]))            // transition N+2
+      .mockResolvedValueOnce(makeResult([]))            // read assignee salary + weekly hours
       .mockResolvedValueOnce(makeResult([]))            // UPDATE N
       .mockResolvedValueOnce(makeResult([]));           // transition N
 
@@ -193,6 +196,7 @@ describe('createRejectionLoopTasks()', () => {
       .mockResolvedValueOnce(makeResult([]))            // transition N+1
       .mockResolvedValueOnce(makeResult([{ id: 102 }])) // INSERT N+2
       .mockResolvedValueOnce(makeResult([]))            // transition N+2
+      .mockResolvedValueOnce(makeResult([]))            // read assignee salary + weekly hours
       .mockResolvedValueOnce(makeResult([]))            // UPDATE N
       .mockResolvedValueOnce(makeResult([]));           // transition N
 
@@ -225,6 +229,7 @@ describe('createRejectionLoopTasks()', () => {
       .mockResolvedValueOnce(makeResult([]))            // transition N+1
       .mockResolvedValueOnce(makeResult([{ id: 102 }])) // INSERT N+2
       .mockResolvedValueOnce(makeResult([]))            // transition N+2
+      .mockResolvedValueOnce(makeResult([]))            // read assignee salary + weekly hours
       .mockResolvedValueOnce(makeResult([]))            // UPDATE N
       .mockResolvedValueOnce(makeResult([]));           // transition N
 
@@ -233,8 +238,8 @@ describe('createRejectionLoopTasks()', () => {
 
     await createRejectionLoopTasks(1, 10, 7, 5);
 
-    // Sixth transaction.execute: UPDATE task N to completed
-    expect(mockTransaction.execute).toHaveBeenNthCalledWith(6, expect.objectContaining({
+    // Seventh transaction.execute (after reading the assignee): UPDATE task N to completed
+    expect(mockTransaction.execute).toHaveBeenNthCalledWith(7, expect.objectContaining({
       sql: expect.stringContaining("status = 'completed'"),
       args: expect.arrayContaining([10]),  // taskId = N = 10
     }));
@@ -304,6 +309,7 @@ describe('validateTask() — immutability guard', () => {
     // completeTask also calls getProjectTaskById, set up transaction
     mockExecute.mockResolvedValueOnce(makeResult([makeTaskRow({ status: 'in_progress', task_type: 'execution' })]));
     mockTransaction.execute
+      .mockResolvedValueOnce(makeResult([]))    // read assignee salary + weekly hours
       .mockResolvedValueOnce(makeResult([]))    // UPDATE completed
       .mockResolvedValueOnce(makeResult([]))    // INSERT transition
       .mockResolvedValueOnce(makeResult([]));   // next task query (empty)

@@ -48,7 +48,8 @@ const toNumber = (value: number | string | null | undefined): number | null =>
 
 const roundCents = (value: number) => Math.round(value * 100) / 100;
 
-function classifyTask(row: ProjectFinancialRow): { internal: boolean; cost: number } {
+/** Cost of one task under the rules above; internal is false for external or unknown assignees. */
+export function computeTaskCost(row: ProjectFinancialRow): { internal: boolean; cost: number } {
   const minutes = toNumber(row.progress_minutes) ?? 0;
   const frozenRate = toNumber(row.completion_hourly_rate);
   const externalPrice = toNumber(row.completion_cost) ?? toNumber(row.accepted_quote_price);
@@ -82,7 +83,7 @@ export function computeProjectFinancials(
     totalMinutes += minutes;
     if (row.assigned_user_id === null) continue;
 
-    const { internal, cost } = classifyTask(row);
+    const { internal, cost } = computeTaskCost(row);
     if (internal) {
       internalMinutes += minutes;
       internalCost += cost;

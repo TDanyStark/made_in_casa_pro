@@ -20,10 +20,11 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { HardDrive, CheckCircle2, XCircle, ExternalLink, Loader2, Settings, Clock } from "lucide-react";
+import { HardDrive, CheckCircle2, XCircle, ExternalLink, Loader2, Settings, Clock, CalendarClock } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { GmailStatusCard } from "@/components/settings/GmailStatusCard";
 import { FailedDeliveriesPanel } from "@/components/notifications/FailedDeliveriesPanel";
+import { DEFAULT_WEEKLY_WORK_HOURS, MAX_WEEKLY_WORK_HOURS, WEEKLY_HOURS_ERROR } from "@/lib/work-time";
 
 interface SettingsData {
   google_oauth_client_id: string | null;
@@ -31,7 +32,9 @@ interface SettingsData {
   google_oauth_connected_email: string | null;
   google_oauth_connected: boolean;
   daily_report_time: string;
+  weekly_work_hours: number;
 }
+
 
 interface CurrentUserData {
   id: number;
@@ -54,6 +57,8 @@ export function SettingsClient() {
   const [connecting, setConnecting] = useState(false);
   const [currentUserRole, setCurrentUserRole] = useState<number | null>(null);
   const [dailyReportTime, setDailyReportTime] = useState("18:00");
+  const [weeklyWorkHours, setWeeklyWorkHours] = useState(String(DEFAULT_WEEKLY_WORK_HOURS));
+  const [savingWeeklyHours, setSavingWeeklyHours] = useState(false);
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
@@ -91,6 +96,7 @@ export function SettingsClient() {
         const data = res.data as unknown as SettingsData;
         setSettings(data);
         setDailyReportTime(data.daily_report_time ?? "18:00");
+        setWeeklyWorkHours(String(data.weekly_work_hours ?? DEFAULT_WEEKLY_WORK_HOURS));
         form.reset({
           google_oauth_client_id: data.google_oauth_client_id ?? "",
           google_oauth_client_secret: "",
@@ -161,6 +167,25 @@ export function SettingsClient() {
       toast.error("Error al guardar la hora de reporte");
     } finally {
       setSavingReportTime(false);
+    }
+  };
+
+  const handleSaveWeeklyWorkHours = async () => {
+    const hours = weeklyWorkHours.trim() === "" ? NaN : Number(weeklyWorkHours);
+    if (!Number.isFinite(hours) || hours <= 0 || hours > MAX_WEEKLY_WORK_HOURS) {
+      toast.error(WEEKLY_HOURS_ERROR);
+      return;
+    }
+    setSavingWeeklyHours(true);
+    try {
+      const res = await patch("settings", { weekly_work_hours: hours });
+      if (!res.ok) throw new Error(res.error);
+      toast.success("Horas semanales guardadas");
+      setSettings((prev) => (prev ? { ...prev, weekly_work_hours: hours } : prev));
+    } catch {
+      toast.error("Error al guardar las horas semanales");
+    } finally {
+      setSavingWeeklyHours(false);
     }
   };
 
@@ -330,6 +355,46 @@ export function SettingsClient() {
                   </div>
                 </form>
               </Form>
+            </CardContent>
+          </Card>
+
+          <Card className="mt-6">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-base">
+                <CalendarClock className="h-4 w-4" />
+                Jornada laboral
+              </CardTitle>
+              <CardDescription>
+                Con estas horas, de lunes a viernes y sin festivos de Colombia, se calcula cuánto vale el minuto de
+                los colaboradores internos según su sueldo mensual.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="weekly-work-hours">Horas semanales de trabajo (ley)</Label>
+                <Input
+                  id="weekly-work-hours"
+                  type="number"
+                  min={0}
+                  max={MAX_WEEKLY_WORK_HOURS}
+                  step="0.1"
+                  value={weeklyWorkHours}
+                  onChange={(e) => setWeeklyWorkHours(e.target.value)}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Si no hay valor guardado, la aplicación usará {DEFAULT_WEEKLY_WORK_HOURS} horas por defecto. Las tareas ya completadas
+                  conservan el valor con el que se cerraron.
+                </p>
+              </div>
+              <div className="flex justify-end">
+                <Button type="button" onClick={handleSaveWeeklyWorkHours} disabled={savingWeeklyHours}>
+                  {savingWeeklyHours ? (
+                    <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Guardando...</>
+                  ) : (
+                    "Guardar horas semanales"
+                  )}
+                </Button>
+              </div>
             </CardContent>
           </Card>
         </TabsContent>

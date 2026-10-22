@@ -5,6 +5,7 @@ import { getProjectTaskById, completeTask } from "@/lib/queries/projectTasks";
 import { decrypt } from "@/lib/session";
 import { cookies } from "next/headers";
 import { AUTHENTICATED_ROLES, TASK_OVERRIDE_ROLES } from "@/lib/role-groups";
+import { UserRole } from "@/lib/definitions";
 import {
   dispatchNotification,
   NOTIFICATION_EVENTS,
@@ -84,6 +85,18 @@ export async function POST(request: NextRequest, { params }: Params) {
       );
     }
     const body = parsed.data;
+
+    // External collaborators (is_internal 0 or never set) must declare their cost,
+    // unless the price comes from an accepted quote.
+    const isExternalAssignee =
+      Number(task.assigned_user_rol_id) === UserRole.COLABORADOR &&
+      Number(task.assigned_user_is_internal) !== 1;
+    if (isExternalAssignee && task.requires_quote !== 1 && !(Number(body.completion_cost) > 0)) {
+      return NextResponse.json(
+        { error: "Debes ingresar el costo del trabajo antes de completar." },
+        { status: 400 }
+      );
+    }
 
     const result = await completeTask(taskId, userId, body.notes, {
       progress_minutes: body.progress_minutes,

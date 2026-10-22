@@ -96,6 +96,7 @@ describe('completeTask()', () => {
     );
 
     mockTransaction.execute
+      .mockResolvedValueOnce(makeResult([])) // 0. read assignee salary + weekly hours
       .mockResolvedValueOnce(makeResult([])) // 1. UPDATE current task -> completed
       .mockResolvedValueOnce(makeResult([])) // 2. INSERT transition (completed)
       .mockResolvedValueOnce(
@@ -111,15 +112,15 @@ describe('completeTask()', () => {
 
     const result = await completeTask(1, 5, null, { progress_minutes: 10 });
 
-    // Only 3 transaction calls: UPDATE complete, INSERT transition, SELECT next.
+    // Only 4 transaction calls: read assignee, UPDATE complete, INSERT transition, SELECT next.
     // No UPDATE/INSERT was issued against the already-blocked next task, and no
     // further task beyond it was queried or touched.
-    expect(mockTransaction.execute).toHaveBeenCalledTimes(3);
+    expect(mockTransaction.execute).toHaveBeenCalledTimes(4);
 
     // The SELECT for the next task must NOT filter out 'blocked' — it must always
     // fetch the immediate next task by order_index regardless of status.
     expect(mockTransaction.execute).toHaveBeenNthCalledWith(
-      3,
+      4,
       expect.objectContaining({
         sql: expect.not.stringContaining("IN ('waiting', 'not_started')"),
       })
@@ -137,6 +138,7 @@ describe('completeTask()', () => {
     );
 
     mockTransaction.execute
+      .mockResolvedValueOnce(makeResult([])) // 0. read assignee salary + weekly hours
       .mockResolvedValueOnce(makeResult([])) // UPDATE current -> completed
       .mockResolvedValueOnce(makeResult([])) // INSERT transition (completed)
       .mockResolvedValueOnce(
@@ -153,7 +155,7 @@ describe('completeTask()', () => {
     const result = await completeTask(1, 5);
 
     expect(mockTransaction.execute).toHaveBeenNthCalledWith(
-      4,
+      5,
       expect.objectContaining({
         sql: expect.stringContaining("status = 'blocked'"),
         args: expect.arrayContaining([2]),
@@ -169,6 +171,7 @@ describe('completeTask()', () => {
     );
 
     mockTransaction.execute
+      .mockResolvedValueOnce(makeResult([])) // 0. read assignee salary + weekly hours
       .mockResolvedValueOnce(makeResult([])) // UPDATE current -> completed
       .mockResolvedValueOnce(makeResult([])) // INSERT transition (completed)
       .mockResolvedValueOnce(
@@ -185,7 +188,7 @@ describe('completeTask()', () => {
     const result = await completeTask(1, 5);
 
     expect(mockTransaction.execute).toHaveBeenNthCalledWith(
-      4,
+      5,
       expect.objectContaining({
         sql: expect.stringContaining("status = 'blocked'"),
         args: expect.arrayContaining([2]),
@@ -200,6 +203,7 @@ describe('completeTask()', () => {
     );
 
     mockTransaction.execute
+      .mockResolvedValueOnce(makeResult([])) // 0. read assignee salary + weekly hours
       .mockResolvedValueOnce(makeResult([])) // UPDATE current -> completed
       .mockResolvedValueOnce(makeResult([])) // INSERT transition (completed)
       .mockResolvedValueOnce(
@@ -216,7 +220,7 @@ describe('completeTask()', () => {
     const result = await completeTask(1, 5);
 
     expect(mockTransaction.execute).toHaveBeenNthCalledWith(
-      4,
+      5,
       expect.objectContaining({
         sql: expect.stringContaining("status = 'not_started'"),
         args: expect.arrayContaining([2]),
@@ -232,6 +236,7 @@ describe('completeTask()', () => {
     );
 
     mockTransaction.execute
+      .mockResolvedValueOnce(makeResult([])) // 0. read assignee salary + weekly hours
       .mockResolvedValueOnce(makeResult([])) // UPDATE current -> completed
       .mockResolvedValueOnce(makeResult([])) // INSERT transition (completed)
       .mockResolvedValueOnce(makeResult([])); // SELECT next — none found in this adjustment
@@ -241,7 +246,7 @@ describe('completeTask()', () => {
     const result = await completeTask(1, 5);
 
     expect(mockTransaction.execute).toHaveBeenNthCalledWith(
-      3,
+      4,
       expect.objectContaining({
         sql: expect.stringContaining('adjustment_id = 7'),
       })
@@ -283,23 +288,59 @@ describe('completeTask()', () => {
       'Esta tarea ya está completada y no puede modificarse'
     );
   });
+});
 
-  // S5: the internal hourly rate in force is frozen on the task at completion.
-  it('freezes the assignee internal hourly rate on the completed task', async () => {
+// S13: completion freezes salary, month working minutes and the resulting rate.
+describe('completeTask() freezes the monthly-salary rate', () => {
+  beforeEach(() => {
+    jest.useFakeTimers({ now: new Date('2026-02-15T15:00:00Z'), doNotFake: ['nextTick', 'setImmediate', 'queueMicrotask'] });
+  });
+  afterEach(() => jest.useRealTimers());
+
+  async function completeWith(assignee: Record<string, unknown>[]) {
     mockExecute.mockResolvedValueOnce(
       makeResult([makeTaskRow({ id: 1, status: 'in_progress', project_id: 1, adjustment_id: null })])
     );
     mockTransaction.execute
-      .mockResolvedValueOnce(makeResult([]))
-      .mockResolvedValueOnce(makeResult([]))
-      .mockResolvedValueOnce(makeResult([]));
+      .mockResolvedValueOnce(makeResult(assignee)) // read assignee salary + weekly hours
+      .mockResolvedValueOnce(makeResult([])) // UPDATE completed
+      .mockResolvedValueOnce(makeResult([])) // INSERT transition
+      .mockResolvedValueOnce(makeResult([])); // SELECT next
     mockExecute.mockResolvedValueOnce(makeResult([makeTaskRow({ id: 1, status: 'completed' })]));
 
-    await completeTask(1, 5, null, { progress_minutes: 90 });
+    await completeTask(1, 5, null, { progress_minutes: 90, completion_cost: null });
 
-    const update = mockTransaction.execute.mock.calls[0][0] as { sql: string };
-    expect(update.sql).toMatch(/completion_hourly_rate\s*=\s*\(\s*SELECT CASE WHEN u\.is_internal = 1 THEN u\.hourly_rate END/);
-    expect(update.sql).toContain('u.id = project_tasks.assigned_user_id');
+    const read = mockTransaction.execute.mock.calls[0][0] as { sql: string; args: unknown[] };
+    expect(read.sql).toContain('u.monthly_salary');
+    expect(read.sql).toContain('u.is_internal');
+    expect(read.sql).toContain("key = 'weekly_work_hours'");
+    expect(read.args).toEqual([1]);
+    const update = mockTransaction.execute.mock.calls[1][0] as { sql: string; args: unknown[] };
+    expect(update.sql).toContain("SET status = 'completed'");
+    expect(update.sql).toMatch(/completion_hourly_rate = \$5/);
+    expect(update.sql).toMatch(/completion_monthly_salary = \$6/);
+    expect(update.sql).toMatch(/completion_month_minutes = \$7/);
+    expect(update.sql).not.toContain('hourly_rate END');
+    return update.args;
+  }
+
+  it('stores rate, salary and month minutes for an internal with salary', async () => {
+    const args = await completeWith([{ is_internal: 1, monthly_salary: '5040000.00', weekly_work_hours: null }]);
+    expect(args).toEqual([1, 90, null, null, 30000, 5040000, 10080]);
+  });
+
+  it('uses the weekly_work_hours setting', async () => {
+    const args = await completeWith([{ is_internal: 1, monthly_salary: '4800000', weekly_work_hours: '40' }]);
+    expect(args).toEqual([1, 90, null, null, 30000, 4800000, 9600]);
+  });
+
+  it('stores nothing for an internal without salary', async () => {
+    const args = await completeWith([{ is_internal: 1, monthly_salary: null, weekly_work_hours: null }]);
+    expect(args).toEqual([1, 90, null, null, null, null, null]);
+  });
+
+  it('stores nothing for an external collaborator', async () => {
+    const args = await completeWith([{ is_internal: 0, monthly_salary: '5040000', weekly_work_hours: null }]);
+    expect(args).toEqual([1, 90, null, null, null, null, null]);
   });
 });
-

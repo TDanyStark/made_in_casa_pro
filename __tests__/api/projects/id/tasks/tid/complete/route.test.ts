@@ -277,3 +277,91 @@ describe('POST /complete — mandatory time tracking', () => {
     expect(mockDispatch).not.toHaveBeenCalled();
   });
 });
+
+// S8: an external assignee (colaborador whose is_internal is 0 or NULL) must declare the cost.
+describe('POST /complete — external cost required (S8)', () => {
+  const COST_ERROR = 'Debes ingresar el costo del trabajo antes de completar.';
+  const completed = () => ({
+    task: makeTask({ status: 'completed' }) as never,
+    nextTask: null,
+  } as never);
+
+  it.each([
+    ['is_internal NULL, no cost', null, { progress_minutes: 30 }],
+    ['is_internal NULL, cost null', null, { progress_minutes: 30, completion_cost: null }],
+    ['is_internal 0, cost 0', 0, { progress_minutes: 30, completion_cost: 0 }],
+  ])('rejects an external colaborador (%s) with 400 and writes nothing', async (_label, isInternal, body) => {
+    setupAuthMocks(UserRole.COLABORADOR, 5);
+    mockGetProjectTaskById.mockResolvedValue(
+      makeTask({ assigned_user_rol_id: UserRole.COLABORADOR, assigned_user_is_internal: isInternal, requires_quote: 0 }) as never
+    );
+
+    const res = await callPost(makeRequest(body), makeParams());
+
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: COST_ERROR });
+    expect(mockCompleteTask).not.toHaveBeenCalled();
+    expect(mockRecalculate).not.toHaveBeenCalled();
+    expect(mockDispatch).not.toHaveBeenCalled();
+  });
+
+  it('completes an external colaborador task when the cost is declared', async () => {
+    setupAuthMocks(UserRole.COLABORADOR, 5);
+    mockGetProjectTaskById.mockResolvedValue(
+      makeTask({ assigned_user_rol_id: UserRole.COLABORADOR, assigned_user_is_internal: null, requires_quote: 0 }) as never
+    );
+    mockCompleteTask.mockResolvedValue(completed());
+
+    const res = await callPost(makeRequest({ progress_minutes: 30, completion_cost: 500000 }), makeParams());
+
+    expect(res.status).toBe(200);
+    expect(mockCompleteTask).toHaveBeenCalledWith(10, 5, undefined, {
+      progress_minutes: 30,
+      delivery_url: undefined,
+      completion_cost: 500000,
+    });
+  });
+
+  it('does not require the cost when the task price comes from a quote', async () => {
+    setupAuthMocks(UserRole.COLABORADOR, 5);
+    mockGetProjectTaskById.mockResolvedValue(
+      makeTask({ assigned_user_rol_id: UserRole.COLABORADOR, assigned_user_is_internal: 0, requires_quote: 1 }) as never
+    );
+    mockCompleteTask.mockResolvedValue(completed());
+
+    const res = await callPost(makeRequest({ progress_minutes: 30 }), makeParams());
+
+    expect(res.status).toBe(200);
+    expect(mockCompleteTask).toHaveBeenCalledTimes(1);
+  });
+
+  it('still completes an internal colaborador task without cost', async () => {
+    setupAuthMocks(UserRole.COLABORADOR, 5);
+    mockGetProjectTaskById.mockResolvedValue(
+      makeTask({ assigned_user_rol_id: UserRole.COLABORADOR, assigned_user_is_internal: 1, requires_quote: 0 }) as never
+    );
+    mockCompleteTask.mockResolvedValue(completed());
+
+    const res = await callPost(makeRequest({ progress_minutes: 30 }), makeParams());
+
+    expect(res.status).toBe(200);
+    expect(mockCompleteTask).toHaveBeenCalledWith(10, 5, undefined, {
+      progress_minutes: 30,
+      delivery_url: undefined,
+      completion_cost: undefined,
+    });
+  });
+
+  it('keeps not requiring the cost for a non-colaborador assignee with is_internal NULL', async () => {
+    setupAuthMocks(UserRole.COMERCIAL, 5);
+    mockGetProjectTaskById.mockResolvedValue(
+      makeTask({ assigned_user_rol_id: UserRole.COMERCIAL, assigned_user_is_internal: null, requires_quote: 0 }) as never
+    );
+    mockCompleteTask.mockResolvedValue(completed());
+
+    const res = await callPost(makeRequest({ progress_minutes: 30 }), makeParams());
+
+    expect(res.status).toBe(200);
+    expect(mockCompleteTask).toHaveBeenCalledTimes(1);
+  });
+});

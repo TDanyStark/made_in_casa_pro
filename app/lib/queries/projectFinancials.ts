@@ -5,14 +5,39 @@ import {
   type ProjectFinancialRow,
   type ProjectFinancials,
 } from "../project-financials";
+import { withCurrentHourlyRates, type SalaryRateFields } from "../internal-rate";
+import { WEEKLY_WORK_HOURS_SQL } from "./settings";
 
-/** Sale price plus hours and money invested; null when the project does not exist. */
-export async function getProjectFinancials(projectId: number): Promise<ProjectFinancials | null> {
+export interface ProjectVersion {
+  id: number;
+  version_number: number;
+}
+
+/** Financials plus the project versions and the version filter applied (null = all). */
+export interface ProjectFinancialsView extends ProjectFinancials {
+  versions: ProjectVersion[];
+  adjustment_id: number | null;
+}
+
+/**
+ * Sale price plus hours and money invested; null when the project does not exist.
+ * With adjustmentId only that version's tasks count. The sale price is for the
+ * whole project, so a filtered summary returns margin null.
+ */
+export async function getProjectFinancials(
+  projectId: number,
+  adjustmentId: number | null = null
+): Promise<ProjectFinancialsView | null> {
   const project = await db.execute({
     sql: `SELECT sale_price FROM projects WHERE id = $1`,
     args: [projectId],
   });
   if (project.rows.length === 0) return null;
+
+  const versions = await db.execute({
+    sql: `SELECT id, version_number FROM project_adjustments WHERE project_id = $1 ORDER BY version_number ASC, id ASC`,
+    args: [projectId],
+  });
 
   const tasks = await db.execute({
     sql: `
@@ -20,7 +45,8 @@ export async function getProjectFinancials(projectId: number): Promise<ProjectFi
         pt.assigned_user_id,
         u.name           AS assigned_user_name,
         u.is_internal    AS assignee_is_internal,
-        u.hourly_rate    AS assignee_hourly_rate,
+        u.monthly_salary AS assignee_monthly_salary,
+        ${WEEKLY_WORK_HOURS_SQL} AS weekly_work_hours,
         pt.status,
         pt.progress_minutes,
         pt.completion_hourly_rate,
@@ -33,15 +59,23 @@ export async function getProjectFinancials(projectId: number): Promise<ProjectFi
         ) AS accepted_quote_price
       FROM project_tasks pt
       LEFT JOIN users u ON u.id = pt.assigned_user_id
-      WHERE pt.project_id = $1
+      WHERE pt.project_id = $1${adjustmentId === null ? "" : " AND pt.adjustment_id = $2"}
     `,
-    args: [projectId],
+    args: adjustmentId === null ? [projectId] : [projectId, adjustmentId],
   });
 
-  return computeProjectFinancials(
-    tasks.rows as unknown as ProjectFinancialRow[],
+  const financials = computeProjectFinancials(
+    withCurrentHourlyRates(tasks.rows as unknown as (ProjectFinancialRow & SalaryRateFields)[]),
     (project.rows[0] as { sale_price: number | string | null }).sale_price
   );
+  return {
+    ...financials,
+    margin: adjustmentId === null ? financials.margin : null,
+    versions: (versions.rows as unknown as { id: number | string; version_number: number | string }[]).map(
+      (v) => ({ id: Number(v.id), version_number: Number(v.version_number) })
+    ),
+    adjustment_id: adjustmentId,
+  };
 }
 
 /** Sets (or clears with null) the sale price; false when the project does not exist. */

@@ -1,4 +1,6 @@
 import { db } from "../db";
+import type { DbTransaction } from "../db/types";
+import { parseWeeklyWorkHours } from "../work-time";
 
 export interface AppSettings {
   google_oauth_client_id: string | null;
@@ -37,7 +39,22 @@ export async function getAppSettings(): Promise<AppSettings> {
   };
 }
 
-export async function upsertSetting(key: keyof AppSettings, value: string | null): Promise<void> {
+/** Settings the admin can change; weekly_work_hours is the weekly legal work hours (S12). */
+export type SettingsUpdate = Partial<AppSettings> & { weekly_work_hours?: number };
+
+/** Subquery with the stored weekly legal work hours (text, NULL when unset). */
+export const WEEKLY_WORK_HOURS_SQL = `(SELECT value FROM app_settings WHERE key = 'weekly_work_hours')`;
+
+/** Weekly legal work hours; 42 when unset. Pass a transaction to read inside it. */
+export async function getWeeklyWorkHours(executor: Pick<DbTransaction, "execute"> = db): Promise<number> {
+  const result = await executor.execute({
+    sql: `SELECT value FROM app_settings WHERE key = 'weekly_work_hours'`,
+    args: [],
+  });
+  return parseWeeklyWorkHours(result.rows[0]?.value);
+}
+
+export async function upsertSetting(key: keyof SettingsUpdate, value: string | null): Promise<void> {
   await db.execute({
     sql: `
       INSERT INTO app_settings (key, value, updated_at)
@@ -48,8 +65,8 @@ export async function upsertSetting(key: keyof AppSettings, value: string | null
   });
 }
 
-export async function upsertSettings(partial: Partial<AppSettings>): Promise<void> {
+export async function upsertSettings(partial: SettingsUpdate): Promise<void> {
   for (const [key, value] of Object.entries(partial)) {
-    await upsertSetting(key as keyof AppSettings, value ?? null);
+    await upsertSetting(key as keyof SettingsUpdate, value === null || value === undefined ? null : String(value));
   }
 }

@@ -687,6 +687,7 @@ export function TasksCommandCenterClient({ userRole }: TasksCommandCenterClientP
         open={deliverableOpen}
         onOpenChange={setDeliverableOpen}
         task={deliverableTask}
+        showCost={canEditAssignee}
       />
 
       <div className="flex flex-wrap items-center justify-between gap-3">
