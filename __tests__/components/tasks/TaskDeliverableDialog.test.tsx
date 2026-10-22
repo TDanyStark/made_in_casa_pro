@@ -1,5 +1,11 @@
 import React from "react";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+
+const mockGet = jest.fn();
+jest.mock("@/lib/services/apiService", () => ({
+  get: (...args: unknown[]) => mockGet(...args),
+}));
 
 jest.mock("@/components/ui/dialog", () => ({
   Dialog: ({ children, open }: { children: React.ReactNode; open: boolean }) =>
@@ -184,5 +190,76 @@ describe("TaskDeliverableDialog", () => {
 
     expect(screen.getByText("javascript:alert(1)")).toBeInTheDocument();
     expect(screen.queryByRole("link")).not.toBeInTheDocument();
+  });
+});
+
+// S7: cost block, only when the caller passes showCost (leadership roles).
+describe("TaskDeliverableDialog — task cost (S7)", () => {
+  const money = (value: number) =>
+    new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", maximumFractionDigits: 0 })
+      .format(value)
+      .replace(/\s+/g, " ");
+
+  function renderWithCost(cost: Record<string, unknown> | null, showCost = true) {
+    mockGet.mockResolvedValue({ ok: true, data: cost });
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    return render(
+      <QueryClientProvider client={client}>
+        <TaskDeliverableDialog open={true} onOpenChange={jest.fn()} task={makeTask()} showCost={showCost} />
+      </QueryClientProvider>
+    );
+  }
+
+  beforeEach(() => mockGet.mockReset());
+
+  it("does not fetch nor show the cost by default", () => {
+    renderDialog();
+
+    expect(screen.queryByText("Costo de la tarea")).not.toBeInTheDocument();
+    expect(mockGet).not.toHaveBeenCalled();
+  });
+
+  it("shows an internal cost with time and frozen rate", async () => {
+    renderWithCost({ cost: 45000, internal: true, minutes: 90, hourly_rate: 30000, source: "frozen_rate" });
+
+    expect(await screen.findByText(money(45000))).toBeInTheDocument();
+    expect(screen.getByText("Costo de la tarea")).toBeInTheDocument();
+    expect(screen.getByText(`Interno · 1 h 30 min × ${money(30000)}/h`)).toBeInTheDocument();
+    expect(mockGet).toHaveBeenCalledWith("projects/10/tasks/1/cost");
+  });
+
+  it("shows an internal cost at the current rate for unfinished work", async () => {
+    renderWithCost({ cost: 20000, internal: true, minutes: 30, hourly_rate: 40000, source: "current_rate" });
+
+    expect(await screen.findByText(money(20000))).toBeInTheDocument();
+    expect(screen.getByText(`Interno · 30 min × ${money(40000)}/h`)).toBeInTheDocument();
+  });
+
+  it("shows an external declared cost", async () => {
+    renderWithCost({ cost: 500000, internal: false, minutes: 60, hourly_rate: null, source: "declared" });
+
+    expect(await screen.findByText(money(500000))).toBeInTheDocument();
+    expect(screen.getByText("Externo · costo declarado")).toBeInTheDocument();
+  });
+
+  it("shows an external accepted quote", async () => {
+    renderWithCost({ cost: 70000, internal: false, minutes: 60, hourly_rate: null, source: "quote" });
+
+    expect(await screen.findByText(money(70000))).toBeInTheDocument();
+    expect(screen.getByText("Externo · cotización aceptada")).toBeInTheDocument();
+  });
+
+  it("shows 'Sin costo registrado' when there is no cost source", async () => {
+    renderWithCost({ cost: 0, internal: false, minutes: 1080, hourly_rate: null, source: "none" });
+
+    expect(await screen.findByText("Sin costo registrado")).toBeInTheDocument();
+    expect(screen.queryByText(money(0))).not.toBeInTheDocument();
+  });
+
+  it("does not render the block when showCost is false even inside a query provider", async () => {
+    renderWithCost({ cost: 1, internal: true, minutes: 1, hourly_rate: 1, source: "frozen_rate" }, false);
+
+    await waitFor(() => expect(mockGet).not.toHaveBeenCalled());
+    expect(screen.queryByText("Costo de la tarea")).not.toBeInTheDocument();
   });
 });

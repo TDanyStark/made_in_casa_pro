@@ -25,6 +25,8 @@ import { TaskValidationDialog } from "@/components/tasks/TaskValidationDialog";
 import { TaskCompleteDialog } from "@/components/tasks/TaskCompleteDialog";
 import { TaskHistoryDialog } from "@/components/tasks/TaskHistoryDialog";
 import { TaskDeliverableDialog } from "@/components/tasks/TaskDeliverableDialog";
+import { LEADERSHIP_ROLES } from "@/lib/role-groups";
+import type { UserRole } from "@/lib/definitions";
 import {
   Dialog,
   DialogContent,
@@ -385,6 +387,10 @@ export function ProjectTasksTab({
   // pueden tomar, completar y validar cualquier tarea aunque no sean el
   // colaborador asignado.
   const canCompleteOverride = isAdmin || currentUserRole === 3;
+
+  // Costo de cada tarea en el ojito: solo admin, directivo y financiero.
+  const canSeeTaskCost =
+    currentUserRole !== undefined && LEADERSHIP_ROLES.includes(currentUserRole as UserRole);
 
   // ─────────────────────────────────────────────────────────────────────────────
   // Handlers
@@ -1143,6 +1149,7 @@ export function ProjectTasksTab({
           open={deliverableDialogOpen}
           onOpenChange={setDeliverableDialogOpen}
           task={taskForDeliverable}
+          showCost={canSeeTaskCost}
         />
       </>
     </TooltipProvider>

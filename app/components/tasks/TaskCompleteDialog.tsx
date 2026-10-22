@@ -19,7 +19,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ProjectTaskType } from "@/lib/definitions";
+import { ProjectTaskType, UserRole } from "@/lib/definitions";
 import { toast } from "sonner";
 import { post } from "@/lib/services/apiService";
 import { formatProgressMinutes } from "@/lib/task-progress";
@@ -106,10 +106,13 @@ export function TaskCompleteDialog({
   };
 
   // ── Derived flags ─────────────────────────────────────────────────────────
+  // A colaborador whose internal flag is 0 or was never set (NULL) is external;
+  // other roles are external only when the flag is explicitly 0.
+  const internalFlag = task?.assigned_user_is_internal;
   const isExternalCollaborator =
-    task?.assigned_user_is_internal !== null &&
-    task?.assigned_user_is_internal !== undefined &&
-    Number(task?.assigned_user_is_internal) === 0;
+    Number(task?.assigned_user_rol_id) === UserRole.COLABORADOR
+      ? Number(internalFlag) !== 1
+      : internalFlag !== null && internalFlag !== undefined && Number(internalFlag) === 0;
 
   const isReadOnlyCost =
     task?.requires_quote === 1;

@@ -7,6 +7,13 @@ jest.mock("@tanstack/react-query", () => ({
     invalidateQueries: jest.fn(),
   }),
   useQuery: ({ queryKey }: { queryKey: unknown[] }) => {
+    if (String(queryKey[0]) === "task-cost") {
+      return {
+        data: { cost: 15000, internal: true, minutes: 30, hourly_rate: 30000, source: "frozen_rate" },
+        isLoading: false,
+        isError: false,
+      };
+    }
     if (String(queryKey[0]) === "project-tasks") {
       return {
         data: [
@@ -189,6 +196,28 @@ describe("ProjectTasksTab", () => {
       "https://example.com/final"
     );
     expect(screen.getByText(/entrega publicada/i)).toBeInTheDocument();
+  });
+});
+
+// S7: the task cost is shown in the eye dialog only to admin, directivo and financiero.
+describe("ProjectTasksTab — task cost in the eye dialog (S7)", () => {
+  async function openEye(role: number) {
+    const user = userEvent.setup();
+    render(
+      <ProjectTasksTab projectId={7} productName="Producto" canEdit={false} currentUserId={1} currentUserRole={role} />
+    );
+    await user.click(screen.getByRole("button", { name: /ver detalles de subir artes finales/i }));
+  }
+
+  it.each([1, 2, 5])("shows the cost to role %i", async (role) => {
+    await openEye(role);
+    expect(screen.getByText("Costo de la tarea")).toBeInTheDocument();
+  });
+
+  it.each([3, 4])("hides the cost from role %i", async (role) => {
+    await openEye(role);
+    expect(screen.getByText("Sin descripción")).toBeInTheDocument();
+    expect(screen.queryByText("Costo de la tarea")).not.toBeInTheDocument();
   });
 });
 
