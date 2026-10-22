@@ -12,7 +12,7 @@ S6. Already-completed tasks without a frozen rate: "Congelarlas con la tarifa vi
 
 ## Tasks
 T1 | S3,S5,S6 | inline: migration 019 (users.hourly_rate, project_tasks.completion_hourly_rate, projects.sale_price), freeze rate in completeTask, hourly_rate in users API/query with backfill, profile UI + tests | done | commit 1 (feat(users): hourly rate frozen on task completion)
-T2 | S1,S2,S4,S5 | inline: financials computation + GET/PATCH /api/projects/[id]/financials + tests | pending |
+T2 | S1,S2,S4,S5 | inline: financials computation + GET/PATCH /api/projects/[id]/financials + tests | done | commit 2 (feat(projects): sale price and investment API)
 T3 | S1,S2 | inline: recharts chart component, financial cards above tabs, sale price editor, README + tests | pending |
 
 ## Log
@@ -20,3 +20,4 @@ L1. User: "quiero que los directivos y el comercial del proyecto, pueda anotar e
 L2. User answers: rate "Por colaborador, en su ficha (reemplaza el mensual)"; past data "Congelarlas con la tarifa vigente al migrar"; charts "Agregar recharts (shadcn charts)"; visibility "Sí, como propones".
 L3. Exploration: time is project_tasks.progress_minutes; external cost is project_tasks.completion_cost (TaskCompleteDialog) or accepted task_quotes.price; monthly salary lives in users.monthly_salary edited in DetailsCollaborator (admin-only PATCH /api/users/[id]). Decision: users.monthly_salary column is kept in the DB (no stored data deleted) but no code uses it anymore. No persistent-memory tools callable: Engram mirror unavailable.
 L4. RED/GREEN T1: 7 new tests failed (hourly_rate missing, no freeze in completeTask, API schema) -> green; full jest 105 suites / 859 tests, tsc clean. Real PostgreSQL check on scratch DB mic_fin_check (all 19 migrations + 019): setting Ana's rate 30000 froze her completed task (30000), raising to 40000 kept it at 30000, external task with completion_cost and quoted task untouched, completing her in-progress task froze 40000, name-only update changed nothing. Risk: item 1 (backfill writes stored task rates) -> own commit.
+L5. RED/GREEN T2: 3 new suites failed (modules missing) -> 25 new tests green; full jest 108 suites / 884, tsc clean. Real PostgreSQL (scratch mic_fin_check): sale price 1500000 stored; summary total 300 min, internal 210 min / 120000 (frozen 30000 + 40000 rates), external 90 min / 570000 (declared 500000 + accepted quote 70000), margin 810000; missing project -> null. Financials stay out of GET /api/projects/[id] (collaborators can read it); new endpoint enforces comercial-creator via userCanAccessProject.
