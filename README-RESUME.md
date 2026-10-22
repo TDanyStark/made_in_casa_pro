@@ -265,13 +265,14 @@ administrativos ven en qué está trabajando en este momento. El resto queda en
 
 ## Inversión y precio de venta del proyecto
 
-El detalle de un proyecto muestra arriba tres cards con gráficos: **Horas del
-equipo**, **Dinero invertido** y **Precio de venta** (con el margen).
+El detalle de un proyecto muestra arriba un panel compacto con mini gráficos:
+**Horas**, **Invertido** (con el detalle por colaborador), **Venta** y
+**Margen**. Un selector pequeño filtra por versión (por defecto, todas).
 
 | Qué | Dónde | Quién |
 | --- | --- | --- |
 | Valor de la hora de un interno | Ficha del colaborador (`PATCH /api/users/[id]` con `hourly_rate`) | Admin |
-| Ver horas, dinero y margen | `GET /api/projects/[id]/financials` | Admin, directivo, financiero y el comercial que creó el proyecto |
+| Ver horas, dinero y margen | `GET /api/projects/[id]/financials` (opcional `?adjustment_id=<id>` para una versión) | Admin, directivo, financiero y el comercial que creó el proyecto |
 | Anotar en cuánto se vendió | `PATCH /api/projects/[id]/financials` con `{ "sale_price": number \| null }` | Admin, directivo y el comercial que creó el proyecto |
 
 Cómo se calcula el dinero invertido:
@@ -286,6 +287,13 @@ Cómo se calcula el dinero invertido:
   tarifa congelada toman esa tarifa una sola vez.
 - El valor de la hora reemplaza al antiguo sueldo mensual. La columna
   `users.monthly_salary` sigue en la base, pero la aplicación ya no la usa.
+- **Filtro por versión**: `?adjustment_id` (id de `project_adjustments`) cuenta solo
+  las tareas de esa versión. Un valor que no es entero positivo responde `400
+  { "error": "Versión inválida" }`; una versión de otro proyecto, `404
+  { "error": "Versión no encontrada" }`. La respuesta siempre incluye
+  `versions: [{ id, version_number }]` y `adjustment_id` (el filtro o `null`).
+- El precio de venta y el margen son de todo el proyecto: con un filtro de
+  versión, `sale_price` sigue siendo el del proyecto y `margin` es `null`.
 - Los gráficos usan `recharts` a través del componente `chart` de shadcn.
 - Migración: `019_project_financials.sql`.
 

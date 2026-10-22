@@ -33,13 +33,16 @@ const mockUpdate = updateProjectSalePrice as jest.Mock;
 const mockAccess = userCanAccessProject as jest.Mock;
 
 const params = { params: Promise.resolve({ id: '10' }) };
-const summary = { sale_price: 100, total_cost: 40, margin: 60 };
+const summary = {
+  sale_price: 100, total_cost: 40, margin: 60,
+  versions: [{ id: 4, version_number: 1 }, { id: 7, version_number: 2 }], adjustment_id: null,
+};
 
 function as(role: UserRole) {
   mockRole.mockResolvedValue({ isAuthorized: true, userRole: role });
 }
-function req(method: string, body?: unknown) {
-  return new NextRequest('http://localhost/api/projects/10/financials', {
+function req(method: string, body?: unknown, query = '') {
+  return new NextRequest(`http://localhost/api/projects/10/financials${query}`, {
     method,
     headers: { 'Content-Type': 'application/json' },
     body: body === undefined ? undefined : JSON.stringify(body),
@@ -67,7 +70,42 @@ describe('GET /api/projects/[id]/financials', () => {
     const roles = mockRole.mock.calls[0][1];
     expect(roles).toEqual(expect.arrayContaining([UserRole.ADMIN, UserRole.DIRECTIVO, UserRole.FINANCIERO, UserRole.COMERCIAL]));
     expect(roles).not.toContain(UserRole.COLABORADOR);
-    expect(mockGet).toHaveBeenCalledWith(10);
+    expect(mockGet).toHaveBeenCalledWith(10, null);
+  });
+
+  // S9: version filter.
+  it('filters by a version of the project with ?adjustment_id', async () => {
+    as(UserRole.DIRECTIVO);
+    const filtered = { ...summary, margin: null, adjustment_id: 7 };
+    mockGet.mockResolvedValue(filtered);
+    const res = await run(GET, req('GET', undefined, '?adjustment_id=7'));
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual(filtered);
+    expect(mockGet).toHaveBeenCalledWith(10, 7);
+  });
+
+  it.each(['abc', '0', '-1', '1.5', ''])('rejects ?adjustment_id=%s with 400', async (value) => {
+    as(UserRole.ADMIN);
+    const res = await run(GET, req('GET', undefined, `?adjustment_id=${value}`));
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: 'Versión inválida' });
+    expect(mockGet).not.toHaveBeenCalled();
+  });
+
+  it('returns 404 for a version that does not belong to the project', async () => {
+    as(UserRole.ADMIN);
+    mockGet.mockResolvedValue({ ...summary, margin: null, adjustment_id: 99 });
+    const res = await run(GET, req('GET', undefined, '?adjustment_id=99'));
+    expect(res.status).toBe(404);
+    expect(await res.json()).toEqual({ error: 'Versión no encontrada' });
+  });
+
+  it('rejects a commercial who did not create the project with 403 before validating the version', async () => {
+    as(UserRole.COMERCIAL);
+    mockAccess.mockResolvedValue(false);
+    const res = await run(GET, req('GET', undefined, '?adjustment_id=abc'));
+    expect(res.status).toBe(403);
+    expect(mockGet).not.toHaveBeenCalled();
   });
 
   it('returns the role rejection response unchanged', async () => {
@@ -110,6 +148,8 @@ describe('PATCH /api/projects/[id]/financials', () => {
     expect(res.status).toBe(200);
     expect(mockUpdate).toHaveBeenCalledWith(10, 2500000);
     expect(await res.json()).toEqual(summary);
+    expect(mockGet.mock.calls[0][0]).toBe(10);
+    expect(mockGet.mock.calls[0][1] ?? null).toBeNull(); // unfiltered summary
     const roles = mockRole.mock.calls[0][1];
     expect(roles).toEqual([UserRole.ADMIN, UserRole.DIRECTIVO, UserRole.COMERCIAL]);
   });
