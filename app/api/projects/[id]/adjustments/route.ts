@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { validateApiRole, validateHttpMethod } from "@/lib/services/api-auth";
-import { getProjectById, recalculateProjectProgress } from "@/lib/queries/projects";
+import { getProjectById } from "@/lib/queries/projects";
 import {
   createProjectAdjustment,
   getAdjustmentsByProject,
@@ -15,7 +15,11 @@ import { decrypt } from "@/lib/session";
 import { cookies } from "next/headers";
 import { db } from "@/lib/db";
 import { AUTHENTICATED_ROLES, OPERATIONS_ROLES } from "@/lib/role-groups";
-import { dispatchNotification, NOTIFICATION_EVENTS } from "@/lib/services/notificationEngine";
+import {
+  dispatchNotification,
+  NOTIFICATION_EVENTS,
+  recalculateProgressAndNotify,
+} from "@/lib/services/notificationEngine";
 import { syncProjectDriveAccess } from "@/lib/services/projectDriveAccess";
 
 // Task template row type
@@ -274,7 +278,7 @@ export async function POST(
       }
     }
 
-    await recalculateProjectProgress(projectId);
+    await recalculateProgressAndNotify(projectId, currentUserId);
     const driveWarning = createdNotifications.some((created) => created.assignedTo)
       ? await syncProjectDriveAccess(projectId)
       : null;

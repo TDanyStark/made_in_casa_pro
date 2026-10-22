@@ -32,6 +32,7 @@ jest.mock("@/lib/session", () => ({
 jest.mock("@/lib/services/notificationEngine", () => ({
   NOTIFICATION_EVENTS: { QUOTE_ACCEPTED: "quote.accepted", TASK_READY: "task.ready" },
   dispatchNotification: jest.fn(),
+  recalculateProgressAndNotify: jest.fn().mockResolvedValue(0),
 }));
 
 jest.mock("@/lib/services/projectDriveAccess", () => ({

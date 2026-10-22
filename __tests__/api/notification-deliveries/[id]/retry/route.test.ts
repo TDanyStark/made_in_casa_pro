@@ -38,6 +38,7 @@ jest.mock("@/lib/queries/notificationRecipients", () => ({
   getActorName: jest.fn(),
   getUserNotificationRecipient: jest.fn(),
   getProjectStakeholders: jest.fn(),
+  getProjectCommercial: jest.fn(),
 }));
 
 jest.mock("@/lib/queries/projectEmailThreads", () => ({
@@ -56,7 +57,11 @@ import { getNotificationEventById } from "@/lib/queries/notificationEvents";
 import { resendExistingDelivery } from "@/lib/services/email/emailService";
 import { getProjectById } from "@/lib/queries/projects";
 import { getProjectTaskById, getTaskDriveFolderUrl } from "@/lib/queries/projectTasks";
-import { getActorName, getUserNotificationRecipient } from "@/lib/queries/notificationRecipients";
+import {
+  getActorName,
+  getProjectCommercial,
+  getUserNotificationRecipient,
+} from "@/lib/queries/notificationRecipients";
 import { resolveProjectVersionThreadKey } from "@/lib/queries/projectEmailThreads";
 
 const mockValidateHttpMethod = validateHttpMethod as jest.MockedFunction<typeof validateHttpMethod>;
@@ -69,6 +74,7 @@ const mockGetProjectTaskById = getProjectTaskById as jest.MockedFunction<typeof 
 const mockGetTaskDriveFolderUrl = getTaskDriveFolderUrl as jest.MockedFunction<typeof getTaskDriveFolderUrl>;
 const mockGetActorName = getActorName as jest.MockedFunction<typeof getActorName>;
 const mockGetUserNotificationRecipient = getUserNotificationRecipient as jest.MockedFunction<typeof getUserNotificationRecipient>;
+const mockGetProjectCommercial = getProjectCommercial as jest.MockedFunction<typeof getProjectCommercial>;
 const mockResolveThreadKey = resolveProjectVersionThreadKey as jest.MockedFunction<typeof resolveProjectVersionThreadKey>;
 
 const ADMIN = { isAuthorized: true, userRole: 1, response: undefined } as never;
@@ -264,6 +270,63 @@ describe("POST /api/notification-deliveries/[id]/retry", () => {
       }),
       { projectId: 7, adjustmentId: null, threadKey: "project:7:version:base" }
     );
+  });
+
+  it("rebuilds and resends a failed project.ready_to_close delivery to the commercial", async () => {
+    mockGetDeliveryById.mockResolvedValue({
+      ...failedDelivery,
+      event_type: "project.ready_to_close",
+      task_id: null,
+    } as unknown as never);
+    mockGetNotificationEventById.mockResolvedValue({
+      ...baseEvent,
+      event_type: "project.ready_to_close",
+      task_id: null,
+    } as unknown as never);
+    mockGetProjectById.mockResolvedValue({ ...project, client_name: "Acme Corp", brand_name: null } as unknown as never);
+    mockGetUserNotificationRecipient.mockResolvedValue({ userId: 5, name: "Ana", email: "to@example.com" } as never);
+    mockResolveThreadKey.mockResolvedValue("project:7:version:base");
+
+    const res = await callPost("42");
+
+    expect(res!.status).toBe(200);
+    expect(await res!.json()).toEqual({ ok: true, retrying: false, sent: true, attempt: 2 });
+    expect(mockGetProjectTaskById).not.toHaveBeenCalled();
+    expect(mockGetUserNotificationRecipient).toHaveBeenCalledWith(5);
+    expect(mockResolveThreadKey).toHaveBeenCalledWith(7, null);
+    expect(mockResendExistingDelivery).toHaveBeenCalledWith(
+      42,
+      expect.objectContaining({
+        to: { email: "to@example.com", name: "Ana" },
+        subject: "[Project X] Tu proyecto est\u00e1 al 100%, listo para cerrar",
+        html: expect.stringContaining("/projects/7\""),
+        text: expect.stringContaining("Acme Corp"),
+      }),
+      { projectId: 7, adjustmentId: null, threadKey: "project:7:version:base" }
+    );
+  });
+
+  it("falls back to the project's commercial when the delivery has no recipient user", async () => {
+    mockGetDeliveryById.mockResolvedValue({
+      ...failedDelivery,
+      event_type: "project.ready_to_close",
+      task_id: null,
+      recipient_user_id: null,
+    } as unknown as never);
+    mockGetNotificationEventById.mockResolvedValue({
+      ...baseEvent,
+      event_type: "project.ready_to_close",
+      task_id: null,
+    } as unknown as never);
+    mockGetProjectById.mockResolvedValue(project as unknown as never);
+    mockGetProjectCommercial.mockResolvedValue({ userId: 3, name: "Comercial", email: "to@example.com" } as never);
+    mockResolveThreadKey.mockResolvedValue("project:7:version:base");
+
+    const res = await callPost("42");
+
+    expect(res!.status).toBe(200);
+    expect(mockGetProjectCommercial).toHaveBeenCalledWith(7);
+    expect(mockResendExistingDelivery).toHaveBeenCalledTimes(1);
   });
 
   it("returns 500 on unexpected error", async () => {

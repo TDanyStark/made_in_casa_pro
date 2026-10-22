@@ -5,10 +5,13 @@ import { OPERATIONS_ROLES } from "@/lib/role-groups";
 import { acceptQuote, rejectQuote } from "@/lib/queries/taskQuotes";
 import { getTaskQuotes } from "@/lib/queries/taskQuotes";
 import { getProjectTaskById } from "@/lib/queries/projectTasks";
-import { recalculateProjectProgress } from "@/lib/queries/projects";
 import { decrypt } from "@/lib/session";
 import { cookies } from "next/headers";
-import { dispatchNotification, NOTIFICATION_EVENTS } from "@/lib/services/notificationEngine";
+import {
+  dispatchNotification,
+  NOTIFICATION_EVENTS,
+  recalculateProgressAndNotify,
+} from "@/lib/services/notificationEngine";
 import { syncProjectDriveAccess } from "@/lib/services/projectDriveAccess";
 
 const bodySchema = z.object({
@@ -53,7 +56,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
       const quote = (await getTaskQuotes(taskId)).find((q) => q.id === quoteId);
       await acceptQuote(quoteId, session.id);
       const driveWarning = await syncProjectDriveAccess(projectId);
-      await recalculateProjectProgress(projectId);
+      await recalculateProgressAndNotify(projectId, session.id);
       await dispatchNotification({
         eventType: NOTIFICATION_EVENTS.QUOTE_ACCEPTED,
         actorUserId: session.id,

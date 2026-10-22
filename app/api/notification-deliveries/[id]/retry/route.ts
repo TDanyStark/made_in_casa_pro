@@ -19,6 +19,7 @@ import {
   getActorName,
   getUserNotificationRecipient,
   getProjectStakeholders,
+  getProjectCommercial,
 } from "@/lib/queries/notificationRecipients";
 import { resolveProjectVersionThreadKey } from "@/lib/queries/projectEmailThreads";
 import { taskAssigned } from "@/lib/email/templates/taskAssigned";
@@ -30,6 +31,7 @@ import { quoteReceived } from "@/lib/email/templates/quoteReceived";
 import { quoteAccepted } from "@/lib/email/templates/quoteAccepted";
 import { projectAdjustmentCreated } from "@/lib/email/templates/projectAdjustmentCreated";
 import { projectCompleted } from "@/lib/email/templates/projectCompleted";
+import { projectReadyToClose } from "@/lib/email/templates/projectReadyToClose";
 import type { NotificationEventType } from "@/lib/services/notificationEngine";
 
 export async function POST(
@@ -399,6 +401,33 @@ async function buildRetryMessage(
           text: projectCompleted.text({ recipientName: r.name, completedByName, projectTitle: project.title, projectId: project.id, completedAt }),
         },
         opts: { projectId: event.project_id, adjustmentId: null, threadKey, forceSystemSender: true },
+      };
+    }
+
+    // ── project.ready_to_close ───────────────────────────────────────────
+    case "project.ready_to_close": {
+      if (!event.project_id) return null;
+      const [project, commercial] = await Promise.all([
+        getProjectById(event.project_id),
+        recipientUserId ? getUserNotificationRecipient(recipientUserId) : getProjectCommercial(event.project_id),
+      ]);
+      if (!project || !commercial) return null;
+      const threadKey = await resolveProjectVersionThreadKey(event.project_id, null);
+      const ctx = {
+        recipientName: commercial.name,
+        projectTitle: project.title,
+        projectId: project.id,
+        clientName: project.client_name ?? null,
+        brandName: project.brand_name ?? null,
+      };
+      return {
+        message: {
+          to: { email: recipientEmail, name: commercial.name },
+          subject: projectReadyToClose.subject(ctx),
+          html: projectReadyToClose.html(ctx),
+          text: projectReadyToClose.text(ctx),
+        },
+        opts: { projectId: event.project_id, adjustmentId: null, threadKey },
       };
     }
 

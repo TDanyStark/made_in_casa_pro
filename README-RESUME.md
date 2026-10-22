@@ -260,6 +260,25 @@ El correo incluye la descripción de la tarea, el enlace al proyecto y, si exist
 la carpeta de Drive. Las tareas en `waiting` o `blocked`, o sin responsable, no
 lo reciben.
 
+### Proyecto listo para cerrar (`project.ready_to_close`)
+
+Avisa al **comercial del proyecto** (`projects.created_by`) con el asunto
+`[<proyecto>] Tu proyecto está al 100%, listo para cerrar` y un botón
+"Ver proyecto". Se envía **cada vez** que el progreso pasa de menos de 100 (o
+vacío) a 100: completar, validar, editar o eliminar tareas, agregar tareas o
+producto, aceptar cotizaciones y `POST /api/projects/[id]/recalculate`. El
+remitente es el usuario cuya acción provocó el cambio.
+
+No se envía si el progreso ya estaba en 100, si el proyecto ya está
+`completed`, si no tiene tareas o si no tiene comercial. Si el progreso baja
+(por ejemplo, un ajuste agrega tareas) y vuelve a llegar a 100, se envía de
+nuevo. La transición se detecta en el mismo `UPDATE` que guarda el progreso
+(fila bloqueada), así que dos recálculos simultáneos no duplican el correo.
+Las peticiones del wizard con `?notify=false` no lo envían.
+
+Es distinto de `project.completed`, que llega a todos los interesados cuando
+alguien marca el proyecto como completado.
+
 ### Creación de proyectos con el wizard
 
 El wizard (`WizardStep6Confirm`) arma las tareas en varias peticiones: agregar

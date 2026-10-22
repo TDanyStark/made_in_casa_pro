@@ -53,6 +53,7 @@ jest.mock("@/lib/services/notificationEngine", () => ({
     PROJECT_ADJUSTMENT_CREATED: "project.adjustment.created",
   },
   dispatchNotification: jest.fn(),
+  recalculateProgressAndNotify: jest.fn().mockResolvedValue(0),
 }));
 
 jest.mock("@/lib/services/projectDriveAccess", () => ({

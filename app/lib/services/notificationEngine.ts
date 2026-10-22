@@ -29,9 +29,10 @@ import {
   getAcceptedQuoteCollaborator,
   getActorName,
   getUserNotificationRecipient,
+  getProjectCommercial,
   type NotificationRecipient,
 } from "@/lib/queries/notificationRecipients";
-import { getProjectById } from "@/lib/queries/projects";
+import { getProjectById, recalculateProjectProgressWithTransition } from "@/lib/queries/projects";
 import { getProjectTaskById, getTaskDriveFolderUrl } from "@/lib/queries/projectTasks";
 import { sendEmail } from "@/lib/services/email/emailService";
 
@@ -44,6 +45,7 @@ import { quoteReceived } from "@/lib/email/templates/quoteReceived";
 import { quoteAccepted } from "@/lib/email/templates/quoteAccepted";
 import { projectAdjustmentCreated } from "@/lib/email/templates/projectAdjustmentCreated";
 import { projectCompleted } from "@/lib/email/templates/projectCompleted";
+import { projectReadyToClose } from "@/lib/email/templates/projectReadyToClose";
 
 // ── Supported event types ──────────────────────────────────────────────────
 
@@ -57,6 +59,7 @@ export const NOTIFICATION_EVENTS = {
   QUOTE_ACCEPTED: "quote.accepted",
   PROJECT_ADJUSTMENT_CREATED: "project.adjustment.created",
   PROJECT_COMPLETED: "project.completed",
+  PROJECT_READY_TO_CLOSE: "project.ready_to_close",
 } as const;
 
 export type NotificationEventType =
@@ -135,6 +138,12 @@ export interface ProjectCompletedInput extends BaseInput {
   projectId: number;
 }
 
+/** The project's progress just reached 100%: tell its commercial it is ready to close. */
+export interface ProjectReadyToCloseInput extends BaseInput {
+  eventType: "project.ready_to_close";
+  projectId: number;
+}
+
 export type DispatchInput =
   | TaskAssignedInput
   | TaskReadyInput
@@ -144,7 +153,8 @@ export type DispatchInput =
   | QuoteReceivedInput
   | QuoteAcceptedInput
   | ProjectAdjustmentCreatedInput
-  | ProjectCompletedInput;
+  | ProjectCompletedInput
+  | ProjectReadyToCloseInput;
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -590,10 +600,74 @@ export async function dispatchNotification(input: DispatchInput): Promise<void> 
         );
         break;
       }
+
+      // ── project.ready_to_close ────────────────────────────────────────────
+      case "project.ready_to_close": {
+        const [project, commercial] = await Promise.all([
+          getProjectById(input.projectId),
+          getProjectCommercial(input.projectId),
+        ]);
+        if (!project || !commercial) break;
+
+        const threadKey = await resolveProjectVersionThreadKey(input.projectId, null);
+
+        // Same sender rule as task.completed: the actor whose action caused it.
+        await sendToRecipients(
+          [commercial],
+          input.actorUserId,
+          eventId,
+          (r) => {
+            const ctx = {
+              recipientName: r.name,
+              projectTitle: project.title,
+              projectId: project.id,
+              clientName: project.client_name ?? null,
+              brandName: project.brand_name ?? null,
+            };
+            return {
+              subject: projectReadyToClose.subject(ctx),
+              html: projectReadyToClose.html(ctx),
+              text: projectReadyToClose.text(ctx),
+            };
+          },
+          { projectId: input.projectId, adjustmentId: null, threadKey }
+        );
+        break;
+      }
     }
   } catch (error) {
     // El motor no rompe la mutación principal — solo registra el error
     const msg = error instanceof Error ? error.message : String(error);
     notifLog.error("engine", `Error dispatching ${input.eventType}: ${msg}`);
   }
+}
+
+// ── Progress recalculation + project.ready_to_close ────────────────────────
+
+/**
+ * Shared helper for every route that recalculates a project's progress after
+ * a task mutation. Recalculates (atomically detecting the < 100 → 100
+ * transition) and, when the project just reached 100%, dispatches
+ * project.ready_to_close to its commercial. Call it after the route's DB work.
+ *
+ * Recalculation errors propagate like before; notification errors are
+ * swallowed by dispatchNotification. `notify: false` (project wizard) and a
+ * missing actor skip the email. Returns the new progress.
+ */
+export async function recalculateProgressAndNotify(
+  projectId: number,
+  actorUserId: number | null,
+  options: { notify?: boolean } = {}
+): Promise<number> {
+  const { progress, reachedCompletion } = await recalculateProjectProgressWithTransition(projectId);
+
+  if (reachedCompletion && options.notify !== false && actorUserId != null) {
+    await dispatchNotification({
+      eventType: NOTIFICATION_EVENTS.PROJECT_READY_TO_CLOSE,
+      actorUserId,
+      projectId,
+    });
+  }
+
+  return progress;
 }

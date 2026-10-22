@@ -2,11 +2,14 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { validateApiRole, validateHttpMethod } from "@/lib/services/api-auth";
 import { getProjectTaskById, completeTask } from "@/lib/queries/projectTasks";
-import { recalculateProjectProgress } from "@/lib/queries/projects";
 import { decrypt } from "@/lib/session";
 import { cookies } from "next/headers";
 import { AUTHENTICATED_ROLES, TASK_OVERRIDE_ROLES } from "@/lib/role-groups";
-import { dispatchNotification, NOTIFICATION_EVENTS } from "@/lib/services/notificationEngine";
+import {
+  dispatchNotification,
+  NOTIFICATION_EVENTS,
+  recalculateProgressAndNotify,
+} from "@/lib/services/notificationEngine";
 
 const bodySchema = z.object({
   notes: z.string().optional().nullable(),
@@ -87,7 +90,8 @@ export async function POST(request: NextRequest, { params }: Params) {
       delivery_url: body.delivery_url,
       completion_cost: body.completion_cost,
     });
-    await recalculateProjectProgress(projectId);
+    // Emails the commercial (project.ready_to_close) if this completion took the project to 100%.
+    await recalculateProgressAndNotify(projectId, userId);
 
     await dispatchNotification({
       eventType: NOTIFICATION_EVENTS.TASK_COMPLETED,

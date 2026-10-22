@@ -40,6 +40,7 @@ jest.mock("@/lib/services/notificationEngine", () => ({
     QUOTE_REQUESTED: "quote.requested",
   },
   dispatchNotification: jest.fn(),
+  recalculateProgressAndNotify: jest.fn().mockResolvedValue(0),
 }));
 
 jest.mock("@/lib/services/projectDriveAccess", () => ({
@@ -57,7 +58,7 @@ import {
 } from "@/lib/queries/projectTasks";
 import { cookies } from "next/headers";
 import { decrypt } from "@/lib/session";
-import { dispatchNotification } from "@/lib/services/notificationEngine";
+import { dispatchNotification, recalculateProgressAndNotify } from "@/lib/services/notificationEngine";
 
 const mockValidateHttpMethod = validateHttpMethod as jest.MockedFunction<typeof validateHttpMethod>;
 const mockValidateApiRole = validateApiRole as jest.MockedFunction<typeof validateApiRole>;
@@ -68,6 +69,7 @@ const mockDeleteProjectTask = deleteProjectTask as jest.MockedFunction<typeof de
 const mockCookies = cookies as jest.MockedFunction<typeof cookies>;
 const mockDecrypt = decrypt as jest.MockedFunction<typeof decrypt>;
 const mockDispatchNotification = dispatchNotification as jest.MockedFunction<typeof dispatchNotification>;
+const mockRecalcAndNotify = recalculateProgressAndNotify as jest.MockedFunction<typeof recalculateProgressAndNotify>;
 
 const existingTask = {
   id: 10,
@@ -193,6 +195,28 @@ describe("PATCH /api/projects/[id]/tasks/[tid] task.ready notifications", () => 
 
     expect(response.status).toBe(200);
     expect(eventTypes()).toEqual(["quote.requested"]);
+    // project.ready_to_close is also silenced in the wizard
+    expect(mockRecalcAndNotify).toHaveBeenCalledWith(15, 3, { notify: false });
+  });
+
+  it("recalculates progress through the ready-to-close helper when the status changes", async () => {
+    mockGetProjectTaskById.mockResolvedValueOnce({ ...existingTask, status: "waiting" } as never);
+    mockUpdateProjectTask.mockResolvedValueOnce({ ...existingTask, status: "not_started" } as never);
+
+    const response = await callPatch({ status: "not_started" });
+
+    expect(response.status).toBe(200);
+    expect(mockRecalcAndNotify).toHaveBeenCalledTimes(1);
+    expect(mockRecalcAndNotify).toHaveBeenCalledWith(15, 3, { notify: true });
+  });
+
+  it("does not recalculate progress when the status does not change (previous behavior)", async () => {
+    mockGetProjectTaskById.mockResolvedValueOnce(existingTask as never);
+    mockUpdateProjectTask.mockResolvedValueOnce({ ...existingTask, title: "Otro" } as never);
+
+    await callPatch({ title: "Otro" });
+
+    expect(mockRecalcAndNotify).not.toHaveBeenCalled();
   });
 
   it("rejects an invalid notify value with 400 and updates nothing", async () => {
@@ -278,6 +302,17 @@ describe("DELETE /api/projects/[id]/tasks/[tid] task.ready notifications", () =>
     expect(await response.json()).toEqual({ success: true });
     expect(mockDeleteProjectTask).toHaveBeenCalledWith(10);
     expect(mockDispatchNotification).not.toHaveBeenCalled();
+    expect(mockRecalcAndNotify).toHaveBeenCalledWith(15, 3, { notify: false });
+  });
+
+  it("deleting the last pending task recalculates through the ready-to-close helper (notify on)", async () => {
+    mockDeleteProjectTask.mockResolvedValueOnce([] as never);
+
+    const response = await callDelete();
+
+    expect(response.status).toBe(200);
+    expect(mockRecalcAndNotify).toHaveBeenCalledTimes(1);
+    expect(mockRecalcAndNotify).toHaveBeenCalledWith(15, 3, { notify: true });
   });
 
   it("rejects an invalid notify value with 400 and deletes nothing", async () => {

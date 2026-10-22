@@ -43,6 +43,7 @@ jest.mock("@/lib/services/notificationEngine", () => ({
     QUOTE_REQUESTED: "quote.requested",
   },
   dispatchNotification: jest.fn(),
+  recalculateProgressAndNotify: jest.fn().mockResolvedValue(0),
 }));
 
 jest.mock("@/lib/services/projectDriveAccess", () => ({
@@ -59,7 +60,7 @@ import { TaskVersionError } from "@/lib/definitions";
 import { db } from "@/lib/db";
 import { cookies } from "next/headers";
 import { decrypt } from "@/lib/session";
-import { dispatchNotification } from "@/lib/services/notificationEngine";
+import { dispatchNotification, recalculateProgressAndNotify } from "@/lib/services/notificationEngine";
 
 const mockValidateHttpMethod = validateHttpMethod as jest.MockedFunction<typeof validateHttpMethod>;
 const mockValidateApiRole = validateApiRole as jest.MockedFunction<typeof validateApiRole>;
@@ -296,6 +297,24 @@ describe("POST /api/projects/[id]/tasks — canonical initial status", () => {
         taskId: 203,
         inviteeUserId: 12,
       });
+      expect(recalculateProgressAndNotify).toHaveBeenCalledWith(15, 3, { notify: false });
+    });
+
+    it("recalculates progress through the ready-to-close helper with notify on by default", async () => {
+      mockDbExecute.mockResolvedValueOnce({ rows: [{ next_order: 0 }] } as never);
+      mockResolveProjectTaskAssignment.mockResolvedValue(null);
+      mockCreateProjectTask.mockResolvedValue({
+        id: 204,
+        project_id: 15,
+        status: "not_started",
+        assigned_user_id: null,
+      } as never);
+
+      const res = await callPost({ title: "Normal", adjustment_id: 9 });
+
+      expect(res.status).toBe(201);
+      expect(recalculateProgressAndNotify).toHaveBeenCalledTimes(1);
+      expect(recalculateProgressAndNotify).toHaveBeenCalledWith(15, 3, { notify: true });
     });
 
     it("rejects an invalid notify value with 400 and creates nothing", async () => {

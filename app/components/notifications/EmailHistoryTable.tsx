@@ -30,6 +30,7 @@ const EVENT_TYPE_LABELS: Record<string, string> = {
   "quote.accepted": "Cotización aceptada",
   "project.adjustment.created": "Ajuste creado",
   "project.completed": "Proyecto completado",
+  "project.ready_to_close": "Proyecto listo para cerrar",
 };
 
 function StatusBadge({ status }: { status: DeliveryStatus }) {

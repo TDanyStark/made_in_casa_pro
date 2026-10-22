@@ -1,11 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { validateApiRole, validateHttpMethod } from "@/lib/services/api-auth";
-import {
-  getProjectDetail,
-  updateProject,
-  recalculateProjectProgress,
-} from "@/lib/queries/projects";
+import { getProjectDetail, updateProject } from "@/lib/queries/projects";
 import { resolveTaskAdjustmentId } from "@/lib/queries/adjustments";
 import { instantiateTasksFromTemplates } from "@/lib/queries/projectTasks";
 import { TaskVersionError } from "@/lib/definitions";
@@ -13,6 +9,7 @@ import { cookies } from "next/headers";
 import { decrypt } from "@/lib/session";
 import { OPERATIONS_ROLES } from "@/lib/role-groups";
 import { syncProjectDriveAccess } from "@/lib/services/projectDriveAccess";
+import { recalculateProgressAndNotify } from "@/lib/services/notificationEngine";
 
 const bodySchema = z.object({
   product_id: z.coerce.number().int().positive(),
@@ -69,7 +66,7 @@ export async function POST(request: NextRequest, { params }: Params) {
     const driveWarning = await syncProjectDriveAccess(projectId);
 
     // Recalculate progress
-    await recalculateProjectProgress(projectId);
+    await recalculateProgressAndNotify(projectId, currentUserId);
 
     const updated = await getProjectDetail(projectId);
     return NextResponse.json(

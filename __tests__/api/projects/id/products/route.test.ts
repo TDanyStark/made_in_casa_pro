@@ -29,6 +29,10 @@ jest.mock("@/lib/session", () => ({
   decrypt: jest.fn(),
 }));
 
+jest.mock("@/lib/services/notificationEngine", () => ({
+  recalculateProgressAndNotify: jest.fn().mockResolvedValue(0),
+}));
+
 jest.mock("@/lib/services/projectDriveAccess", () => ({
   syncProjectDriveAccess: jest.fn().mockResolvedValue(null),
 }));

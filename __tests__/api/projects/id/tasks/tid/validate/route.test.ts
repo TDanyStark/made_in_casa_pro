@@ -41,6 +41,7 @@ jest.mock('@/lib/queries/projects', () => ({
 
 jest.mock('@/lib/services/notificationEngine', () => ({
   dispatchNotification: jest.fn().mockResolvedValue(undefined),
+  recalculateProgressAndNotify: jest.fn().mockResolvedValue(0),
   NOTIFICATION_EVENTS: { TASK_READY: 'task.ready' },
 }));
 
@@ -53,7 +54,7 @@ import { getProjectTaskById, validateTask } from '@/lib/queries/projectTasks';
 import { recalculateProjectProgress } from '@/lib/queries/projects';
 import { decrypt } from '@/lib/session';
 import { cookies } from 'next/headers';
-import { dispatchNotification } from '@/lib/services/notificationEngine';
+import { dispatchNotification, recalculateProgressAndNotify } from '@/lib/services/notificationEngine';
 
 // Typed mocks
 const mockValidateHttpMethod = validateHttpMethod as jest.MockedFunction<typeof validateHttpMethod>;
@@ -277,7 +278,7 @@ describe('POST /validate — approve action', () => {
     expect(mockValidateTask).toHaveBeenCalledWith(10, 5, 'approve', undefined, undefined);
   });
 
-  it('5.8 — recalculateProjectProgress is called after approve', async () => {
+  it('5.8 — progress is recalculated (and ready-to-close notified) after approve', async () => {
     setupAuthMocks();
     mockGetProjectTaskById.mockResolvedValue(makeValidationTask() as never);
     mockValidateTask.mockResolvedValue({
@@ -288,7 +289,7 @@ describe('POST /validate — approve action', () => {
     const req = makeRequest({ action: 'approve' });
     await callPost(req, makeParams());
 
-    expect(mockRecalculate).toHaveBeenCalledWith(1);  // projectId=1
+    expect(recalculateProgressAndNotify).toHaveBeenCalledWith(1, 5);  // projectId=1, actor=5
   });
 });
 

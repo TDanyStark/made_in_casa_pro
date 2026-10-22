@@ -11,6 +11,7 @@ import { quoteReceived } from "@/lib/email/templates/quoteReceived";
 import { quoteAccepted } from "@/lib/email/templates/quoteAccepted";
 import { projectAdjustmentCreated } from "@/lib/email/templates/projectAdjustmentCreated";
 import { projectCompleted } from "@/lib/email/templates/projectCompleted";
+import { projectReadyToClose } from "@/lib/email/templates/projectReadyToClose";
 
 beforeAll(() => {
   process.env.NEXT_PUBLIC_APP_URL = "https://app.madeincasa.com";
@@ -414,5 +415,59 @@ describe("projectCompleted template", () => {
   it("html omits client/brand rows when not provided", () => {
     const html = projectCompleted.html({ ...ctx, clientName: undefined, brandName: undefined });
     expect(html).not.toContain("Acme Corp");
+  });
+});
+
+// ── projectReadyToClose ───────────────────────────────────────────────────
+
+describe("projectReadyToClose template", () => {
+  const ctx = {
+    recipientName: "Daniel Amado",
+    projectTitle: "Campaña Q2",
+    projectId: 15,
+    clientName: "Acme Corp",
+    brandName: "Acme Brand",
+  };
+
+  it("subject announces the project is at 100% and ready to close", () => {
+    expect(projectReadyToClose.subject(ctx)).toBe(
+      "[Campaña Q2] Tu proyecto está al 100%, listo para cerrar"
+    );
+  });
+
+  it("html greets, says all tasks are completed and links to the project", () => {
+    const html = projectReadyToClose.html(ctx);
+    assertValidHtml(html);
+    assertNoUndefined(html);
+    expect(html).toContain("Hola, Daniel Amado");
+    expect(html).toContain("todas las tareas");
+    expect(html).toContain("Acme Corp");
+    expect(html).toContain("Acme Brand");
+    expect(html).toContain("Ver proyecto");
+    expect(html).toContain('href="https://app.madeincasa.com/projects/15"');
+    expect(html).toContain("marcarlo como completado");
+  });
+
+  it("html omits client/brand rows when not provided and escapes the title", () => {
+    const html = projectReadyToClose.html({
+      ...ctx,
+      projectTitle: "<b>X</b>",
+      clientName: undefined,
+      brandName: null,
+    });
+    assertNoUndefined(html);
+    expect(html).not.toContain("Acme");
+    expect(html).not.toContain("<b>X</b>");
+    expect(html).toContain("&lt;b&gt;X&lt;/b&gt;");
+  });
+
+  it("text includes greeting, completion message and project link", () => {
+    const text = projectReadyToClose.text(ctx);
+    assertNoUndefined(text);
+    expect(text).toContain("Hola, Daniel Amado");
+    expect(text).toContain("100%");
+    expect(text).toContain("Cliente: Acme Corp");
+    expect(text).toContain("Ver proyecto: https://app.madeincasa.com/projects/15");
+    expect(text).toContain("marcarlo como completado");
   });
 });

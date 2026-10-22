@@ -44,6 +44,29 @@ export async function getProjectStakeholders(
   return result.rows as unknown as NotificationRecipient[];
 }
 
+/**
+ * Devuelve el comercial del proyecto (projects.created_by) si está activo y
+ * tiene email. Usado para: project.ready_to_close
+ */
+export async function getProjectCommercial(
+  projectId: number
+): Promise<NotificationRecipient | null> {
+  const result = await db.execute({
+    sql: `
+      SELECT u.id AS "userId", u.email, u.name
+      FROM projects p
+      JOIN users u ON u.id = p.created_by
+      WHERE p.id = $1
+        AND p.created_by IS NOT NULL
+        AND u.email IS NOT NULL
+        AND u.is_active = 1
+    `,
+    args: [projectId],
+  });
+  if (result.rows.length === 0) return null;
+  return result.rows[0] as unknown as NotificationRecipient;
+}
+
 // ── Tarea ───────────────────────────────────────────────────────────────────
 
 /**

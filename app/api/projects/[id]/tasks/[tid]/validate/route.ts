@@ -2,11 +2,14 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { validateApiRole, validateHttpMethod } from "@/lib/services/api-auth";
 import { getProjectTaskById, validateTask } from "@/lib/queries/projectTasks";
-import { recalculateProjectProgress } from "@/lib/queries/projects";
 import { decrypt } from "@/lib/session";
 import { cookies } from "next/headers";
 import { AUTHENTICATED_ROLES, TASK_OVERRIDE_ROLES } from "@/lib/role-groups";
-import { dispatchNotification, NOTIFICATION_EVENTS } from "@/lib/services/notificationEngine";
+import {
+  dispatchNotification,
+  NOTIFICATION_EVENTS,
+  recalculateProgressAndNotify,
+} from "@/lib/services/notificationEngine";
 
 const bodySchema = z.object({
   action: z.enum(["approve", "reject"]),
@@ -82,7 +85,7 @@ export async function POST(request: NextRequest, { params }: Params) {
     }
 
     const result = await validateTask(taskId, userId, action, targetTaskId, notes);
-    await recalculateProjectProgress(projectId);
+    await recalculateProgressAndNotify(projectId, userId);
 
     // approve: targetTask is the next task completeTask activated (or blocked).
     // reject: targetTask is the first correction task, created 'not_started'.

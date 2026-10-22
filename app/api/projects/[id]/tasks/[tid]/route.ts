@@ -7,12 +7,15 @@ import {
   deleteProjectTask,
   resolveProjectTaskAssignment,
 } from "@/lib/queries/projectTasks";
-import { recalculateProjectProgress } from "@/lib/queries/projects";
 import { db } from "@/lib/db";
 import { cookies } from "next/headers";
 import { decrypt } from "@/lib/session";
 import { AUTHENTICATED_ROLES, OPERATIONS_ROLES } from "@/lib/role-groups";
-import { dispatchNotification, NOTIFICATION_EVENTS } from "@/lib/services/notificationEngine";
+import {
+  dispatchNotification,
+  NOTIFICATION_EVENTS,
+  recalculateProgressAndNotify,
+} from "@/lib/services/notificationEngine";
 import { syncProjectDriveAccess } from "@/lib/services/projectDriveAccess";
 import { dispatchReadyForActivatedTasks, parseNotifyParam } from "../taskReadyNotifications";
 
@@ -129,9 +132,9 @@ export async function PATCH(request: NextRequest, { params }: Params) {
       }
     }
 
-    // Recalculate progress when status changes
+    // Recalculate progress when status changes (project.ready_to_close is silenced with notify=false)
     if (validation.data.status !== undefined) {
-      await recalculateProjectProgress(projectId);
+      await recalculateProgressAndNotify(projectId, currentUserId, { notify: notifyParam.notify });
     }
 
     // notify=false (project wizard) silences the task emails; quote requests are still sent.
@@ -202,11 +205,13 @@ export async function DELETE(request: NextRequest, { params }: Params) {
     const { id, tid } = await params;
     const projectId = parseInt(id);
     const activatedIds = await deleteProjectTask(parseInt(tid));
-    await recalculateProjectProgress(projectId);
 
     const cookie = (await cookies()).get("session")?.value;
     const session = cookie ? await decrypt(cookie) : null;
     const currentUserId = session?.id ? Number(session.id) : null;
+
+    // Deleting the last pending task can take the project to 100% (project.ready_to_close).
+    await recalculateProgressAndNotify(projectId, currentUserId, { notify: notifyParam.notify });
     if (currentUserId && notifyParam.notify) {
       await dispatchReadyForActivatedTasks(activatedIds, currentUserId, projectId);
     }

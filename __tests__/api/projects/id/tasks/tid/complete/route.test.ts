@@ -44,6 +44,7 @@ jest.mock('@/lib/queries/projects', () => ({
 
 jest.mock('@/lib/services/notificationEngine', () => ({
   dispatchNotification: jest.fn(),
+  recalculateProgressAndNotify: jest.fn(),
   NOTIFICATION_EVENTS: { TASK_COMPLETED: 'task_completed', TASK_READY: 'task.ready' },
 }));
 
@@ -53,8 +54,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { POST } from '@/api/projects/[id]/tasks/[tid]/complete/route';
 import { validateHttpMethod, validateApiRole } from '@/lib/services/api-auth';
 import { getProjectTaskById, completeTask } from '@/lib/queries/projectTasks';
-import { recalculateProjectProgress } from '@/lib/queries/projects';
-import { dispatchNotification } from '@/lib/services/notificationEngine';
+import { dispatchNotification, recalculateProgressAndNotify } from '@/lib/services/notificationEngine';
 import { decrypt } from '@/lib/session';
 import { cookies } from 'next/headers';
 import { UserRole } from '@/lib/definitions';
@@ -64,7 +64,7 @@ const mockValidateHttpMethod = validateHttpMethod as jest.MockedFunction<typeof 
 const mockValidateApiRole = validateApiRole as jest.MockedFunction<typeof validateApiRole>;
 const mockGetProjectTaskById = getProjectTaskById as jest.MockedFunction<typeof getProjectTaskById>;
 const mockCompleteTask = completeTask as jest.MockedFunction<typeof completeTask>;
-const mockRecalculate = recalculateProjectProgress as jest.MockedFunction<typeof recalculateProjectProgress>;
+const mockRecalculate = recalculateProgressAndNotify as jest.MockedFunction<typeof recalculateProgressAndNotify>;
 const mockDispatch = dispatchNotification as jest.MockedFunction<typeof dispatchNotification>;
 const mockDecrypt = decrypt as jest.MockedFunction<typeof decrypt>;
 const mockCookies = cookies as jest.MockedFunction<typeof cookies>;
@@ -144,6 +144,9 @@ describe('POST /complete — role override', () => {
       completion_cost: undefined,
     });
     expect(data.task).toBeDefined();
+    // Progress recalculated after the DB work, with the caller as the ready-to-close actor
+    expect(mockRecalculate).toHaveBeenCalledTimes(1);
+    expect(mockRecalculate).toHaveBeenCalledWith(1, 99);
   });
 
   it('allows the assigned COLABORADOR to complete their own task', async () => {

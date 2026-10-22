@@ -2,14 +2,17 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { validateApiRole, validateHttpMethod } from "@/lib/services/api-auth";
 import { getTasksByProject, createProjectTask, resolveProjectTaskAssignment } from "@/lib/queries/projectTasks";
-import { recalculateProjectProgress } from "@/lib/queries/projects";
 import { resolveTaskAdjustmentId } from "@/lib/queries/adjustments";
 import { TaskVersionError } from "@/lib/definitions";
 import { db } from "@/lib/db";
 import { cookies } from "next/headers";
 import { decrypt } from "@/lib/session";
 import { AUTHENTICATED_ROLES, OPERATIONS_ROLES } from "@/lib/role-groups";
-import { dispatchNotification, NOTIFICATION_EVENTS } from "@/lib/services/notificationEngine";
+import {
+  dispatchNotification,
+  NOTIFICATION_EVENTS,
+  recalculateProgressAndNotify,
+} from "@/lib/services/notificationEngine";
 import { syncProjectDriveAccess } from "@/lib/services/projectDriveAccess";
 import { parseNotifyParam } from "./taskReadyNotifications";
 
@@ -172,7 +175,8 @@ export async function POST(request: NextRequest, { params }: Params) {
       }
     }
 
-    await recalculateProjectProgress(projectId);
+    // notify=false (project wizard) also silences project.ready_to_close.
+    await recalculateProgressAndNotify(projectId, currentUserId, { notify: notifyParam.notify });
 
     if (currentUserId) {
       // notify=false (project wizard): task emails are sent once at the end by notify-created.

@@ -607,7 +607,36 @@ export async function deleteProject(id: number): Promise<void> {
 
 // ─── Progress recalculation ───────────────────────────────────────────────────
 
+export interface ProjectProgressRecalculation {
+  progress: number;
+  /**
+   * true only when THIS recalculation moved the project from < 100 (or NULL) to
+   * 100, with at least one task and a status other than 'completed'.
+   * Drives the `project.ready_to_close` email.
+   */
+  reachedCompletion: boolean;
+}
+
+/**
+ * Recalculates and stores the project's progress (always returns the number;
+ * kept for existing callers). Use `recalculateProjectProgressWithTransition`
+ * when the caller needs to know whether the project just reached 100%.
+ */
 export async function recalculateProjectProgress(projectId: number): Promise<number> {
+  const { progress } = await recalculateProjectProgressWithTransition(projectId);
+  return progress;
+}
+
+/**
+ * Same recalculation as `recalculateProjectProgress`, plus atomic detection of
+ * the < 100 → 100 transition. The UPDATE reads the previous progress/status from
+ * a `FOR UPDATE` subquery in the same statement, so two concurrent
+ * recalculations serialize on the row lock and only the first one sees the
+ * previous value below 100.
+ */
+export async function recalculateProjectProgressWithTransition(
+  projectId: number
+): Promise<ProjectProgressRecalculation> {
   try {
     // Get the active adjustment (the current version being worked on)
     const activeAdjResult = await db.execute({
@@ -636,15 +665,33 @@ export async function recalculateProjectProgress(projectId: number): Promise<num
     }
 
     const progress = total === 0 ? 0 : Math.round((completed / total) * 100);
-    
-    await db.execute({
-      sql: `UPDATE projects SET progress = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2`,
+
+    const updateResult = await db.execute({
+      sql: `UPDATE projects SET progress = $1, updated_at = CURRENT_TIMESTAMP
+            FROM (
+              SELECT id, progress AS previous_progress, status AS previous_status
+              FROM projects WHERE id = $2 FOR UPDATE
+            ) AS previous
+            WHERE projects.id = previous.id
+            RETURNING previous.previous_progress, previous.previous_status`,
       args: [progress, projectId],
     });
 
+    const previous = updateResult?.rows?.[0] as unknown as
+      | { previous_progress: number | string | null; previous_status: string | null }
+      | undefined;
+    const previousProgress =
+      previous?.previous_progress == null ? null : Number(previous.previous_progress);
+    const reachedCompletion =
+      progress === 100 &&
+      total > 0 &&
+      previous !== undefined &&
+      (previousProgress === null || previousProgress < 100) &&
+      previous.previous_status !== "completed";
+
     revalidatePath(`/projects/${projectId}`);
     revalidatePath("/projects");
-    return progress;
+    return { progress, reachedCompletion };
   } catch (error) {
     console.error("Error recalculating project progress:", error);
     throw error;

@@ -26,6 +26,7 @@ import {
   getProjectStakeholderEmails,
   getProjectsWithPagination,
   recalculateProjectProgress,
+  recalculateProjectProgressWithTransition,
   updateProject,
   upsertProjectDriveAccessFailure,
 } from '@/lib/queries/projects';
@@ -265,6 +266,112 @@ describe('project queries metadata fields', () => {
     const finalUpdateSql = (mockExecute.mock.calls[2]?.[0] as { sql: string }).sql;
     expect(finalUpdateSql).not.toContain('completed_at');
     expect(finalUpdateSql).not.toContain('billing_closed_at');
+  });
+});
+
+// Llegar al 100% dispara `project.ready_to_close`: la transición se detecta en el
+// mismo UPDATE (fila bloqueada con FOR UPDATE) que mueve `progress`.
+describe('recalculateProjectProgressWithTransition — detección de llegada al 100%', () => {
+  /** Encola: versión activa, conteo de tareas y la fila previa que devuelve el UPDATE. */
+  function queueRecalc(
+    counts: { total: number; completed: number } | null,
+    previous: { previous_progress: number | null; previous_status: string | null } | null
+  ) {
+    if (counts === null) {
+      mockExecute.mockResolvedValueOnce(makeResult([])); // sin versión activa
+    } else {
+      mockExecute
+        .mockResolvedValueOnce(makeResult([{ id: 70 }]))
+        .mockResolvedValueOnce(
+          makeResult([{ total: String(counts.total), completed: String(counts.completed) }])
+        );
+    }
+    mockExecute.mockResolvedValueOnce(makeResult(previous ? [previous] : []));
+  }
+
+  function lastUpdate() {
+    const calls = mockExecute.mock.calls;
+    return calls[calls.length - 1]?.[0] as { sql: string; args: unknown[] };
+  }
+
+  it('99 → 100 reporta la transición', async () => {
+    queueRecalc({ total: 4, completed: 4 }, { previous_progress: 99, previous_status: 'active' });
+
+    const result = await recalculateProjectProgressWithTransition(33);
+
+    expect(result).toEqual({ progress: 100, reachedCompletion: true });
+    const update = lastUpdate();
+    expect(update.sql).toContain('UPDATE projects SET progress = $1');
+    expect(update.sql).toContain('FOR UPDATE');
+    expect(update.args).toEqual([100, 33]);
+  });
+
+  it('100 → 100 no reporta la transición', async () => {
+    queueRecalc({ total: 4, completed: 4 }, { previous_progress: 100, previous_status: 'active' });
+
+    await expect(recalculateProjectProgressWithTransition(33)).resolves.toEqual({
+      progress: 100,
+      reachedCompletion: false,
+    });
+  });
+
+  it('NULL → 100 reporta la transición', async () => {
+    queueRecalc({ total: 2, completed: 2 }, { previous_progress: null, previous_status: 'active' });
+
+    await expect(recalculateProjectProgressWithTransition(33)).resolves.toEqual({
+      progress: 100,
+      reachedCompletion: true,
+    });
+  });
+
+  it('un proyecto ya completado no reporta la transición', async () => {
+    queueRecalc({ total: 4, completed: 4 }, { previous_progress: 75, previous_status: 'completed' });
+
+    await expect(recalculateProjectProgressWithTransition(33)).resolves.toEqual({
+      progress: 100,
+      reachedCompletion: false,
+    });
+  });
+
+  it('sin tareas (0 de 0) no reporta la transición', async () => {
+    queueRecalc(null, { previous_progress: 50, previous_status: 'active' });
+
+    await expect(recalculateProjectProgressWithTransition(33)).resolves.toEqual({
+      progress: 0,
+      reachedCompletion: false,
+    });
+    expect(lastUpdate().args).toEqual([0, 33]);
+  });
+
+  it('si el progreso baja y vuelve a llegar al 100% reporta otra vez', async () => {
+    // Un ajuste agrega tareas: 100 → 75
+    queueRecalc({ total: 4, completed: 3 }, { previous_progress: 100, previous_status: 'active' });
+    await expect(recalculateProjectProgressWithTransition(33)).resolves.toEqual({
+      progress: 75,
+      reachedCompletion: false,
+    });
+
+    // Se completan de nuevo: 75 → 100
+    queueRecalc({ total: 4, completed: 4 }, { previous_progress: 75, previous_status: 'active' });
+    await expect(recalculateProjectProgressWithTransition(33)).resolves.toEqual({
+      progress: 100,
+      reachedCompletion: true,
+    });
+  });
+
+  it('un proyecto inexistente (UPDATE sin filas) no reporta la transición', async () => {
+    queueRecalc({ total: 1, completed: 1 }, null);
+
+    await expect(recalculateProjectProgressWithTransition(33)).resolves.toEqual({
+      progress: 100,
+      reachedCompletion: false,
+    });
+  });
+
+  it('recalculateProjectProgress mantiene su contrato: devuelve solo el número', async () => {
+    queueRecalc({ total: 4, completed: 4 }, { previous_progress: 99, previous_status: 'active' });
+
+    await expect(recalculateProjectProgress(33)).resolves.toBe(100);
   });
 });
 

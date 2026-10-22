@@ -20,11 +20,13 @@ jest.mock("@/lib/queries/notificationRecipients", () => ({
   getQuoteReceivedRecipient: jest.fn(),
   getAcceptedQuoteCollaborator: jest.fn(),
   getUserNotificationRecipient: jest.fn(),
+  getProjectCommercial: jest.fn(),
   getActorName: jest.fn().mockResolvedValue("Daniel Amado"),
 }));
 
 jest.mock("@/lib/queries/projects", () => ({
   getProjectById: jest.fn(),
+  recalculateProjectProgressWithTransition: jest.fn(),
 }));
 
 jest.mock("@/lib/queries/projectTasks", () => ({
@@ -36,7 +38,11 @@ jest.mock("@/lib/services/email/emailService", () => ({
   sendEmail: jest.fn().mockResolvedValue({ deliveryId: 1, provider: "gmail" }),
 }));
 
-import { dispatchNotification, NOTIFICATION_EVENTS } from "@/lib/services/notificationEngine";
+import {
+  dispatchNotification,
+  NOTIFICATION_EVENTS,
+  recalculateProgressAndNotify,
+} from "@/lib/services/notificationEngine";
 import { createNotificationEvent } from "@/lib/queries/notificationEvents";
 import {
   getTaskAssignee,
@@ -46,8 +52,9 @@ import {
   getAcceptedQuoteCollaborator,
   getUserNotificationRecipient,
   getProjectStakeholders,
+  getProjectCommercial,
 } from "@/lib/queries/notificationRecipients";
-import { getProjectById } from "@/lib/queries/projects";
+import { getProjectById, recalculateProjectProgressWithTransition } from "@/lib/queries/projects";
 import { getProjectTaskById, getTaskDriveFolderUrl } from "@/lib/queries/projectTasks";
 import { sendEmail } from "@/lib/services/email/emailService";
 
@@ -63,6 +70,8 @@ const mockGetProjectById = getProjectById as jest.Mock;
 const mockGetProjectTaskById = getProjectTaskById as jest.Mock;
 const mockGetTaskDriveFolderUrl = getTaskDriveFolderUrl as jest.Mock;
 const mockSendEmail = sendEmail as jest.Mock;
+const mockGetProjectCommercial = getProjectCommercial as jest.Mock;
+const mockRecalcWithTransition = recalculateProjectProgressWithTransition as jest.Mock;
 
 const project = { id: 1, title: "Campaña Q2", brand_name: "Acme", client_name: "Acme Corp", notes: null, ideal_delivery_at: null, completed_at: null };
 const task = { id: 10, title: "Diseño de banner", task_type: "execution", task_flag: "new", description: null, adjustment_id: null, completed_at: null, delivery_notes: null };
@@ -423,6 +432,121 @@ describe("dispatchNotification()", () => {
     for (const call of mockSendEmail.mock.calls) {
       expect(call[0].forceSystemSender).toBe(true);
     }
+  });
+
+  // ── project.ready_to_close ───────────────────────────────────────────────
+
+  it("project.ready_to_close: sends one email to the commercial (created_by) from the actor", async () => {
+    mockGetProjectCommercial.mockResolvedValue(creator);
+
+    await dispatchNotification({
+      eventType: NOTIFICATION_EVENTS.PROJECT_READY_TO_CLOSE,
+      actorUserId: 5,
+      projectId: 1,
+    });
+
+    expect(mockCreateEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ event_type: "project.ready_to_close", project_id: 1, task_id: null, actor_user_id: 5 })
+    );
+    expect(mockGetProjectCommercial).toHaveBeenCalledWith(1);
+    expect(mockGetProjectStakeholders).not.toHaveBeenCalled();
+    expect(mockSendEmail).toHaveBeenCalledTimes(1);
+    const call = mockSendEmail.mock.calls[0][0];
+    expect(call).toEqual(
+      expect.objectContaining({
+        senderUserId: 5,
+        eventId: 99,
+        recipientUserId: 3,
+        projectId: 1,
+        adjustmentId: null,
+        thread: { threadKey: "project:1:version:v1" },
+      })
+    );
+    expect(call.forceSystemSender).toBeFalsy();
+    expect(call.message.to).toEqual({ email: "daniel@test.com", name: "Daniel Amado" });
+    expect(call.message.subject).toBe("[Campaña Q2] Tu proyecto está al 100%, listo para cerrar");
+    expect(call.message.html).toContain("https://app.madeincasa.com/projects/1");
+    expect(call.message.text).toContain("https://app.madeincasa.com/projects/1");
+  });
+
+  it("project.ready_to_close: skips silently when the project has no commercial", async () => {
+    mockGetProjectCommercial.mockResolvedValue(null);
+
+    await expect(
+      dispatchNotification({
+        eventType: NOTIFICATION_EVENTS.PROJECT_READY_TO_CLOSE,
+        actorUserId: 5,
+        projectId: 1,
+      })
+    ).resolves.toBeUndefined();
+
+    expect(mockSendEmail).not.toHaveBeenCalled();
+  });
+
+  it("project.ready_to_close: skips silently when the project is missing", async () => {
+    mockGetProjectCommercial.mockResolvedValue(creator);
+    mockGetProjectById.mockResolvedValue(null);
+
+    await dispatchNotification({
+      eventType: NOTIFICATION_EVENTS.PROJECT_READY_TO_CLOSE,
+      actorUserId: 5,
+      projectId: 1,
+    });
+
+    expect(mockSendEmail).not.toHaveBeenCalled();
+  });
+
+  // ── recalculateProgressAndNotify ─────────────────────────────────────────
+
+  describe("recalculateProgressAndNotify()", () => {
+    function readyEvents() {
+      return mockCreateEvent.mock.calls.filter(([e]) => e.event_type === "project.ready_to_close");
+    }
+
+    it("dispatches project.ready_to_close once when progress just reached 100", async () => {
+      mockRecalcWithTransition.mockResolvedValue({ progress: 100, reachedCompletion: true });
+      mockGetProjectCommercial.mockResolvedValue(creator);
+
+      await expect(recalculateProgressAndNotify(1, 5)).resolves.toBe(100);
+
+      expect(mockRecalcWithTransition).toHaveBeenCalledWith(1);
+      expect(readyEvents()).toHaveLength(1);
+      expect(readyEvents()[0][0]).toEqual(expect.objectContaining({ project_id: 1, actor_user_id: 5 }));
+      expect(mockSendEmail).toHaveBeenCalledTimes(1);
+    });
+
+    it("does not dispatch when there was no transition", async () => {
+      mockRecalcWithTransition.mockResolvedValue({ progress: 100, reachedCompletion: false });
+
+      await expect(recalculateProgressAndNotify(1, 5)).resolves.toBe(100);
+
+      expect(mockCreateEvent).not.toHaveBeenCalled();
+      expect(mockSendEmail).not.toHaveBeenCalled();
+    });
+
+    it("does not dispatch with notify=false (project wizard)", async () => {
+      mockRecalcWithTransition.mockResolvedValue({ progress: 100, reachedCompletion: true });
+
+      await expect(recalculateProgressAndNotify(1, 5, { notify: false })).resolves.toBe(100);
+
+      expect(mockCreateEvent).not.toHaveBeenCalled();
+      expect(mockSendEmail).not.toHaveBeenCalled();
+    });
+
+    it("does not dispatch without an actor", async () => {
+      mockRecalcWithTransition.mockResolvedValue({ progress: 100, reachedCompletion: true });
+
+      await expect(recalculateProgressAndNotify(1, null)).resolves.toBe(100);
+
+      expect(mockCreateEvent).not.toHaveBeenCalled();
+    });
+
+    it("propagates recalculation errors (the route's DB work failed)", async () => {
+      mockRecalcWithTransition.mockRejectedValue(new Error("DB down"));
+
+      await expect(recalculateProgressAndNotify(1, 5)).rejects.toThrow("DB down");
+      expect(mockCreateEvent).not.toHaveBeenCalled();
+    });
   });
 
   // ── Error handling ───────────────────────────────────────────────────────
