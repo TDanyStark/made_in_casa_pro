@@ -275,6 +275,8 @@ El detalle de un proyecto muestra arriba un panel compacto con mini gráficos:
 | Horas semanales de trabajo (ley) | Configuración → General (`PATCH /api/settings` con `weekly_work_hours`, mayor que 0 y máximo 60; por defecto 42) | Admin |
 | Ver horas, dinero y margen | `GET /api/projects/[id]/financials` (opcional `?adjustment_id=<id>` para una versión) | Admin, directivo, financiero y el comercial que creó el proyecto |
 | Anotar en cuánto se vendió | `PATCH /api/projects/[id]/financials` con `{ "sale_price": number \| null }` | Admin, directivo y el comercial que creó el proyecto |
+| Ver cuánto valió una tarea | Ojito de la tarea (`GET /api/projects/[id]/tasks/[tid]/cost`) | Admin, directivo y financiero |
+| Corregir el costo de una tarea externa completada | Lápiz en el ojito de la tarea (`PATCH /api/projects/[id]/tasks/[tid]/cost` con `{ "completion_cost": number }`, >= 0) | Admin y directivo |
 
 Cómo se calcula el dinero invertido:
 
@@ -297,6 +299,17 @@ Cómo se calcula el dinero invertido:
   para colaboradores sin la casilla de interno marcada), pero 0 es válido: así se
   registra el trabajo gratis, como revisiones o ajustes. Solo se rechaza un costo
   ausente o negativo.
+- **Corrección del costo de un externo**: si un externo se equivoca, admin o
+  directivo corrigen el valor desde el ojito de la tarea (0 es válido). Solo
+  aplica a tareas completadas de externos; las tareas internas se valoran con el
+  sueldo y no se editan (`400`). Queda rastro: `completion_cost_original` guarda
+  el valor que declaró el externo antes de la primera corrección (no cambia en
+  correcciones posteriores; `NULL` si nunca se corrigió o no había valor), y
+  `completion_cost_updated_by` / `completion_cost_updated_at` dicen quién y
+  cuándo. El ojito lo muestra: "Corregido por {nombre} el {fecha} · valor
+  declarado {valor}". Así los externos pasan su cuenta de cobro con lo que
+  aparece en MIC: lo que no está en MIC no se paga. Financiero solo lo ve;
+  comercial y colaborador no ven costos.
 - **Recálculo único**: al guardar el sueldo mensual de un interno (mayor que 0),
   sus tareas ya completadas que aún no estaban congeladas con sueldo mensual (sin
   precio externo ni cotización aceptada) se recalculan una sola vez con el mes en
@@ -312,7 +325,8 @@ Cómo se calcula el dinero invertido:
 - El precio de venta y el margen son de todo el proyecto: con un filtro de
   versión, `sale_price` sigue siendo el del proyecto y `margin` es `null`.
 - Los gráficos usan `recharts` a través del componente `chart` de shadcn.
-- Migraciones: `019_project_financials.sql` y `020_monthly_salary_cost.sql`.
+- Migraciones: `019_project_financials.sql`, `020_monthly_salary_cost.sql` y
+  `021_task_cost_correction.sql`.
 
 ## Notificaciones por correo
 

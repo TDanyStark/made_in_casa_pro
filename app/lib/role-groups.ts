@@ -43,6 +43,12 @@ export const PROJECT_SALE_PRICE_EDIT_ROLES: readonly UserRole[] = [
   UserRole.COMERCIAL,
 ];
 
+// Corrigen el costo de una tarea externa completada (financiero solo lo ve).
+export const TASK_COST_EDIT_ROLES: readonly UserRole[] = [
+  UserRole.ADMIN,
+  UserRole.DIRECTIVO,
+];
+
 export const CREATOR_FILTER_ROLES: readonly UserRole[] = OPERATIONS_ROLES;
 
 // Roles que pueden ver quién creó cada proyecto en la lista de proyectos.

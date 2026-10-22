@@ -172,8 +172,12 @@ jest.mock("@/components/pagination/Pagination", () => ({
 }));
 
 jest.mock("@/components/tasks/TaskDeliverableDialog", () => ({
-  TaskDeliverableDialog: ({ showCost }: { showCost?: boolean }) => (
-    <div data-testid="deliverable-dialog" data-show-cost={String(Boolean(showCost))} />
+  TaskDeliverableDialog: ({ showCost, canEditCost }: { showCost?: boolean; canEditCost?: boolean }) => (
+    <div
+      data-testid="deliverable-dialog"
+      data-show-cost={String(Boolean(showCost))}
+      data-can-edit-cost={String(Boolean(canEditCost))}
+    />
   ),
 }));
 
@@ -244,5 +248,17 @@ describe("TasksCommandCenterClient", () => {
     render(<TasksCommandCenterClient userRole={role} />);
 
     expect(screen.getByTestId("deliverable-dialog")).toHaveAttribute("data-show-cost", expected);
+  });
+
+  // S15: only admin and directivo may correct a task cost from the eye dialog.
+  it.each([
+    [UserRole.ADMIN, "true"],
+    [UserRole.DIRECTIVO, "true"],
+    [UserRole.FINANCIERO, "false"],
+    [UserRole.COMERCIAL, "false"],
+  ])("passes canEditCost to the deliverable dialog for role %i -> %s", (role, expected) => {
+    render(<TasksCommandCenterClient userRole={role} />);
+
+    expect(screen.getByTestId("deliverable-dialog")).toHaveAttribute("data-can-edit-cost", expected);
   });
 });

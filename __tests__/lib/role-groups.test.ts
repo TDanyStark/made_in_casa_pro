@@ -8,6 +8,7 @@ import {
   PROJECT_VIEW_ROLES,
   PROJECT_CREATOR_VIEW_ROLES,
   TASK_OVERRIDE_ROLES,
+  TASK_COST_EDIT_ROLES,
   hasAnyRole,
 } from '@/lib/role-groups';
 
@@ -62,5 +63,13 @@ describe('role-groups', () => {
     expect(hasAnyRole(UserRole.DIRECTIVO, PROJECT_CREATOR_VIEW_ROLES)).toBe(true);
     expect(hasAnyRole(UserRole.FINANCIERO, PROJECT_CREATOR_VIEW_ROLES)).toBe(false);
     expect(hasAnyRole(UserRole.COMERCIAL, PROJECT_CREATOR_VIEW_ROLES)).toBe(false);
+  });
+
+  // S15: only admin and directivo correct the cost of a completed external task.
+  it('restricts task cost correction to admin and directivo', () => {
+    expect(TASK_COST_EDIT_ROLES).toEqual([UserRole.ADMIN, UserRole.DIRECTIVO]);
+    expect(hasAnyRole(UserRole.FINANCIERO, TASK_COST_EDIT_ROLES)).toBe(false);
+    expect(hasAnyRole(UserRole.COMERCIAL, TASK_COST_EDIT_ROLES)).toBe(false);
+    expect(hasAnyRole(UserRole.COLABORADOR, TASK_COST_EDIT_ROLES)).toBe(false);
   });
 });

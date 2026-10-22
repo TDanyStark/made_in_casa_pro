@@ -25,7 +25,7 @@ import { TaskValidationDialog } from "@/components/tasks/TaskValidationDialog";
 import { TaskCompleteDialog } from "@/components/tasks/TaskCompleteDialog";
 import { TaskHistoryDialog } from "@/components/tasks/TaskHistoryDialog";
 import { TaskDeliverableDialog } from "@/components/tasks/TaskDeliverableDialog";
-import { LEADERSHIP_ROLES } from "@/lib/role-groups";
+import { LEADERSHIP_ROLES, TASK_COST_EDIT_ROLES } from "@/lib/role-groups";
 import type { UserRole } from "@/lib/definitions";
 import {
   Dialog,
@@ -1150,6 +1150,7 @@ export function ProjectTasksTab({
           onOpenChange={setDeliverableDialogOpen}
           task={taskForDeliverable}
           showCost={canSeeTaskCost}
+          canEditCost={currentUserRole !== undefined && TASK_COST_EDIT_ROLES.includes(currentUserRole as UserRole)}
         />
       </>
     </TooltipProvider>

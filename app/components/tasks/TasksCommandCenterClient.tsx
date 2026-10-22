@@ -31,7 +31,7 @@ import { SearchableSelect } from "@/components/ui/searchable-select";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
-import { CREATOR_FILTER_ROLES, LEADERSHIP_ROLES } from "@/lib/role-groups";
+import { CREATOR_FILTER_ROLES, LEADERSHIP_ROLES, TASK_COST_EDIT_ROLES } from "@/lib/role-groups";
 import { hasAnyRole } from "@/lib/role-groups";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -688,6 +688,7 @@ export function TasksCommandCenterClient({ userRole }: TasksCommandCenterClientP
         onOpenChange={setDeliverableOpen}
         task={deliverableTask}
         showCost={canEditAssignee}
+        canEditCost={hasAnyRole(userRole, TASK_COST_EDIT_ROLES)}
       />
 
       <div className="flex flex-wrap items-center justify-between gap-3">

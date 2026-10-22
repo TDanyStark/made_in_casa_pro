@@ -3,9 +3,13 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 const mockGet = jest.fn();
+const mockPatch = jest.fn();
 jest.mock("@/lib/services/apiService", () => ({
   get: (...args: unknown[]) => mockGet(...args),
+  patch: (...args: unknown[]) => mockPatch(...args),
 }));
+
+jest.mock("sonner", () => ({ toast: { success: jest.fn(), error: jest.fn() } }));
 
 jest.mock("@/components/ui/dialog", () => ({
   Dialog: ({ children, open }: { children: React.ReactNode; open: boolean }) =>
@@ -34,6 +38,7 @@ jest.mock("lucide-react", () => new Proxy({}, {
   },
 }));
 
+import { toast } from "sonner";
 import { TaskDeliverableDialog } from "@/components/tasks/TaskDeliverableDialog";
 
 function makeTask(overrides: Record<string, unknown> = {}) {
@@ -261,5 +266,139 @@ describe("TaskDeliverableDialog — task cost (S7)", () => {
 
     await waitFor(() => expect(mockGet).not.toHaveBeenCalled());
     expect(screen.queryByText("Costo de la tarea")).not.toBeInTheDocument();
+  });
+});
+
+// S15, S16: directivo/admin correct the cost of a completed external task from the eye dialog.
+describe("TaskDeliverableDialog — cost correction (S15, S16)", () => {
+  const money = (value: number) =>
+    new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", maximumFractionDigits: 0 })
+      .format(value)
+      .replace(/\s+/g, " ");
+  const external = {
+    cost: 500000, internal: false, minutes: 60, hourly_rate: null, source: "declared",
+    editable: true, original_cost: null, updated_by_name: null, updated_at: null,
+  };
+  const corrected = {
+    ...external, cost: 650000, original_cost: 500000, updated_by_name: "Diana",
+    updated_at: "2026-05-03T15:00:00.000Z",
+  };
+  const auditDate = new Date("2026-05-03T15:00:00.000Z").toLocaleDateString("es-CO", {
+    timeZone: "America/Bogota", day: "numeric", month: "long", year: "numeric",
+  });
+
+  function renderEditable(cost: Record<string, unknown>, canEditCost?: boolean) {
+    mockGet.mockResolvedValue({ ok: true, data: cost });
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const invalidate = jest.spyOn(client, "invalidateQueries");
+    render(
+      <QueryClientProvider client={client}>
+        <TaskDeliverableDialog
+          open={true}
+          onOpenChange={jest.fn()}
+          task={makeTask()}
+          showCost={true}
+          {...(canEditCost === undefined ? {} : { canEditCost })}
+        />
+      </QueryClientProvider>
+    );
+    return { client, invalidate };
+  }
+
+  beforeEach(() => {
+    mockGet.mockReset();
+    mockPatch.mockReset();
+    (toast.success as jest.Mock).mockReset();
+    (toast.error as jest.Mock).mockReset();
+  });
+
+  it("does not offer the pencil without canEditCost (default)", async () => {
+    renderEditable(external);
+    expect(await screen.findByText(money(500000))).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Corregir costo de la tarea" })).not.toBeInTheDocument();
+  });
+
+  it("does not offer the pencil when the cost is not editable (internal)", async () => {
+    renderEditable({ cost: 45000, internal: true, minutes: 90, hourly_rate: 30000, source: "frozen_rate",
+      editable: false, original_cost: null, updated_by_name: null, updated_at: null }, true);
+    expect(await screen.findByText(money(45000))).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Corregir costo de la tarea" })).not.toBeInTheDocument();
+  });
+
+  it("saves a corrected cost with PATCH, toasts and refreshes the cost and the project financials", async () => {
+    const { client, invalidate } = renderEditable(external, true);
+    fireEvent.click(await screen.findByRole("button", { name: "Corregir costo de la tarea" }));
+    const input = screen.getByLabelText("Nuevo costo de la tarea");
+    expect(input).toHaveValue("500000");
+    fireEvent.change(input, { target: { value: "650000" } });
+    mockPatch.mockResolvedValue({ ok: true, data: corrected });
+    fireEvent.click(screen.getByRole("button", { name: "Guardar" }));
+
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith("Costo de la tarea actualizado"));
+    expect(mockPatch).toHaveBeenCalledWith("projects/10/tasks/1/cost", { completion_cost: 650000 });
+    expect(await screen.findByText(money(650000))).toBeInTheDocument();
+    expect(client.getQueryData(["task-cost", 10, 1])).toEqual(corrected);
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: ["project-financials", 10] });
+    expect(screen.queryByLabelText("Nuevo costo de la tarea")).not.toBeInTheDocument();
+  });
+
+  it("sends 0 as a valid cost", async () => {
+    renderEditable(external, true);
+    fireEvent.click(await screen.findByRole("button", { name: "Corregir costo de la tarea" }));
+    fireEvent.change(screen.getByLabelText("Nuevo costo de la tarea"), { target: { value: "0" } });
+    mockPatch.mockResolvedValue({ ok: true, data: { ...external, cost: 0 } });
+    fireEvent.click(screen.getByRole("button", { name: "Guardar" }));
+
+    await waitFor(() => expect(mockPatch).toHaveBeenCalledWith("projects/10/tasks/1/cost", { completion_cost: 0 }));
+  });
+
+  it("does not send an empty value", async () => {
+    renderEditable(external, true);
+    fireEvent.click(await screen.findByRole("button", { name: "Corregir costo de la tarea" }));
+    fireEvent.change(screen.getByLabelText("Nuevo costo de la tarea"), { target: { value: "" } });
+    fireEvent.click(screen.getByRole("button", { name: "Guardar" }));
+
+    expect(screen.getByRole("button", { name: "Guardar" })).toBeDisabled();
+    expect(mockPatch).not.toHaveBeenCalled();
+  });
+
+  it("toasts the API error and keeps the old value", async () => {
+    renderEditable(external, true);
+    fireEvent.click(await screen.findByRole("button", { name: "Corregir costo de la tarea" }));
+    fireEvent.change(screen.getByLabelText("Nuevo costo de la tarea"), { target: { value: "650000" } });
+    mockPatch.mockResolvedValue({ ok: false, error: "Solo se puede corregir el costo de una tarea completada" });
+    fireEvent.click(screen.getByRole("button", { name: "Guardar" }));
+
+    await waitFor(() =>
+      expect(toast.error).toHaveBeenCalledWith("Solo se puede corregir el costo de una tarea completada")
+    );
+    expect(toast.success).not.toHaveBeenCalled();
+    // The editor stays open to retry; cancelling shows the unchanged stored cost.
+    expect(screen.getByLabelText("Nuevo costo de la tarea")).toHaveValue("650000");
+    fireEvent.click(screen.getByRole("button", { name: "Cancelar" }));
+    expect(screen.getByText(money(500000))).toBeInTheDocument();
+  });
+
+  it("cancel closes the editor without saving", async () => {
+    renderEditable(external, true);
+    fireEvent.click(await screen.findByRole("button", { name: "Corregir costo de la tarea" }));
+    fireEvent.click(screen.getByRole("button", { name: "Cancelar" }));
+
+    expect(screen.queryByLabelText("Nuevo costo de la tarea")).not.toBeInTheDocument();
+    expect(mockPatch).not.toHaveBeenCalled();
+  });
+
+  it("shows the audit line of a corrected cost to every role that sees the cost", async () => {
+    renderEditable(corrected);
+    expect(await screen.findByText(money(650000))).toBeInTheDocument();
+    expect(
+      screen.getByText(`Corregido por Diana el ${auditDate} · valor declarado ${money(500000)}`)
+    ).toBeInTheDocument();
+  });
+
+  it("shows no audit line for a never corrected cost", async () => {
+    renderEditable(external, true);
+    expect(await screen.findByText(money(500000))).toBeInTheDocument();
+    expect(screen.queryByText(/Corregido por/)).not.toBeInTheDocument();
   });
 });

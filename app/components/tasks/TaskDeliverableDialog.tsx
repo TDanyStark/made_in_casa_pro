@@ -1,15 +1,17 @@
 "use client";
 
 import { useLayoutEffect, useRef, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { ProjectTaskType } from "@/lib/definitions";
 import { formatProgressMinutes } from "@/lib/task-progress";
-import { get } from "@/lib/services/apiService";
+import { get, patch } from "@/lib/services/apiService";
 import type { TaskCost } from "@/lib/queries/taskCost";
 import { TaskStatusBadge } from "./TaskStatusBadge";
-import { Clock, Eye, ExternalLink, FileText, Link as LinkIcon, User, Wallet } from "lucide-react";
+import { Clock, Eye, ExternalLink, FileText, Link as LinkIcon, Pencil, User, Wallet } from "lucide-react";
 
 interface TaskDeliverableDialogProps {
   open: boolean;
@@ -17,6 +19,8 @@ interface TaskDeliverableDialogProps {
   task: ProjectTaskType | null;
   /** Shows how much the task cost; only for admin, directivo and financiero. */
   showCost?: boolean;
+  /** Lets admin and directivo correct the cost of a completed external task (needs showCost). */
+  canEditCost?: boolean;
 }
 
 const money = new Intl.NumberFormat("es-CO", {
@@ -39,9 +43,38 @@ function describeTaskCost(data: TaskCost) {
   }
 }
 
-function TaskCostSection({ projectId, taskId }: { projectId: number; taskId: number }) {
+const auditDate = (iso: string) =>
+  new Date(iso).toLocaleDateString("es-CO", {
+    timeZone: "America/Bogota",
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  });
+
+function describeCorrection(data: TaskCost) {
+  if (!data.updated_at) return null;
+  const who = data.updated_by_name ? `Corregido por ${data.updated_by_name}` : "Corregido";
+  const original = data.original_cost !== null ? ` · valor declarado ${money.format(data.original_cost)}` : "";
+  return `${who} el ${auditDate(data.updated_at)}${original}`;
+}
+
+function TaskCostSection({
+  projectId,
+  taskId,
+  canEditCost,
+}: {
+  projectId: number;
+  taskId: number;
+  canEditCost: boolean;
+}) {
+  const queryClient = useQueryClient();
+  const [isEditing, setIsEditing] = useState(false);
+  const [draft, setDraft] = useState("");
+  const [isSaving, setIsSaving] = useState(false);
+  const queryKey = ["task-cost", projectId, taskId];
+
   const { data, isLoading, isError } = useQuery({
-    queryKey: ["task-cost", projectId, taskId],
+    queryKey,
     queryFn: async () => {
       const res = await get<TaskCost>(`projects/${projectId}/tasks/${taskId}/cost`);
       if (!res.ok || !res.data) throw new Error(res.error || "Error al obtener el costo de la tarea");
@@ -50,13 +83,79 @@ function TaskCostSection({ projectId, taskId }: { projectId: number; taskId: num
   });
 
   const detail = data ? describeTaskCost(data) : null;
+  const correction = data ? describeCorrection(data) : null;
+  const canEdit = canEditCost && Boolean(data?.editable);
+  const cleanDraft = draft.replace(/[^0-9.]/g, "");
+
+  const startEditing = () => {
+    setDraft(data ? String(data.cost) : "");
+    setIsEditing(true);
+  };
+
+  const saveCost = async () => {
+    if (cleanDraft === "") return;
+    setIsSaving(true);
+    try {
+      const res = await patch<TaskCost>(`projects/${projectId}/tasks/${taskId}/cost`, {
+        completion_cost: Number(cleanDraft),
+      });
+      if (!res.ok || !res.data) throw new Error(res.error || "Error al corregir el costo de la tarea");
+      queryClient.setQueryData(queryKey, res.data);
+      await queryClient.invalidateQueries({ queryKey: ["project-financials", projectId] });
+      toast.success("Costo de la tarea actualizado");
+      setIsEditing(false);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Error al corregir el costo de la tarea");
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
   return (
     <div className="flex items-start gap-2 border-t pt-4 text-sm">
       <Wallet className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
       <div className="flex flex-col gap-0.5">
-        <span className="text-muted-foreground">Costo de la tarea</span>
-        {isLoading ? (
+        <span className="flex items-center gap-1 text-muted-foreground">
+          Costo de la tarea
+          {canEdit && !isEditing && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-xs"
+              className="size-5"
+              aria-label="Corregir costo de la tarea"
+              onClick={startEditing}
+            >
+              <Pencil />
+            </Button>
+          )}
+        </span>
+        {isEditing ? (
+          <form
+            className="flex items-center gap-1"
+            onSubmit={(e) => {
+              e.preventDefault();
+              saveCost();
+            }}
+          >
+            <Input
+              aria-label="Nuevo costo de la tarea"
+              inputMode="numeric"
+              placeholder="Ej: 250000"
+              className="h-7 w-32 text-sm"
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              disabled={isSaving}
+              autoFocus
+            />
+            <Button type="submit" size="xs" disabled={isSaving || cleanDraft === ""}>
+              Guardar
+            </Button>
+            <Button type="button" size="xs" variant="ghost" onClick={() => setIsEditing(false)} disabled={isSaving}>
+              Cancelar
+            </Button>
+          </form>
+        ) : isLoading ? (
           <span className="text-muted-foreground">Cargando…</span>
         ) : isError || !data ? (
           <span className="text-muted-foreground">No se pudo cargar el costo</span>
@@ -68,6 +167,7 @@ function TaskCostSection({ projectId, taskId }: { projectId: number; taskId: num
             {detail && <span className="text-xs text-muted-foreground">{detail}</span>}
           </>
         )}
+        {correction && <span className="text-xs text-muted-foreground">{correction}</span>}
       </div>
     </div>
   );
@@ -142,6 +242,7 @@ export function TaskDeliverableDialog({
   onOpenChange,
   task,
   showCost = false,
+  canEditCost = false,
 }: TaskDeliverableDialogProps) {
   if (!task) return null;
 
@@ -177,7 +278,7 @@ export function TaskDeliverableDialog({
           <p className="text-sm italic text-muted-foreground">Sin descripción</p>
         )}
 
-        {showCost && open && <TaskCostSection projectId={task.project_id} taskId={task.id} />}
+        {showCost && open && <TaskCostSection projectId={task.project_id} taskId={task.id} canEditCost={canEditCost} />}
 
         {isCompleted && (
           <div className="flex flex-col gap-3 border-t pt-4">
