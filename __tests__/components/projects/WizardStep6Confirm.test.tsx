@@ -208,3 +208,131 @@ describe('WizardStep6Confirm', () => {
     expect(mockPost).toHaveBeenNthCalledWith(1, 'drive/create-folder', expect.anything());
   });
 });
+
+describe('WizardStep6Confirm — task notifications', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  const customizedState = {
+    ...baseState,
+    removed_template_ids: [30],
+    task_overrides: [
+      { template_id: 10, assigned_user_id: 8, order_index: 1 },
+      { template_id: 20, order_index: 2 },
+    ],
+    extra_tasks: [
+      {
+        localId: -1,
+        title: 'Extra',
+        assigned_user_id: 9,
+        assign_to_commercial: 0,
+        area_id: null,
+        task_type: 'execution' as const,
+        order_index: 0,
+      },
+    ],
+  };
+
+  function mockApi(notifyResult: unknown = { ok: true, data: { notified: { assigned: 3, ready: 1 } } }) {
+    mockPost.mockImplementation(async (url: string) => {
+      if (url === 'projects') return { ok: true, data: { id: 44 } };
+      if (url === 'projects/44/products') return { ok: true, data: {} };
+      if (url === 'projects/44/tasks?notify=false') return { ok: true, data: { id: 501 } };
+      if (url === 'projects/44/tasks/reorder?notify=false') return { ok: true, data: { success: true } };
+      if (url === 'projects/44/tasks/notify-created') {
+        if (notifyResult instanceof Error) throw notifyResult;
+        return notifyResult;
+      }
+      return { ok: true, data: {} };
+    });
+    mockGet.mockResolvedValue({
+      ok: true,
+      data: [
+        { id: 101, template_id: 10 },
+        { id: 102, template_id: 20 },
+        { id: 103, template_id: 30 },
+      ],
+    });
+    mockPatch.mockResolvedValue({ ok: true, data: {} });
+    mockDel.mockResolvedValue({ ok: true, data: {} });
+  }
+
+  async function submit() {
+    const user = userEvent.setup();
+    render(<WizardStep6Confirm state={customizedState} onBack={jest.fn()} />);
+    // Paste an existing folder so the Drive creation step is skipped.
+    await user.type(screen.getByPlaceholderText(/drive.google.com/i), 'https://drive.google.com/drive/folders/existing-id');
+    await user.click(screen.getByRole('button', { name: /crear proyecto/i }));
+    await waitFor(() => expect(mockPush).toHaveBeenCalledWith('/projects/44'));
+  }
+
+  it('silences the intermediate task requests and calls notify-created once, last', async () => {
+    mockApi();
+
+    await submit();
+
+    expect(mockDel).toHaveBeenCalledWith('projects/44/tasks/103?notify=false');
+    expect(mockPatch).toHaveBeenCalledWith('projects/44/tasks/101?notify=false', { assigned_user_id: 8 });
+    expect(mockPost).toHaveBeenCalledWith('projects/44/tasks?notify=false', expect.objectContaining({ title: 'Extra' }));
+    expect(mockPost).toHaveBeenCalledWith('projects/44/tasks/reorder?notify=false', { orderedIds: [501, 101, 102] });
+
+    const postUrls = mockPost.mock.calls.map(([url]) => url);
+    expect(postUrls.filter((url) => url === 'projects/44/tasks/notify-created')).toHaveLength(1);
+    expect(postUrls[postUrls.length - 1]).toBe('projects/44/tasks/notify-created');
+    expect(mockPost).toHaveBeenLastCalledWith('projects/44/tasks/notify-created', {});
+    expect(mockToastSuccess).toHaveBeenCalled();
+    expect(mockToastWarning).not.toHaveBeenCalled();
+  });
+
+  it('calls notify-created even without task customizations', async () => {
+    mockPost.mockImplementation(async (url: string) =>
+      url === 'projects' ? { ok: true, data: { id: 44 } } : { ok: true, data: {} }
+    );
+    const user = userEvent.setup();
+    render(<WizardStep6Confirm state={baseState} onBack={jest.fn()} />);
+    await user.type(screen.getByPlaceholderText(/drive.google.com/i), 'https://drive.google.com/drive/folders/existing-id');
+    await user.click(screen.getByRole('button', { name: /crear proyecto/i }));
+
+    await waitFor(() => expect(mockPush).toHaveBeenCalledWith('/projects/44'));
+    expect(mockPost).toHaveBeenLastCalledWith('projects/44/tasks/notify-created', {});
+  });
+
+  it('a failing notify-created only warns: the project is still created and opened', async () => {
+    mockApi({ ok: false, error: 'boom' });
+
+    await submit();
+
+    expect(mockToastWarning).toHaveBeenCalledWith(
+      'Proyecto creado, pero no se pudieron enviar los correos a los colaboradores: boom'
+    );
+    expect(mockToastError).not.toHaveBeenCalled();
+    expect(mockToastSuccess).toHaveBeenCalled();
+  });
+
+  it('a thrown notify-created error only warns too', async () => {
+    mockApi(new Error('network down'));
+
+    await submit();
+
+    expect(mockToastWarning).toHaveBeenCalledWith(
+      'Proyecto creado, pero no se pudieron enviar los correos a los colaboradores: network down'
+    );
+    expect(mockToastError).not.toHaveBeenCalled();
+    expect(mockPush).toHaveBeenCalledWith('/projects/44');
+  });
+
+  it('does not call notify-created when project creation fails', async () => {
+    mockPost.mockImplementation(async (url: string) =>
+      url === 'projects' ? { ok: false, error: 'no se pudo' } : { ok: true, data: {} }
+    );
+    const user = userEvent.setup();
+    render(<WizardStep6Confirm state={baseState} onBack={jest.fn()} />);
+    await user.type(screen.getByPlaceholderText(/drive.google.com/i), 'https://drive.google.com/drive/folders/existing-id');
+    await user.click(screen.getByRole('button', { name: /crear proyecto/i }));
+
+    await waitFor(() => expect(mockToastError).toHaveBeenCalledWith('no se pudo'));
+    expect(mockPost).not.toHaveBeenCalledWith('projects/44/tasks/notify-created', expect.anything());
+    expect(mockPush).not.toHaveBeenCalled();
+  });
+});

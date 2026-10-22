@@ -39,6 +39,11 @@ jest.mock('@/lib/queries/projects', () => ({
   recalculateProjectProgress: jest.fn(),
 }));
 
+jest.mock('@/lib/services/notificationEngine', () => ({
+  dispatchNotification: jest.fn().mockResolvedValue(undefined),
+  NOTIFICATION_EVENTS: { TASK_READY: 'task.ready' },
+}));
+
 // ── Imports (after mocks) ───────────────────────────────────────────────────
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -48,6 +53,7 @@ import { getProjectTaskById, validateTask } from '@/lib/queries/projectTasks';
 import { recalculateProjectProgress } from '@/lib/queries/projects';
 import { decrypt } from '@/lib/session';
 import { cookies } from 'next/headers';
+import { dispatchNotification } from '@/lib/services/notificationEngine';
 
 // Typed mocks
 const mockValidateHttpMethod = validateHttpMethod as jest.MockedFunction<typeof validateHttpMethod>;
@@ -57,6 +63,7 @@ const mockValidateTask = validateTask as jest.MockedFunction<typeof validateTask
 const mockRecalculate = recalculateProjectProgress as jest.MockedFunction<typeof recalculateProjectProgress>;
 const mockDecrypt = decrypt as jest.MockedFunction<typeof decrypt>;
 const mockCookies = cookies as jest.MockedFunction<typeof cookies>;
+const mockDispatch = dispatchNotification as jest.MockedFunction<typeof dispatchNotification>;
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -306,5 +313,72 @@ describe('POST /validate — task checks', () => {
     const res = await callPost(req, makeParams());
 
     expect(res.status).toBe(400);
+  });
+});
+
+// ── task.ready for the task activated by the validation ──────────────────────
+
+describe('POST /validate — task.ready notification', () => {
+  it('approve: dispatches task.ready for the next task activated to not_started with an assignee', async () => {
+    setupAuthMocks();
+    mockGetProjectTaskById.mockResolvedValue(makeValidationTask() as never);
+    mockValidateTask.mockResolvedValue({
+      task: makeValidationTask({ status: 'completed' }) as never,
+      targetTask: makeValidationTask({ id: 11, task_type: 'execution', status: 'not_started', assigned_user_id: 8 }) as never,
+    });
+
+    const res = await callPost(makeRequest({ action: 'approve' }), makeParams());
+
+    expect(res.status).toBe(200);
+    expect(mockDispatch).toHaveBeenCalledTimes(1);
+    expect(mockDispatch).toHaveBeenCalledWith({
+      eventType: 'task.ready',
+      actorUserId: 5,
+      projectId: 1,
+      taskId: 11,
+    });
+  });
+
+  it('reject: dispatches task.ready for the first correction task (created not_started with an assignee)', async () => {
+    setupAuthMocks();
+    mockGetProjectTaskById.mockResolvedValue(makeValidationTask() as never);
+    mockValidateTask.mockResolvedValue({
+      task: makeValidationTask({ status: 'completed' }) as never,
+      targetTask: makeCorrectionTask(101, 4) as never,
+    });
+
+    await callPost(makeRequest({ action: 'reject', targetTaskId: 7 }), makeParams());
+
+    expect(mockDispatch).toHaveBeenCalledWith({
+      eventType: 'task.ready',
+      actorUserId: 5,
+      projectId: 1,
+      taskId: 101,
+    });
+  });
+
+  it('approve: does not dispatch task.ready when the next task was blocked, unassigned, or missing', async () => {
+    setupAuthMocks();
+    mockGetProjectTaskById.mockResolvedValue(makeValidationTask() as never);
+    mockValidateTask.mockResolvedValueOnce({
+      task: makeValidationTask({ status: 'completed' }) as never,
+      targetTask: makeValidationTask({ id: 11, status: 'blocked', assigned_user_id: null }) as never,
+      blockedReason: 'La siguiente tarea no tiene colaborador asignado.',
+    });
+    await callPost(makeRequest({ action: 'approve' }), makeParams());
+
+    mockValidateTask.mockResolvedValueOnce({
+      task: makeValidationTask({ status: 'completed' }) as never,
+      targetTask: makeValidationTask({ id: 11, status: 'not_started', assigned_user_id: null }) as never,
+    });
+    await callPost(makeRequest({ action: 'approve' }), makeParams());
+
+    mockValidateTask.mockResolvedValueOnce({
+      task: makeValidationTask({ status: 'completed' }) as never,
+      targetTask: null,
+    });
+    await callPost(makeRequest({ action: 'approve' }), makeParams());
+
+    expect(mockDispatch).not.toHaveBeenCalled();
   });
 });

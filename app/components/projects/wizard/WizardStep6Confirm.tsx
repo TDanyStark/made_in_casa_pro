@@ -167,7 +167,7 @@ export function WizardStep6Confirm({ state, onBack }: Props) {
               (t) => t.template_id === templateId
             );
             if (taskToDelete) {
-              await del(`projects/${project.id}/tasks/${taskToDelete.id}`);
+              await del(`projects/${project.id}/tasks/${taskToDelete.id}?notify=false`);
             }
           }
         }
@@ -185,7 +185,7 @@ export function WizardStep6Confirm({ state, onBack }: Props) {
             override.assign_to_commercial !== undefined;
 
           if (hasChanges) {
-            await patch(`projects/${project.id}/tasks/${createdTask.id}`, {
+            await patch(`projects/${project.id}/tasks/${createdTask.id}?notify=false`, {
               ...(override.title !== undefined && { title: override.title }),
               ...(override.assigned_user_id !== undefined && {
                 assigned_user_id: override.assigned_user_id,
@@ -201,7 +201,7 @@ export function WizardStep6Confirm({ state, onBack }: Props) {
         const extraTaskMap = new Map<number, number>();
         if (state.extra_tasks.length > 0) {
           for (const extra of state.extra_tasks) {
-            const res = await post<ProjectTaskType>(`projects/${project.id}/tasks`, {
+            const res = await post<ProjectTaskType>(`projects/${project.id}/tasks?notify=false`, {
               title: extra.title,
               assigned_user_id: extra.assigned_user_id,
               assign_to_commercial: extra.assign_to_commercial,
@@ -233,10 +233,26 @@ export function WizardStep6Confirm({ state, onBack }: Props) {
           .filter((id): id is number => id !== undefined);
 
         if (orderedIds.length > 1) {
-          await post(`projects/${project.id}/tasks/reorder`, {
+          await post(`projects/${project.id}/tasks/reorder?notify=false`, {
             orderedIds,
           });
         }
+      }
+
+      // 6. Notify collaborators once the final task list exists. The task
+      // requests above are silenced (?notify=false) so nobody gets an email for a
+      // task that later moves or changes assignee. A failure here never blocks
+      // the already-created project.
+      setCurrentAction("Notificando a los colaboradores...");
+      try {
+        const notifyRes = await post(`projects/${project.id}/tasks/notify-created`, {});
+        if (!notifyRes?.ok) {
+          throw new Error(notifyRes?.error ?? "Error desconocido");
+        }
+      } catch (notifyError) {
+        const notifyMsg = notifyError instanceof Error ? notifyError.message : "Error desconocido";
+        console.error("Error notifying created tasks:", notifyError);
+        toast.warning(`Proyecto creado, pero no se pudieron enviar los correos a los colaboradores: ${notifyMsg}`);
       }
 
       toast.success("¡Proyecto creado exitosamente!");

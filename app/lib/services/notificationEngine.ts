@@ -36,6 +36,7 @@ import { getProjectTaskById, getTaskDriveFolderUrl } from "@/lib/queries/project
 import { sendEmail } from "@/lib/services/email/emailService";
 
 import { taskAssigned } from "@/lib/email/templates/taskAssigned";
+import { taskReady } from "@/lib/email/templates/taskReady";
 import { taskReassigned } from "@/lib/email/templates/taskReassigned";
 import { taskCompleted } from "@/lib/email/templates/taskCompleted";
 import { quoteRequested } from "@/lib/email/templates/quoteRequested";
@@ -48,6 +49,7 @@ import { projectCompleted } from "@/lib/email/templates/projectCompleted";
 
 export const NOTIFICATION_EVENTS = {
   TASK_ASSIGNED: "task.assigned",
+  TASK_READY: "task.ready",
   TASK_REASSIGNED: "task.reassigned",
   TASK_COMPLETED: "task.completed",
   QUOTE_REQUESTED: "quote.requested",
@@ -69,6 +71,13 @@ interface BaseInput {
 
 export interface TaskAssignedInput extends BaseInput {
   eventType: "task.assigned";
+  taskId: number;
+  projectId: number;
+}
+
+/** The task (with an assignee) became 'not_started': it is the assignee's turn to execute it. */
+export interface TaskReadyInput extends BaseInput {
+  eventType: "task.ready";
   taskId: number;
   projectId: number;
 }
@@ -128,6 +137,7 @@ export interface ProjectCompletedInput extends BaseInput {
 
 export type DispatchInput =
   | TaskAssignedInput
+  | TaskReadyInput
   | TaskReassignedInput
   | TaskCompletedInput
   | QuoteRequestedInput
@@ -280,6 +290,39 @@ export async function dispatchNotification(input: DispatchInput): Promise<void> 
               driveFolderUrl,
             }),
           }),
+          { projectId: input.projectId, adjustmentId: task.adjustment_id ?? null, threadKey }
+        );
+        break;
+      }
+
+      // ── task.ready ─────────────────────────────────────────────────────
+      case "task.ready": {
+        const [task, project, assignee] = await Promise.all([
+          getProjectTaskById(input.taskId),
+          getProjectById(input.projectId),
+          getTaskAssignee(input.taskId),
+        ]);
+        if (!assignee || !task || !project) break;
+
+        const driveFolderUrl = await getTaskDriveFolderUrl(task.id);
+        const threadKey = await resolveProjectVersionThreadKey(input.projectId, task.adjustment_id ?? null);
+
+        await sendToRecipients(
+          [assignee],
+          input.actorUserId,
+          eventId,
+          (r) => {
+            const ctx = {
+              recipientName: r.name,
+              taskTitle: task.title,
+              projectTitle: project.title,
+              projectId: project.id,
+              taskId: task.id,
+              taskDescription: task.description,
+              driveFolderUrl,
+            };
+            return { subject: taskReady.subject(ctx), html: taskReady.html(ctx), text: taskReady.text(ctx) };
+          },
           { projectId: input.projectId, adjustmentId: task.adjustment_id ?? null, threadKey }
         );
         break;

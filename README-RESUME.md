@@ -234,6 +234,51 @@ crear la tarea o asignación. La creación y la recreación comparten con
 administradores, directivos, financieros, creador, gerente principal, co-gerentes
 y asignados actuales.
 
+## Notificaciones por correo
+
+`dispatchNotification` (`app/lib/services/notificationEngine.ts`) registra cada
+evento en `notification_events` y envía los correos después de que la mutación
+confirma; un fallo de correo nunca rompe la mutación. Las entregas fallidas se
+pueden reintentar desde `POST /api/notification-deliveries/[id]/retry`.
+
+### Tarea lista para ejecutar (`task.ready`)
+
+Avisa al **colaborador asignado** que la tarea ya está lista para que la ejecute
+("está en tu cancha"). Es distinto de `task.assigned`, que solo avisa la
+asignación. Se envía cada vez que una tarea **con responsable** queda en
+`not_started`:
+
+| Origen | Cuándo |
+|--------|--------|
+| Crear tarea (`POST /api/projects/[id]/tasks`) o ajuste (`POST /api/projects/[id]/adjustments`) | La tarea se crea ya activa; llega después de `task.assigned`, así que el primer colaborador recibe los dos correos |
+| Completar (`.../tasks/[tid]/complete`) o validar (`.../tasks/[tid]/validate`) | Se activa la siguiente tarea (o la primera de corrección al rechazar). Si queda `blocked` no se envía |
+| Editar (`PATCH .../tasks/[tid]`) | El estado cambia a `not_started` desde otro estado |
+| Eliminar o reordenar (`DELETE .../tasks/[tid]`, `POST .../tasks/reorder`) | La siguiente tarea pendiente pasa de `waiting` a `not_started` |
+| Aceptar cotización (`PATCH .../tasks/[tid]/quotes/[qid]`) | La tarea queda `not_started` con el colaborador aceptado; llega después de `quote.accepted` |
+
+El correo incluye la descripción de la tarea, el enlace al proyecto y, si existe,
+la carpeta de Drive. Las tareas en `waiting` o `blocked`, o sin responsable, no
+lo reciben.
+
+### Creación de proyectos con el wizard
+
+El wizard (`WizardStep6Confirm`) arma las tareas en varias peticiones: agregar
+el producto (instancia las plantillas sin correos), eliminar, editar, crear
+tareas extra y reordenar. Esas peticiones de tareas llevan `?notify=false`, que
+silencia `task.assigned`, `task.reassigned` y `task.ready` para que nadie reciba
+un correo de una tarea que luego cambia de responsable o de posición. Las
+solicitudes de cotización (`quote.requested`) no se silencian. El valor por
+defecto es `notify=true`; un valor distinto de `true`/`false` responde 400.
+
+Al final, con la lista de tareas ya definitiva, el wizard llama una sola vez a
+`POST /api/projects/[id]/tasks/notify-created` (`OPERATIONS_ROLES`). Este
+endpoint envía `task.assigned` a cada tarea de la versión base (v1) que tiene
+responsable y después `task.ready` a las que están en `not_started`, así que el
+primer colaborador recibe los dos correos. Responde
+`{ notified: { assigned, ready } }` y omite las tareas que ya tienen ese evento
+registrado, así que llamarlo dos veces no duplica correos. Si falla, el
+proyecto queda creado y el wizard solo muestra un aviso.
+
 ## Auditoría e historial
 
 | Tabla | Registra |

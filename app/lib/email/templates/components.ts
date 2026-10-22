@@ -105,6 +105,12 @@ export function escapeHtml(str: string): string {
     .replace(/"/g, "&quot;");
 }
 
+/** Only http(s) links are rendered, so a malformed value never becomes a clickable href. */
+export function safeDriveUrl(url: string | null | undefined): string | null {
+  const trimmed = url?.trim();
+  return trimmed && /^https?:\/\//i.test(trimmed) ? trimmed : null;
+}
+
 export function appUrl(): string {
   return process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
 }

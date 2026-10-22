@@ -44,7 +44,7 @@ jest.mock('@/lib/queries/projects', () => ({
 
 jest.mock('@/lib/services/notificationEngine', () => ({
   dispatchNotification: jest.fn(),
-  NOTIFICATION_EVENTS: { TASK_COMPLETED: 'task_completed' },
+  NOTIFICATION_EVENTS: { TASK_COMPLETED: 'task_completed', TASK_READY: 'task.ready' },
 }));
 
 // ── Imports (after mocks) ───────────────────────────────────────────────────
@@ -182,6 +182,66 @@ describe('POST /complete — role override', () => {
 
     expect(res.status).toBe(404);
     expect(mockCompleteTask).not.toHaveBeenCalled();
+  });
+});
+
+describe('POST /complete — task.ready for the activated next task', () => {
+  function readyCalls() {
+    return mockDispatch.mock.calls.filter(([input]) => input.eventType === 'task.ready');
+  }
+
+  it('dispatches task.ready (after task.completed) when the next task was activated to not_started with an assignee', async () => {
+    setupAuthMocks(UserRole.COLABORADOR, 5);
+    mockGetProjectTaskById.mockResolvedValue(makeTask() as never);
+    mockCompleteTask.mockResolvedValue({
+      task: makeTask({ status: 'completed' }) as never,
+      nextTask: makeTask({ id: 11, status: 'not_started', assigned_user_id: 8 }) as never,
+    } as never);
+
+    const res = await callPost(makeRequest(), makeParams());
+
+    expect(res.status).toBe(200);
+    expect(mockDispatch.mock.calls.map(([i]) => i.eventType)).toEqual(['task_completed', 'task.ready']);
+    expect(mockDispatch).toHaveBeenLastCalledWith({
+      eventType: 'task.ready',
+      actorUserId: 5,
+      projectId: 1,
+      taskId: 11,
+    });
+  });
+
+  it('does not dispatch task.ready when the next task was set to blocked', async () => {
+    setupAuthMocks(UserRole.COLABORADOR, 5);
+    mockGetProjectTaskById.mockResolvedValue(makeTask() as never);
+    mockCompleteTask.mockResolvedValue({
+      task: makeTask({ status: 'completed' }) as never,
+      nextTask: makeTask({ id: 11, status: 'blocked', assigned_user_id: null }) as never,
+      blockedReason: 'La siguiente tarea no tiene colaborador asignado.',
+    } as never);
+
+    const res = await callPost(makeRequest(), makeParams());
+
+    expect(res.status).toBe(200);
+    expect(readyCalls()).toHaveLength(0);
+    expect(mockDispatch).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not dispatch task.ready when the next task is not_started without assignee or there is no next task', async () => {
+    setupAuthMocks(UserRole.COLABORADOR, 5);
+    mockGetProjectTaskById.mockResolvedValue(makeTask() as never);
+    mockCompleteTask.mockResolvedValueOnce({
+      task: makeTask({ status: 'completed' }) as never,
+      nextTask: makeTask({ id: 11, status: 'not_started', assigned_user_id: null }) as never,
+    } as never);
+    await callPost(makeRequest(), makeParams());
+
+    mockCompleteTask.mockResolvedValueOnce({
+      task: makeTask({ status: 'completed' }) as never,
+      nextTask: null,
+    } as never);
+    await callPost(makeRequest(), makeParams());
+
+    expect(readyCalls()).toHaveLength(0);
   });
 });
 

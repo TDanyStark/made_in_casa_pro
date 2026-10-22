@@ -96,6 +96,18 @@ export async function POST(request: NextRequest, { params }: Params) {
       taskId,
     });
 
+    // completeTask re-reads the next task after commit: 'not_started' means it was
+    // activated (never when it was set to 'blocked'). Tell its assignee it's their turn.
+    const nextTask = result.nextTask;
+    if (nextTask && nextTask.status === "not_started" && nextTask.assigned_user_id) {
+      await dispatchNotification({
+        eventType: NOTIFICATION_EVENTS.TASK_READY,
+        actorUserId: userId,
+        projectId,
+        taskId: nextTask.id,
+      });
+    }
+
     return NextResponse.json({
       task: result.task,
       nextTask: result.nextTask,

@@ -23,6 +23,7 @@ interface Props {
 
 const EVENT_TYPE_LABELS: Record<string, string> = {
   "task.assigned": "Tarea asignada",
+  "task.ready": "Tarea lista para ejecutar",
   "task.completed": "Tarea completada",
   "quote.requested": "Cotización solicitada",
   "quote.received": "Cotización recibida",

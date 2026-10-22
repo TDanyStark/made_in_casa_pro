@@ -1,7 +1,7 @@
 import { emailLayout } from "./layout";
 import {
   heading, subheading, paragraph, infoCard,
-  primaryButton, secondaryButton, divider, muted, badge, noteBlock, appUrl, escapeHtml,
+  primaryButton, secondaryButton, divider, muted, badge, noteBlock, appUrl, escapeHtml, safeDriveUrl,
 } from "./components";
 
 export interface TaskAssignedContext {
@@ -18,12 +18,6 @@ export interface TaskAssignedContext {
   notes?: string | null;
   taskDescription?: string | null;
   driveFolderUrl?: string | null;
-}
-
-/** Only http(s) links are rendered, so a malformed value never becomes a clickable href. */
-function safeDriveUrl(url: string | null | undefined): string | null {
-  const trimmed = url?.trim();
-  return trimmed && /^https?:\/\//i.test(trimmed) ? trimmed : null;
 }
 
 const FLAG_LABELS: Record<string, string> = {

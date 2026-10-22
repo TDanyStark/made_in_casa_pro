@@ -239,6 +239,33 @@ describe("POST /api/notification-deliveries/[id]/retry", () => {
     );
   });
 
+  it("rebuilds and resends a failed task.ready delivery with the 'ready to execute' subject", async () => {
+    mockGetDeliveryById.mockResolvedValue({ ...failedDelivery, event_type: "task.ready" } as unknown as never);
+    mockGetNotificationEventById.mockResolvedValue({ ...baseEvent, event_type: "task.ready" } as unknown as never);
+    mockGetProjectTaskById.mockResolvedValue(task as unknown as never);
+    mockGetProjectById.mockResolvedValue(project as unknown as never);
+    mockGetUserNotificationRecipient.mockResolvedValue({ id: 5, name: "Ana", email: "to@example.com" } as never);
+    mockGetActorName.mockResolvedValue("Alice");
+    mockGetTaskDriveFolderUrl.mockResolvedValue("https://drive.google.com/drive/folders/r1" as never);
+    mockResolveThreadKey.mockResolvedValue("project:7:version:base");
+
+    const res = await callPost("42");
+
+    expect(res!.status).toBe(200);
+    expect(await res!.json()).toEqual({ ok: true, retrying: false, sent: true, attempt: 2 });
+    expect(mockGetUserNotificationRecipient).toHaveBeenCalledWith(5);
+    expect(mockResendExistingDelivery).toHaveBeenCalledWith(
+      42,
+      expect.objectContaining({
+        to: { email: "to@example.com", name: "Ana" },
+        subject: "[Project X] Tu tarea est\u00e1 lista para ejecutar: Task Y",
+        html: expect.stringContaining("https://drive.google.com/drive/folders/r1"),
+        text: expect.stringContaining("Dise\u00f1ar piezas"),
+      }),
+      { projectId: 7, adjustmentId: null, threadKey: "project:7:version:base" }
+    );
+  });
+
   it("returns 500 on unexpected error", async () => {
     mockGetDeliveryById.mockRejectedValue(new Error("DB error"));
     const res = await callPost("42");

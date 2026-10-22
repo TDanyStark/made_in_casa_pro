@@ -3,6 +3,7 @@
  */
 
 import { taskAssigned } from "@/lib/email/templates/taskAssigned";
+import { taskReady } from "@/lib/email/templates/taskReady";
 import { taskReassigned } from "@/lib/email/templates/taskReassigned";
 import { taskCompleted } from "@/lib/email/templates/taskCompleted";
 import { quoteRequested } from "@/lib/email/templates/quoteRequested";
@@ -113,6 +114,81 @@ describe("taskAssigned template", () => {
     const html = taskAssigned.html({ ...ctx, driveFolderUrl: "javascript:alert(1)" });
     const text = taskAssigned.text({ ...ctx, driveFolderUrl: "javascript:alert(1)" });
     expect(html).not.toContain("javascript:");
+    expect(text).not.toContain("javascript:");
+  });
+});
+
+// ── taskReady ───────────────────────────────────────────────────────────────
+
+describe("taskReady template", () => {
+  const ctx = {
+    recipientName: "Ana García",
+    taskTitle: "Diseño de banner",
+    projectTitle: "Campaña Q2",
+    projectId: 15,
+    taskId: 3,
+  };
+  const withDetails = {
+    ...ctx,
+    taskDescription: "Banner 300x250 con <logo> & CTA",
+    driveFolderUrl: "https://drive.google.com/drive/folders/abc123",
+  };
+
+  it("subject says the task is ready to execute, with project and task title", () => {
+    expect(taskReady.subject(ctx)).toBe(
+      "[Campaña Q2] Tu tarea está lista para ejecutar: Diseño de banner"
+    );
+  });
+
+  it("html tells the recipient it is their turn and links to the project", () => {
+    const html = taskReady.html(ctx);
+    assertValidHtml(html);
+    assertNoUndefined(html);
+    expect(html).toContain("Ana García");
+    expect(html).toContain("Diseño de banner");
+    expect(html).toContain("Campaña Q2");
+    expect(html).toContain("ya está lista para que la ejecutes");
+    expect(html).toContain("está en tu cancha");
+    expect(html).toContain('href="https://app.madeincasa.com/projects/15"');
+  });
+
+  it("html includes escaped description (pre-line) and Drive button when provided", () => {
+    const html = taskReady.html(withDetails);
+    assertNoUndefined(html);
+    expect(html).toContain("Descripción");
+    expect(html).toContain("Banner 300x250 con &lt;logo&gt; &amp; CTA");
+    expect(html).not.toContain("<logo>");
+    expect(html).toContain("white-space:pre-line");
+    expect(html).toContain('href="https://drive.google.com/drive/folders/abc123"');
+    expect(html).toContain("Abrir carpeta de Drive");
+  });
+
+  it("text version includes main fields, description and Drive link", () => {
+    const text = taskReady.text(withDetails);
+    assertNoUndefined(text);
+    expect(text).toContain("Hola, Ana García");
+    expect(text).toContain("ya está lista para que la ejecutes");
+    expect(text).toContain("Diseño de banner");
+    expect(text).toContain("Campaña Q2");
+    expect(text).toContain("Descripción: Banner 300x250 con <logo> & CTA");
+    expect(text).toContain("Ver proyecto: https://app.madeincasa.com/projects/15");
+    expect(text).toContain("Carpeta de Drive: https://drive.google.com/drive/folders/abc123");
+  });
+
+  it("omits description and Drive sections when not provided", () => {
+    const html = taskReady.html({ ...ctx, taskDescription: null, driveFolderUrl: null });
+    const text = taskReady.text({ ...ctx, taskDescription: "   ", driveFolderUrl: null });
+    expect(html).not.toContain("Descripción");
+    expect(html).not.toContain("Abrir carpeta de Drive");
+    expect(text).not.toContain("Descripción");
+    expect(text).not.toContain("Carpeta de Drive");
+  });
+
+  it("ignores a Drive link that is not http(s)", () => {
+    const html = taskReady.html({ ...ctx, driveFolderUrl: "javascript:alert(1)" });
+    const text = taskReady.text({ ...ctx, driveFolderUrl: "javascript:alert(1)" });
+    expect(html).not.toContain("javascript:");
+    expect(html).not.toContain("Abrir carpeta de Drive");
     expect(text).not.toContain("javascript:");
   });
 });

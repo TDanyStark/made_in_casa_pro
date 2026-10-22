@@ -175,6 +175,7 @@ export async function POST(
     const createdNotifications: Array<{
       taskId: number;
       assignedTo: number | null;
+      status: string;
       quoterIds: number[];
     }> = [];
 
@@ -236,6 +237,7 @@ export async function POST(
           createdNotifications.push({
             taskId,
             assignedTo,
+            status,
             quoterIds: t.quoter_ids ?? [],
           });
 
@@ -289,6 +291,16 @@ export async function POST(
             projectId,
             taskId: created.taskId,
           });
+
+          // Created already active: it's the assignee's turn to execute it.
+          if (created.status === "not_started") {
+            await dispatchNotification({
+              eventType: NOTIFICATION_EVENTS.TASK_READY,
+              actorUserId: currentUserId,
+              projectId,
+              taskId: created.taskId,
+            });
+          }
         }
 
         for (const quoterId of created.quoterIds) {

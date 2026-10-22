@@ -14,6 +14,7 @@ import { decrypt } from "@/lib/session";
 import { AUTHENTICATED_ROLES, OPERATIONS_ROLES } from "@/lib/role-groups";
 import { dispatchNotification, NOTIFICATION_EVENTS } from "@/lib/services/notificationEngine";
 import { syncProjectDriveAccess } from "@/lib/services/projectDriveAccess";
+import { dispatchReadyForActivatedTasks, parseNotifyParam } from "../taskReadyNotifications";
 
 const patchSchema = z.object({
   title: z.string().min(1).optional(),
@@ -49,6 +50,9 @@ export async function PATCH(request: NextRequest, { params }: Params) {
 
   const roleValidation = await validateApiRole(request, AUTHENTICATED_ROLES);
   if (!roleValidation.isAuthorized) return roleValidation.response;
+
+  const notifyParam = parseNotifyParam(request);
+  if (!notifyParam.ok) return notifyParam.response;
 
   try {
     const { id, tid } = await params;
@@ -130,7 +134,8 @@ export async function PATCH(request: NextRequest, { params }: Params) {
       await recalculateProjectProgress(projectId);
     }
 
-    if (currentUserId) {
+    // notify=false (project wizard) silences the task emails; quote requests are still sent.
+    if (currentUserId && notifyParam.notify) {
       if (assignmentChanged && existingTask.assigned_user_id) {
         await dispatchNotification({
           eventType: NOTIFICATION_EVENTS.TASK_REASSIGNED,
@@ -149,16 +154,30 @@ export async function PATCH(request: NextRequest, { params }: Params) {
         });
       }
 
-      if (validation.data.quoter_ids !== undefined) {
-        for (const quoterId of validation.data.quoter_ids) {
-          await dispatchNotification({
-            eventType: NOTIFICATION_EVENTS.QUOTE_REQUESTED,
-            actorUserId: currentUserId,
-            projectId,
-            taskId,
-            inviteeUserId: quoterId,
-          });
-        }
+      // Became active (from waiting/blocked/etc.) with an assignee: it's their turn.
+      if (
+        existingTask.status !== "not_started" &&
+        updated.status === "not_started" &&
+        updated.assigned_user_id
+      ) {
+        await dispatchNotification({
+          eventType: NOTIFICATION_EVENTS.TASK_READY,
+          actorUserId: currentUserId,
+          projectId,
+          taskId,
+        });
+      }
+    }
+
+    if (currentUserId && validation.data.quoter_ids !== undefined) {
+      for (const quoterId of validation.data.quoter_ids) {
+        await dispatchNotification({
+          eventType: NOTIFICATION_EVENTS.QUOTE_REQUESTED,
+          actorUserId: currentUserId,
+          projectId,
+          taskId,
+          inviteeUserId: quoterId,
+        });
       }
     }
 
@@ -176,11 +195,22 @@ export async function DELETE(request: NextRequest, { params }: Params) {
   const roleValidation = await validateApiRole(request, OPERATIONS_ROLES);
   if (!roleValidation.isAuthorized) return roleValidation.response;
 
+  const notifyParam = parseNotifyParam(request);
+  if (!notifyParam.ok) return notifyParam.response;
+
   try {
     const { id, tid } = await params;
     const projectId = parseInt(id);
-    await deleteProjectTask(parseInt(tid));
+    const activatedIds = await deleteProjectTask(parseInt(tid));
     await recalculateProjectProgress(projectId);
+
+    const cookie = (await cookies()).get("session")?.value;
+    const session = cookie ? await decrypt(cookie) : null;
+    const currentUserId = session?.id ? Number(session.id) : null;
+    if (currentUserId && notifyParam.notify) {
+      await dispatchReadyForActivatedTasks(activatedIds, currentUserId, projectId);
+    }
+
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("Error deleting task:", error);

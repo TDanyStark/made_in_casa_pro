@@ -22,6 +22,7 @@ import {
 } from "@/lib/queries/notificationRecipients";
 import { resolveProjectVersionThreadKey } from "@/lib/queries/projectEmailThreads";
 import { taskAssigned } from "@/lib/email/templates/taskAssigned";
+import { taskReady } from "@/lib/email/templates/taskReady";
 import { taskReassigned } from "@/lib/email/templates/taskReassigned";
 import { taskCompleted } from "@/lib/email/templates/taskCompleted";
 import { quoteRequested } from "@/lib/email/templates/quoteRequested";
@@ -172,6 +173,37 @@ async function buildRetryMessage(
           subject: taskAssigned.subject({ recipientName: r.name, assignedByName, taskTitle: task.title, taskType: task.task_type, taskFlag: task.task_flag, projectTitle: project.title, projectId: project.id, taskId: task.id }),
           html: taskAssigned.html({ recipientName: r.name, assignedByName, taskTitle: task.title, taskType: task.task_type, taskFlag: task.task_flag, projectTitle: project.title, projectId: project.id, taskId: task.id, dueDate: project.ideal_delivery_at ? formatDate(project.ideal_delivery_at) : null, deliveryDays: null, taskDescription: task.description, driveFolderUrl }),
           text: taskAssigned.text({ recipientName: r.name, assignedByName, taskTitle: task.title, taskType: task.task_type, taskFlag: task.task_flag, projectTitle: project.title, projectId: project.id, taskId: task.id, taskDescription: task.description, driveFolderUrl }),
+        },
+        opts: { projectId: event.project_id, adjustmentId: task.adjustment_id ?? null, threadKey },
+      };
+    }
+
+    // ── task.ready ───────────────────────────────────────────────────────
+    case "task.ready": {
+      if (!event.task_id || !event.project_id) return null;
+      const [task, project, assignee] = await Promise.all([
+        getProjectTaskById(event.task_id),
+        getProjectById(event.project_id),
+        recipientUserId ? getUserNotificationRecipient(recipientUserId) : getTaskAssignee(event.task_id),
+      ]);
+      if (!task || !project || !assignee) return null;
+      const driveFolderUrl = await getTaskDriveFolderUrl(task.id);
+      const threadKey = await resolveProjectVersionThreadKey(event.project_id, task.adjustment_id ?? null);
+      const ctx = {
+        recipientName: assignee.name,
+        taskTitle: task.title,
+        projectTitle: project.title,
+        projectId: project.id,
+        taskId: task.id,
+        taskDescription: task.description,
+        driveFolderUrl,
+      };
+      return {
+        message: {
+          to: { email: recipientEmail, name: assignee.name },
+          subject: taskReady.subject(ctx),
+          html: taskReady.html(ctx),
+          text: taskReady.text(ctx),
         },
         opts: { projectId: event.project_id, adjustmentId: task.adjustment_id ?? null, threadKey },
       };

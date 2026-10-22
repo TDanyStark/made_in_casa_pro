@@ -4,6 +4,7 @@ import { validateApiRole, validateHttpMethod } from "@/lib/services/api-auth";
 import { OPERATIONS_ROLES } from "@/lib/role-groups";
 import { acceptQuote, rejectQuote } from "@/lib/queries/taskQuotes";
 import { getTaskQuotes } from "@/lib/queries/taskQuotes";
+import { getProjectTaskById } from "@/lib/queries/projectTasks";
 import { recalculateProjectProgress } from "@/lib/queries/projects";
 import { decrypt } from "@/lib/session";
 import { cookies } from "next/headers";
@@ -64,6 +65,17 @@ export async function PATCH(request: NextRequest, { params }: Params) {
           delivery_days: quote?.delivery_days ?? 0,
         },
       });
+
+      // acceptQuote activates the task; notify only if it really ended up 'not_started'.
+      const acceptedTask = await getProjectTaskById(taskId);
+      if (acceptedTask && acceptedTask.status === "not_started" && acceptedTask.assigned_user_id) {
+        await dispatchNotification({
+          eventType: NOTIFICATION_EVENTS.TASK_READY,
+          actorUserId: session.id,
+          projectId,
+          taskId,
+        });
+      }
       return NextResponse.json({
         success: true,
         action: "accepted",

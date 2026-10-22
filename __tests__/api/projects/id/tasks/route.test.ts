@@ -35,9 +35,14 @@ jest.mock("@/lib/session", () => ({
 jest.mock("@/lib/services/notificationEngine", () => ({
   NOTIFICATION_EVENTS: {
     TASK_ASSIGNED: "task.assigned",
+    TASK_READY: "task.ready",
     QUOTE_REQUESTED: "quote.requested",
   },
   dispatchNotification: jest.fn(),
+}));
+
+jest.mock("@/lib/services/projectDriveAccess", () => ({
+  syncProjectDriveAccess: jest.fn().mockResolvedValue(null),
 }));
 
 import { NextRequest } from "next/server";
@@ -65,9 +70,9 @@ const mockCookies = cookies as jest.MockedFunction<typeof cookies>;
 const mockDecrypt = decrypt as jest.MockedFunction<typeof decrypt>;
 const mockDispatchNotification = dispatchNotification as jest.MockedFunction<typeof dispatchNotification>;
 
-async function callPost(body: Record<string, unknown>, projectId = "15") {
+async function callPost(body: Record<string, unknown>, projectId = "15", query = "") {
   const response = await POST(
-    new NextRequest(`http://localhost/api/projects/${projectId}/tasks`, {
+    new NextRequest(`http://localhost/api/projects/${projectId}/tasks${query}`, {
       method: "POST",
       body: JSON.stringify(body),
       headers: { "Content-Type": "application/json" },
@@ -194,6 +199,117 @@ describe("POST /api/projects/[id]/tasks — canonical initial status", () => {
         sql: expect.stringContaining("'blocked'"),
       })
     );
+  });
+
+  describe("task.ready notification on creation", () => {
+    beforeEach(() => {
+      mockCookies.mockResolvedValue({
+        get: jest.fn().mockReturnValue({ value: "session-token" }),
+      } as never);
+      mockDecrypt.mockResolvedValue({ id: 3, email: "admin@test.com", rol_id: 1 } as never);
+    });
+
+    function eventTypes() {
+      return mockDispatchNotification.mock.calls.map(([input]) => input.eventType);
+    }
+
+    it("dispatches task.assigned and then task.ready when the first task is created not_started with an assignee", async () => {
+      mockDbExecute.mockResolvedValueOnce({ rows: [{ next_order: 0 }] } as never);
+      mockResolveProjectTaskAssignment.mockResolvedValue(7);
+      mockCreateProjectTask.mockResolvedValue({
+        id: 200,
+        project_id: 15,
+        status: "not_started",
+        assigned_user_id: 7,
+      } as never);
+
+      const res = await callPost({ title: "Primera tarea", adjustment_id: 9 });
+
+      expect(res.status).toBe(201);
+      expect(eventTypes()).toEqual(["task.assigned", "task.ready"]);
+      expect(mockDispatchNotification).toHaveBeenNthCalledWith(1, {
+        eventType: "task.assigned",
+        actorUserId: 3,
+        projectId: 15,
+        taskId: 200,
+      });
+      expect(mockDispatchNotification).toHaveBeenNthCalledWith(2, {
+        eventType: "task.ready",
+        actorUserId: 3,
+        projectId: 15,
+        taskId: 200,
+      });
+    });
+
+    it("dispatches only task.assigned for a task created in 'waiting'", async () => {
+      mockDbExecute.mockResolvedValueOnce({ rows: [{ next_order: 2 }] } as never);
+      mockDbExecute.mockResolvedValueOnce({ rows: [{ cnt: "1" }] } as never);
+      mockResolveProjectTaskAssignment.mockResolvedValue(7);
+      mockCreateProjectTask.mockResolvedValue({
+        id: 201,
+        project_id: 15,
+        status: "waiting",
+        assigned_user_id: 7,
+      } as never);
+
+      const res = await callPost({ title: "Tarea en espera", adjustment_id: 9 });
+
+      expect(res.status).toBe(201);
+      expect(eventTypes()).toEqual(["task.assigned"]);
+    });
+
+    it("?notify=false silences task.assigned and task.ready but still sends quote.requested", async () => {
+      mockDbExecute.mockResolvedValueOnce({ rows: [{ next_order: 0 }] } as never);
+      mockResolveProjectTaskAssignment.mockResolvedValue(7);
+      mockCreateProjectTask.mockResolvedValue({
+        id: 203,
+        project_id: 15,
+        status: "not_started",
+        assigned_user_id: 7,
+      } as never);
+      mockDbTransaction.mockResolvedValue({
+        execute: jest.fn().mockResolvedValue(undefined),
+        commit: jest.fn().mockResolvedValue(undefined),
+        rollback: jest.fn().mockResolvedValue(undefined),
+      } as never);
+
+      const res = await callPost({ title: "Silenciosa", adjustment_id: 9, quoter_ids: [12] }, "15", "?notify=false");
+
+      expect(res.status).toBe(201);
+      expect(mockDispatchNotification).toHaveBeenCalledTimes(1);
+      expect(mockDispatchNotification).toHaveBeenCalledWith({
+        eventType: "quote.requested",
+        actorUserId: 3,
+        projectId: 15,
+        taskId: 203,
+        inviteeUserId: 12,
+      });
+    });
+
+    it("rejects an invalid notify value with 400 and creates nothing", async () => {
+      const res = await callPost({ title: "X", adjustment_id: 9 }, "15", "?notify=maybe");
+
+      expect(res.status).toBe(400);
+      expect(await res.json()).toEqual({ error: "Par\u00e1metro notify inv\u00e1lido" });
+      expect(mockCreateProjectTask).not.toHaveBeenCalled();
+      expect(mockDispatchNotification).not.toHaveBeenCalled();
+    });
+
+    it("does not dispatch task.ready when the created not_started task has no assignee", async () => {
+      mockDbExecute.mockResolvedValueOnce({ rows: [{ next_order: 0 }] } as never);
+      mockResolveProjectTaskAssignment.mockResolvedValue(null);
+      mockCreateProjectTask.mockResolvedValue({
+        id: 202,
+        project_id: 15,
+        status: "not_started",
+        assigned_user_id: null,
+      } as never);
+
+      const res = await callPost({ title: "Sin responsable", adjustment_id: 9 });
+
+      expect(res.status).toBe(201);
+      expect(mockDispatchNotification).not.toHaveBeenCalled();
+    });
   });
 
   it("still honors an explicit status sent by the caller (e.g. admin tooling), untouched by the default-status computation", async () => {

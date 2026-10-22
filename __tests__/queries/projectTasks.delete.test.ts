@@ -90,7 +90,7 @@ describe('deleteProjectTask()', () => {
   it('does nothing when the task does not exist', async () => {
     mockExecute.mockResolvedValueOnce(makeResult([])); // getProjectTaskById -> not found
 
-    await deleteProjectTask(999);
+    await expect(deleteProjectTask(999)).resolves.toEqual([]);
 
     expect(mockTransaction.execute).not.toHaveBeenCalled();
     expect(mockTransaction.commit).not.toHaveBeenCalled();
@@ -123,7 +123,8 @@ describe('deleteProjectTask()', () => {
       ) // SELECT remaining tasks ordered by order_index
       .mockResolvedValueOnce(makeResult([])); // UPDATE promote id=2
 
-    await deleteProjectTask(1);
+    // Returns the ids it activated so the API layer can notify (task.ready)
+    await expect(deleteProjectTask(1)).resolves.toEqual([2]);
 
     // DELETE issued for the removed task
     expect(mockTransaction.execute).toHaveBeenNthCalledWith(
@@ -179,7 +180,7 @@ describe('deleteProjectTask()', () => {
       .mockResolvedValueOnce(makeResult([])) // DELETE
       .mockResolvedValueOnce(makeResult([])); // SELECT — no tasks remain
 
-    await expect(deleteProjectTask(1)).resolves.toBeUndefined();
+    await expect(deleteProjectTask(1)).resolves.toEqual([]);
 
     expect(mockTransaction.execute).toHaveBeenCalledTimes(2);
     expect(mockTransaction.commit).toHaveBeenCalled();
@@ -200,7 +201,8 @@ describe('deleteProjectTask()', () => {
       )
       .mockResolvedValueOnce(makeResult([])); // UPDATE demote id=4
 
-    await deleteProjectTask(1);
+    // Demoted tasks are never reported as activated
+    await expect(deleteProjectTask(1)).resolves.toEqual([]);
 
     expect(mockTransaction.execute).toHaveBeenNthCalledWith(
       3,

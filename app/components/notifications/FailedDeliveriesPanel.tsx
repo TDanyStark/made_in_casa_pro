@@ -29,6 +29,7 @@ const MAX_RETRY_COUNT = 3;
 
 const EVENT_TYPE_LABELS: Record<string, string> = {
   "task.assigned": "Tarea asignada",
+  "task.ready": "Tarea lista para ejecutar",
   "task.reassigned": "Tarea reasignada",
   "task.completed": "Tarea completada",
   "quote.requested": "Cotización solicitada",

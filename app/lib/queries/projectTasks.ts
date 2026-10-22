@@ -334,10 +334,14 @@ export async function updateProjectTask(
 
 // ─── Delete ───────────────────────────────────────────────────────────────────
 
-export async function deleteProjectTask(id: number): Promise<void> {
+/**
+ * Deletes a non-completed task. Returns the ids of the tasks that the pending-task
+ * promotion activated ('waiting' -> 'not_started') so callers can notify them.
+ */
+export async function deleteProjectTask(id: number): Promise<number[]> {
   try {
     const task = await getProjectTaskById(id);
-    if (!task) return;
+    if (!task) return [];
     if (task.status === "completed") {
       throw new Error("No se pueden eliminar tareas completadas.");
     }
@@ -352,15 +356,15 @@ export async function deleteProjectTask(id: number): Promise<void> {
       // next pending task in order to 'not_started'. Completed tasks and tasks from
       // other adjustment versions are never touched (same semantics as completeTask
       // / reorderProjectTasks).
-      await ensureNextPendingTaskActive(transaction, task.project_id, task.adjustment_id);
+      const activatedIds = await ensureNextPendingTaskActive(transaction, task.project_id, task.adjustment_id);
 
       await transaction.commit();
+      revalidatePath(`/projects/${task.project_id}`);
+      return activatedIds;
     } catch (err) {
       await transaction.rollback();
       throw err;
     }
-
-    revalidatePath(`/projects/${task.project_id}`);
   } catch (error) {
     console.error("Error deleting project task:", error);
     throw error;
@@ -381,6 +385,8 @@ export async function deleteProjectTask(id: number): Promise<void> {
  *   - Completed tasks are skipped entirely and never touched.
  *
  * Must run inside an existing write transaction (delete/reorder are atomic).
+ * Returns the ids of the tasks it promoted 'waiting' -> 'not_started' (never the
+ * ones it demotes), so the API layer can dispatch task.ready after commit.
  * Extracted from reorderProjectTasks() so deleteProjectTask() (and any future
  * caller) can reuse the exact same promotion semantics instead of duplicating it.
  */
@@ -388,7 +394,8 @@ async function ensureNextPendingTaskActive(
   transaction: DbTransaction,
   projectId: number,
   adjustmentId?: number | null
-): Promise<void> {
+): Promise<number[]> {
+  const activatedIds: number[] = [];
   const adjustmentFilter =
     adjustmentId === undefined
       ? ""
@@ -417,6 +424,7 @@ async function ensureNextPendingTaskActive(
           sql: `UPDATE project_tasks SET status = 'not_started', assigned_at = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $1`,
           args: [task.id, task.assigned_user_id ? new Date() : null],
         });
+        activatedIds.push(Number(task.id));
       }
     } else {
       if (task.status === "not_started") {
@@ -427,6 +435,7 @@ async function ensureNextPendingTaskActive(
       }
     }
   }
+  return activatedIds;
 }
 
 // ─── Reorder ──────────────────────────────────────────────────────────────────
@@ -435,7 +444,7 @@ export async function reorderProjectTasks(
   projectId: number,
   orderedIds: number[],
   adjustmentId?: number | null
-): Promise<void> {
+): Promise<number[]> {
   const currentTasks = await getTasksByProject(projectId, adjustmentId);
   const completedTaskIds = currentTasks.filter(t => t.status === "completed").map(t => t.id);
 
@@ -466,10 +475,11 @@ export async function reorderProjectTasks(
     // Status logic:
     // 1. The first task that is NOT completed must be set to 'not_started' if it was 'waiting'
     // 2. All subsequent tasks that are 'not_started' must be set to 'waiting'
-    await ensureNextPendingTaskActive(transaction, projectId, adjustmentId);
+    const activatedIds = await ensureNextPendingTaskActive(transaction, projectId, adjustmentId);
 
     await transaction.commit();
     revalidatePath(`/projects/${projectId}`);
+    return activatedIds;
   } catch (error) {
     await transaction.rollback();
     console.error("Error reordering project tasks:", error);

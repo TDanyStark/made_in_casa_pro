@@ -9,6 +9,7 @@ import { decrypt } from "@/lib/session";
 import { AUTHENTICATED_ROLES, OPERATIONS_ROLES } from "@/lib/role-groups";
 import { dispatchNotification, NOTIFICATION_EVENTS } from "@/lib/services/notificationEngine";
 import { syncProjectDriveAccess } from "@/lib/services/projectDriveAccess";
+import { parseNotifyParam } from "./taskReadyNotifications";
 
 const taskSchema = z.object({
   title: z.string().min(1, "El título es requerido"),
@@ -57,6 +58,9 @@ export async function POST(request: NextRequest, { params }: Params) {
 
   const roleValidation = await validateApiRole(request, OPERATIONS_ROLES);
   if (!roleValidation.isAuthorized) return roleValidation.response;
+
+  const notifyParam = parseNotifyParam(request);
+  if (!notifyParam.ok) return notifyParam.response;
 
   try {
     const { id } = await params;
@@ -178,13 +182,24 @@ export async function POST(request: NextRequest, { params }: Params) {
     await recalculateProjectProgress(projectId);
 
     if (currentUserId) {
-      if (task.assigned_user_id) {
+      // notify=false (project wizard): task emails are sent once at the end by notify-created.
+      if (notifyParam.notify && task.assigned_user_id) {
         await dispatchNotification({
           eventType: NOTIFICATION_EVENTS.TASK_ASSIGNED,
           actorUserId: currentUserId,
           projectId,
           taskId: task.id,
         });
+
+        // Created already active: it's the assignee's turn, so a second email after "assigned".
+        if (task.status === "not_started") {
+          await dispatchNotification({
+            eventType: NOTIFICATION_EVENTS.TASK_READY,
+            actorUserId: currentUserId,
+            projectId,
+            taskId: task.id,
+          });
+        }
       }
 
       for (const quoterId of validation.data.quoter_ids) {

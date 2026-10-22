@@ -6,6 +6,7 @@ import { recalculateProjectProgress } from "@/lib/queries/projects";
 import { decrypt } from "@/lib/session";
 import { cookies } from "next/headers";
 import { AUTHENTICATED_ROLES, TASK_OVERRIDE_ROLES } from "@/lib/role-groups";
+import { dispatchNotification, NOTIFICATION_EVENTS } from "@/lib/services/notificationEngine";
 
 const bodySchema = z.object({
   action: z.enum(["approve", "reject"]),
@@ -82,6 +83,18 @@ export async function POST(request: NextRequest, { params }: Params) {
 
     const result = await validateTask(taskId, userId, action, targetTaskId, notes);
     await recalculateProjectProgress(projectId);
+
+    // approve: targetTask is the next task completeTask activated (or blocked).
+    // reject: targetTask is the first correction task, created 'not_started'.
+    const activated = result.targetTask;
+    if (activated && activated.status === "not_started" && activated.assigned_user_id) {
+      await dispatchNotification({
+        eventType: NOTIFICATION_EVENTS.TASK_READY,
+        actorUserId: userId,
+        projectId,
+        taskId: activated.id,
+      });
+    }
 
     return NextResponse.json({
       task: result.task,

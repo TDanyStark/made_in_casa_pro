@@ -143,6 +143,71 @@ describe("dispatchNotification()", () => {
     expect(mockSendEmail).not.toHaveBeenCalled();
   });
 
+  // ── task.ready ──────────────────────────────────────────────────────────
+
+  it("task.ready: exposes the event type constant", () => {
+    expect(NOTIFICATION_EVENTS.TASK_READY).toBe("task.ready");
+  });
+
+  it("task.ready: creates event and sends one 'ready to execute' email to the assignee", async () => {
+    mockGetProjectTaskById.mockResolvedValueOnce({ ...task, description: "Banner principal", adjustment_id: 7 });
+    mockGetTaskDriveFolderUrl.mockResolvedValueOnce("https://drive.google.com/drive/folders/v2");
+
+    await dispatchNotification({
+      eventType: NOTIFICATION_EVENTS.TASK_READY,
+      actorUserId: 3,
+      taskId: 10,
+      projectId: 1,
+    });
+
+    expect(mockCreateEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ event_type: "task.ready", actor_user_id: 3, project_id: 1, task_id: 10 })
+    );
+    expect(mockGetTaskAssignee).toHaveBeenCalledWith(10);
+    expect(mockGetTaskDriveFolderUrl).toHaveBeenCalledWith(10);
+    expect(mockSendEmail).toHaveBeenCalledTimes(1);
+    expect(mockSendEmail).toHaveBeenCalledWith(
+      expect.objectContaining({
+        senderUserId: 3,
+        message: expect.objectContaining({
+          to: { email: "ana@test.com", name: "Ana García" },
+          subject: "[Campaña Q2] Tu tarea está lista para ejecutar: Diseño de banner",
+        }),
+        eventId: 99,
+        recipientUserId: 5,
+        projectId: 1,
+        adjustmentId: 7,
+        thread: { threadKey: "project:1:version:v2" },
+      })
+    );
+    const { message } = mockSendEmail.mock.calls[0][0];
+    expect(message.html).toContain("Banner principal");
+    expect(message.html).toContain("https://drive.google.com/drive/folders/v2");
+    expect(message.text).toContain("Carpeta de Drive: https://drive.google.com/drive/folders/v2");
+  });
+
+  it("task.ready: skips email when the task has no assignee", async () => {
+    mockGetTaskAssignee.mockResolvedValueOnce(null);
+
+    await dispatchNotification({
+      eventType: NOTIFICATION_EVENTS.TASK_READY,
+      actorUserId: 3,
+      taskId: 10,
+      projectId: 1,
+    });
+
+    expect(mockSendEmail).not.toHaveBeenCalled();
+  });
+
+  it("task.ready: skips email when the task or project no longer exists", async () => {
+    mockGetProjectTaskById.mockResolvedValueOnce(null);
+    await dispatchNotification({ eventType: NOTIFICATION_EVENTS.TASK_READY, actorUserId: 3, taskId: 10, projectId: 1 });
+    mockGetProjectById.mockResolvedValueOnce(null);
+    await dispatchNotification({ eventType: NOTIFICATION_EVENTS.TASK_READY, actorUserId: 3, taskId: 10, projectId: 1 });
+
+    expect(mockSendEmail).not.toHaveBeenCalled();
+  });
+
   it("task.reassigned: notifies previous assignee and new assignee", async () => {
     await dispatchNotification({
       eventType: NOTIFICATION_EVENTS.TASK_REASSIGNED,
