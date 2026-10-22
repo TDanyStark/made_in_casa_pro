@@ -94,3 +94,21 @@ describe("getTasksCommandCenterWithPagination", () => {
     expect(dataCall.args.slice(-2)).toEqual([10, 20]);
   });
 });
+
+describe("getTasksCommandCenterWithPagination — paused status", () => {
+  it("restricts by status when the five legacy statuses are requested without 'paused'", async () => {
+    const { db } = jest.requireMock("@/lib/db");
+    (db.execute as jest.Mock).mockReset().mockResolvedValue({ rows: [{ count: 0 }] });
+    const { getTasksCommandCenterWithPagination } = jest.requireActual("@/lib/queries/projectTasks");
+
+    await getTasksCommandCenterWithPagination({
+      page: 1,
+      limit: 10,
+      statuses: ["not_started", "waiting", "in_progress", "completed", "blocked"],
+    });
+
+    const countCall = (db.execute as jest.Mock).mock.calls[0][0];
+    expect(countCall.sql).toContain("(pt.status = 'completed' OR pt.status = ANY(");
+    expect(countCall.args).toContainEqual(["not_started", "waiting", "in_progress", "blocked"]);
+  });
+});

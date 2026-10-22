@@ -24,7 +24,7 @@ const patchSchema = z.object({
   description: z.string().nullable().optional(),
   area_id: z.coerce.number().int().positive().nullable().optional(),
   assigned_user_id: z.coerce.number().int().positive().nullable().optional(),
-  status: z.enum(["not_started", "waiting", "in_progress", "completed", "blocked"]).optional(),
+  status: z.enum(["not_started", "waiting", "in_progress", "paused", "completed", "blocked"]).optional(),
   task_type: z.enum(["execution", "validation"]).optional(),
   task_flag: z.enum(["new", "correction", "adjustment"]).optional(),
   requires_quote: z.coerce.number().int().min(0).max(1).optional(),
@@ -100,16 +100,16 @@ export async function PATCH(request: NextRequest, { params }: Params) {
       updateData.status = "blocked";
     }
 
-    const updated = await updateProjectTask(taskId, updateData);
+    const cookie = (await cookies()).get("session")?.value;
+    const session = cookie ? await decrypt(cookie) : null;
+    const currentUserId = session?.id ? Number(session.id) : null;
+
+    const updated = await updateProjectTask(taskId, updateData, currentUserId);
     if (!updated) return NextResponse.json({ error: "Tarea no encontrada" }, { status: 404 });
     const assignmentChanged = updated.assigned_user_id !== existingTask.assigned_user_id;
     const driveWarning = assignmentChanged && updated.assigned_user_id
       ? await syncProjectDriveAccess(projectId)
       : null;
-
-    const cookie = (await cookies()).get("session")?.value;
-    const session = cookie ? await decrypt(cookie) : null;
-    const currentUserId = session?.id ? Number(session.id) : null;
 
     // Handle quoter invitations sync
     if (validation.data.quoter_ids !== undefined) {

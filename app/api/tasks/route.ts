@@ -11,7 +11,7 @@ const querySchema = z.object({
   areaId: z.coerce.number().int().positive().optional(),
   assignedUserId: z.coerce.number().int().positive().optional(),
   statuses: z
-    .array(z.enum(["not_started", "waiting", "in_progress", "completed", "blocked"]))
+    .array(z.enum(["not_started", "waiting", "in_progress", "paused", "completed", "blocked"]))
     .optional()
     .transform((value) => (value && value.length > 0 ? Array.from(new Set(value)) : undefined)),
   taskType: z.enum(["execution", "validation"]).optional(),

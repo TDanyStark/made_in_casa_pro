@@ -417,7 +417,7 @@ export class TaskVersionError extends Error {
   }
 }
 
-export type ProjectTaskStatus = 'not_started' | 'waiting' | 'in_progress' | 'completed' | 'blocked';
+export type ProjectTaskStatus = 'not_started' | 'waiting' | 'in_progress' | 'paused' | 'completed' | 'blocked';
 
 /**
  * Input to create a project task. `adjustment_id` is optional here: when omitted

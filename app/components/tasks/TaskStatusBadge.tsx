@@ -8,6 +8,7 @@ export const TASK_STATUS_LABELS: Record<ProjectTaskStatus, string> = {
   not_started: "Sin iniciar",
   waiting: "En espera",
   in_progress: "En progreso",
+  paused: "Pausada",
   completed: "Completada",
   blocked: "Bloqueada",
 };
@@ -19,6 +20,8 @@ export const TASK_STATUS_STYLES: Record<ProjectTaskStatus, string> = {
     "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950 dark:text-amber-400 dark:border-amber-800",
   in_progress:
     "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950 dark:text-blue-400 dark:border-blue-800",
+  paused:
+    "bg-orange-50 text-orange-700 border-orange-200 dark:bg-orange-950 dark:text-orange-400 dark:border-orange-800",
   completed:
     "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950 dark:text-emerald-400 dark:border-emerald-800",
   blocked:
@@ -29,6 +32,7 @@ export const TASK_STATUS_DOT: Record<ProjectTaskStatus, string> = {
   not_started: "bg-slate-400",
   waiting: "bg-amber-400",
   in_progress: "bg-blue-500 animate-pulse",
+  paused: "bg-orange-400",
   completed: "bg-emerald-500",
   blocked: "bg-red-500",
 };

@@ -77,6 +77,7 @@ export function TaskHistoryDialog({
                            {transition.to_status === 'completed' ? 'Completada' : 
                             transition.to_status === 'blocked' ? 'Bloqueada' : 
                             transition.to_status === 'in_progress' ? 'En progreso' : 
+                            transition.to_status === 'paused' ? 'Pausada' :
                             transition.to_status === 'not_started' ? 'Sin iniciar' : transition.to_status}
                         </span>
                         <time className="text-[10px] text-muted-foreground">

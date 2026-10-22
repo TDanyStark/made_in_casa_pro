@@ -214,7 +214,7 @@ describe("TasksCommandCenterClient", () => {
     expect(url.startsWith("/tasks?")).toBe(true);
     const params = new URLSearchParams(url.split("?")[1]);
     expect(params.get("page")).toBe("1");
-    expect(params.getAll("status").sort()).toEqual(["blocked", "in_progress", "not_started", "waiting"]);
+    expect(params.getAll("status").sort()).toEqual(["blocked", "in_progress", "not_started", "paused", "waiting"]);
   });
 
   it("double click on a status pill selects only that status", () => {

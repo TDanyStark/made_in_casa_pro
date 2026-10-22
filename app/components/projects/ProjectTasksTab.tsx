@@ -99,6 +99,10 @@ const TASK_STATUS_CONFIG: Record<ProjectTaskStatus, { label: string; className: 
     label: "En progreso",
     className: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400",
   },
+  paused: {
+    label: "Pausada",
+    className: "bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400",
+  },
   completed: {
     label: "Completado",
     className: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400",
@@ -127,7 +131,7 @@ const taskSchema = z
   .object({
     title: z.string().min(1, "El título es requerido"),
     description: z.string().optional().nullable(),
-    status: z.enum(["not_started", "waiting", "in_progress", "completed", "blocked"]).optional(),
+    status: z.enum(["not_started", "waiting", "in_progress", "paused", "completed", "blocked"]).optional(),
     task_type: z.enum(["execution", "validation"]).default("execution"),
     requires_quote: z.boolean().default(false),
     quoter_ids: z.array(z.number()).default([]),

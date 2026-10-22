@@ -21,7 +21,7 @@ const taskSchema = z.object({
   description: z.string().optional().nullable(),
   area_id: z.coerce.number().int().positive().optional().nullable(),
   assigned_user_id: z.coerce.number().int().positive().optional().nullable(),
-  status: z.enum(["not_started", "waiting", "in_progress", "completed", "blocked"]).optional(),
+  status: z.enum(["not_started", "waiting", "in_progress", "paused", "completed", "blocked"]).optional(),
   task_type: z.enum(["execution", "validation"]).optional().default("execution"),
   task_flag: z.enum(["new", "correction", "adjustment"]).optional().default("new"),
   requires_quote: z.coerce.number().int().min(0).max(1).optional().default(0),
@@ -112,7 +112,7 @@ export async function POST(request: NextRequest, { params }: Params) {
       const activeResult = await db.execute({
         sql: `SELECT COUNT(*) AS cnt FROM project_tasks
               WHERE project_id = $1 AND adjustment_id = $2
-                AND status IN ('not_started', 'in_progress', 'waiting', 'blocked')`,
+                AND status IN ('not_started', 'in_progress', 'paused', 'waiting', 'blocked')`,
         args: [projectId, adjustmentId],
       });
       const activeCount = Number((activeResult.rows[0] as unknown as { cnt: string }).cnt);

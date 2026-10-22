@@ -12,7 +12,7 @@ const querySchema = z.object({
   page: z.coerce.number().int().positive().default(1),
   statuses: z
     .array(
-      z.enum(["not_started", "waiting", "in_progress", "completed", "blocked"])
+      z.enum(["not_started", "waiting", "in_progress", "paused", "completed", "blocked"])
     )
     .optional()
     .transform((v) =>

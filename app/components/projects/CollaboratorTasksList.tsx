@@ -25,6 +25,7 @@ const TASK_STATUS_LABELS: Record<string, string> = {
   not_started: "Sin iniciar",
   waiting: "En espera",
   in_progress: "En progreso",
+  paused: "Pausada",
   completed: "Completado",
   blocked: "Bloqueado",
 };
@@ -33,6 +34,7 @@ const STATUS_VARIANT: Record<string, "default" | "secondary" | "outline" | "dest
   not_started: "secondary",
   waiting: "secondary",
   in_progress: "default",
+  paused: "outline",
   completed: "default",
   blocked: "destructive",
 };

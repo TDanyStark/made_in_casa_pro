@@ -114,4 +114,15 @@ describe("POST /progress", () => {
     expect(res.status).toBe(400);
     expect(data.error).toMatch(/en progreso/i);
   });
+
+  it("returns 400 and saves nothing when the task is paused (resume first)", async () => {
+    mockGetProjectTaskById.mockResolvedValue(makeTask({ status: "paused" }) as never);
+
+    const res = await callPost(makeRequest({ progress_percent: 60, additional_minutes: 60 }));
+    const data = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(data).toEqual({ error: "Solo se puede reportar avance para tareas en progreso" });
+    expect(mockUpdateTaskProgress).not.toHaveBeenCalled();
+  });
 });

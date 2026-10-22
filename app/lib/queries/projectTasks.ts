@@ -248,7 +248,8 @@ export async function updateProjectTask(
     task_flag: TaskFlag;
     requires_quote: number;
     assign_to_commercial: number;
-  }>
+  }>,
+  movedByUserId: number | null = null
 ): Promise<ProjectTaskType | null> {
   try {
     const currentTask = await getProjectTaskById(id);
@@ -308,13 +309,35 @@ export async function updateProjectTask(
     updates.push("updated_at = CURRENT_TIMESTAMP");
     args.push(id);
 
-    await db.execute({
-      sql: `UPDATE project_tasks SET ${updates.join(", ")} WHERE id = $${args.length}`,
-      args,
-    });
+    const updateSql = `UPDATE project_tasks SET ${updates.join(", ")} WHERE id = $${args.length}`;
+
+    // Single in-progress rule: a task entering 'in_progress' (or changing
+    // owner while in progress) pauses the assignee's other in-progress tasks.
+    const finalAssignee =
+      data.assigned_user_id !== undefined ? data.assigned_user_id : currentTask.assigned_user_id;
+    const entersInProgress =
+      newStatus === "in_progress" &&
+      (currentTask.status !== "in_progress" || finalAssignee !== currentTask.assigned_user_id);
+
+    let pausedProjectIds: number[] = [];
+    if (entersInProgress && finalAssignee) {
+      const tx = await db.transaction("write");
+      try {
+        const paused = await pauseOtherInProgressTasks(tx, finalAssignee, id, movedByUserId);
+        await tx.execute({ sql: updateSql, args });
+        await tx.commit();
+        pausedProjectIds = paused.map((p) => p.project_id);
+      } catch (error) {
+        await tx.rollback();
+        throw error;
+      }
+    } else {
+      await db.execute({ sql: updateSql, args });
+    }
 
     const updated = await getProjectTaskById(id);
     if (updated) revalidatePath(`/projects/${updated.project_id}`);
+    new Set(pausedProjectIds).forEach((pid) => revalidatePath(`/projects/${pid}`));
     return updated;
   } catch (error) {
     console.error("Error updating project task:", error);
@@ -370,7 +393,7 @@ export async function deleteProjectTask(id: number): Promise<number[]> {
  *     'waiting' to 'not_started' if needed.
  *   - Any other 'not_started' task that isn't the first non-completed one is
  *     demoted back to 'waiting' (keeps a single pending task active at a time).
- *   - Tasks already 'in_progress' or 'blocked' are left untouched — those are
+ *   - Tasks already 'in_progress', 'paused' or 'blocked' are left untouched — those are
  *     healthy active states, not something to "fix".
  *   - Completed tasks are skipped entirely and never touched.
  *
@@ -499,55 +522,151 @@ async function logTransition(
   });
 }
 
-// ─── Start task (not_started → in_progress) ──────────────────────────────────
+// ─── Single in-progress rule (start / pause / resume) ────────────────────────
+
+type LockedTask = {
+  id: number;
+  status: ProjectTaskStatus;
+  assigned_user_id: number | null;
+  project_id: number;
+  task_flag: string;
+};
+
+type TaskStateChangeResult = { success: boolean; error?: string; pausedTaskIds?: number[] };
+
+async function insertTransition(
+  tx: DbTransaction,
+  task: { id: number; project_id: number; task_flag: string },
+  fromStatus: ProjectTaskStatus,
+  toStatus: ProjectTaskStatus,
+  movedBy: number | null,
+  notes: string | null
+): Promise<void> {
+  await tx.execute({
+    sql: `
+      INSERT INTO task_transitions
+        (task_id, project_id, from_status, to_status, from_flag, to_flag, moved_by, notes)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+    `,
+    args: [task.id, task.project_id, fromStatus, toStatus, task.task_flag, task.task_flag, movedBy, notes],
+  });
+}
 
 /**
- * Transitions a task from 'not_started' to 'in_progress'.
- * Only callable when the task is in 'not_started' status.
+ * Pauses every 'in_progress' task of `userId` except `keepTaskId`, logging one
+ * transition per paused task. Locks the user row first so concurrent
+ * start/resume calls for the same collaborator serialize and can never leave
+ * two tasks in progress. Returns the paused tasks (id + project_id).
  */
-export async function startTask(
-  taskId: number,
-  movedByUserId: number
-): Promise<{ success: boolean; error?: string }> {
-  const result = await db.execute({
-    sql: `SELECT id, status, assigned_user_id, project_id FROM project_tasks WHERE id = $1`,
-    args: [taskId],
+async function pauseOtherInProgressTasks(
+  tx: DbTransaction,
+  userId: number,
+  keepTaskId: number,
+  movedBy: number | null
+): Promise<Array<{ id: number; project_id: number }>> {
+  await tx.execute({
+    sql: `SELECT id FROM users WHERE id = $1 FOR UPDATE`,
+    args: [userId],
   });
 
-  if (result.rows.length === 0) {
-    return { success: false, error: "Tarea no encontrada" };
-  }
-
-  const task = result.rows[0] as unknown as {
-    id: number;
-    status: ProjectTaskStatus;
-    assigned_user_id: number | null;
-    project_id: number;
-  };
-
-  if (task.status !== "not_started") {
-    return {
-      success: false,
-      error: 'La tarea debe estar en estado "sin iniciar" para poder tomarla',
-    };
-  }
-
-  await db.execute({
-    sql: `UPDATE project_tasks SET status = 'in_progress', updated_at = NOW() WHERE id = $1`,
-    args: [taskId],
-  });
-
-  await db.execute({
+  const paused = await tx.execute({
     sql: `
-      INSERT INTO task_transitions (task_id, project_id, from_status, to_status, from_flag, to_flag, moved_by, notes)
-      SELECT $1, project_id, 'not_started', 'in_progress', task_flag, task_flag, $2, ''
-      FROM project_tasks WHERE id = $1
+      UPDATE project_tasks
+         SET status = 'paused', updated_at = CURRENT_TIMESTAMP
+       WHERE assigned_user_id = $1
+         AND status = 'in_progress'
+         AND id <> $2
+      RETURNING id, project_id, task_flag
     `,
-    args: [taskId, movedByUserId],
+    args: [userId, keepTaskId],
   });
 
-  revalidatePath(`/projects/${task.project_id}`);
-  return { success: true };
+  const rows = paused.rows as unknown as Array<{ id: number; project_id: number; task_flag: string }>;
+  for (const row of rows) {
+    await insertTransition(tx, row, "in_progress", "paused", movedBy, "Pausada automáticamente al activar otra tarea");
+  }
+  return rows.map(({ id, project_id }) => ({ id, project_id }));
+}
+
+/**
+ * Runs a guarded status change for one task inside a write transaction.
+ * `fromStatus` is the only status allowed; when the task enters
+ * 'in_progress' the assignee's other in-progress tasks are paused first.
+ */
+async function changeTaskStatus(
+  taskId: number,
+  movedBy: number,
+  fromStatus: ProjectTaskStatus,
+  toStatus: ProjectTaskStatus,
+  invalidStatusError: string
+): Promise<TaskStateChangeResult> {
+  const tx = await db.transaction("write");
+  try {
+    const result = await tx.execute({
+      sql: `SELECT id, status, assigned_user_id, project_id, task_flag FROM project_tasks
+            WHERE id = $1
+            FOR UPDATE`,
+      args: [taskId],
+    });
+    const task = result.rows[0] as unknown as LockedTask | undefined;
+    if (!task) {
+      await tx.rollback();
+      return { success: false, error: "Tarea no encontrada" };
+    }
+    if (task.status !== fromStatus) {
+      await tx.rollback();
+      return { success: false, error: invalidStatusError };
+    }
+
+    const paused =
+      toStatus === "in_progress" && task.assigned_user_id
+        ? await pauseOtherInProgressTasks(tx, task.assigned_user_id, task.id, movedBy)
+        : [];
+
+    await tx.execute({
+      sql: `UPDATE project_tasks SET status = '${toStatus}', updated_at = CURRENT_TIMESTAMP WHERE id = $1`,
+      args: [taskId],
+    });
+    await insertTransition(tx, task, fromStatus, toStatus, movedBy, null);
+    await tx.commit();
+
+    const projectIds = new Set([task.project_id, ...paused.map((p) => p.project_id)]);
+    projectIds.forEach((pid) => revalidatePath(`/projects/${pid}`));
+
+    return toStatus === "in_progress"
+      ? { success: true, pausedTaskIds: paused.map((p) => p.id) }
+      : { success: true };
+  } catch (error) {
+    await tx.rollback();
+    throw error;
+  }
+}
+
+/**
+ * Transitions a task from 'not_started' to 'in_progress'. The assignee's
+ * other in-progress tasks become 'paused' (only one task in progress).
+ */
+export async function startTask(taskId: number, movedByUserId: number): Promise<TaskStateChangeResult> {
+  return changeTaskStatus(
+    taskId,
+    movedByUserId,
+    "not_started",
+    "in_progress",
+    'La tarea debe estar en estado "sin iniciar" para poder tomarla'
+  );
+}
+
+/** Transitions a task from 'in_progress' to 'paused'. */
+export async function pauseTask(taskId: number, movedByUserId: number): Promise<TaskStateChangeResult> {
+  return changeTaskStatus(taskId, movedByUserId, "in_progress", "paused", "Solo se pueden pausar tareas en progreso");
+}
+
+/**
+ * Transitions a task from 'paused' back to 'in_progress'; the assignee's
+ * current in-progress task is paused automatically.
+ */
+export async function resumeTask(taskId: number, movedByUserId: number): Promise<TaskStateChangeResult> {
+  return changeTaskStatus(taskId, movedByUserId, "paused", "in_progress", "Solo se pueden reanudar tareas pausadas");
 }
 
 // ─── Complete task (execution flow) ──────────────────────────────────────────
@@ -1205,8 +1324,8 @@ export async function getMyTasks(userId: number): Promise<ProjectTaskType[]> {
         LEFT JOIN projects p         ON pt.project_id        = p.id
         LEFT JOIN products pr        ON p.product_id         = pr.id
         WHERE pt.assigned_user_id = $1
-          AND pt.status IN ('in_progress', 'not_started', 'blocked')
-        ORDER BY pt.status = 'in_progress' DESC, pt.updated_at DESC
+          AND pt.status IN ('in_progress', 'paused', 'not_started', 'blocked')
+        ORDER BY pt.status = 'in_progress' DESC, pt.status = 'paused' DESC, pt.updated_at DESC
       `,
       args: [userId],
     });
@@ -1232,9 +1351,19 @@ export async function logTaskTransition(
 
 // ─── My Tasks — paginated ─────────────────────────────────────────────────────
 
+const ALL_TASK_STATUSES: ProjectTaskStatus[] = [
+  "not_started",
+  "waiting",
+  "in_progress",
+  "paused",
+  "completed",
+  "blocked",
+];
+
 const DEFAULT_MY_TASK_STATUSES: ProjectTaskStatus[] = [
   "not_started",
   "in_progress",
+  "paused",
   "blocked",
   "waiting",
 ];
@@ -1374,10 +1503,11 @@ export async function getMyTasksWithPagination(
         ORDER BY
           CASE pt.status
             WHEN 'in_progress' THEN 0
-            WHEN 'not_started' THEN 1
-            WHEN 'blocked'     THEN 2
-            WHEN 'waiting'     THEN 3
-            WHEN 'completed'   THEN 4
+            WHEN 'paused'      THEN 1
+            WHEN 'not_started' THEN 2
+            WHEN 'blocked'     THEN 3
+            WHEN 'waiting'     THEN 4
+            WHEN 'completed'   THEN 5
           END ASC,
           COALESCE(pt.assigned_at, pt.created_at) DESC
         LIMIT ${limitPH} OFFSET ${offsetPH}
@@ -1462,9 +1592,9 @@ export async function getTasksCommandCenterWithPagination({
   try {
     const requestedStatuses = statuses && statuses.length > 0
       ? Array.from(new Set(statuses))
-      : ["not_started", "waiting", "in_progress", "completed", "blocked"];
+      : ALL_TASK_STATUSES;
 
-    const hasAllStatuses = requestedStatuses.length === 5;
+    const hasAllStatuses = ALL_TASK_STATUSES.every((st) => requestedStatuses.includes(st));
     const includeCompleted = requestedStatuses.includes("completed");
     const statusesWithoutCompleted = requestedStatuses.filter((taskStatus) => taskStatus !== "completed");
     const restrictByStatuses = !hasAllStatuses;

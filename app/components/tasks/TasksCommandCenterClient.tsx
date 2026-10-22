@@ -85,6 +85,7 @@ const STATUS_OPTIONS: ProjectTaskStatus[] = [
   "not_started",
   "waiting",
   "in_progress",
+  "paused",
   "completed",
   "blocked",
 ];

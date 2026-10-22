@@ -36,6 +36,7 @@ describe("getMyTasksWithPagination", () => {
     expect(countCall.args).toContainEqual([
       "not_started",
       "in_progress",
+      "paused",
       "blocked",
       "waiting",
     ]);
