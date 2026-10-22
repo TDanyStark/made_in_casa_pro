@@ -210,6 +210,9 @@ jest.mock("lucide-react", () => ({
   User: () => null,
   BellRing: () => null,
   ShieldCheck: () => null,
+  PauseCircle: () => null,
+  PlayCircle: () => null,
+  Loader2: () => null,
 }));
 
 jest.mock("next/link", () => ({
@@ -258,7 +261,7 @@ describe("MyTasksClient", () => {
     const params = new URLSearchParams(lastCall.split("?")[1]);
     expect(lastCall.startsWith("/my-tasks?")).toBe(true);
     expect(params.get("page")).toBe("1");
-    expect(params.getAll("status").sort()).toEqual(["blocked", "in_progress", "waiting"]);
+    expect(params.getAll("status").sort()).toEqual(["blocked", "in_progress", "paused", "waiting"]);
   });
 
   it("allows enabling completed status explicitly", () => {
@@ -279,6 +282,7 @@ describe("MyTasksClient", () => {
       "completed",
       "in_progress",
       "not_started",
+      "paused",
       "waiting",
     ]);
   });
@@ -334,5 +338,12 @@ describe("MyTasksClient", () => {
     expect(within(dialog).getByRole("heading", { name: "Tarea demo" })).toBeInTheDocument();
     expect(within(dialog).getByText("Desc")).toBeInTheDocument();
     expect(within(dialog).queryByText("Notas de entrega")).not.toBeInTheDocument();
+  });
+
+  it("offers Pausar on the in-progress task", () => {
+    render(<MyTasksClient />);
+
+    expect(screen.getByRole("button", { name: "Pausar" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Reanudar" })).not.toBeInTheDocument();
   });
 });

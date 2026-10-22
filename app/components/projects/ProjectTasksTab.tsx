@@ -8,6 +8,7 @@ import { z } from "zod";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { toast } from "sonner";
+import { TaskPauseResumeButton, notifyAutoPaused } from "@/components/tasks/TaskPauseResumeButton";
 import { get, post, patch, del } from "@/lib/services/apiService";
 import {
   ProjectTaskType,
@@ -502,9 +503,10 @@ export function ProjectTasksTab({
   const handleStartTask = async (task: ProjectTaskType) => {
     setStartingTaskId(task.id);
     try {
-      const res = await post(`projects/${projectId}/tasks/${task.id}/start`, {});
+      const res = await post<{ pausedTaskIds?: number[] }>(`projects/${projectId}/tasks/${task.id}/start`, {});
       if (!res.ok) throw new Error(res.error || "Error al iniciar tarea");
       toast.success("Tarea iniciada correctamente");
+      notifyAutoPaused(res.data?.pausedTaskIds);
       invalidateAll();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Error al iniciar tarea");
@@ -624,6 +626,7 @@ export function ProjectTasksTab({
               const isCompleted = task.status === "completed";
               const isValidation = taskType === "validation";
                       const canStart = isNotStarted && (isMyTask(task) || canCompleteOverride);
+                      const canPauseOrResume = isMyTask(task) || canCompleteOverride;
                       const canComplete = isInProgress && !isValidation && (isMyTask(task) || canCompleteOverride);
                       const canValidate = isInProgress && isValidation && (isMyTask(task) || canCompleteOverride);
                       const needsQuote = task.requires_quote === 1 && isBlocked;
@@ -821,6 +824,10 @@ export function ProjectTasksTab({
                                 )}
                                 Tomar tarea
                               </Button>
+                            )}
+
+                            {canPauseOrResume && (
+                              <TaskPauseResumeButton task={task} onChanged={invalidateAll} />
                             )}
 
                             {canComplete && (

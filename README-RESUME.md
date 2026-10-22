@@ -234,6 +234,33 @@ crear la tarea o asignación. La creación y la recreación comparten con
 administradores, directivos, financieros, creador, gerente principal, co-gerentes
 y asignados actuales.
 
+## Una sola tarea en progreso por colaborador
+
+Cada colaborador puede tener **una sola** tarea en `in_progress`. Así los
+administrativos ven en qué está trabajando en este momento. El resto queda en
+`paused` (**Pausada**).
+
+| Acción | Endpoint | Efecto |
+|--------|----------|--------|
+| Tomar tarea | `POST /api/projects/[id]/tasks/[tid]/start` | `not_started` → `in_progress`; las demás tareas en progreso del asignado pasan a `paused` |
+| Pausar | `POST /api/projects/[id]/tasks/[tid]/pause` | `in_progress` → `paused` (sirve también para pausar la única activa) |
+| Reanudar | `POST /api/projects/[id]/tasks/[tid]/resume` | `paused` → `in_progress`; la tarea en progreso del asignado se pausa sola |
+| Editar estado | `PATCH /api/projects/[id]/tasks/[tid]` | Poner `in_progress` a mano aplica la misma pausa automática |
+
+- Pueden pausar y reanudar el colaborador asignado y los roles de liderazgo
+  (`TASK_OVERRIDE_ROLES`), igual que al tomar una tarea.
+- Una tarea pausada no admite reportar avance, completar ni validar: primero hay
+  que reanudarla.
+- Cada pausa queda en `task_transitions`. Las pausas automáticas se registran con
+  la nota "Pausada automáticamente al activar otra tarea".
+- `start` y `resume` devuelven `pausedTaskIds` con las tareas pausadas
+  automáticamente, y la interfaz las informa en un aviso.
+- Los cambios corren en una transacción que bloquea la fila del usuario. Así, dos
+  solicitudes simultáneas no pueden dejar dos tareas en progreso.
+- La migración `018_task_paused_status.sql` solo agrega el estado. Las tareas que
+  ya estaban en progreso no se modifican; la regla se aplica la próxima vez que el
+  colaborador toma o reanuda una tarea.
+
 ## Notificaciones por correo
 
 `dispatchNotification` (`app/lib/services/notificationEngine.ts`) registra cada

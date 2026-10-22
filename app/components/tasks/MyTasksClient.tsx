@@ -41,6 +41,7 @@ import {
   TASK_STATUS_STYLES,
   TASK_STATUS_DOT,
 } from "./TaskStatusBadge";
+import { TaskPauseResumeButton, notifyAutoPaused } from "./TaskPauseResumeButton";
 import {
   AlertTriangle,
   BellRing,
@@ -50,6 +51,7 @@ import {
   ExternalLink,
   Eye,
   History as HistoryIcon,
+  PauseCircle,
   PlayCircle,
   ShieldCheck,
 } from "lucide-react";
@@ -77,6 +79,7 @@ const STATUS_OPTIONS: ProjectTaskStatus[] = [
   "not_started",
   "waiting",
   "in_progress",
+  "paused",
   "completed",
   "blocked",
 ];
@@ -84,6 +87,7 @@ const STATUS_OPTIONS: ProjectTaskStatus[] = [
 const DEFAULT_STATUS_OPTIONS: ProjectTaskStatus[] = [
   "not_started",
   "in_progress",
+  "paused",
   "blocked",
   "waiting",
 ];
@@ -377,6 +381,7 @@ export function MyTasksClient() {
     (t) => t.status === "in_progress" || t.status === "not_started"
   );
   const inProgressTasks = tasks.filter((t) => t.status === "in_progress");
+  const pausedTasks = tasks.filter((t) => t.status === "paused");
   const blockedTasks = tasks.filter((t) => t.status === "blocked");
   const waitingTasks = tasks.filter((t) => t.status === "waiting");
   const shouldShowDailyReportBanner =
@@ -509,9 +514,10 @@ export function MyTasksClient() {
   const handleStartTask = async (task: MyTaskRowPaginated) => {
     setStartingTaskId(task.id);
     try {
-      const res = await post(`projects/${task.project_id}/tasks/${task.id}/start`, {});
+      const res = await post<{ pausedTaskIds?: number[] }>(`projects/${task.project_id}/tasks/${task.id}/start`, {});
       if (!res.ok) throw new Error(res.error || "Error al iniciar tarea");
       toast.success("Tarea iniciada correctamente");
+      notifyAutoPaused(res.data?.pausedTaskIds);
       queryClient.invalidateQueries({ queryKey: ["my-tasks"] });
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Error al iniciar tarea");
@@ -668,6 +674,11 @@ export function MyTasksClient() {
                 Tomar tarea
               </Button>
             )}
+
+            <TaskPauseResumeButton
+              task={task}
+              onChanged={() => queryClient.invalidateQueries({ queryKey: ["my-tasks"] })}
+            />
 
             {canAct && !isValidation && (
               <>
@@ -970,6 +981,16 @@ export function MyTasksClient() {
                 Activas ({activeTasks.length})
               </h2>
               {activeTasks.map(renderTask)}
+            </section>
+          )}
+
+          {pausedTasks.length > 0 && (
+            <section className="space-y-3">
+              <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-1.5">
+                <PauseCircle className="h-4 w-4" />
+                Pausadas ({pausedTasks.length})
+              </h2>
+              {pausedTasks.map(renderTask)}
             </section>
           )}
 
