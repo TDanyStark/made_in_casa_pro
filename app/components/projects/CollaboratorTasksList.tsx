@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { 
   Clock, 
   DollarSign, 
-  FileText, 
+  Eye, 
   Send
 } from "lucide-react";
 import { TaskDeliverableDialog } from "@/components/tasks/TaskDeliverableDialog";
@@ -56,7 +56,6 @@ export function CollaboratorTasksList({ tasks, invitedTaskIds, submittedQuotes, 
     <div className="space-y-4">
       {tasks.map((task) => {
         const quote = getQuoteForTask(task.id);
-        const isCompleted = task.status === "completed";
         const isQuoteOpen = task.requires_quote === 1 && task.status === "blocked" && !task.assigned_user_id;
         const canQuoteTask = invitedTaskIds.includes(task.id) && isQuoteOpen && !quote;
         const statusLabel = TASK_STATUS_LABELS[task.status] || task.status;
@@ -80,17 +79,16 @@ export function CollaboratorTasksList({ tasks, invitedTaskIds, submittedQuotes, 
                   )}
                 </div>
                 
-                {isCompleted && (
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8 text-muted-foreground shrink-0"
-                    onClick={() => setDeliverableDialogTask(task)}
-                    title="Ver entregable"
-                  >
-                    <FileText className="h-4 w-4" />
-                  </Button>
-                )}
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 text-muted-foreground shrink-0"
+                  onClick={() => setDeliverableDialogTask(task)}
+                  title="Ver detalles"
+                  aria-label={`Ver detalles de ${task.title}`}
+                >
+                  <Eye className="h-4 w-4" />
+                </Button>
               </div>
             </CardHeader>
             

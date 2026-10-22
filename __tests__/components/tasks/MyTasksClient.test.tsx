@@ -1,5 +1,5 @@
 import React from "react";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 
 let currentSearch = "page=1";
 const mockReplace = jest.fn();
@@ -141,9 +141,30 @@ jest.mock("@/components/ui/label", () => ({
 }));
 
 jest.mock("@/components/ui/button", () => ({
-  Button: ({ children, onClick }: { children: React.ReactNode; onClick?: () => void }) => (
-    <button onClick={onClick}>{children}</button>
+  Button: ({
+    children,
+    onClick,
+    title,
+    "aria-label": ariaLabel,
+  }: {
+    children: React.ReactNode;
+    onClick?: () => void;
+    title?: string;
+    "aria-label"?: string;
+  }) => (
+    <button onClick={onClick} title={title} aria-label={ariaLabel}>
+      {children}
+    </button>
   ),
+}));
+
+jest.mock("@/components/ui/dialog", () => ({
+  Dialog: ({ children, open }: { children: React.ReactNode; open: boolean }) =>
+    open ? <div data-testid="task-details-dialog">{children}</div> : null,
+  DialogContent: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  DialogHeader: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  DialogTitle: ({ children }: { children: React.ReactNode }) => <h2>{children}</h2>,
+  DialogDescription: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
 }));
 
 jest.mock("@/components/ui/badge", () => ({
@@ -182,7 +203,11 @@ jest.mock("lucide-react", () => ({
   CheckCircle: () => null,
   Clock: () => null,
   ExternalLink: () => null,
+  Eye: () => null,
+  FileText: () => null,
   History: () => null,
+  Link: () => null,
+  User: () => null,
   BellRing: () => null,
   ShieldCheck: () => null,
 }));
@@ -192,7 +217,7 @@ jest.mock("next/link", () => ({
   default: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }));
 
-const { MyTasksClient } = require("@/components/tasks/MyTasksClient");
+import { MyTasksClient } from "@/components/tasks/MyTasksClient";
 
 describe("MyTasksClient", () => {
   beforeEach(() => {
@@ -296,5 +321,18 @@ describe("MyTasksClient", () => {
     expect(lastCall).not.toContain("q=");
     expect(lastCall).not.toContain("status=");
     expect(lastCall).not.toContain("page=");
+  });
+
+  it("opens the task details dialog from the eye button of a non-completed task", () => {
+    render(<MyTasksClient />);
+
+    expect(screen.queryByTestId("task-details-dialog")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Ver detalles de Tarea demo" }));
+
+    const dialog = screen.getByTestId("task-details-dialog");
+    expect(within(dialog).getByRole("heading", { name: "Tarea demo" })).toBeInTheDocument();
+    expect(within(dialog).getByText("Desc")).toBeInTheDocument();
+    expect(within(dialog).queryByText("Notas de entrega")).not.toBeInTheDocument();
   });
 });

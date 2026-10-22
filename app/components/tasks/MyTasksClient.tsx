@@ -634,17 +634,16 @@ export function MyTasksClient() {
 
           <div className="flex flex-col items-end gap-2">
             <div className="flex items-center gap-1.5">
-              {task.status === "completed" && (
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-7 w-7 text-muted-foreground"
-                  onClick={() => openDeliverableDialog(task)}
-                  title="Ver entregable"
-                >
-                  <Eye className="h-3.5 w-3.5" />
-                </Button>
-              )}
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7 text-muted-foreground"
+                onClick={() => openDeliverableDialog(task)}
+                title="Ver detalles"
+                aria-label={`Ver detalles de ${task.title}`}
+              >
+                <Eye className="h-3.5 w-3.5" />
+              </Button>
               <Button
                 variant="ghost"
                 size="icon"

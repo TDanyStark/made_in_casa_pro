@@ -148,8 +148,8 @@ jest.mock("@/components/ui/card", () => ({
 jest.mock("@/components/ui/badge", () => ({ Badge: ({ children }: { children: React.ReactNode }) => <span>{children}</span> }));
 
 jest.mock("@/components/ui/sortable-list", () => ({
-  SortableList: ({ items, renderItem }: { items: unknown[]; renderItem: (item: any) => React.ReactNode }) => (
-    <div>{items.map((item: any) => <div key={item.id}>{renderItem(item)}</div>)}</div>
+  SortableList: ({ items, renderItem }: { items: { id: number }[]; renderItem: (item: { id: number }) => React.ReactNode }) => (
+    <div>{items.map((item) => <div key={item.id}>{renderItem(item)}</div>)}</div>
   ),
 }));
 
@@ -181,10 +181,13 @@ describe("ProjectTasksTab", () => {
       />
     );
 
-    await user.click(screen.getByRole("button", { name: /ver entregable de subir artes finales/i }));
+    await user.click(screen.getByRole("button", { name: /ver detalles de subir artes finales/i }));
 
-    expect(screen.getByText(/ver entregable/i)).toBeInTheDocument();
-    expect(screen.getByText("https://example.com/final")).toBeInTheDocument();
+    expect(screen.getByText("Sin descripción")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /https:\/\/example.com\/final/ })).toHaveAttribute(
+      "href",
+      "https://example.com/final"
+    );
     expect(screen.getByText(/entrega publicada/i)).toBeInTheDocument();
   });
 });

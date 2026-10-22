@@ -1,5 +1,5 @@
 import React from "react";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 
 jest.mock("@/components/ui/button", () => ({
   Button: ({ children, ...props }: React.ButtonHTMLAttributes<HTMLButtonElement>) => (
@@ -19,7 +19,13 @@ jest.mock("@/components/ui/badge", () => ({
 }));
 
 jest.mock("@/components/tasks/TaskDeliverableDialog", () => ({
-  TaskDeliverableDialog: () => null,
+  TaskDeliverableDialog: ({ open, task }: { open: boolean; task: { title: string; description: string | null } | null }) =>
+    open && task ? (
+      <div data-testid="task-details-dialog">
+        <h2>{task.title}</h2>
+        <p>{task.description}</p>
+      </div>
+    ) : null,
 }));
 
 jest.mock("lucide-react", () => new Proxy({}, {
@@ -78,8 +84,27 @@ describe("CollaboratorTasksList", () => {
     expect(screen.getByText("Asignada")).toBeInTheDocument();
     expect(screen.getByText("Completada")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /enviar cotización/i })).toBeInTheDocument();
-    expect(screen.getByTitle(/ver entregable/i)).toBeInTheDocument();
+    expect(screen.getAllByTitle("Ver detalles")).toHaveLength(3);
     expect(screen.queryByText(/tarea completada - no puedes enviar cotización/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/visible solo como contexto del proyecto/i)).not.toBeInTheDocument();
+  });
+
+  it("opens the details dialog with the description from the eye button of a non-completed task", () => {
+    render(
+      <CollaboratorTasksList
+        tasks={[makeTask({ id: 21, title: "Sin iniciar", description: "Diseñar banner" })]}
+        invitedTaskIds={[]}
+        submittedQuotes={[]}
+        onQuoteTask={jest.fn()}
+      />
+    );
+
+    expect(screen.queryByTestId("task-details-dialog")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Ver detalles de Sin iniciar" }));
+
+    const dialog = screen.getByTestId("task-details-dialog");
+    expect(within(dialog).getByRole("heading", { name: "Sin iniciar" })).toBeInTheDocument();
+    expect(within(dialog).getByText("Diseñar banner")).toBeInTheDocument();
   });
 });
