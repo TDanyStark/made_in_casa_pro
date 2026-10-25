@@ -96,3 +96,78 @@ describe("login() redirect target", () => {
     expect(mockCreateSession).not.toHaveBeenCalled();
   });
 });
+
+// S4: login rejects deactivated users with the generic message.
+describe("login() inactive users", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockCompare.mockResolvedValue(true);
+    mockGmailStatus.mockResolvedValue(true);
+  });
+
+  it("rejects an inactive user with the generic message and creates no session", async () => {
+    mockGetUserByEmail.mockResolvedValue([
+      { id: 5, name: "Ana", email: "ana@test.com", rol_id: 3, password: "hash", is_active: false },
+    ]);
+
+    const state = await login({ errors: {} } as never, form());
+
+    expect(state).toEqual({
+      errors: { general: "Datos incorrectos" },
+      submittedData: { email: "ana@test.com" },
+    });
+    expect(mockCreateSession).not.toHaveBeenCalled();
+  });
+
+  it("still logs in an active user", async () => {
+    mockGetUserByEmail.mockResolvedValue([
+      { id: 5, name: "Ana", email: "ana@test.com", rol_id: 3, password: "hash", is_active: true },
+    ]);
+
+    expect(await loginRedirect(form())).toBe("/dashboard");
+    expect(mockCreateSession).toHaveBeenCalledTimes(1);
+  });
+});
+
+// S9: the submitted password is never echoed back in the action state.
+describe("login() never returns the password", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockGetUserByEmail.mockResolvedValue([
+      { id: 5, name: "Ana", email: "ana@test.com", rol_id: 3, password: "hash", is_active: true },
+    ]);
+    mockCompare.mockResolvedValue(true);
+  });
+
+  it("omits the password on wrong credentials", async () => {
+    mockCompare.mockResolvedValue(false);
+
+    const state = await login({ errors: {} } as never, form());
+
+    expect(state).toEqual({
+      errors: { general: "Datos incorrectos" },
+      submittedData: { email: "ana@test.com" },
+    });
+    expect(JSON.stringify(state)).not.toContain("secret123");
+  });
+
+  it("omits the password when the email is unknown", async () => {
+    mockGetUserByEmail.mockResolvedValue([]);
+
+    const state = await login({ errors: {} } as never, form());
+
+    expect(state?.submittedData).toEqual({ email: "ana@test.com" });
+    expect(JSON.stringify(state)).not.toContain("secret123");
+  });
+
+  it("omits the password on validation errors", async () => {
+    const fd = new FormData();
+    fd.set("email", "not-an-email");
+    fd.set("password", "secret123");
+
+    const state = await login({ errors: {} } as never, fd);
+
+    expect(state?.submittedData).toEqual({ email: "not-an-email" });
+    expect(JSON.stringify(state)).not.toContain("secret123");
+  });
+});

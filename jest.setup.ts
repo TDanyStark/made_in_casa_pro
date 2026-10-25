@@ -30,6 +30,17 @@ jest.mock('next/cache', () => ({
   unstable_cache: jest.fn((fn: () => unknown) => fn),
 }));
 
+// validateApiRole re-reads is_active / rol_id from the DB on every call.
+// Default: the session user is active and keeps the role in its JWT, so route
+// tests that mock only the session keep working. Tests for that lookup override
+// this with their own jest.mock or jest.unmock.
+jest.mock('@/lib/services/session-user', () => ({
+  getSessionUserState: async (session: { rol_id: number }) => ({
+    is_active: true,
+    rol_id: session.rol_id,
+  }),
+}));
+
 // Suppress console.error in tests — query files call it on catch blocks
 beforeEach(() => {
   jest.spyOn(console, 'error').mockImplementation(() => {});

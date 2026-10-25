@@ -3,27 +3,49 @@ import { getCurrentSession } from "@/lib/services/api-session";
 import {
   createUserGmailOAuthClient,
   getGoogleAccountEmail,
+  GMAIL_OAUTH_CALLBACK_PATH,
+  GMAIL_OAUTH_STATE_COOKIE,
   USER_GMAIL_SCOPES,
 } from "@/lib/services/userGmailOAuth";
 import { createUserEmailConnection, getUserEmailConnection } from "@/lib/queries/userEmailConnections";
+import { clearOAuthStateCookie, isValidOAuthState } from "@/lib/session";
 
+/**
+ * GET /api/user-email/google/callback
+ * Only accepts the Google response when its `state` matches the cookie set by
+ * /api/user-email/google (login CSRF). Errors go back as fixed codes in
+ * `email_error`, never as internal messages.
+ */
 export async function GET(request: NextRequest) {
-  const { searchParams } = new URL(request.url);
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+  // The state cookie is single-use: every response clears it.
+  const redirectTo = (pathAndQuery: string) =>
+    clearOAuthStateCookie(
+      NextResponse.redirect(`${appUrl}${pathAndQuery}`),
+      GMAIL_OAUTH_STATE_COOKIE,
+      GMAIL_OAUTH_CALLBACK_PATH
+    );
+
+  if (!isValidOAuthState(request, GMAIL_OAUTH_STATE_COOKIE)) {
+    return redirectTo("/connect-email?email_error=invalid_state");
+  }
+
+  const { searchParams } = request.nextUrl;
   const code = searchParams.get("code");
   const error = searchParams.get("error");
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
 
   if (error) {
-    return NextResponse.redirect(`${appUrl}/connect-email?email_error=${encodeURIComponent(error)}`);
+    const errorCode = error === "access_denied" ? "access_denied" : "oauth_error";
+    return redirectTo(`/connect-email?email_error=${errorCode}`);
   }
 
   if (!code) {
-    return NextResponse.redirect(`${appUrl}/connect-email?email_error=no_code`);
+    return redirectTo("/connect-email?email_error=no_code");
   }
 
   const session = await getCurrentSession();
   if (!session?.id) {
-    return NextResponse.redirect(`${appUrl}/?email_error=unauthorized`);
+    return redirectTo("/?email_error=unauthorized");
   }
 
   try {
@@ -35,12 +57,12 @@ export async function GET(request: NextRequest) {
     const refreshToken = tokens.refresh_token ?? existingConnection?.refresh_token ?? null;
 
     if (!refreshToken) {
-      return NextResponse.redirect(`${appUrl}/connect-email?email_error=no_refresh_token`);
+      return redirectTo("/connect-email?email_error=no_refresh_token");
     }
 
     const connectedEmail = await getGoogleAccountEmail(oauth2Client, tokens.id_token);
     if (!connectedEmail) {
-      return NextResponse.redirect(`${appUrl}/connect-email?email_error=no_email`);
+      return redirectTo("/connect-email?email_error=no_email");
     }
 
     await createUserEmailConnection({
@@ -52,10 +74,9 @@ export async function GET(request: NextRequest) {
       scopes: tokens.scope ?? USER_GMAIL_SCOPES.join(" "),
     });
 
-    return NextResponse.redirect(`${appUrl}/connect-email?email_success=1`);
+    return redirectTo("/connect-email?email_success=1");
   } catch (err) {
     console.error("Error in user Gmail OAuth callback:", err);
-    const message = err instanceof Error ? err.message : "unknown_error";
-    return NextResponse.redirect(`${appUrl}/connect-email?email_error=${encodeURIComponent(message)}`);
+    return redirectTo("/connect-email?email_error=oauth_failed");
   }
 }

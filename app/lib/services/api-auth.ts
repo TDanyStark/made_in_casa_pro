@@ -3,6 +3,7 @@ import { UserRole } from "@/lib/definitions";
 import { cookies } from "next/headers";
 import { decrypt, SessionData } from "../session";
 import { getUserConnectedEmailStatus, isGmailConnectionRequired } from "@/lib/queries/userEmailConnections";
+import { getSessionUserState, SessionUserState } from "./session-user";
 
 /**
  * Rutas que pueden operar sin Gmail conectado.
@@ -22,7 +23,8 @@ function canSkipGmailConnection(request: NextRequest) {
 
 /**
  * Verifica si el usuario tiene uno de los roles permitidos para acceder a un endpoint API.
- * Usa la información del rol del usuario pasada por el middleware en los headers.
+ * El estado activo y el rol se releen de la BD en cada llamada (no se confía en el
+ * rol del JWT, que dura 7 días): un usuario desactivado recibe 401.
  *
  * @param request La solicitud Next.js
  * @param allowedRoles Arreglo de roles que tienen permiso para acceder
@@ -67,8 +69,29 @@ export async function validateApiRole(
     };
   }
 
-  // Convertir el header de rol a un número para compararlo con UserRole enum
-  const userRole = userRoleHeader as UserRole;
+  let userState: SessionUserState | null;
+  try {
+    userState = await getSessionUserState(session);
+  } catch (error) {
+    console.error("Error al leer el usuario de la sesión:", error);
+    return {
+      isAuthorized: false,
+      userRole: UserRole.NO_AUTHENTICADO,
+      response: NextResponse.json({ error: "Error al validar la sesión" }, { status: 500 }),
+    };
+  }
+
+  // Usuario eliminado o desactivado después de emitir el JWT
+  if (!userState || !userState.is_active) {
+    return {
+      isAuthorized: false,
+      userRole: UserRole.NO_AUTHENTICADO,
+      response: NextResponse.json({ error: "No autorizado" }, { status: 401 }),
+    };
+  }
+
+  // El rol vigente es el de la BD, no el del JWT
+  const userRole = userState.rol_id;
 
   // Verificar si el rol del usuario está en la lista de roles permitidos
   if (!allowedRoles.includes(userRole)) {

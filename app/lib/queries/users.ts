@@ -69,34 +69,45 @@ export async function getUsers(params?: GetUsersParams) {
   }
 }
 
-export async function getUserById(userId: number) {
+function mapUserRow(row: Record<string, unknown>) {
+  return {
+    id: row.id,
+    name: row.name,
+    email: row.email,
+    password: row.password,
+    rol_id: row.rol_id as UserRole,
+    area_id: row.area_id,
+    is_internal: Boolean(row.is_internal),
+    is_active: Boolean(row.is_active),
+    monthly_salary: row.monthly_salary == null ? null : Number(row.monthly_salary),
+    must_change_password: Boolean(row.must_change_password),
+    last_login: row.last_login,
+    created_at: row.created_at,
+  } as UserType;
+}
+
+/** Igual que getUserById pero devuelve null si el usuario no existe (para responder 404). */
+export async function findUserById(userId: number): Promise<UserType | null> {
   try {
     const result = await db.execute({
       sql: `SELECT * FROM users WHERE id = $1`,
       args: [userId],
     });
     const row = result.rows[0];
-    if (!row) {
-      throw new Error('Usuario no encontrado');
-    }
-    return {
-      id: row.id,
-      name: row.name,
-      email: row.email,
-      password: row.password,
-      rol_id: row.rol_id as UserRole,
-      area_id: row.area_id,
-      is_internal: Boolean(row.is_internal),
-      is_active: Boolean(row.is_active),
-      monthly_salary: row.monthly_salary == null ? null : Number(row.monthly_salary),
-      must_change_password: Boolean(row.must_change_password),
-      last_login: row.last_login,
-      created_at: row.created_at,
-    } as UserType;
+    return row ? mapUserRow(row as Record<string, unknown>) : null;
   } catch (error) {
     console.error(`Error al obtener el usuario con ID ${userId}:`, error);
     throw new Error('No se pudo obtener el usuario');
   }
+}
+
+export async function getUserById(userId: number) {
+  const user = await findUserById(userId);
+  if (!user) {
+    console.error(`Error al obtener el usuario con ID ${userId}: Usuario no encontrado`);
+    throw new Error('No se pudo obtener el usuario');
+  }
+  return user;
 }
 
 export async function getUserByEmail(email: string): Promise<UserType[]> {
@@ -111,6 +122,7 @@ export async function getUserByEmail(email: string): Promise<UserType[]> {
       email: row.email,
       password: row.password,
       rol_id: row.rol_id as UserRole,
+      is_active: Boolean(row.is_active),
     })) as UserType[];
   } catch (error) {
     console.error(`Error al obtener el usuario con email ${email}:`, error);

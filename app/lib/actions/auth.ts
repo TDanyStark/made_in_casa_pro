@@ -10,67 +10,45 @@ import { getUserConnectedEmailStatus } from "../queries/userEmailConnections";
 import { getSafeRedirectPath, LOGIN_REDIRECT_PARAM } from "../utils/safe-redirect";
 
 
-export async function login(state: FormState, formData: FormData) {
-  // Extraer los datos del formulario para usarlos incluso si hay errores
+export async function login(state: FormState, formData: FormData): Promise<FormState> {
+  // Extraer los datos del formulario. Solo el email vuelve al cliente:
+  // la contraseña nunca se devuelve en el estado de la acción.
   const submittedEmail = formData.get("email") as string;
   const submittedPassword = formData.get("password") as string;
-  
+
   // Validate form fields
   const validatedFields = SignupFormSchema.safeParse({
     email: submittedEmail,
     password: submittedPassword,
   });
 
-  // If any form fields are invalid, return early with submitted data
+  // If any form fields are invalid, return early with the submitted email
   if (!validatedFields.success) {
     return {
       errors: validatedFields.error.flatten().fieldErrors,
-      submittedData: {
-        email: submittedEmail,
-        password: submittedPassword,
-      }
+      submittedData: { email: submittedEmail },
     };
   }
 
-  // 2. Prepare data for insertion into database
   const { email, password } = validatedFields.data;
-  // e.g. Hash the user's password before storing it
+  const invalidCredentials = {
+    errors: { general: "Datos incorrectos" },
+    submittedData: { email },
+  };
+
   // comprobar en la base de datos el email
   const res = await getUserByEmail(email);
-  if (res.length === 0) {
-    return {
-      errors: { general: "Datos incorrectos"},
-      submittedData: {
-        email: email,
-        password: password,
-      }
-    };
-  }
+  if (res.length === 0) return invalidCredentials;
 
   const user: UserType = res[0];
-  
-  // comprobar la contraseña
-  if (!user.password) {
-    return {
-      errors: { general: "Datos incorrectos" },
-      submittedData: {
-        email: email,
-        password: password,
-      }
-    };
-  }
 
+  // comprobar la contraseña
+  if (!user.password) return invalidCredentials;
 
   const match = await bcrypt.compare(password, user.password);
-  if (!match) {
-    return {
-      errors: { general: "Datos incorrectos" },
-      submittedData: {
-        email: email,
-        password: password,
-      }
-    };
-  }
+  // Un usuario desactivado recibe el mismo mensaje genérico (no revela que existe).
+  if (!match || user.is_active === false) return invalidCredentials;
+
   // 3. Create a session
   await createSession({name: user.name, email: user.email, id: user.id, rol_id: user.rol_id });
 
