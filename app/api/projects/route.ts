@@ -3,7 +3,7 @@ import { z } from "zod";
 import { validateApiRole, validateHttpMethod } from "@/lib/services/api-auth";
 import { domainErrorResponse } from "@/lib/services/api-errors";
 import { createProject, getProjectsWithPagination } from "@/lib/queries/projects";
-import { ITEMS_PER_PAGE } from "@/config/constants";
+import { parsePagination } from "@/lib/utils/pagination";
 import { decrypt } from "@/lib/session";
 import { cookies } from "next/headers";
 import { PROJECT_EDIT_ROLES, PROJECT_VIEW_ROLES } from "@/lib/role-groups";
@@ -51,8 +51,9 @@ export async function GET(request: NextRequest) {
 
   try {
     const url = new URL(request.url);
-    const page = parseInt(url.searchParams.get("page") || "1");
-    const limit = parseInt(url.searchParams.get("limit") || ITEMS_PER_PAGE.toString());
+    const pagination = parsePagination(url.searchParams);
+    if (!pagination.success) return pagination.response;
+    const { page, limit } = pagination;
     const search = url.searchParams.get("search") || undefined;
     const status = url.searchParams.get("status") || undefined;
     const brandId = url.searchParams.get("brand_id") ? parseInt(url.searchParams.get("brand_id")!) : undefined;
@@ -69,9 +70,10 @@ export async function GET(request: NextRequest) {
     let assignedUserId: number | undefined;
     let createdById: number | undefined;
     if (session?.id) {
-      if (session.rol_id === UserRole.COLABORADOR) {
+      // Rol vigente en BD (validateApiRole), no el del JWT
+      if (roleValidation.userRole === UserRole.COLABORADOR) {
         assignedUserId = session.id;
-      } else if (session.rol_id === UserRole.COMERCIAL) {
+      } else if (roleValidation.userRole === UserRole.COMERCIAL) {
         createdById = session.id;
       }
     }
