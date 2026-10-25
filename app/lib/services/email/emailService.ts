@@ -1,8 +1,7 @@
 import { getUserEmailConnection } from "@/lib/queries/userEmailConnections";
 import {
-  createNotificationDelivery,
+  claimNotificationDelivery,
   getDeliveryById,
-  getDeliveryCountByEventAndRecipient,
   markDeliveryFailed,
   markDeliverySent,
   markDeliverySkipped,
@@ -25,7 +24,7 @@ import type { SendEmailOptions, SendResult, ThreadContext } from "./emailTypes";
 //   2. senderUserId with connected Gmail → Gmail provider
 //   3. fallback → system provider
 //
-// Records every attempt in notification_deliveries.
+// Records every attempt in notification_deliveries (one row per event+recipient).
 // Updates project_email_threads with gmail_thread_id / root_message_id.
 // ---------------------------------------------------------------------------
 
@@ -83,11 +82,26 @@ export async function sendEmail(opts: SendEmailOptions): Promise<SendResult> {
     };
   }
 
-  // ── Idempotency check ─────────────────────────────────────────────────────
-  // Prevent sending the same notification twice if dispatchNotification is
-  // called more than once for the same (event, recipient) pair.
-  const existingCount = await getDeliveryCountByEventAndRecipient(eventId, message.to.email);
-  if (existingCount > 0) {
+  // ── Claim the (event, recipient) pair atomically ──────────────────────────
+  // INSERT ... ON CONFLICT DO NOTHING on the UNIQUE (event_id, recipient_email)
+  // constraint: only the caller that inserts the row sends. If the DB fails we
+  // do not send, so an unrecorded email can never go out (or go out twice).
+  let delivery;
+  try {
+    delivery = await claimNotificationDelivery({
+      event_id: eventId,
+      recipient_user_id: recipientUserId ?? null,
+      recipient_email: message.to.email,
+      sender_user_id: senderUserId ?? null,
+      provider: providerLabel,
+    });
+  } catch (error) {
+    const errorMsg = error instanceof Error ? error.message : String(error);
+    notifLog.error("sendEmail", `Not sent — could not record delivery event=${eventId} recipient=${message.to.email}: ${errorMsg}`);
+    throw error;
+  }
+
+  if (!delivery) {
     notifLog.warn("sendEmail", `Skipping duplicate delivery — event=${eventId} recipient=${message.to.email}`);
     // Return a sentinel result so callers do not crash
     return {
@@ -97,15 +111,6 @@ export async function sendEmail(opts: SendEmailOptions): Promise<SendResult> {
       messageId: null,
     };
   }
-
-  // ── Create pending delivery record ────────────────────────────────────────
-  const delivery = await createNotificationDelivery({
-    event_id: eventId,
-    recipient_user_id: recipientUserId ?? null,
-    recipient_email: message.to.email,
-    sender_user_id: senderUserId ?? null,
-    provider: providerLabel,
-  });
 
   // ── Send ──────────────────────────────────────────────────────────────────
   try {

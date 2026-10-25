@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { createBrand, getBrandById, getBrandsWithPagination } from "@/lib/queries/brands";
 import { getManagerById } from "@/lib/queries/managers";
-import { ITEMS_PER_PAGE } from "@/config/constants";
+import { parsePagination } from "@/lib/utils/pagination";
 import { validateApiRole, validateHttpMethod } from "@/lib/services/api-auth";
 import { domainErrorResponse } from "@/lib/services/api-errors";
 import { AUTHENTICATED_ROLES, OPERATIONS_ROLES } from "@/lib/role-groups";
@@ -84,8 +84,6 @@ export async function GET(request: NextRequest) {
     const managerId = url.searchParams.get("manager_id");
     const clientId = url.searchParams.get("client_id");
     const id = url.searchParams.get("id");
-    const page = parseInt(url.searchParams.get("page") || "1");
-    const limit = parseInt(url.searchParams.get("limit") || ITEMS_PER_PAGE.toString());
     const search = url.searchParams.get("search");
     
     // Si se solicita una marca específica por ID
@@ -98,27 +96,29 @@ export async function GET(request: NextRequest) {
         );
       }
       return NextResponse.json(brand);
-    } 
-    else {// Si no hay ID específico, usar paginación
-      // Get paginated results
-      const { brands, total } = await getBrandsWithPagination({
-        managerId: managerId || undefined,
-        clientId: clientId || undefined,
-        page,
-        limit,
-        search: search || undefined
-      });
-      
-      // Calculate total pages
-      const pageCount = Math.ceil(total / limit);
-      
-      return NextResponse.json({
-        data: brands,
-        pageCount,
-        currentPage: page,
-        total
-      });
     }
+
+    // Pagination is validated for list requests only (id lookups ignore it)
+    const pagination = parsePagination(url.searchParams, { maxLimit: 500 });
+    if (!pagination.success) return pagination.response;
+    const { page, limit } = pagination;
+    // Si no hay ID específico, usar paginación
+    const { brands, total } = await getBrandsWithPagination({
+      managerId: managerId || undefined,
+      clientId: clientId || undefined,
+      page,
+      limit,
+      search: search || undefined
+    });
+
+    const pageCount = Math.ceil(total / limit);
+
+    return NextResponse.json({
+      data: brands,
+      pageCount,
+      currentPage: page,
+      total
+    });
   } catch (error) {
     console.error("Error al obtener marcas:", error);
     return NextResponse.json(

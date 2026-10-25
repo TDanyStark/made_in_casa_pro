@@ -5,7 +5,7 @@ import {
   getProductCategoriesWithPagination,
   createProductCategory,
 } from "@/lib/queries/productCategories";
-import { ITEMS_PER_PAGE } from "@/config/constants";
+import { parsePagination } from "@/lib/utils/pagination";
 import { validateApiRole, validateHttpMethod } from "@/lib/services/api-auth";
 import { OPERATIONS_ROLES } from "@/lib/role-groups";
 
@@ -30,8 +30,9 @@ export async function GET(request: NextRequest) {
       return NextResponse.json(categories);
     }
 
-    const page = parseInt(url.searchParams.get("page") || "1");
-    const limit = parseInt(url.searchParams.get("limit") || ITEMS_PER_PAGE.toString());
+    const pagination = parsePagination(url.searchParams);
+    if (!pagination.success) return pagination.response;
+    const { page, limit } = pagination;
     const search = url.searchParams.get("search") || undefined;
 
     const { categories, total } = await getProductCategoriesWithPagination({ page, limit, search });

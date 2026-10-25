@@ -9,7 +9,7 @@ import {
 } from '@/lib/queries/areas';
 import { AreaType } from '@/lib/definitions';
 import { validateApiRole, validateHttpMethod } from "@/lib/services/api-auth";
-import { ITEMS_PER_PAGE } from "@/config/constants";
+import { parsePagination } from "@/lib/utils/pagination";
 import { AUTHENTICATED_ROLES, LEADERSHIP_ROLES } from '@/lib/role-groups';
 
 // Schema para validar los datos de un área
@@ -33,8 +33,6 @@ export async function GET(request: NextRequest) {
   try {
     const url = new URL(request.url);
     const id = url.searchParams.get("id");
-    const page = parseInt(url.searchParams.get("page") || "1");
-    const limit = parseInt(url.searchParams.get("limit") || ITEMS_PER_PAGE.toString());
     const search = url.searchParams.get("search");
     const withActiveInternals = url.searchParams.get("with_active_internals") === "1";
     
@@ -48,8 +46,13 @@ export async function GET(request: NextRequest) {
         );
       }
       return NextResponse.json(area);
-    } 
-    else if (search || page > 1) {
+    }
+
+    // Pagination is validated for list requests only (id lookups ignore it)
+    const pagination = parsePagination(url.searchParams);
+    if (!pagination.success) return pagination.response;
+    const { page, limit } = pagination;
+    if (search || page > 1) {
       // Si hay búsqueda o paginación, usar getAreasWithPagination
       const { areas, total } = await getAreasWithPagination({
         page,

@@ -32,6 +32,20 @@ function encodeRfc2047(value: string): string {
   return `=?UTF-8?B?${encoded}?=`;
 }
 
+/**
+ * Formats an address header value with an optional display name.
+ * - CR/LF are removed from the name so no extra header can be injected.
+ * - Non-ASCII names are RFC 2047 encoded (encoded-words cannot be quoted).
+ * - ASCII names are sent as a quoted-string with `\\` and `"` escaped.
+ */
+function formatAddress(email: string, name?: string | null): string {
+  const cleanName = (name ?? "").replace(/[\r\n]+/g, " ").trim();
+  if (!cleanName) return email;
+  const encoded = encodeRfc2047(cleanName);
+  if (encoded !== cleanName) return `${encoded} <${email}>`;
+  return `"${cleanName.replace(/(["\\])/g, "\\$1")}" <${email}>`;
+}
+
 function buildRfc822Message({
   from,
   to,
@@ -131,10 +145,8 @@ export class GmailEmailProvider implements EmailProvider {
 
     const gmail = google.gmail({ version: "v1", auth: oauth2Client });
 
-    const fromAddress = `"${from.name}" <${from.email}>`;
-    const toAddress = message.to.name
-      ? `"${message.to.name}" <${message.to.email}>`
-      : message.to.email;
+    const fromAddress = formatAddress(from.email, from.name);
+    const toAddress = formatAddress(message.to.email, message.to.name);
     const text = message.text ?? stripHtml(message.html);
 
     const raw = buildRfc822Message({
