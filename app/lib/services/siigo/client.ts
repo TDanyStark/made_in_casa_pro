@@ -1,5 +1,5 @@
 import 'server-only';
-import { getSiigoToken, forceRenewSiigoToken } from './auth';
+import { getSiigoToken, forceRenewSiigoToken, readSiigoErrorBody, SIIGO_REQUEST_TIMEOUT_MS } from './auth';
 
 /**
  * Cliente base para realizar llamadas a la API de Siigo
@@ -48,7 +48,8 @@ export class SiigoClient {
           'Partner-Id': this.partnerId
         },
         body: body ? JSON.stringify(body) : undefined,
-        cache: 'no-store'
+        cache: 'no-store',
+        signal: AbortSignal.timeout(SIIGO_REQUEST_TIMEOUT_MS),
       });
 
       // Si recibimos 401 Unauthorized y no estamos en un reintento, renovamos el token y reintentamos
@@ -59,8 +60,11 @@ export class SiigoClient {
       }
 
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(`Error en la API de Siigo: ${JSON.stringify(errorData)}`);
+        const errorData = await readSiigoErrorBody(response);
+        const detail = errorData === null
+          ? `${response.status} ${response.statusText}`
+          : JSON.stringify(errorData);
+        throw new Error(`Error en la API de Siigo: ${detail}`);
       }
 
       return await response.json() as T;

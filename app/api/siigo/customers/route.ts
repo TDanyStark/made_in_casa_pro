@@ -1,11 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSiigoCustomers, searchSiigoCustomersByName, searchSiigoCustomerByIdentification } from '@/lib/queries/siigo-customers';
+import { validateApiRole, validateHttpMethod } from '@/lib/services/api-auth';
+import { OPERATIONS_ROLES } from '@/lib/role-groups';
 
 /**
  * GET /api/siigo/customers
  * Endpoint para obtener clientes de Siigo con filtros opcionales
  */
 export async function GET(request: NextRequest) {
+  const methodValidation = validateHttpMethod(request, ['GET']);
+  if (!methodValidation.isValidMethod) return methodValidation.response;
+
+  const roleValidation = await validateApiRole(request, OPERATIONS_ROLES);
+  if (!roleValidation.isAuthorized) return roleValidation.response;
+
   const searchParams = request.nextUrl.searchParams;
   const page = parseInt(searchParams.get('page') || '1');
   const pageSize = parseInt(searchParams.get('pageSize') || '25');

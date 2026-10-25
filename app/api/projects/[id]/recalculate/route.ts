@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { validateApiRole, validateHttpMethod } from "@/lib/services/api-auth";
-import { AUTHENTICATED_ROLES } from "@/lib/role-groups";
+import { PROJECT_EDIT_ROLES } from "@/lib/role-groups";
 import { decrypt } from "@/lib/session";
 import { recalculateProgressAndNotify } from "@/lib/services/notificationEngine";
 
@@ -11,7 +11,7 @@ export async function POST(request: NextRequest, { params }: Params) {
   const methodValidation = validateHttpMethod(request, ["POST"]);
   if (!methodValidation.isValidMethod) return methodValidation.response;
 
-  const roleValidation = await validateApiRole(request, AUTHENTICATED_ROLES);
+  const roleValidation = await validateApiRole(request, PROJECT_EDIT_ROLES);
   if (!roleValidation.isAuthorized) return roleValidation.response;
 
   try {
