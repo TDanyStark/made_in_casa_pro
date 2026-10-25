@@ -161,6 +161,12 @@ describe('POST /api/projects', () => {
   });
 });
 
+async function callGet(req: NextRequest) {
+  const response = await GET(req);
+  if (!response) throw new Error('GET handler returned undefined');
+  return response;
+}
+
 describe('GET /api/projects', () => {
   const mockGetProjects = getProjectsWithPagination as jest.MockedFunction<typeof getProjectsWithPagination>;
 
@@ -182,7 +188,7 @@ describe('GET /api/projects', () => {
   it.each(['page=0', 'page=abc', 'limit=0', 'limit=abc', 'limit=101'])(
     'rejects invalid pagination %s with 400 and does not query',
     async (qs) => {
-      const res = await GET(new NextRequest(`http://localhost/api/projects?${qs}`));
+      const res = await callGet(new NextRequest(`http://localhost/api/projects?${qs}`));
       expect(res.status).toBe(400);
       expect(await res.json()).toEqual({ error: 'Parámetros de paginación inválidos' });
       expect(mockGetProjects).not.toHaveBeenCalled();
@@ -191,7 +197,7 @@ describe('GET /api/projects', () => {
 
   it('keeps the default paginated response', async () => {
     mockGetProjects.mockResolvedValue({ projects: [{ id: 1 }], total: 1 } as never);
-    const res = await GET(new NextRequest('http://localhost/api/projects'));
+    const res = await callGet(new NextRequest('http://localhost/api/projects'));
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ data: [{ id: 1 }], pageCount: 1, currentPage: 1, total: 1 });
     expect(mockGetProjects).toHaveBeenCalledWith(
@@ -206,7 +212,7 @@ describe('GET /api/projects', () => {
       response: undefined,
     } as never);
     mockDecrypt.mockResolvedValue({ id: 77, rol_id: UserRole.ADMIN } as never);
-    await GET(new NextRequest('http://localhost/api/projects'));
+    await callGet(new NextRequest('http://localhost/api/projects'));
     expect(mockGetProjects).toHaveBeenCalledWith(expect.objectContaining({ assignedUserId: 77 }));
   });
 });
