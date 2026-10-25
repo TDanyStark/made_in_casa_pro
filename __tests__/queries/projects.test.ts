@@ -137,11 +137,11 @@ describe('project queries metadata fields', () => {
   });
 
   it('createProject persists ideal delivery, oc, billing closure and the brand client', async () => {
+    // INSERT del proyecto y de su V1 en la misma transacción
+    mockTransaction.execute.mockResolvedValueOnce(makeResult([{ id: 15 }]));
     mockExecute
       .mockResolvedValueOnce(makeResult([{ client_id: 7 }])) // cliente de la marca
       .mockResolvedValueOnce(makeResult([{ client_id: 7 }])) // cliente del gerente
-      .mockResolvedValueOnce(makeResult([{ id: 15 }]))       // INSERT
-      .mockResolvedValueOnce(makeResult([]))                 // project_adjustments
       .mockResolvedValueOnce(
         makeResult([
           {
@@ -163,8 +163,8 @@ describe('project queries metadata fields', () => {
       billing_closed_at: '2026-04-20T17:00:00.000Z',
     });
 
-    expect(mockExecute).toHaveBeenNthCalledWith(
-      3,
+    expect(mockTransaction.execute).toHaveBeenNthCalledWith(
+      1,
       expect.objectContaining({
         sql: expect.stringContaining('billing_closed_at'),
         args: [

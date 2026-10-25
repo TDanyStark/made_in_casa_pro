@@ -28,6 +28,9 @@ export async function DELETE(request: NextRequest, { params }: Params) {
     if (message.includes("No se puede eliminar")) {
       return NextResponse.json({ error: message }, { status: 400 });
     }
+    if (message === "Ajuste no encontrado") {
+      return NextResponse.json({ error: message }, { status: 404 });
+    }
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
