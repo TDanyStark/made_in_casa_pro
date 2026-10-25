@@ -20,6 +20,21 @@ import type { DbTransaction } from "../db/types";
 import { completionFreeze, type CompletionFreeze } from "../internal-rate";
 import { WEEKLY_WORK_HOURS_SQL } from "./settings";
 
+/**
+ * A business rule rejected the operation. `status` is the HTTP status the API
+ * answers with (400 invalid input, 404 missing, 409 state changed / conflict).
+ */
+export class TaskRuleError extends Error {
+  readonly status: 400 | 404 | 409;
+
+  constructor(message: string, status: 400 | 404 | 409) {
+    super(message);
+    this.name = "TaskRuleError";
+    this.status = status;
+    Object.setPrototypeOf(this, TaskRuleError.prototype);
+  }
+}
+
 // ─── Shared SELECT fragments ──────────────────────────────────────────────────
 
 const TASK_SELECT = `
@@ -189,21 +204,78 @@ export async function getTaskTransitions(taskId: number): Promise<TaskTransition
 
 // ─── Create ───────────────────────────────────────────────────────────────────
 
-export async function createProjectTask(data: CreateProjectTaskInput): Promise<ProjectTaskType> {
-  if (data.task_type === "validation" && data.order_index === 0) {
-    throw new Error("Una tarea de validación no puede ser la primera tarea del proyecto.");
-  }
+export type NewProjectTaskInput = Omit<CreateProjectTaskInput, "order_index"> & {
+  /** Collaborators invited to quote, saved in the same transaction as the task. */
+  quoter_ids?: number[];
+  /** User creating the task (invitations and the 'blocked' transition log). */
+  created_by?: number | null;
+};
+
+/**
+ * Creates a task at the end of its version (project + adjustment). The order,
+ * the initial status, the insert and the quoter invitations run in a single
+ * transaction holding the project row lock, so concurrent creations never get
+ * the same order_index and a failed invitation leaves no task behind.
+ *
+ * Initial status when none is requested: 'not_started' for the first task or
+ * when every previous task is done, otherwise 'waiting'. 'blocked' and 'paused'
+ * count as active: tasks are strictly sequential, so a predecessor stuck on
+ * 'blocked' (e.g. an unresolved quote) still holds the queue's turn.
+ * A task that requires a quote and has no assignee starts 'blocked'.
+ */
+export async function createProjectTask(data: NewProjectTaskInput): Promise<ProjectTaskType> {
   if (data.status === "paused") {
     throw new Error("Una tarea nueva no puede crearse pausada");
   }
+  const assignedUserId = data.assigned_user_id ?? null;
+  const quoterIds = data.quoter_ids ?? [];
+  const createdBy = data.created_by ?? null;
+
+  let id: number;
+  let pausedProjectIds: number[] = [];
+  const tx = await db.transaction("write");
   try {
     // A task never exists without a version: default to the project's base version.
-    const adjustmentId = await resolveTaskAdjustmentId(data.project_id, data.adjustment_id);
-    const status = data.status ?? (data.order_index === 0 ? "not_started" : "waiting");
-    const assignedUserId = data.assigned_user_id ?? null;
-    const assignedAt = (status === "not_started" && assignedUserId) ? new Date() : null;
+    const adjustmentId = await resolveTaskAdjustmentId(data.project_id, data.adjustment_id, tx);
 
-    const insert = {
+    await tx.execute({ sql: `SELECT id FROM projects WHERE id = $1 FOR UPDATE`, args: [data.project_id] });
+
+    const orderResult = await tx.execute({
+      sql: `SELECT COALESCE(MAX(order_index), -1) + 1 AS next_order FROM project_tasks WHERE project_id = $1 AND adjustment_id = $2`,
+      args: [data.project_id, adjustmentId],
+    });
+    const orderIndex = Number((orderResult.rows[0] as { next_order?: number | string } | undefined)?.next_order ?? 0);
+
+    if (data.task_type === "validation" && orderIndex === 0) {
+      throw new Error("Una tarea de validación no puede ser la primera tarea del proyecto.");
+    }
+
+    let status: ProjectTaskStatus = data.status ?? "waiting";
+    if (!data.status) {
+      if (orderIndex === 0) {
+        status = "not_started";
+      } else {
+        const activeResult = await tx.execute({
+          sql: `SELECT COUNT(*) AS cnt FROM project_tasks
+                WHERE project_id = $1 AND adjustment_id = $2
+                  AND status IN ('not_started', 'in_progress', 'paused', 'waiting', 'blocked')`,
+          args: [data.project_id, adjustmentId],
+        });
+        const activeCount = Number((activeResult.rows[0] as { cnt?: number | string } | undefined)?.cnt ?? 0);
+        if (activeCount === 0) status = "not_started";
+      }
+    }
+
+    const isBlockedByQuote =
+      (status === "not_started" || status === "in_progress") &&
+      Number(data.requires_quote) === 1 &&
+      !assignedUserId;
+    if (isBlockedByQuote) status = "blocked";
+
+    const assignedAt = (status === "not_started" && assignedUserId) ? new Date() : null;
+    const taskFlag = data.task_flag ?? "new";
+
+    const result = await tx.execute({
       sql: `
         INSERT INTO project_tasks
           (project_id, template_id, title, description,
@@ -221,43 +293,49 @@ export async function createProjectTask(data: CreateProjectTaskInput): Promise<P
         assignedUserId,
         status,
         data.task_type ?? "execution",
-        data.task_flag ?? "new",
+        taskFlag,
         data.requires_quote ?? 0,
         data.assign_to_commercial ?? 0,
-        data.order_index,
+        orderIndex,
         assignedAt,
         adjustmentId,
       ],
-    };
+    });
+    id = Number(result.rows[0]?.id);
 
-    let id: number;
-    let pausedProjectIds: number[] = [];
+    // Single in-progress rule: a task created in progress pauses the
+    // assignee's other in-progress tasks atomically with the insert.
     if (status === "in_progress" && assignedUserId) {
-      // Single in-progress rule: a task created in progress pauses the
-      // assignee's other in-progress tasks atomically with the insert.
-      const tx = await db.transaction("write");
-      try {
-        const result = await tx.execute(insert);
-        id = Number(result.rows[0]?.id);
-        const paused = await pauseOtherInProgressTasks(tx, assignedUserId, id, null);
-        await tx.commit();
-        pausedProjectIds = paused.map((p) => p.project_id);
-      } catch (error) {
-        await tx.rollback();
-        throw error;
-      }
-    } else {
-      const result = await db.execute(insert);
-      id = Number(result.rows[0]?.id);
+      const paused = await pauseOtherInProgressTasks(tx, assignedUserId, id, null);
+      pausedProjectIds = paused.map((p) => p.project_id);
     }
-    revalidatePath(`/projects/${data.project_id}`);
-    new Set(pausedProjectIds).forEach((pid) => revalidatePath(`/projects/${pid}`));
-    const created = await getProjectTaskById(id);
-    return created!;
+
+    for (const quoterId of quoterIds) {
+      await tx.execute({
+        sql: `INSERT INTO task_quote_invitations (task_id, user_id, invited_by) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING`,
+        args: [id, quoterId, createdBy],
+      });
+    }
+
+    if (isBlockedByQuote && createdBy) {
+      await tx.execute({
+        sql: `INSERT INTO task_transitions (task_id, project_id, from_status, to_status, from_flag, to_flag, moved_by, notes)
+              VALUES ($1, $2, NULL, $3, NULL, $4, $5, $6)`,
+        args: [id, data.project_id, "blocked", taskFlag, createdBy, "Requiere cotización de colaborador externo"],
+      });
+    }
+
+    await tx.commit();
   } catch (error) {
+    await tx.rollback();
     console.error("Error creating project task:", error);
     throw error;
   }
+
+  revalidatePath(`/projects/${data.project_id}`);
+  new Set(pausedProjectIds).forEach((pid) => revalidatePath(`/projects/${pid}`));
+  const created = await getProjectTaskById(id);
+  return created!;
 }
 
 // ─── Update ───────────────────────────────────────────────────────────────────
@@ -443,16 +521,18 @@ async function ensureNextPendingTaskActive(
   adjustmentId?: number | null
 ): Promise<number[]> {
   const activatedIds: number[] = [];
-  const adjustmentFilter =
-    adjustmentId === undefined
-      ? ""
-      : adjustmentId === null
-        ? "AND adjustment_id IS NULL"
-        : `AND adjustment_id = ${adjustmentId}`;
+  const args: unknown[] = [projectId];
+  let adjustmentFilter = "";
+  if (adjustmentId === null) {
+    adjustmentFilter = "AND adjustment_id IS NULL";
+  } else if (adjustmentId !== undefined) {
+    args.push(adjustmentId);
+    adjustmentFilter = `AND adjustment_id = $${args.length}`;
+  }
 
   const tasksResult = await transaction.execute({
     sql: `SELECT id, status, assigned_user_id FROM project_tasks WHERE project_id = $1 ${adjustmentFilter} ORDER BY order_index ASC`,
-    args: [projectId],
+    args,
   });
   const tasks = tasksResult.rows as unknown as {
     id: number;
@@ -508,14 +588,16 @@ export async function reorderProjectTasks(
     }
   }
 
-  const adjustmentFilter = adjustmentId === undefined ? "" : (adjustmentId === null ? "AND adjustment_id IS NULL" : `AND adjustment_id = ${adjustmentId}`);
+  const adjustmentFilter =
+    adjustmentId === undefined ? "" : adjustmentId === null ? "AND adjustment_id IS NULL" : "AND adjustment_id = $4";
+  const adjustmentArgs = adjustmentId === undefined || adjustmentId === null ? [] : [adjustmentId];
 
   const transaction = await db.transaction("write");
   try {
     for (let i = 0; i < orderedIds.length; i++) {
       await transaction.execute({
         sql: `UPDATE project_tasks SET order_index = $1 WHERE id = $2 AND project_id = $3 ${adjustmentFilter}`,
-        args: [i, orderedIds[i], projectId],
+        args: [i, orderedIds[i], projectId, ...adjustmentArgs],
       });
     }
 
@@ -635,6 +717,8 @@ async function changeTaskStatus(
   invalidStatusError: string
 ): Promise<TaskStateChangeResult> {
   const tx = await db.transaction("write");
+  let task: LockedTask;
+  let paused: Array<{ id: number; project_id: number }>;
   try {
     const result = await tx.execute({
       sql: `SELECT id, status, assigned_user_id, project_id, task_flag FROM project_tasks
@@ -642,38 +726,39 @@ async function changeTaskStatus(
             FOR UPDATE`,
       args: [taskId],
     });
-    const task = result.rows[0] as unknown as LockedTask | undefined;
-    if (!task) {
+    const locked = result.rows[0] as unknown as LockedTask | undefined;
+    if (!locked) {
       await tx.rollback();
       return { success: false, error: "Tarea no encontrada" };
     }
-    if (task.status !== fromStatus) {
+    if (locked.status !== fromStatus) {
       await tx.rollback();
       return { success: false, error: invalidStatusError };
     }
+    task = locked;
 
-    const paused =
+    paused =
       toStatus === "in_progress" && task.assigned_user_id
         ? await pauseOtherInProgressTasks(tx, task.assigned_user_id, task.id, movedBy)
         : [];
 
     await tx.execute({
-      sql: `UPDATE project_tasks SET status = '${toStatus}', updated_at = CURRENT_TIMESTAMP WHERE id = $1`,
-      args: [taskId],
+      sql: `UPDATE project_tasks SET status = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $1`,
+      args: [taskId, toStatus],
     });
     await insertTransition(tx, task, fromStatus, toStatus, movedBy, null);
     await tx.commit();
-
-    const projectIds = new Set([task.project_id, ...paused.map((p) => p.project_id)]);
-    projectIds.forEach((pid) => revalidatePath(`/projects/${pid}`));
-
-    return toStatus === "in_progress"
-      ? { success: true, pausedTaskIds: paused.map((p) => p.id) }
-      : { success: true };
   } catch (error) {
     await tx.rollback();
     throw error;
   }
+
+  const projectIds = new Set([task.project_id, ...paused.map((p) => p.project_id)]);
+  projectIds.forEach((pid) => revalidatePath(`/projects/${pid}`));
+
+  return toStatus === "in_progress"
+    ? { success: true, pausedTaskIds: paused.map((p) => p.id) }
+    : { success: true };
 }
 
 /**
@@ -759,18 +844,33 @@ export async function completeTask(
   }
 
   const transaction = await db.transaction("write");
+  let nextId: number | null = null;
+  let blockedReason: string | undefined;
   try {
+    // 0. Lock the task and re-check: a concurrent completion may have won the race.
+    const locked = await transaction.execute({
+      sql: `SELECT status FROM project_tasks
+            WHERE id = $1
+            FOR UPDATE`,
+      args: [taskId],
+    });
+    if ((locked.rows[0] as { status?: string } | undefined)?.status !== "in_progress") {
+      throw new TaskRuleError("Solo se pueden completar tareas en progreso", 409);
+    }
+
     const freeze = await readCompletionFreeze(transaction, taskId);
 
-    // 1. Mark current task as completed (with optional enrichment fields)
+    // 1. Mark current task as completed. progress_minutes is the total time:
+    // when sent it replaces the stored value; values not sent keep what is stored
+    // (e.g. approving a validation keeps its minutes and cost).
     await transaction.execute({
       sql: `UPDATE project_tasks
             SET status = 'completed',
                 completed_at = CURRENT_TIMESTAMP,
                 updated_at = CURRENT_TIMESTAMP,
-                progress_minutes = $2,
-                delivery_url = $3,
-                completion_cost = $4,
+                progress_minutes = COALESCE($2, progress_minutes),
+                delivery_url = COALESCE($3, delivery_url),
+                completion_cost = COALESCE($4, completion_cost),
                 completion_hourly_rate = $5,
                 completion_monthly_salary = $6,
                 completion_month_minutes = $7,
@@ -778,7 +878,7 @@ export async function completeTask(
             WHERE id = $1`,
       args: [
         taskId,
-        options?.progress_minutes ?? 0,
+        options?.progress_minutes ?? null,
         options?.delivery_url ?? null,
         options?.completion_cost ?? null,
         freeze.completion_hourly_rate,
@@ -803,9 +903,7 @@ export async function completeTask(
     // skip over an immediate-next task that is already 'blocked' (e.g. an
     // unresolved quote) and incorrectly jump ahead to evaluate/activate a
     // later task, letting work after the blocked one cut the queue.
-    const adjFilter = task.adjustment_id !== null
-      ? `AND adjustment_id = ${task.adjustment_id}`
-      : `AND adjustment_id IS NULL`;
+    const adjFilter = task.adjustment_id !== null ? `AND adjustment_id = $3` : `AND adjustment_id IS NULL`;
 
     const nextResult = await transaction.execute({
       sql: `
@@ -817,11 +915,8 @@ export async function completeTask(
         ORDER BY order_index ASC
         LIMIT 1
       `,
-      args: [task.project_id, taskId],
+      args: task.adjustment_id !== null ? [task.project_id, taskId, task.adjustment_id] : [task.project_id, taskId],
     });
-
-    let nextTask: ProjectTaskType | null = null;
-    let blockedReason: string | undefined;
 
     if (nextResult.rows.length > 0) {
       const next = nextResult.rows[0] as unknown as {
@@ -884,21 +979,22 @@ export async function completeTask(
       }
     }
 
-    await transaction.commit();
-
-    const updatedTask = await getProjectTaskById(taskId);
     if (nextResult.rows.length > 0) {
-      const nextId = Number((nextResult.rows[0] as unknown as { id: number }).id);
-      nextTask = await getProjectTaskById(nextId);
+      nextId = Number((nextResult.rows[0] as unknown as { id: number }).id);
     }
 
-    revalidatePath(`/projects/${task.project_id}`);
-    return { task: updatedTask!, nextTask, blockedReason };
+    await transaction.commit();
   } catch (error) {
     await transaction.rollback();
     console.error("Error completing task:", error);
     throw error;
   }
+
+  const updatedTask = await getProjectTaskById(taskId);
+  const nextTask = nextId !== null ? await getProjectTaskById(nextId) : null;
+
+  revalidatePath(`/projects/${task.project_id}`);
+  return { task: updatedTask!, nextTask, blockedReason };
 }
 
 // ─── Rejection loop — append-only new tasks ──────────────────────────────────
@@ -936,6 +1032,11 @@ export async function createRejectionLoopTasks(
   const taskN = taskNResult.rows[0] as unknown as { id: number; order_index: number; task_flag: string; status: string; adjustment_id: number | null };
   const taskM = taskMResult.rows[0] as unknown as { id: number; order_index: number };
 
+  // The task sent back for correction must come before the validation task.
+  if (Number(taskM.order_index) >= Number(taskN.order_index)) {
+    throw new TaskRuleError("La tarea a corregir debe estar antes de la validación", 400);
+  }
+
   // Step 2: Fetch the range of tasks between M and N inclusive (ONLY within the same adjustment)
   const adjustmentFilterSQL = taskN.adjustment_id === null ? "AND adjustment_id IS NULL" : "AND adjustment_id = $4";
   const rangeArgs = [projectId, taskM.order_index, taskN.order_index];
@@ -955,6 +1056,9 @@ export async function createRejectionLoopTasks(
 
   const rangeTasks = rangeResult.rows as unknown as ProjectTaskType[];
     const K = rangeTasks.length;
+    if (K === 0) {
+      throw new TaskRuleError("La tarea a corregir debe estar antes de la validación", 400);
+    }
 
     // Clones stay in task N's version (base version for legacy tasks without one).
     const cloneAdjustmentId = await resolveTaskAdjustmentId(projectId, taskN.adjustment_id);
@@ -964,7 +1068,20 @@ export async function createRejectionLoopTasks(
     if (taskN.adjustment_id !== null) shiftArgs.push(taskN.adjustment_id);
 
     const transaction = await db.transaction("write");
+    const newTasksIds: number[] = [];
     try {
+      // Lock task N and re-check: a duplicated reject (double click, two tabs)
+      // must not clone the range twice.
+      const lockedN = await transaction.execute({
+        sql: `SELECT status FROM project_tasks
+              WHERE id = $1
+              FOR UPDATE`,
+        args: [rejectedValidationTaskId],
+      });
+      if ((lockedN.rows[0] as { status?: string } | undefined)?.status !== "in_progress") {
+        throw new TaskRuleError("La tarea de validación ya fue resuelta", 409);
+      }
+
       // Step 3: Shift all tasks after N up by K
       await transaction.execute({
         sql: `
@@ -974,8 +1091,6 @@ export async function createRejectionLoopTasks(
         `,
         args: shiftArgs,
       });
-
-      const newTasksIds: number[] = [];
 
     // Step 4: Clone all tasks in the range
     for (let i = 0; i < K; i++) {
@@ -1050,16 +1165,16 @@ export async function createRejectionLoopTasks(
     });
 
     await transaction.commit();
-
-    const firstCorrectionTask = await getProjectTaskById(newTasksIds[0]);
-
-    revalidatePath(`/projects/${projectId}`);
-    return { firstCorrectionTask: firstCorrectionTask! };
   } catch (error) {
     await transaction.rollback();
     console.error("Error creating rejection loop tasks:", error);
     throw error;
   }
+
+  const firstCorrectionTask = await getProjectTaskById(newTasksIds[0]);
+
+  revalidatePath(`/projects/${projectId}`);
+  return { firstCorrectionTask: firstCorrectionTask! };
 }
 
 // ─── Validate task (validation flow) ─────────────────────────────────────────

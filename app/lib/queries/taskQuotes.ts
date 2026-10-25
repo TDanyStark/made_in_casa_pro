@@ -2,6 +2,10 @@ import { db } from "../db";
 import { revalidatePath } from "next/cache";
 import { TaskQuoteType, TaskQuoteInvitationType } from "../definitions";
 import { dhmToMinutes } from "../utils/time";
+import { TaskRuleError } from "./projectTasks";
+
+const QUOTE_NOT_FOUND = "Cotización no encontrada";
+const TASK_CLOSED_FOR_QUOTES = "Esta tarea ya no recibe cotizaciones";
 
 const OPEN_QUOTE_TASK_FILTER = `
   pt.requires_quote = 1
@@ -231,7 +235,10 @@ export async function getPendingQuoteInvitationsCount(userId: number): Promise<n
 }
 
 /**
- * Submit a quote for a task. Only allowed if the user is invited.
+ * Submit a quote for a task. Only allowed if the user is invited and the task
+ * still accepts quotes (blocked, unassigned, no accepted quote). The task row is
+ * locked like acceptQuote does, so a submission never races an acceptance and
+ * an accepted quote is never turned back into a pending one.
  */
 export async function submitQuote(data: {
   task_id: number;
@@ -242,9 +249,20 @@ export async function submitQuote(data: {
   delivery_minutes?: number | null;
   notes?: string | null;
 }): Promise<TaskQuoteType> {
+  const totalMinutes = dhmToMinutes({
+    days: data.delivery_days || 0,
+    hours: data.delivery_hours || 0,
+    minutes: data.delivery_minutes || 0,
+  });
+
+  // Normalize HTML notes content
+  const normalizedNotes = normalizeHtmlContent(data.notes ?? null);
+
+  let id: number;
+  const transaction = await db.transaction("write");
   try {
     // Verify invitation
-    const invCheck = await db.execute({
+    const invCheck = await transaction.execute({
       sql: `SELECT id FROM task_quote_invitations WHERE task_id = $1 AND user_id = $2`,
       args: [data.task_id, data.user_id],
     });
@@ -252,16 +270,17 @@ export async function submitQuote(data: {
       throw new Error("No tienes invitación para cotizar esta tarea");
     }
 
-    const totalMinutes = dhmToMinutes({
-      days: data.delivery_days || 0,
-      hours: data.delivery_hours || 0,
-      minutes: data.delivery_minutes || 0,
+    const openTask = await transaction.execute({
+      sql: `SELECT pt.id FROM project_tasks pt
+            WHERE pt.id = $1 AND ${OPEN_QUOTE_TASK_FILTER}
+            FOR UPDATE`,
+      args: [data.task_id],
     });
+    if (openTask.rows.length === 0) {
+      throw new TaskRuleError(TASK_CLOSED_FOR_QUOTES, 409);
+    }
 
-    // Normalize HTML notes content
-    const normalizedNotes = normalizeHtmlContent(data.notes ?? null);
-
-    const result = await db.execute({
+    const result = await transaction.execute({
       sql: `
         INSERT INTO task_quotes (task_id, user_id, price, delivery_days, delivery_hours, delivery_minutes, notes, status)
         VALUES ($1, $2, $3, $4, $5, $6, $7, 'pending')
@@ -273,6 +292,7 @@ export async function submitQuote(data: {
           notes           = EXCLUDED.notes,
           status          = 'pending',
           updated_at      = CURRENT_TIMESTAMP
+        WHERE task_quotes.status <> 'accepted'
         RETURNING id
       `,
       args: [
@@ -285,42 +305,78 @@ export async function submitQuote(data: {
         normalizedNotes,
       ],
     });
+    if (result.rows.length === 0) {
+      throw new TaskRuleError(TASK_CLOSED_FOR_QUOTES, 409);
+    }
+    id = Number(result.rows[0]?.id);
 
-    const id = Number(result.rows[0]?.id);
-    const quotes = await getTaskQuotes(data.task_id);
-    const quote = quotes.find((q) => q.id === id);
-    return quote!;
+    await transaction.commit();
   } catch (error) {
+    await transaction.rollback();
     console.error("Error submitting quote:", error);
     throw error;
   }
+
+  const quotes = await getTaskQuotes(data.task_id);
+  const quote = quotes.find((q) => q.id === id);
+  return quote!;
 }
 
 /**
- * Accept a quote: assigns the user to the task and activates it (in_progress).
+ * Accept a quote: assigns the user to the task and activates it ('not_started').
  * Rejects all other quotes for the same task.
+ *
+ * Everything is read inside the transaction with the task row locked (task
+ * before quotes, same order as submitQuote). Only a pending quote of `scope`'s
+ * task can be accepted, and only while that task is blocked, unassigned and
+ * without an accepted quote. Throws TaskRuleError 404 (missing / other task or
+ * project) or 409 (state no longer allows it).
  */
 export async function acceptQuote(
   quoteId: number,
-  acceptedBy: number
+  acceptedBy: number,
+  scope: { projectId: number; taskId: number }
 ): Promise<void> {
-  const quoteResult = await db.execute({
-    sql: `SELECT id, task_id, user_id FROM task_quotes WHERE id = $1`,
-    args: [quoteId],
-  });
-  if (quoteResult.rows.length === 0) throw new Error("Cotización no encontrada");
-
-  const quote = quoteResult.rows[0] as unknown as { id: number; task_id: number; user_id: number };
-
-  // Get current task for project_id and status
-  const taskResult = await db.execute({
-    sql: `SELECT id, project_id, status, task_flag FROM project_tasks WHERE id = $1`,
-    args: [quote.task_id],
-  });
-  const task = taskResult.rows[0] as unknown as { id: number; project_id: number; status: string; task_flag: string };
-
   const transaction = await db.transaction("write");
+  let projectId: number;
   try {
+    const quoteResult = await transaction.execute({
+      sql: `SELECT id, task_id, user_id FROM task_quotes WHERE id = $1`,
+      args: [quoteId],
+    });
+    const quote = quoteResult.rows[0] as unknown as { id: number; task_id: number; user_id: number } | undefined;
+    if (!quote || Number(quote.task_id) !== scope.taskId) {
+      throw new TaskRuleError(QUOTE_NOT_FOUND, 404);
+    }
+
+    const taskResult = await transaction.execute({
+      sql: `SELECT id, project_id, status, task_flag, assigned_user_id FROM project_tasks WHERE id = $1 FOR UPDATE`,
+      args: [quote.task_id],
+    });
+    const task = taskResult.rows[0] as unknown as
+      | { id: number; project_id: number; status: string; task_flag: string; assigned_user_id: number | null }
+      | undefined;
+    if (!task || Number(task.project_id) !== scope.projectId) {
+      throw new TaskRuleError("Tarea no encontrada", 404);
+    }
+    projectId = Number(task.project_id);
+
+    const quotesResult = await transaction.execute({
+      sql: `SELECT id, status FROM task_quotes WHERE task_id = $1 FOR UPDATE`,
+      args: [quote.task_id],
+    });
+    const taskQuotes = quotesResult.rows as unknown as Array<{ id: number; status: string }>;
+    const current = taskQuotes.find((q) => Number(q.id) === quoteId);
+    if (current?.status !== "pending") {
+      throw new TaskRuleError("La cotización ya no está pendiente", 409);
+    }
+    if (taskQuotes.some((q) => q.status === "accepted")) {
+      throw new TaskRuleError("La tarea ya tiene una cotización aceptada", 409);
+    }
+    if (task.status !== "blocked" || task.assigned_user_id) {
+      throw new TaskRuleError("La tarea ya no está esperando cotización", 409);
+    }
+
     // 1. Accept this quote
     await transaction.execute({
       sql: `UPDATE task_quotes SET status = 'accepted', updated_at = CURRENT_TIMESTAMP WHERE id = $1`,
@@ -353,19 +409,31 @@ export async function acceptQuote(
     });
 
     await transaction.commit();
-    revalidatePath(`/projects/${task.project_id}`);
   } catch (error) {
     await transaction.rollback();
     console.error("Error accepting quote:", error);
     throw error;
   }
+  revalidatePath(`/projects/${projectId}`);
 }
 
 /**
- * Reject a specific quote (without accepting another).
+ * Reject a specific quote (without accepting another). The quote must belong to
+ * `scope`'s task and project, otherwise TaskRuleError 404.
  */
-export async function rejectQuote(quoteId: number): Promise<void> {
+export async function rejectQuote(
+  quoteId: number,
+  scope: { projectId: number; taskId: number }
+): Promise<void> {
   try {
+    const found = await db.execute({
+      sql: `SELECT tq.id FROM task_quotes tq
+            JOIN project_tasks pt ON pt.id = tq.task_id
+            WHERE tq.id = $1 AND tq.task_id = $2 AND pt.project_id = $3`,
+      args: [quoteId, scope.taskId, scope.projectId],
+    });
+    if (found.rows.length === 0) throw new TaskRuleError(QUOTE_NOT_FOUND, 404);
+
     await db.execute({
       sql: `UPDATE task_quotes SET status = 'rejected', updated_at = CURRENT_TIMESTAMP WHERE id = $1`,
       args: [quoteId],
@@ -374,6 +442,7 @@ export async function rejectQuote(quoteId: number): Promise<void> {
     console.error("Error rejecting quote:", error);
     throw error;
   }
+  revalidatePath(`/projects/${scope.projectId}`);
 }
 
 /**

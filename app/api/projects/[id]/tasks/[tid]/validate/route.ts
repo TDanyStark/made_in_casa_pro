@@ -10,6 +10,7 @@ import {
   NOTIFICATION_EVENTS,
   recalculateProgressAndNotify,
 } from "@/lib/services/notificationEngine";
+import { taskRuleErrorResponse } from "../taskStateChange";
 
 const bodySchema = z.object({
   action: z.enum(["approve", "reject"]),
@@ -105,6 +106,8 @@ export async function POST(request: NextRequest, { params }: Params) {
       blockedReason: result.blockedReason ?? null,
     });
   } catch (error) {
+    const ruleResponse = taskRuleErrorResponse(error);
+    if (ruleResponse) return ruleResponse;
     const message = error instanceof Error ? error.message : "Error al validar tarea";
     console.error("Error validating task:", error);
     return NextResponse.json({ error: message }, { status: 500 });

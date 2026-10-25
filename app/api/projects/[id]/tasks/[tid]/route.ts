@@ -7,10 +7,11 @@ import {
   deleteProjectTask,
   resolveProjectTaskAssignment,
 } from "@/lib/queries/projectTasks";
+import { userCanAccessProject } from "@/lib/queries/projects";
 import { db } from "@/lib/db";
 import { cookies } from "next/headers";
 import { decrypt } from "@/lib/session";
-import { AUTHENTICATED_ROLES, OPERATIONS_ROLES, TASK_OVERRIDE_ROLES } from "@/lib/role-groups";
+import { AUTHENTICATED_ROLES, hasAnyRole, OPERATIONS_ROLES } from "@/lib/role-groups";
 import {
   dispatchNotification,
   NOTIFICATION_EVENTS,
@@ -34,6 +35,20 @@ const patchSchema = z.object({
 
 type Params = { params: Promise<{ id: string; tid: string }> };
 
+const TASK_NOT_FOUND = { error: "Tarea no encontrada" };
+
+async function getSessionUserId(): Promise<number | null> {
+  const cookie = (await cookies()).get("session")?.value;
+  const session = cookie ? await decrypt(cookie) : null;
+  return session?.id ? Number(session.id) : null;
+}
+
+/** A task is only reachable through the URL of its own project. */
+async function getTaskOfProject(projectId: number, taskId: number) {
+  const task = await getProjectTaskById(taskId);
+  return task && task.project_id === projectId ? task : null;
+}
+
 export async function GET(request: NextRequest, { params }: Params) {
   const methodValidation = validateHttpMethod(request, ["GET"]);
   if (!methodValidation.isValidMethod) return methodValidation.response;
@@ -41,17 +56,33 @@ export async function GET(request: NextRequest, { params }: Params) {
   const roleValidation = await validateApiRole(request, AUTHENTICATED_ROLES);
   if (!roleValidation.isAuthorized) return roleValidation.response;
 
-  const { tid } = await params;
-  const task = await getProjectTaskById(parseInt(tid));
-  if (!task) return NextResponse.json({ error: "Tarea no encontrada" }, { status: 404 });
+  const { id, tid } = await params;
+  const projectId = parseInt(id);
+  const task = await getTaskOfProject(projectId, parseInt(tid));
+  if (!task) return NextResponse.json(TASK_NOT_FOUND, { status: 404 });
+
+  // Roles fuera de operaciones (colaborador) solo ven tareas de proyectos donde tienen acceso.
+  if (!hasAnyRole(roleValidation.userRole, OPERATIONS_ROLES)) {
+    const userId = await getSessionUserId();
+    const allowed = userId
+      ? await userCanAccessProject(projectId, userId, roleValidation.userRole)
+      : false;
+    if (!allowed) {
+      return NextResponse.json({ error: "No tienes acceso a este proyecto" }, { status: 403 });
+    }
+  }
   return NextResponse.json(task);
 }
 
+/**
+ * Editing a task (title, assignee, status, quoters...) is an operations task.
+ * Collaborators use the start/pause/resume/progress/complete endpoints instead.
+ */
 export async function PATCH(request: NextRequest, { params }: Params) {
   const methodValidation = validateHttpMethod(request, ["PATCH"]);
   if (!methodValidation.isValidMethod) return methodValidation.response;
 
-  const roleValidation = await validateApiRole(request, AUTHENTICATED_ROLES);
+  const roleValidation = await validateApiRole(request, OPERATIONS_ROLES);
   if (!roleValidation.isAuthorized) return roleValidation.response;
 
   const notifyParam = parseNotifyParam(request);
@@ -74,30 +105,41 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     }
 
     const taskId = parseInt(tid);
-    const existingTask = await getProjectTaskById(taskId);
-    if (!existingTask) return NextResponse.json({ error: "Tarea no encontrada" }, { status: 404 });
+    const existingTask = await getTaskOfProject(projectId, taskId);
+    if (!existingTask) return NextResponse.json(TASK_NOT_FOUND, { status: 404 });
 
-    const cookie = (await cookies()).get("session")?.value;
-    const session = cookie ? await decrypt(cookie) : null;
-    const currentUserId = session?.id ? Number(session.id) : null;
+    const currentUserId = await getSessionUserId();
 
-    // Pausing/resuming (paused <-> in_progress) follows the pause/resume
-    // routes: only the assignee or a leadership role.
-    const requestedStatus = validation.data.status;
-    if (requestedStatus === "paused" && existingTask.status !== "paused" && existingTask.status !== "in_progress") {
+    // Pausing/resuming through PATCH is limited to operations roles (the role
+    // check above), which are the leadership roles allowed to pause/resume.
+    if (
+      validation.data.status === "paused" &&
+      existingTask.status !== "paused" &&
+      existingTask.status !== "in_progress"
+    ) {
       return NextResponse.json({ error: "Solo se pueden pausar tareas en progreso" }, { status: 400 });
     }
-    const isPauseOrResume =
-      requestedStatus !== existingTask.status &&
-      ((requestedStatus === "paused" && existingTask.status === "in_progress") ||
-        (requestedStatus === "in_progress" && existingTask.status === "paused"));
-    if (isPauseOrResume) {
-      const isAssigned = currentUserId !== null && existingTask.assigned_user_id === currentUserId;
-      if (!isAssigned && !TASK_OVERRIDE_ROLES.includes(roleValidation.userRole)) {
-        return NextResponse.json(
-          { error: "No tienes permiso para pausar o reanudar esta tarea" },
-          { status: 403 }
-        );
+
+    // Quoter invitations are saved first: when they fail nothing else changes
+    // and no quote.requested is sent.
+    if (validation.data.quoter_ids !== undefined) {
+      const transaction = await db.transaction("write");
+      try {
+        await transaction.execute({
+          sql: `DELETE FROM task_quote_invitations WHERE task_id = $1`,
+          args: [taskId],
+        });
+        for (const quoterId of validation.data.quoter_ids) {
+          await transaction.execute({
+            sql: `INSERT INTO task_quote_invitations (task_id, user_id, invited_by) VALUES ($1, $2, $3)`,
+            args: [taskId, quoterId, currentUserId],
+          });
+        }
+        await transaction.commit();
+      } catch (err) {
+        await transaction.rollback();
+        console.error("Error syncing quoter invitations:", err);
+        return NextResponse.json({ error: "Error al guardar las invitaciones a cotizar" }, { status: 500 });
       }
     }
 
@@ -130,27 +172,6 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     const driveWarning = assignmentChanged && updated.assigned_user_id
       ? await syncProjectDriveAccess(projectId)
       : null;
-
-    // Handle quoter invitations sync
-    if (validation.data.quoter_ids !== undefined) {
-      const transaction = await db.transaction("write");
-      try {
-        await transaction.execute({
-          sql: `DELETE FROM task_quote_invitations WHERE task_id = $1`,
-          args: [taskId],
-        });
-        for (const quoterId of validation.data.quoter_ids) {
-          await transaction.execute({
-            sql: `INSERT INTO task_quote_invitations (task_id, user_id, invited_by) VALUES ($1, $2, $3)`,
-            args: [taskId, quoterId, currentUserId],
-          });
-        }
-        await transaction.commit();
-      } catch (err) {
-        await transaction.rollback();
-        console.error("Error syncing quoter invitations:", err);
-      }
-    }
 
     // Recalculate progress when status changes (project.ready_to_close is silenced with notify=false)
     if (validation.data.status !== undefined) {
@@ -224,11 +245,13 @@ export async function DELETE(request: NextRequest, { params }: Params) {
   try {
     const { id, tid } = await params;
     const projectId = parseInt(id);
-    const activatedIds = await deleteProjectTask(parseInt(tid));
+    const taskId = parseInt(tid);
+    if (!(await getTaskOfProject(projectId, taskId))) {
+      return NextResponse.json(TASK_NOT_FOUND, { status: 404 });
+    }
+    const activatedIds = await deleteProjectTask(taskId);
 
-    const cookie = (await cookies()).get("session")?.value;
-    const session = cookie ? await decrypt(cookie) : null;
-    const currentUserId = session?.id ? Number(session.id) : null;
+    const currentUserId = await getSessionUserId();
 
     // Deleting the last pending task can take the project to 100% (project.ready_to_close).
     await recalculateProgressAndNotify(projectId, currentUserId, { notify: notifyParam.notify });

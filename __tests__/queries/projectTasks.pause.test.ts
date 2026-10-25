@@ -133,7 +133,7 @@ describe('pauseTask()', () => {
     expect(result).toEqual({ success: true });
     const calls = sqlCalls();
     expect(calls).toContainEqual(
-      expect.objectContaining({ sql: expect.stringMatching(/SET status = 'paused'/), args: [10] })
+      expect.objectContaining({ sql: expect.stringMatching(/SET status = \$2/), args: [10, 'paused'] })
     );
     const log = calls.find((c) => /INSERT INTO task_transitions/.test(c.sql));
     expect(log?.args).toEqual([10, 1, 'in_progress', 'paused', 'new', 'new', 5, null]);
@@ -174,7 +174,7 @@ describe('resumeTask()', () => {
     expect(result).toEqual({ success: true, pausedTaskIds: [20] });
     const calls = sqlCalls();
     expect(calls).toContainEqual(
-      expect.objectContaining({ sql: expect.stringMatching(/SET status = 'in_progress'/), args: [10] })
+      expect.objectContaining({ sql: expect.stringMatching(/SET status = \$2/), args: [10, 'in_progress'] })
     );
     const logs = calls
       .filter((c) => /INSERT INTO task_transitions/.test(c.sql))
@@ -294,7 +294,7 @@ describe('createProjectTask() — a task created in_progress keeps the rule', ()
     });
     (db.execute as jest.Mock).mockResolvedValue({ rows: [{ id: 55, project_id: 1, status: 'in_progress', quoter_ids: '[]' }] });
 
-    await createProjectTask({ project_id: 1, title: 'X', assigned_user_id: 7, status: 'in_progress', order_index: 2 });
+    await createProjectTask({ project_id: 1, title: 'X', assigned_user_id: 7, status: 'in_progress' });
 
     expect(sqlCalls()).toContainEqual(
       expect.objectContaining({ sql: expect.stringMatching(/SET status = 'paused'/), args: [7, 55] })
@@ -303,20 +303,24 @@ describe('createProjectTask() — a task created in_progress keeps the rule', ()
     expect(revalidatePath).toHaveBeenCalledWith('/projects/2');
   });
 
-  it('keeps the previous single insert for any other status', async () => {
+  it('pauses nobody for any other status', async () => {
     const { createProjectTask } = jest.requireActual('@/lib/queries/projectTasks');
+    mockTransaction.execute.mockImplementation(async (query: { sql: string }) =>
+      /INSERT INTO project_tasks/.test(query.sql) ? { rows: [{ id: 56 }] } : { rows: [] }
+    );
     (db.execute as jest.Mock).mockResolvedValue({ rows: [{ id: 56, project_id: 1, status: 'not_started', quoter_ids: '[]' }] });
 
-    await createProjectTask({ project_id: 1, title: 'Y', assigned_user_id: 7, status: 'not_started', order_index: 0 });
+    await createProjectTask({ project_id: 1, title: 'Y', assigned_user_id: 7, status: 'not_started' });
 
-    expect(db.transaction).not.toHaveBeenCalled();
+    expect(sqlCalls().some((c) => /SET status = 'paused'/.test(c.sql))).toBe(false);
+    expect(mockTransaction.commit).toHaveBeenCalledTimes(1);
   });
 
   it('rejects creating a paused task without writing', async () => {
     const { createProjectTask } = jest.requireActual('@/lib/queries/projectTasks');
 
     await expect(
-      createProjectTask({ project_id: 1, title: 'Z', assigned_user_id: 7, status: 'paused', order_index: 1 })
+      createProjectTask({ project_id: 1, title: 'Z', assigned_user_id: 7, status: 'paused' })
     ).rejects.toThrow('Una tarea nueva no puede crearse pausada');
     expect(db.execute).not.toHaveBeenCalled();
     expect(db.transaction).not.toHaveBeenCalled();

@@ -13,6 +13,7 @@ import {
   recalculateProgressAndNotify,
 } from "@/lib/services/notificationEngine";
 import { syncProjectDriveAccess } from "@/lib/services/projectDriveAccess";
+import { taskRuleErrorResponse } from "../../taskStateChange";
 
 const bodySchema = z.object({
   action: z.enum(["accept", "reject"]),
@@ -25,6 +26,8 @@ type Params = { params: Promise<{ id: string; tid: string; qid: string }> };
  * Accept or reject a quote.
  * - accept: assigns the user to the task, activates it, rejects all other quotes
  * - reject: marks the quote as rejected
+ * The quote must belong to the URL task and project (404); accepting needs a
+ * pending quote of a blocked, unassigned task without an accepted quote (409).
  * Only ADMIN, DIRECTIVO, COMERCIAL can accept/reject quotes.
  */
 export async function PATCH(request: NextRequest, { params }: Params) {
@@ -52,9 +55,13 @@ export async function PATCH(request: NextRequest, { params }: Params) {
       return NextResponse.json({ error: "Datos inválidos" }, { status: 400 });
     }
 
+    const scope = { projectId, taskId };
     if (validation.data.action === "accept") {
       const quote = (await getTaskQuotes(taskId)).find((q) => q.id === quoteId);
-      await acceptQuote(quoteId, session.id);
+      if (!quote) {
+        return NextResponse.json({ error: "Cotización no encontrada" }, { status: 404 });
+      }
+      await acceptQuote(quoteId, session.id, scope);
       const driveWarning = await syncProjectDriveAccess(projectId);
       await recalculateProgressAndNotify(projectId, session.id);
       await dispatchNotification({
@@ -64,8 +71,8 @@ export async function PATCH(request: NextRequest, { params }: Params) {
         taskId,
         quoteId,
         metadata: {
-          price: quote?.price ?? 0,
-          delivery_days: quote?.delivery_days ?? 0,
+          price: quote.price ?? 0,
+          delivery_days: quote.delivery_days ?? 0,
         },
       });
 
@@ -85,12 +92,13 @@ export async function PATCH(request: NextRequest, { params }: Params) {
         ...(driveWarning ? { driveWarning } : {}),
       });
     } else {
-      await rejectQuote(quoteId);
+      await rejectQuote(quoteId, scope);
       return NextResponse.json({ success: true, action: "rejected" });
     }
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Error al procesar cotización";
+    const ruleResponse = taskRuleErrorResponse(error);
+    if (ruleResponse) return ruleResponse;
     console.error("Error processing quote:", error);
-    return NextResponse.json({ error: message }, { status: 500 });
+    return NextResponse.json({ error: "Error al procesar cotización" }, { status: 500 });
   }
 }

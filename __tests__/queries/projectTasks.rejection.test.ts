@@ -88,6 +88,7 @@ function makeTargetTaskRow(overrides: Record<string, unknown> = {}) {
 
 beforeEach(() => {
   jest.clearAllMocks();
+  mockExecute.mockReset();
   mockTransaction.execute.mockReset();
   mockTransaction.commit.mockReset();
   mockTransaction.rollback.mockReset();
@@ -123,6 +124,7 @@ describe('createRejectionLoopTasks()', () => {
     // 7. UPDATE task N to completed
     // 8. Transition task N (in_progress -> completed)
     mockTransaction.execute
+      .mockResolvedValueOnce(makeResult([{ status: 'in_progress' }])) // lock task N (re-check)
       .mockResolvedValueOnce(makeResult([]))            // shift
       .mockResolvedValueOnce(makeResult([{ id: 101 }])) // INSERT N+1
       .mockResolvedValueOnce(makeResult([]))            // transition N+1
@@ -157,6 +159,7 @@ describe('createRejectionLoopTasks()', () => {
     mockExecute.mockResolvedValueOnce(makeResult([{ id: 1 }]));
 
     mockTransaction.execute
+      .mockResolvedValueOnce(makeResult([{ status: 'in_progress' }])) // lock task N (re-check)
       .mockResolvedValueOnce(makeResult([]))            // shift
       .mockResolvedValueOnce(makeResult([{ id: 101 }])) // INSERT N+1
       .mockResolvedValueOnce(makeResult([]))            // transition N+1
@@ -171,9 +174,9 @@ describe('createRejectionLoopTasks()', () => {
 
     await createRejectionLoopTasks(1, 10, 7, 5);
 
-    // The second transaction.execute call is INSERT N+1 with order_index=4 (3+1) and projectId=1
+    // The third transaction.execute call (after the lock and the shift) is INSERT N+1 with order_index=4 (3+1) and projectId=1
     // (Note: we check if it contains correction flag and correct order_index)
-    expect(mockTransaction.execute).toHaveBeenNthCalledWith(2, expect.objectContaining({
+    expect(mockTransaction.execute).toHaveBeenNthCalledWith(3, expect.objectContaining({
       sql: expect.stringContaining("'correction'"),
       args: expect.arrayContaining([1, 4]),  // projectId=1, order_index=N+1=4
     }));
@@ -191,6 +194,7 @@ describe('createRejectionLoopTasks()', () => {
     mockExecute.mockResolvedValueOnce(makeResult([{ id: 1 }]));
 
     mockTransaction.execute
+      .mockResolvedValueOnce(makeResult([{ status: 'in_progress' }])) // lock task N (re-check)
       .mockResolvedValueOnce(makeResult([]))            // shift
       .mockResolvedValueOnce(makeResult([{ id: 101 }])) // INSERT N+1
       .mockResolvedValueOnce(makeResult([]))            // transition N+1
@@ -205,8 +209,8 @@ describe('createRejectionLoopTasks()', () => {
 
     await createRejectionLoopTasks(1, 10, 7, 5);
 
-    // Fourth transaction.execute call: INSERT N+2 with order_index=5 (3+2) and status=waiting
-    expect(mockTransaction.execute).toHaveBeenNthCalledWith(4, expect.objectContaining({
+    // Fifth transaction.execute call: INSERT N+2 with order_index=5 (3+2) and status=waiting
+    expect(mockTransaction.execute).toHaveBeenNthCalledWith(5, expect.objectContaining({
       sql: expect.stringContaining("'correction'"),
       args: expect.arrayContaining([5, 'waiting']),  // order_index=N+2=5, status=waiting
     }));
@@ -224,6 +228,7 @@ describe('createRejectionLoopTasks()', () => {
     mockExecute.mockResolvedValueOnce(makeResult([{ id: 1 }]));
 
     mockTransaction.execute
+      .mockResolvedValueOnce(makeResult([{ status: 'in_progress' }])) // lock task N (re-check)
       .mockResolvedValueOnce(makeResult([]))            // shift
       .mockResolvedValueOnce(makeResult([{ id: 101 }])) // INSERT N+1
       .mockResolvedValueOnce(makeResult([]))            // transition N+1
@@ -238,8 +243,8 @@ describe('createRejectionLoopTasks()', () => {
 
     await createRejectionLoopTasks(1, 10, 7, 5);
 
-    // Seventh transaction.execute (after reading the assignee): UPDATE task N to completed
-    expect(mockTransaction.execute).toHaveBeenNthCalledWith(7, expect.objectContaining({
+    // Eighth transaction.execute (after reading the assignee): UPDATE task N to completed
+    expect(mockTransaction.execute).toHaveBeenNthCalledWith(8, expect.objectContaining({
       sql: expect.stringContaining("status = 'completed'"),
       args: expect.arrayContaining([10]),  // taskId = N = 10
     }));
@@ -257,6 +262,7 @@ describe('createRejectionLoopTasks()', () => {
     mockExecute.mockResolvedValueOnce(makeResult([{ id: 1 }]));
 
     mockTransaction.execute
+      .mockResolvedValueOnce(makeResult([{ status: 'in_progress' }])) // lock task N (re-check)
       .mockResolvedValue(makeResult([{ id: 99 }]));
 
     mockExecute
@@ -309,6 +315,7 @@ describe('validateTask() — immutability guard', () => {
     // completeTask also calls getProjectTaskById, set up transaction
     mockExecute.mockResolvedValueOnce(makeResult([makeTaskRow({ status: 'in_progress', task_type: 'execution' })]));
     mockTransaction.execute
+      .mockResolvedValueOnce(makeResult([{ status: 'in_progress' }])) // lock task (re-check)
       .mockResolvedValueOnce(makeResult([]))    // read assignee salary + weekly hours
       .mockResolvedValueOnce(makeResult([]))    // UPDATE completed
       .mockResolvedValueOnce(makeResult([]))    // INSERT transition
