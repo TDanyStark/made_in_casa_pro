@@ -362,6 +362,16 @@ describe("TaskDeliverableDialog — cost correction (S15, S16)", () => {
     await waitFor(() => expect(mockPatch).toHaveBeenCalledWith("projects/10/tasks/1/cost", { completion_cost: 1500000 }));
   });
 
+  it("keeps a stored decimal cost when it is saved without changes", async () => {
+    renderEditable({ ...external, cost: 1500.5 }, true);
+    fireEvent.click(await screen.findByRole("button", { name: "Corregir costo de la tarea" }));
+    expect(screen.getByLabelText("Nuevo costo de la tarea")).toHaveValue("1500.5");
+    mockPatch.mockResolvedValue({ ok: true, data: { ...external, cost: 1500.5 } });
+    fireEvent.click(screen.getByRole("button", { name: "Guardar" }));
+
+    await waitFor(() => expect(mockPatch).toHaveBeenCalledWith("projects/10/tasks/1/cost", { completion_cost: 1500.5 }));
+  });
+
   it("does not send a non-numeric cost and shows an error", async () => {
     renderEditable(external, true);
     fireEvent.click(await screen.findByRole("button", { name: "Corregir costo de la tarea" }));

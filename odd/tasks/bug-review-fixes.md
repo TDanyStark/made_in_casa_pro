@@ -50,6 +50,8 @@ T2 | S11-S22 | writer B (background mvogtpyc-6-5dv5) | done | 5e30515, b145eba, 
 T3 | S23-S25 (S25 except app/api/projects/route.ts) | writer C (background mvogu9zu-7-7pat) | done | bb26363
 T3b | S25 app/api/projects/route.ts (+ S4 visibility by DB role) | inline | done | 6e4fcc6
 T4 | S26-S31 + UserLoginForm password follow-up | writer D (background mvogu9zw-8-ybvf) + inline follow-up | done | 7e2e4a8, e1b673c
+T7 | S26-S31,T6 | independent verify mvohu1hb-b-aaih (items 2,4) | done | -
+T8 | S27 | inline: keep cents in parseCopAmount, no rounding on sale price edit | done | (this commit)
 T5 | S1-S25 | independent verify mvohewgo-9-lsjb (items 1,2,4) | done | -
 T6 | S5,S17,S20,S24,S25 | writer (background mvohlgh6-a-iacw): verifier blocker + advisories | done | d84f58a
 
@@ -68,3 +70,6 @@ L11. T6 done: RED 13 failed -> GREEN 95/95 focused; full jest 169 suites / 1416 
 L12. T4 done: dompurify ^3.4.17 (isomorphic-dompurify rejected: ESM jsdom breaks Jest and bloats server bundle; all 7 renderers are client components, SafeHtml renders empty on server). All listed queryFns throw on failure with error UI; wizards block Next/Create when templates fail; useDebouncedSearch hook for 7 selects; SiigoCustomersList on useQuery; URL_BACKEND_API removed; UserLoginForm no longer reads password. RED per file (plus git-archive HEAD comparison: 60 failed there) -> full jest 169/1416, tsc 0, lint 0. Commit 7e2e4a8.
 L13. Inline follow-up: TaskDeliverableDialog cost correction had the S27 bug class (replace(/[^0-9.]/g)); parseCopAmount moved to app/lib/utils/cop-amount.ts and reused; FormState.submittedData.password removed. RED 2 -> GREEN 48/48. Commit e1b673c.
 L14. Not changed on purpose: axios now unused in app code (dependency removal left to user); token-at-rest encryption postponed (L3); middleware page routing and /api/me still use JWT role; markAdjustmentAsCompleted returns success on foreign id (no rows updated); WizardStep3Products debounce rebuilt per render. README-RESUME.md not updated: fixes to existing behavior (CLAUDE.md policy). Native review: not run here; RDD candidate would be per work-unit commit.
+L15. Native review: inspect offered review.start for target sha256:a3624306...; START returned consent declined_this_candidate by the human (no lineage created). Candidate left without native review by that decision.
+L16. Verify mvohu1hb-b-aaih on e1b673c: S26, S28-S31 and T6 met (XSS vectors blocked, server renders empty div, query errors never crash pages, invitation EXISTS matches schema, FOR NO KEY UPDATE avoids FK deadlock). BLOCKER S27: parseCopAmount stripped cents ("1500.5" -> 15005), so editing a decimal task cost multiplied it. Advisories: relative/anchor hrefs dropped by SafeHtml; sale price rounded on edit. Scratch left at $TMPDIR/tmp.U1sEmGROqk.
+L17. T8 inline: RED 4 failed (cop-amount.test.ts cents cases) + 1 failed (decimal cost round-trip in TaskDeliverableDialog) -> GREEN; last separator followed by 1-2 digits is cents; sale price edit no longer rounds. Full jest 170 suites / 1434 tests, tsc 0, eslint clean.

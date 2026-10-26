@@ -83,7 +83,7 @@ export function ProjectFinancialCards({ projectId, canEditSalePrice }: Props) {
   const isFiltered = adjustmentId !== null;
 
   const startEditing = () => {
-    setDraft(data.sale_price != null ? String(Math.round(data.sale_price)) : "");
+    setDraft(data.sale_price != null ? String(data.sale_price) : "");
     setIsEditing(true);
   };
 
