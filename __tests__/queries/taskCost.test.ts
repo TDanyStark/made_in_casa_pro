@@ -139,6 +139,15 @@ describe('getTaskCost()', () => {
     });
   });
 
+  // S41: editable follows the same rule as the computed cost.
+  it.each([
+    ['a declared cost', { completion_cost: '150000' }],
+    ['an accepted quote', { accepted_quote_price: '150000' }],
+  ])('is editable when an internal assignee task without frozen rate shows %s', async (_label, extra) => {
+    mockExecute.mockResolvedValueOnce(res([row({ completion_hourly_rate: null, ...extra })]));
+    expect(await getTaskCost(65, 141)).toMatchObject({ internal: false, cost: 150000, editable: true });
+  });
+
   it('is not editable for a completed task of an internal assignee without a frozen rate', async () => {
     mockExecute.mockResolvedValueOnce(res([row({ completion_hourly_rate: null })]));
     expect(await getTaskCost(65, 141)).toMatchObject({ internal: true, editable: false });
@@ -220,7 +229,7 @@ describe('updateTaskCost()', () => {
     ['not_found', null],
     ['not_completed', locked({ status: 'in_progress' })],
     ['internal', locked({ completion_hourly_rate: '30000' })],
-    ['internal', locked({ assignee_is_internal: 1 })],
+    ['internal', locked({ assignee_is_internal: 1, completion_cost: null })],
   ])('returns %s without writing', async (expected, lockedRow) => {
     queueLocked(lockedRow as Record<string, unknown> | null);
     expect(await updateTaskCost(65, 141, 600000, 7)).toBe(expected);
@@ -228,6 +237,22 @@ describe('updateTaskCost()', () => {
     expect(mockTx.commit).not.toHaveBeenCalled();
     expect(mockTx.rollback).toHaveBeenCalledTimes(1);
     expect(revalidatePath).not.toHaveBeenCalled();
+  });
+
+  // S41: an external cost shown for a now-internal assignee must be correctable.
+  it.each([
+    ['a declared cost', locked({ assignee_is_internal: 1 })],
+    ['an accepted quote', locked({ assignee_is_internal: 1, completion_cost: null, accepted_quote_price: '150000' })],
+  ])('updates a completed task of an internal assignee with %s and no frozen rate', async (_label, lockedRow) => {
+    queueLocked(lockedRow);
+    expect(await updateTaskCost(65, 141, 600000, 7)).toBe('updated');
+    expect(writes()).toHaveLength(1);
+  });
+
+  it('reads the accepted quote price in the locked row', async () => {
+    queueLocked(locked());
+    await updateTaskCost(65, 141, 600000, 7);
+    expect(txQueries()[0].sql).toContain('accepted_quote_price');
   });
 
   it('rolls back and rethrows when the write fails', async () => {

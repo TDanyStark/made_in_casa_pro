@@ -29,6 +29,7 @@ type LockedTaskCostRow = {
   completion_cost: number | string | null;
   completion_cost_original: number | string | null;
   assignee_is_internal: number | string | null;
+  accepted_quote_price: number | string | null;
 };
 
 type TaskCostAuditRow = {
@@ -43,11 +44,22 @@ const toNumber = (value: number | string | null | undefined): number | null =>
 const toIsoString = (value: Date | string | null): string | null =>
   value === null ? null : value instanceof Date ? value.toISOString() : String(value);
 
-/** Internal work is valued by salary: a frozen rate or an internal assignee. */
-const isInternalTask = (row: {
-  completion_hourly_rate: number | string | null;
-  assignee_is_internal: number | string | null;
-}) => toNumber(row.completion_hourly_rate) !== null || Number(row.assignee_is_internal) === 1;
+/**
+ * Internal work is valued by salary. Uses the same precedence as computeTaskCost
+ * (frozen rate, then declared cost or accepted quote, then the assignee), so a task
+ * that shows an external cost is always correctable.
+ */
+const isInternalTask = (
+  row: Pick<ProjectFinancialRow, "status" | "completion_hourly_rate" | "completion_cost" | "accepted_quote_price"> & {
+    assignee_is_internal: number | string | null;
+  }
+) =>
+  computeTaskCost({
+    ...row,
+    assignee_is_internal: row.assignee_is_internal === null ? null : Number(row.assignee_is_internal),
+    progress_minutes: 0,
+    assignee_hourly_rate: null,
+  } as ProjectFinancialRow).internal;
 
 /** Explains which rule of computeTaskCost produced the cost (same order of precedence). */
 function describeCost(row: ProjectFinancialRow): Pick<TaskCost, "hourly_rate" | "source"> {
@@ -110,7 +122,7 @@ export async function getTaskCost(projectId: number, taskId: number): Promise<Ta
     internal,
     minutes: toNumber(row.progress_minutes) ?? 0,
     ...describeCost(row),
-    editable: row.status === "completed" && !isInternalTask(row),
+    editable: row.status === "completed" && !internal,
     original_cost: toNumber(audit.completion_cost_original),
     updated_by_name: audit.updated_by_name ?? null,
     updated_at: toIsoString(audit.completion_cost_updated_at ?? null),
@@ -134,7 +146,13 @@ export async function updateTaskCost(
   try {
     const locked = await tx.execute({
       sql: `SELECT pt.status, pt.completion_hourly_rate, pt.completion_cost,
-                   pt.completion_cost_original, u.is_internal AS assignee_is_internal
+                   pt.completion_cost_original, u.is_internal AS assignee_is_internal,
+                   (
+                     SELECT tq.price FROM task_quotes tq
+                     WHERE tq.task_id = pt.id AND tq.status = 'accepted'
+                     ORDER BY tq.updated_at DESC
+                     LIMIT 1
+                   ) AS accepted_quote_price
             FROM project_tasks pt
             LEFT JOIN users u ON u.id = pt.assigned_user_id
             WHERE pt.id = $1 AND pt.project_id = $2
