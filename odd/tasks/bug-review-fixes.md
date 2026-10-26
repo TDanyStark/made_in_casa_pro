@@ -55,6 +55,11 @@ S38. "3.3 Arreglalo" — "Marcar como completado un ajuste de otro proyecto no c
 S39. "3.6 Dale" — "SafeHtml quita los enlaces relativos y los anclas." Keep safe relative paths (/...) and anchors (#...) without allowing protocol-relative (//) or dangerous schemes.
 S40. "3.8 Arreglalo" — "En 'Mis cotizaciones', las fechas no usan el formato es-CO." Dates use es-CO.
 
+### Round 3 (T10)
+S41. "2.6 me parece bien" — apply the S33 recommendation: whether a task cost is editable and whether PATCH cost rejects it as internal must follow the same rule computeTaskCost uses (completed task with no frozen rate but a completion_cost or accepted quote is external and editable).
+S42. "3.7 si dale, todo lo que sea buenas practicas y mantenibilidad, bienvenido sea" — WizardStep3Products search uses the shared useDebouncedSearch hook.
+S43. "5. si no se esta usando borralo" — delete unused markAdjustmentAsCompleted and its tests.
+
 ## Tasks
 T1 | S1-S10 | writer A (background) | done | 9ab2e27, 89b13bb
 T2 | S11-S22 | writer B (background mvogtpyc-6-5dv5) | done | 5e30515, b145eba, e44553e
@@ -64,6 +69,7 @@ T4 | S26-S31 + UserLoginForm password follow-up | writer D (background mvogu9zw-
 T7 | S26-S31,T6 | independent verify mvohu1hb-b-aaih (items 2,4) | done | -
 T8 | S27 | inline: keep cents in parseCopAmount, no rounding on sale price edit | done | (this commit)
 T9 | S32-S40 | writer (background mvpa8h6u-1-j8ih) | done | de5f204, 554d612
+T10 | S41-S43 | inline (writer mvpbq32t-1-ee77 failed with no changes) | done | see L24
 T5 | S1-S25 | independent verify mvohewgo-9-lsjb (items 1,2,4) | done | -
 T6 | S5,S17,S20,S24,S25 | writer (background mvohlgh6-a-iacw): verifier blocker + advisories | done | d84f58a
 
@@ -89,3 +95,6 @@ L18. User (round 2): "2. Las tareas deben de tener un asignado no? 2.2 si es nor
 L19. Not done by user decision: 2.2 (normal), 2.5 (no impact), 3.4, 3.5. Explanations owed: 2.1, 2.3, 3.7. Answer to 4: no migration run and no push; branch fix/bug-review-2025 is local only, origin/main still at 641c4a1. 2.3 evidence: ProjectTasksTab.tsx:550 sends the full ordered list for the version, so the partial-list risk only applies to direct API calls.
 L20. T9 done: RED 19 failed -> GREEN 51 suites / 403 focused; full jest 173 suites / 1465 tests; tsc 0; lint 0 (2 pre-existing warnings). S32 409 "El correo electrónico ya está en uso" (existing route wording); S35 session key read lazily, throws "SESSION_SECRET no está configurado"; S36 invitations written inside updateProjectTask transaction, failure -> 500 "Error al actualizar tarea"; S37 same-version check 400; S38 RETURNING id -> "Ajuste no encontrado" (function has no caller/endpoint in app/); S39 # and single-/ hrefs allowed; S40 es-CO dates. Commits de5f204 (UI), 554d612 (backend).
 L21. S33 review: isInternalTask (taskCost.ts:47-50) vs computeTaskCost (project-financials.ts:58-61) disagree for completed tasks with no frozen rate, internal assignee and a completion_cost/accepted quote: UI shows an external cost that cannot be corrected (editable=false, PATCH rejected as internal). Recommendation: derive editable/rejection from computeTaskCost(row).internal. S34 review: no caller sets forceSystemSender; retry falls back to SMTP only when Gmail is disconnected; Gmail quota/limit failures retry on Gmail until MAX_RETRY_COUNT. Recommendation: no change now; optional system-sender choice on retry or remove dead field.
+L22. User (round 3): "2.6 me parece bien 2.7 si esta bien 2.1 en teoria si, si no quien la ejecuta? incluso las de cotizacion una vez se cotiza queda asignado al que se elije 2.3 esto sigo sin entenderlo explicame bien este fallo 3.7 si dale, todo lo que sea buenas practicas y mantenibilidad, bienvenido sea 2.6 explicame bien de que trata esto 5. si no se esta usando borralo 6. espera que todo quede ok"
+L23. Decisions: 2.1 confirmed -> current PATCH auto-assignment (least-loaded in area when assignee cleared) is correct, no change. 2.7 no change. 2.3 explanation owed again (no change until user decides). 6: no push/PR yet.
+L24. T10: background writer mvpbq32t-1-ee77 failed ("assistant reported an error") with no changes; done inline. S41: isInternalTask now delegates to computeTaskCost precedence; locked row selects accepted_quote_price; getTaskCost editable = completed && !internal. Existing pin "internal assignee is not editable" narrowed to no declared cost/quote. RED 5 -> GREEN 51/51. S43: markAdjustmentAsCompleted and its tests deleted (no callers). S42: WizardStep3Products uses useDebouncedSearch(400); RED with previous code (filter stayed until debounce) -> GREEN. Full jest 173 suites / 1470 tests, tsc 0, lint 2 pre-existing warnings.
