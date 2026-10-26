@@ -50,3 +50,5 @@ tmpclaude-*
 .atl/
 .codegraph/
 .playwright-mcp/
+
+.unipi/config
