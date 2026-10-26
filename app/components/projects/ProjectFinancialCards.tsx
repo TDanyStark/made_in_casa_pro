@@ -47,6 +47,19 @@ export function formatHours(totalMinutes: number) {
   return hours === 0 ? `${minutes} min` : `${hours} h ${minutes} min`;
 }
 
+/**
+ * Parses a COP amount typed by a person. Pesos are integers, so "." and ","
+ * are thousands separators ("1.500.000" -> 1500000, "1.500" -> 1500).
+ * Returns null for an empty field and undefined when the input is not a number.
+ */
+export function parseCopAmount(input: string): number | null | undefined {
+  const trimmed = input.trim();
+  if (trimmed === "") return null;
+  if (!/^\$?[\d.,\s]+$/.test(trimmed)) return undefined;
+  const digits = trimmed.replace(/\D/g, "");
+  return digits === "" ? undefined : Number(digits);
+}
+
 const hoursChartConfig = {
   internal: { label: "Internos", color: "var(--chart-1)" },
   external: { label: "Externos", color: "var(--chart-2)" },
@@ -82,13 +95,16 @@ export function ProjectFinancialCards({ projectId, canEditSalePrice }: Props) {
   const isFiltered = adjustmentId !== null;
 
   const startEditing = () => {
-    setDraft(data.sale_price != null ? String(data.sale_price) : "");
+    setDraft(data.sale_price != null ? String(Math.round(data.sale_price)) : "");
     setIsEditing(true);
   };
 
   const saveSalePrice = async () => {
-    const clean = draft.replace(/[^0-9.]/g, "");
-    const salePrice = clean === "" ? null : Number(clean);
+    const salePrice = parseCopAmount(draft);
+    if (salePrice === undefined) {
+      toast.error("Ingresa un precio válido en pesos (solo números)");
+      return;
+    }
     setIsSaving(true);
     try {
       const res = await patch<ProjectFinancialsView>(`projects/${projectId}/financials`, {

@@ -208,19 +208,21 @@ export function TasksCommandCenterClient({ userRole }: TasksCommandCenterClientP
     refetchOnWindowFocus: true,
   });
 
-  const { data: areas = [] } = useQuery({
+  const { data: areas = [], isError: areasError } = useQuery({
     queryKey: ["areas-with-internals"],
     queryFn: async () => {
       const res = await get<{ data: AreaType[] }>("areas?with_active_internals=1");
-      return res.ok ? res.data?.data || [] : [];
+      if (!res.ok) throw new Error(res.error);
+      return res.data?.data || [];
     },
   });
 
-  const { data: assignableUsers = [] } = useQuery({
+  const { data: assignableUsers = [], isError: usersError } = useQuery({
     queryKey: ["assignable-users"],
     queryFn: async () => {
       const res = await get<{ data: UserType[] }>("users/assignable");
-      return res.ok ? res.data?.data || [] : [];
+      if (!res.ok) throw new Error(res.error);
+      return res.data?.data || [];
     },
   });
 
@@ -295,7 +297,7 @@ export function TasksCommandCenterClient({ userRole }: TasksCommandCenterClientP
           ]}
           placeholder="Usuario creador"
           searchPlaceholder="Buscar usuario..."
-          emptyMessage="Sin usuarios."
+          emptyMessage={usersError ? "Error al cargar los usuarios." : "Sin usuarios."}
         />
 
         <SearchableSelect
@@ -309,7 +311,7 @@ export function TasksCommandCenterClient({ userRole }: TasksCommandCenterClientP
           ]}
           placeholder="Área"
           searchPlaceholder="Buscar área..."
-          emptyMessage="Sin áreas."
+          emptyMessage={areasError ? "Error al cargar las áreas." : "Sin áreas."}
         />
 
         <SearchableSelect
@@ -325,7 +327,7 @@ export function TasksCommandCenterClient({ userRole }: TasksCommandCenterClientP
           ]}
           placeholder="Asignado a"
           searchPlaceholder="Buscar usuario..."
-          emptyMessage="Sin usuarios."
+          emptyMessage={usersError ? "Error al cargar los usuarios." : "Sin usuarios."}
         />
 
         <Select
@@ -585,7 +587,7 @@ export function TasksCommandCenterClient({ userRole }: TasksCommandCenterClientP
                             ]}
                             placeholder="Seleccionar usuario"
                             searchPlaceholder="Buscar usuario..."
-                            emptyMessage="Sin usuarios."
+                            emptyMessage={usersError ? "Error al cargar los usuarios." : "Sin usuarios."}
                           />
                           {isExternalUser && (
                             <div className="flex items-center justify-between gap-2">

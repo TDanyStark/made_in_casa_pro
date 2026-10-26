@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import CreatableSelect from "react-select/creatable";
-import { debounce } from "lodash";
+import { useDebouncedSearch } from "@/hooks/useDebouncedSearch";
 import { useGetEndpointQueryClient } from "@/hooks/useGetEndpointQueryClient";
 import { useStableSelectOptions } from "@/hooks/useStableSelectOptions";
 import {
@@ -55,7 +55,7 @@ export function ManagerSelect<T extends FieldValues>({
   isClearable = false,
   onChange,
 }: ManagerSelectProps<T>) {
-  const [searchTerm, setSearchTerm] = useState("");
+  const { searchTerm, handleInputChange, resetSearch } = useDebouncedSearch();
   const [isCreatingManager, setIsCreatingManager] = useState(false);
   const [newManagerName, setNewManagerName] = useState("");
 
@@ -80,16 +80,6 @@ export function ManagerSelect<T extends FieldValues>({
   const { options: managerOptions, pinOption } =
     useStableSelectOptions<ManagerOption>(fetchedOptions);
 
-  const debouncedSearch = debounce((value: string) => {
-    setSearchTerm(value);
-  }, 500);
-
-  const handleInputChange = (inputValue: string) => {
-    if (inputValue.trim()) {
-      debouncedSearch(inputValue);
-    }
-  };
-
   const formatOptionLabel = useMemo(
     () => createManagerOptionFormatter({ clientNames, showClient }),
     [clientNames, showClient]
@@ -98,10 +88,6 @@ export function ManagerSelect<T extends FieldValues>({
   const handleCreateManager = (inputValue: string) => {
     setIsCreatingManager(true);
     setNewManagerName(inputValue);
-  };
-
-  const handleResetSearch = () => {
-    setSearchTerm("");
   };
 
   const handleManagerCreated = (newManager: ManagerType) => {
@@ -145,7 +131,7 @@ export function ManagerSelect<T extends FieldValues>({
                 }}
                 onInputChange={handleInputChange}
                 onCreateOption={handleCreateManager}
-                onBlur={handleResetSearch}
+                onBlur={resetSearch}
                 formatCreateLabel={(inputValue) =>
                   `Crear gerente "${inputValue}"`
                 }

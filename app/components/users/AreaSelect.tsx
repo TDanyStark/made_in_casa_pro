@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import CreatableSelect from "react-select/creatable";
-import { debounce } from "lodash";
+import { useDebouncedSearch } from "@/hooks/useDebouncedSearch";
 import { useGetEndpointQueryClient } from "@/hooks/useGetEndpointQueryClient";
 import { useStableSelectOptions } from "@/hooks/useStableSelectOptions";
 import { post, patch } from "@/lib/services/apiService";
@@ -37,7 +37,7 @@ const AreaSelect = ({
   label,
   user_id,
 }: AreaSelectProps) => {
-  const [searchTerm, setSearchTerm] = useState("");
+  const { searchTerm, handleInputChange, resetSearch } = useDebouncedSearch();
   const [isCreatingArea, setIsCreatingArea] = useState(false);
   const [value, setValue] = useState<number | undefined>(initial_value);
 
@@ -60,16 +60,6 @@ const AreaSelect = ({
 
   const { options: areaOptions, pinOption } =
     useStableSelectOptions<AreaOption>(fetchedOptions);
-
-  const debouncedSearch = debounce((value: string) => {
-    setSearchTerm(value);
-  }, 500);
-
-  const handleInputChange = (inputValue: string) => {
-    if (inputValue.trim()) {
-      debouncedSearch(inputValue);
-    }
-  };
 
   const handleCreateArea = async (inputValue: string) => {
     if (isCreatingArea || !inputValue.trim()) return;
@@ -115,7 +105,7 @@ const AreaSelect = ({
     }
   };
   const handleResetSearch = () => {
-    setSearchTerm("");
+    resetSearch();
     if (onBlur) onBlur();
   };
 

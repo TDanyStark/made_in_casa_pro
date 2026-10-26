@@ -190,6 +190,16 @@ describe("TaskDeliverableDialog", () => {
     expect(screen.queryByText("Sin link reportado")).not.toBeInTheDocument();
   });
 
+  it("strips script and event-handler payloads from delivery notes", () => {
+    const { container } = renderDialog({
+      delivery_notes: '<p>entrega</p><img src=x onerror="alert(1)"><script>alert(2)</script>',
+    });
+
+    expect(screen.getByText("entrega")).toBeInTheDocument();
+    expect(container.querySelector("img")).toBeNull();
+    expect(container.querySelector("script")).toBeNull();
+  });
+
   it("renders a non-http delivery value as plain text", () => {
     renderDialog({ delivery_url: "javascript:alert(1)" });
 

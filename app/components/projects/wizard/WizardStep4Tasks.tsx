@@ -24,25 +24,31 @@ interface Props {
   update: (data: Partial<WizardState>) => void;
 }
 
+// Defaults estables: un [] nuevo en cada render re-dispararía el efecto de inicialización.
+const NO_TEMPLATES: ProductTaskTemplateType[] = [];
+const NO_USERS: UserOption[] = [];
+
 export function WizardStep4Tasks({ state, onNext, onBack, update }: Props) {
   const productId = state.product?.id ?? null;
 
-  const { data: templates = [], isLoading } = useQuery<ProductTaskTemplateType[]>({
+  const { data: templates = NO_TEMPLATES, isLoading, isError: templatesError } = useQuery<ProductTaskTemplateType[]>({
     queryKey: ["product-task-templates", productId],
     queryFn: async () => {
       if (!productId) return [];
       const res = await get<ProductTaskTemplateType[]>(`products/${productId}/tasks`);
-      return res.ok ? (res.data ?? []) : [];
+      if (!res.ok) throw new Error(res.error);
+      return res.data ?? [];
     },
     enabled: !!productId,
     staleTime: 1000 * 60 * 5,
   });
 
-  const { data: users = [] } = useQuery<UserOption[]>({
+  const { data: users = NO_USERS, isError: usersError } = useQuery<UserOption[]>({
     queryKey: ["all-users-for-wizard-tasks"],
     queryFn: async () => {
       const res = await get<UserOption[]>(`collaborators?all_users=1`);
-      return res.ok ? (res.data ?? []) : [];
+      if (!res.ok) throw new Error(res.error);
+      return res.data ?? [];
     },
     staleTime: 1000 * 60 * 5,
   });
@@ -238,6 +244,8 @@ export function WizardStep4Tasks({ state, onNext, onBack, update }: Props) {
 
   if (isLoading) return <Skeleton className="h-64 w-full rounded-lg" />;
 
+  const loadError = templatesError || usersError;
+
   return (
     <div className="space-y-6">
       <div className="space-y-1">
@@ -269,18 +277,22 @@ export function WizardStep4Tasks({ state, onNext, onBack, update }: Props) {
         </div>
 
         <div className="p-4 space-y-4">
-          <ProjectTaskEditorList 
-            tasks={localTasks}
-            onReorder={handleReorder}
-            onEdit={setTaskToEdit}
-            onRemove={handleRemoveTask}
-          />
+          {loadError ? (
+            <p className="text-center py-8 text-sm text-destructive">Error al cargar las tareas del producto</p>
+          ) : (
+            <ProjectTaskEditorList
+              tasks={localTasks}
+              onReorder={handleReorder}
+              onEdit={setTaskToEdit}
+              onRemove={handleRemoveTask}
+            />
+          )}
         </div>
       </div>
 
       <div className="flex justify-between pt-2">
         <Button type="button" variant="outline" onClick={onBack}>Atrás</Button>
-        <Button type="button" onClick={() => onNext({})}>Siguiente</Button>
+        <Button type="button" onClick={() => onNext({})} disabled={loadError}>Siguiente</Button>
       </div>
 
       <TaskSettingsDialog

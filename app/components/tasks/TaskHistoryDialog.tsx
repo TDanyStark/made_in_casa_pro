@@ -10,6 +10,7 @@ import {
   DialogTitle 
 } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
+import { SafeHtml } from "@/components/ui/safe-html";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { History, User, MessageSquare } from "lucide-react";
@@ -27,12 +28,13 @@ export function TaskHistoryDialog({
   taskId,
   taskTitle,
 }: TaskHistoryDialogProps) {
-  const { data: transitions = [], isLoading } = useQuery<TaskTransitionType[]>({
+  const { data: transitions = [], isLoading, isError } = useQuery<TaskTransitionType[]>({
     queryKey: ["task-history", taskId],
     queryFn: async () => {
       if (!taskId) return [];
       const res = await get<TaskTransitionType[]>(`projects/0/tasks/${taskId}/history`);
-      return res.ok ? (res.data ?? []) : [];
+      if (!res.ok) throw new Error(res.error);
+      return res.data ?? [];
     },
     enabled: open && !!taskId,
   });
@@ -56,6 +58,10 @@ export function TaskHistoryDialog({
               <Skeleton className="h-20 w-full" />
               <Skeleton className="h-20 w-full" />
               <Skeleton className="h-20 w-full" />
+            </div>
+          ) : isError ? (
+            <div className="text-center py-12 text-destructive">
+              <p>Error al cargar el historial</p>
             </div>
           ) : transitions.length === 0 ? (
             <div className="text-center py-12 text-muted-foreground">
@@ -94,9 +100,9 @@ export function TaskHistoryDialog({
                         <div className="mt-2 bg-muted/40 rounded-md p-3 border border-dashed border-muted-foreground/20">
                           <div className="flex items-start gap-2">
                             <MessageSquare className="h-3 w-3 mt-1 text-primary/60 shrink-0" />
-                            <div 
+                            <SafeHtml
                               className="text-xs text-foreground/80 leading-relaxed prose prose-sm dark:prose-invert max-w-none"
-                              dangerouslySetInnerHTML={{ __html: transition.notes }}
+                              html={transition.notes}
                             />
                           </div>
                         </div>

@@ -341,6 +341,7 @@ export function ProjectTasksTab({
   const {
     data: tasks = [],
     isLoading: isLoadingTasks,
+    isError: isTasksError,
     isFetching,
     refetch,
     dataUpdatedAt,
@@ -354,7 +355,8 @@ export function ProjectTasksTab({
         url += `?adjustment_id=null`;
       }
       const res = await get<ProjectTaskType[]>(url);
-      return res.ok ? (res.data ?? []) : [];
+      if (!res.ok) throw new Error(res.error);
+      return res.data ?? [];
     },
     staleTime: 1000 * 60,
     refetchInterval: reordering ? false : 30_000,
@@ -606,7 +608,9 @@ export function ProjectTasksTab({
         </div>
 
         {/* ── Task list ── */}
-        {sortedTasks.length === 0 ? (
+        {sortedTasks.length === 0 && isTasksError ? (
+          <div className="text-center py-8 text-destructive">Error al cargar las tareas</div>
+        ) : sortedTasks.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-12 text-center border rounded-lg border-dashed">
             <Package className="h-10 w-10 text-muted-foreground/40 mb-3" />
             <p className="text-muted-foreground text-sm">

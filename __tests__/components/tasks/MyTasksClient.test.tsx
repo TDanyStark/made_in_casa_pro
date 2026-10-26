@@ -2,6 +2,7 @@ import React from "react";
 import { fireEvent, render, screen, within } from "@testing-library/react";
 
 let currentSearch = "page=1";
+const mockQueryFns: Record<string, () => Promise<unknown>> = {};
 const mockReplace = jest.fn();
 
 jest.mock("next/navigation", () => ({
@@ -17,8 +18,9 @@ jest.mock("next/navigation", () => ({
 }));
 
 jest.mock("@tanstack/react-query", () => ({
-  useQuery: ({ queryKey }: { queryKey: unknown[] }) => {
+  useQuery: ({ queryKey, queryFn }: { queryKey: unknown[]; queryFn: () => Promise<unknown> }) => {
     const key = String(queryKey[0]);
+    mockQueryFns[key] = queryFn;
 
     if (key === "my-tasks") {
       return {
@@ -346,4 +348,14 @@ describe("MyTasksClient", () => {
     expect(screen.getByRole("button", { name: "Pausar" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Reanudar" })).not.toBeInTheDocument();
   });
+
+  it.each(["brands-for-filter", "assignable-users"])(
+    "%s query throws when the API fails instead of returning []",
+    async (key) => {
+      const { get } = jest.requireMock("@/lib/services/apiService") as { get: jest.Mock };
+      get.mockResolvedValue({ ok: false, status: 401, error: "No autorizado" });
+      render(<MyTasksClient />);
+      await expect(mockQueryFns[key]()).rejects.toThrow("No autorizado");
+    }
+  );
 });

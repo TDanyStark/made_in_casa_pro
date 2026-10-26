@@ -1,6 +1,7 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
+import { get } from '@/lib/services/apiService';
 
 interface FetchWithParameterProps {
   endpoint: string;
@@ -35,13 +36,13 @@ export const useFetchWithParameter = <T>({
     }
     
     const url = `${endpoint}?${paramName}=${encodeURIComponent(String(paramValue))}`;
-    const response = await fetch(url);
-    
-    if (!response.ok) {
-      throw new Error(`Failed to fetch from ${endpoint}`);
+    const res = await get<T>(url);
+
+    if (!res.ok) {
+      throw new Error(res.error || `Failed to fetch from ${endpoint}`);
     }
-    
-    return response.json();
+
+    return res.data as T;
   };
 
   return useQuery({

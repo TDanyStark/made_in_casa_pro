@@ -54,11 +54,12 @@ export default function ListProductsClient() {
     staleTime: 1000 * 60 * 5,
   });
 
-  const { data: categories = [] } = useQuery({
+  const { data: categories = [], isError: categoriesError } = useQuery({
     queryKey: ["product-categories-all"],
     queryFn: async () => {
       const res = await get<ProductCategoryType[]>("product-categories?all=true");
-      return res.ok ? (res.data ?? []) : [];
+      if (!res.ok) throw new Error(res.error);
+      return res.data ?? [];
     },
   });
 
@@ -105,6 +106,11 @@ export default function ListProductsClient() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Todas las categorías</SelectItem>
+                  {categoriesError && (
+                    <SelectItem value="categories-error" disabled>
+                      Error al cargar las categorías
+                    </SelectItem>
+                  )}
                   {categories.map((cat) => (
                     <SelectItem key={cat.id} value={cat.id.toString()}>
                       {cat.name}

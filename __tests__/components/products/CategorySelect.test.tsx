@@ -56,3 +56,27 @@ describe("CategorySelect — safe in-dialog react-select props", () => {
     expect(latestSelectProps.maxMenuHeight).toBe(240);
   });
 });
+
+describe("CategorySelect — load errors", () => {
+  beforeEach(() => {
+    latestSelectProps = undefined;
+  });
+
+  it("shows an error message instead of an empty option list when the API fails", async () => {
+    mockGet.mockResolvedValue({ ok: false, status: 500, error: "Error interno" });
+    renderCategorySelect();
+
+    await waitFor(() =>
+      expect(latestSelectProps.noOptionsMessage({ inputValue: "" })).toBe("Error al cargar las categorías")
+    );
+    expect(latestSelectProps.options).toEqual([]);
+  });
+
+  it("keeps the normal empty message when the API succeeds", async () => {
+    mockGet.mockResolvedValue({ ok: true, status: 200, data: [] });
+    renderCategorySelect();
+
+    await waitFor(() => expect(latestSelectProps.isLoading).toBe(false));
+    expect(latestSelectProps.noOptionsMessage({ inputValue: "" })).toBe("Escribe para buscar o crear");
+  });
+});

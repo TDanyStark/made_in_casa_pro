@@ -3,7 +3,7 @@
 
 import { useMemo, useRef, useState } from "react";
 import CreatableSelect from "react-select/creatable";
-import { debounce } from "lodash";
+import { useDebouncedSearch } from "@/hooks/useDebouncedSearch";
 import { useGetEndpointQueryClient } from "@/hooks/useGetEndpointQueryClient";
 import { useStableSelectOptions } from "@/hooks/useStableSelectOptions";
 import { API_FLAG_URL, IMG_FLAG_EXT } from "@/config/constants";
@@ -56,7 +56,7 @@ export function ClientSelect<T extends FieldValues>({
   excludeClientId,
   onChange,
 }: ClientSelectProps<T>) {
-  const [searchTerm, setSearchTerm] = useState("");
+  const { searchTerm, handleInputChange, resetSearch } = useDebouncedSearch();
   const [isCreatingClient, setIsCreatingClient] = useState(false);
   const [newClientName, setNewClientName] = useState("");
   // Referencia al onChange del field del formulario para poder escribir el
@@ -88,23 +88,9 @@ export function ClientSelect<T extends FieldValues>({
   const { options: clientOptions, pinOption } =
     useStableSelectOptions<ClientOption>(fetchedOptions);
 
-  const debouncedSearch = debounce((value: string) => {
-    setSearchTerm(value);
-  }, 500);
-
-  const handleInputChange = (inputValue: string) => {
-    if (inputValue.trim()) {
-      debouncedSearch(inputValue);
-    }
-  };
-
   const handleCreateClient = (inputValue: string) => {
     setIsCreatingClient(true);
     setNewClientName(inputValue);
-  };
-
-  const handleResetSearch = () => {
-    setSearchTerm("");
   };
 
   const handleClientCreated = (newClient: ClientType) => {
@@ -182,7 +168,7 @@ export function ClientSelect<T extends FieldValues>({
                 }}
                 onInputChange={handleInputChange}
                 onCreateOption={handleCreateClient}
-                onBlur={handleResetSearch}
+                onBlur={resetSearch}
                 formatCreateLabel={(inputValue) =>
                   `Crear cliente "${inputValue}"`
                 }

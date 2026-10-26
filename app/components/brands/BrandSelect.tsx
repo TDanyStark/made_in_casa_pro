@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import CreatableSelect from "react-select/creatable";
-import { debounce } from "lodash";
+import { useDebouncedSearch } from "@/hooks/useDebouncedSearch";
 import { useGetEndpointQueryClient } from "@/hooks/useGetEndpointQueryClient";
 import { useStableSelectOptions } from "@/hooks/useStableSelectOptions";
 import { 
@@ -53,7 +53,7 @@ export function BrandSelect({
   disabled = false,
   onChange,
 }: BrandSelectProps) {
-  const [searchTerm, setSearchTerm] = useState("");
+  const { searchTerm, handleInputChange, resetSearch } = useDebouncedSearch();
   const [isCreatingBrand, setIsCreatingBrand] = useState(false);
   const [newBrandName, setNewBrandName] = useState<string>("");
 
@@ -63,20 +63,6 @@ export function BrandSelect({
   });
 
   const brands = useMemo(() => data?.data || [], [data]);
-
-  const debouncedSearch = debounce((value: string) => {
-    setSearchTerm(value);
-  }, 500);
-
-  const handleInputChange = (inputValue: string) => {
-    if (inputValue.trim()) {
-      debouncedSearch(inputValue);
-    }
-  };
-
-  const handleResetSearch = () => {
-    setSearchTerm("");
-  };
 
   const fetchedOptions: BrandOption[] = useMemo(
     () =>
@@ -152,7 +138,7 @@ export function BrandSelect({
                   if (onChange) onChange(selectedOption?.value);
                 }}
                 onInputChange={handleInputChange}
-                onBlur={handleResetSearch}
+                onBlur={resetSearch}
                 onCreateOption={handleCreateBrand}
                 formatCreateLabel={(inputValue) =>
                   `Crear marca "${inputValue}"`

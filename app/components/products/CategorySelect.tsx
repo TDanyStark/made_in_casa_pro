@@ -19,6 +19,8 @@ interface CategorySelectProps {
   disabled?: boolean;
 }
 
+const NO_CATEGORIES: ProductCategoryType[] = [];
+
 export default function CategorySelect({
   value,
   onChange,
@@ -28,11 +30,12 @@ export default function CategorySelect({
   const queryClient = useQueryClient();
   const [isCreating, setIsCreating] = useState(false);
 
-  const { data: categories = [], isLoading } = useQuery({
+  const { data: categories = NO_CATEGORIES, isLoading, isError } = useQuery({
     queryKey: ["product-categories-all"],
     queryFn: async () => {
       const res = await get<ProductCategoryType[]>("product-categories?all=true");
-      return res.ok ? (res.data ?? []) : [];
+      if (!res.ok) throw new Error(res.error);
+      return res.data ?? [];
     },
   });
 
@@ -88,7 +91,11 @@ export default function CategorySelect({
       maxMenuHeight={240}
       loadingMessage={() => "Cargando categorías..."}
       noOptionsMessage={({ inputValue }) =>
-        inputValue ? "No se encontraron categorías" : "Escribe para buscar o crear"
+        isError
+          ? "Error al cargar las categorías"
+          : inputValue
+            ? "No se encontraron categorías"
+            : "Escribe para buscar o crear"
       }
     />
   );

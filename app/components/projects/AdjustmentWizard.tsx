@@ -59,6 +59,10 @@ interface Props {
   isSubmitting: boolean;
 }
 
+// Defaults estables para no re-disparar el efecto de inicialización en cada render.
+const NO_TEMPLATES: ProductTaskTemplateType[] = [];
+const NO_USERS: UserOption[] = [];
+
 export function AdjustmentWizard({ 
   open, 
   onOpenChange, 
@@ -86,22 +90,24 @@ export function AdjustmentWizard({
     }
   }, [open]);
 
-  const { data: templates = [], isLoading: loadingTemplates } = useQuery<ProductTaskTemplateType[]>({
+  const { data: templates = NO_TEMPLATES, isLoading: loadingTemplates, isError: templatesError } = useQuery<ProductTaskTemplateType[]>({
     queryKey: ["product-task-templates", productId],
     queryFn: async () => {
       if (!productId) return [];
       const res = await get<ProductTaskTemplateType[]>(`products/${productId}/tasks`);
-      return res.ok ? (res.data ?? []) : [];
+      if (!res.ok) throw new Error(res.error);
+      return res.data ?? [];
     },
     enabled: !!productId && open,
     staleTime: 1000 * 60 * 5,
   });
 
-  const { data: users = [] } = useQuery<UserOption[]>({
+  const { data: users = NO_USERS, isError: usersError } = useQuery<UserOption[]>({
     queryKey: ["all-users-for-wizard-tasks"],
     queryFn: async () => {
       const res = await get<UserOption[]>(`collaborators?all_users=1`);
-      return res.ok ? (res.data ?? []) : [];
+      if (!res.ok) throw new Error(res.error);
+      return res.data ?? [];
     },
     staleTime: 1000 * 60 * 5,
     enabled: open,
@@ -199,6 +205,8 @@ export function AdjustmentWizard({
     await onConfirm({ notes, tasks });
   };
 
+  const loadError = templatesError || usersError;
+
   const STEPS = [
     { label: "Notas del ajuste", icon: FileText },
     { label: "Tareas", icon: ListTodo },
@@ -271,6 +279,8 @@ export function AdjustmentWizard({
                 <div className="p-4 space-y-4">
                   {loadingTemplates ? (
                     <div className="space-y-2">{[1,2,3].map(i => <Skeleton key={i} className="h-12 w-full" />)}</div>
+                  ) : loadError ? (
+                    <p className="text-center py-8 text-sm text-destructive">Error al cargar las tareas del producto</p>
                   ) : (
                     <ProjectTaskEditorList 
                       tasks={localTasks}
@@ -301,7 +311,7 @@ export function AdjustmentWizard({
               <ChevronRight className="h-4 w-4 ml-1" />
             </Button>
           ) : (
-            <Button type="button" onClick={handleSubmit} disabled={isSubmitting} className="min-w-[140px]">
+            <Button type="button" onClick={handleSubmit} disabled={isSubmitting || loadError} className="min-w-[140px]">
               {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
               {isSubmitting ? "Creando ajuste..." : "Crear Ajuste"}
             </Button>

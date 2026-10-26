@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { SafeHtml } from "@/components/ui/safe-html";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
   Briefcase, 
@@ -184,9 +185,9 @@ export function MyQuotesClient() {
                       Tiempo estimado: {formatDHM(quote.delivery_minutes)}
                     </div>
                     {quote.notes && (
-                      <div 
+                      <SafeHtml
                         className="text-sm text-muted-foreground italic border-t pt-2 line-clamp-2"
-                        dangerouslySetInnerHTML={{ __html: quote.notes }}
+                        html={quote.notes}
                       />
                     )}
                     {quote.status === "pending" && (

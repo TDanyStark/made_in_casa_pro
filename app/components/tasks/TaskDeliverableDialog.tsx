@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { SafeHtml } from "@/components/ui/safe-html";
 import { ProjectTaskType } from "@/lib/definitions";
 import { formatProgressMinutes } from "@/lib/task-progress";
 import { get, patch } from "@/lib/services/apiService";
@@ -317,9 +318,9 @@ export function TaskDeliverableDialog({
                 Notas de entrega
               </p>
               {hasDeliveryNotes ? (
-                <div
+                <SafeHtml
                   className="prose prose-sm dark:prose-invert max-w-none max-h-64 overflow-y-auto rounded-md border bg-muted/20 p-4 text-sm"
-                  dangerouslySetInnerHTML={{ __html: task.delivery_notes ?? "" }}
+                  html={task.delivery_notes}
                 />
               ) : (
                 <p className="text-sm text-muted-foreground">No se registraron notas de entrega.</p>

@@ -81,12 +81,14 @@ export default function ProductTasksManager({ productId, initialTasks = [] }: Pr
   const [editingTask, setEditingTask] = useState<ProductTaskTemplateType | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [reordering, setReordering] = useState(false);
+  const [deletingTaskId, setDeletingTaskId] = useState<number | null>(null);
 
-  const { data: tasks = initialTasks, refetch } = useQuery({
+  const { data: tasks = initialTasks, refetch, isError } = useQuery({
     queryKey: ["product-tasks", productId],
     queryFn: async () => {
       const res = await get<ProductTaskTemplateType[]>(`products/${productId}/tasks`);
-      return res.ok ? (res.data ?? []) : [];
+      if (!res.ok) throw new Error(res.error);
+      return res.data ?? [];
     },
     initialData: initialTasks,
     staleTime: 1000 * 60 * 2,
@@ -163,12 +165,15 @@ export default function ProductTasksManager({ productId, initialTasks = [] }: Pr
   };
 
   const handleDelete = async (taskId: number) => {
+    if (deletingTaskId !== null) return;
+    setDeletingTaskId(taskId);
     try {
       const res = await del(`products/${productId}/tasks/${taskId}`);
       if (!res.ok) throw new Error(res.error);
       toast.success("Tarea eliminada");
       refetch();
     } catch { toast.error("Error al eliminar la tarea"); }
+    finally { setDeletingTaskId(null); }
   };
 
   const handleReorder = async (reordered: ProductTaskTemplateType[]) => {
@@ -195,8 +200,12 @@ export default function ProductTasksManager({ productId, initialTasks = [] }: Pr
         </Button>
       </div>
 
+      {isError && (
+        <p className="text-sm text-destructive text-center">Error al cargar las tareas</p>
+      )}
+
       {tasks.length === 0 ? (
-        <p className="text-sm text-muted-foreground py-4 text-center border rounded-md">
+        isError ? null : <p className="text-sm text-muted-foreground py-4 text-center border rounded-md">
           Este producto no tiene tareas predefinidas. Agrega la primera.
         </p>
       ) : (
@@ -249,7 +258,13 @@ export default function ProductTasksManager({ productId, initialTasks = [] }: Pr
                 </Button>
                 <AlertDialog>
                   <AlertDialogTrigger asChild>
-                    <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive" title="Eliminar">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7 text-destructive hover:text-destructive"
+                      title="Eliminar"
+                      disabled={deletingTaskId !== null}
+                    >
                       <Trash2 className="h-3.5 w-3.5" />
                     </Button>
                   </AlertDialogTrigger>
@@ -264,6 +279,7 @@ export default function ProductTasksManager({ productId, initialTasks = [] }: Pr
                       <AlertDialogCancel>Cancelar</AlertDialogCancel>
                       <AlertDialogAction
                         className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                        disabled={deletingTaskId !== null}
                         onClick={() => handleDelete(task.id)}
                       >
                         Eliminar

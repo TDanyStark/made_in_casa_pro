@@ -6,6 +6,7 @@ import { del, get, post } from "@/lib/services/apiService";
 import { canCreateAdjustmentAfter, ProjectAdjustmentType, ProjectDetailType, UserRole } from "@/lib/definitions";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { SafeHtml } from "@/components/ui/safe-html";
 import { toast } from "sonner";
 import { Plus, ExternalLink, HardDrive, ChevronDown, ChevronUp, Trash2 } from "lucide-react";
 import { format } from "date-fns";
@@ -48,11 +49,12 @@ export function ProjectAdjustmentsTab({
   const [wizardOpen, setWizardOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const { data: adjustments = [], isLoading } = useQuery({
+  const { data: adjustments = [], isLoading, isError } = useQuery({
     queryKey: ["project-adjustments", projectId],
     queryFn: async () => {
       const res = await get<ProjectAdjustmentType[]>(`projects/${projectId}/adjustments`);
-      return res.ok ? (res.data ?? []) : [];
+      if (!res.ok) throw new Error(res.error);
+      return res.data ?? [];
     },
     staleTime: 1000 * 60,
   });
@@ -84,6 +86,10 @@ export function ProjectAdjustmentsTab({
 
   if (isLoading) {
     return <Skeleton className="h-64 w-full" />;
+  }
+
+  if (isError) {
+    return <div className="text-center py-8 text-destructive">Error al cargar las tareas y versiones</div>;
   }
 
   const allVersions = [...adjustments].reverse();
@@ -246,9 +252,9 @@ function VersionAccordion({
           {adjustment.notes && (
             <div className="px-5 pt-4 pb-3 border-b bg-muted/10">
               <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5">Notas del ajuste</p>
-              <div
+              <SafeHtml
                 className="text-sm prose prose-sm dark:prose-invert max-w-none"
-                dangerouslySetInnerHTML={{ __html: adjustment.notes }}
+                html={adjustment.notes}
               />
             </div>
           )}
