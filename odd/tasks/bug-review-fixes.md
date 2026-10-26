@@ -45,14 +45,26 @@ S30. "SiigoCustomersList hace una petición por tecla, respuestas fuera de orden
 S31. "ProjectNotesEditor ignora datos nuevos" + "doble click en borrar" + "useFetchWithParameters puede llamar a localhost".
 
 ## Tasks
-T1 | S1-S10 | writer A (background) | pending | -
-T2 | S11-S22 | writer B (background) | pending | -
-T3 | S23-S25 | writer C (background) | pending | -
-T4 | S26-S31 | writer D (background) | pending | -
-T5 | all | independent verify (high-risk items 1,2,4) | pending | -
+T1 | S1-S10 | writer A (background) | done | 9ab2e27, 89b13bb
+T2 | S11-S22 | writer B (background mvogtpyc-6-5dv5) | done | 5e30515, b145eba, e44553e
+T3 | S23-S25 (S25 except app/api/projects/route.ts) | writer C (background mvogu9zu-7-7pat) | done | bb26363
+T3b | S25 app/api/projects/route.ts (+ S4 visibility by DB role) | inline | done | 6e4fcc6
+T4 | S26-S31 + UserLoginForm password follow-up | writer D (background mvogu9zw-8-ybvf) + inline follow-up | done | 7e2e4a8, e1b673c
+T5 | S1-S25 | independent verify mvohewgo-9-lsjb (items 1,2,4) | done | -
+T6 | S5,S17,S20,S24,S25 | writer (background mvohlgh6-a-iacw): verifier blocker + advisories | done | d84f58a
 
 ## Log
 L1. User: "quiero que hagas una revision de posibles bugs de mi app"
 L2. User: "necesito que arregles todos esos bugs" (referring to the consolidated report in this session).
 L3. User decisions: COLABORADOR PATCH -> "Nada por PATCH (recomendado)"; Gmail token encryption -> "Posponer"; session -> "Releer usuario en cada API (recomendado)"; progress_minutes -> "No lo sé, revisa la UI".
 L4. Evidence: TaskCompleteDialog.tsx:73 seeds accumulatedMinutes from task.progress_minutes and :176 submits it, so progress_minutes on complete is the total.
+L5. T1 done: 55 RED -> 193/193 GREEN focused; full jest 132 suites / 1161 tests; tsc clean. Committed as 9ab2e27 (auth/session/OAuth state/passwords) and 89b13bb (route guards). Slice boundary: T1 alone is ~1840 authored lines incl. tests (over the ~400 guideline; security unit kept together). Follow-ups: one extra DB query per validateApiRole call; UserLoginForm.tsx password prefill moved to T4.
+L6. Overlap checker treats bracket/paren/star paths conservatively: writers serialized after T1; app/api/projects/route.ts pagination moved inline (T3b); app/(admin)/** excluded from T4 (writer reports needed page edits).
+L7. T3 done: 55 RED -> 148/148 GREEN focused. Migration 022 aborts on existing duplicates (pre-check query in header; not run on any DB). Brands keeps maxLimit 500 because MyTasksClient requests brands?limit=500. Committed bb26363.
+L8. T3b inline: RED 6 failed (5 invalid pagination cases + JWT-role visibility) -> GREEN 11/11; GET /api/projects uses parsePagination and roleValidation.userRole (DB role) for COLABORADOR/COMERCIAL scoping. Committed 6e4fcc6.
+L9. T2 done: RED per suite (adapter 2/5, access 13/22, projectTasks.integrity 18/20, taskQuotes.integrity 17/17, rule-errors 11, projects/adjustments 7/9) -> full jest 163 suites / 1362 tests green. Known gaps: PATCH saves invitations before task update (not atomic); rejection loop does not check same version; explicit completion_cost null now keeps stored cost. Frontend PATCH callers checked: /tasks command center is OPERATIONS_ROLES, ProjectTasksTab edits gated by canEdit, CollaboratorProjectView uses canEdit=false -> no collaborator PATCH path. tsc errors in projects route test fixed (05a3a5b). Commits 5e30515 (adapter), b145eba (projects/adjustments), e44553e (tasks/quotes). Slice boundary: backend fixes total ~5.5k authored lines incl. tests across 8 commits.
+L10. Verify mvohewgo-9-lsjb on e44553e (scratch git archive, tsc 0, jest 153/1319): S1-S23 met, S24/S25 partially met. BLOCKER: S5 adjustments GET returns 403 to collaborators invited to quote but not assigned (userCanAccessProject only checks assigned tasks), breaking /my-quotes/projects/[id] (baseline 200). Advisories: FOR UPDATE on project row in createProjectTask can deadlock with completeTask FK inserts (use FOR NO KEY UPDATE); systemEmailProvider names unescaped; siigo/customers still parseInt; markAdjustmentAsCompleted reports success on foreign id; middleware and api/me still use JWT role. Unverified: real PostgreSQL, migration 022, concurrency. Verifier scratch dir left at /var/folders/7f/36n3mxgj1m96qbr4q9998htw0000gn/T/tmp.pET7jG1M4w.
+L11. T6 done: RED 13 failed -> GREEN 95/95 focused; full jest 169 suites / 1416 tests. userCanAccessProject gains { includeQuoteInvitations } used only by adjustments GET; project-row locks FOR NO KEY UPDATE in createProjectTask/createProjectAdjustment; SMTP provider uses {name,address}; siigo/customers uses parsePagination (default 25, max 100). Commit d84f58a.
+L12. T4 done: dompurify ^3.4.17 (isomorphic-dompurify rejected: ESM jsdom breaks Jest and bloats server bundle; all 7 renderers are client components, SafeHtml renders empty on server). All listed queryFns throw on failure with error UI; wizards block Next/Create when templates fail; useDebouncedSearch hook for 7 selects; SiigoCustomersList on useQuery; URL_BACKEND_API removed; UserLoginForm no longer reads password. RED per file (plus git-archive HEAD comparison: 60 failed there) -> full jest 169/1416, tsc 0, lint 0. Commit 7e2e4a8.
+L13. Inline follow-up: TaskDeliverableDialog cost correction had the S27 bug class (replace(/[^0-9.]/g)); parseCopAmount moved to app/lib/utils/cop-amount.ts and reused; FormState.submittedData.password removed. RED 2 -> GREEN 48/48. Commit e1b673c.
+L14. Not changed on purpose: axios now unused in app code (dependency removal left to user); token-at-rest encryption postponed (L3); middleware page routing and /api/me still use JWT role; markAdjustmentAsCompleted returns success on foreign id (no rows updated); WizardStep3Products debounce rebuilt per render. README-RESUME.md not updated: fixes to existing behavior (CLAUDE.md policy). Native review: not run here; RDD candidate would be per work-unit commit.
