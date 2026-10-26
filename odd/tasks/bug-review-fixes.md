@@ -75,7 +75,7 @@ T8 | S27 | inline: keep cents in parseCopAmount, no rounding on sale price edit 
 T9 | S32-S40 | writer (background mvpa8h6u-1-j8ih) | done | de5f204, 554d612
 T10 | S41-S43 | inline (writer mvpbq32t-1-ee77 failed with no changes) | done | see L24
 T11 | S44 | inline | done | (this commit)
-T12 | S45 | inline: migrate, merge, push | in progress | -
+T12 | S45 | inline: migrate, merge, push | done | merge into main
 T5 | S1-S25 | independent verify mvohewgo-9-lsjb (items 1,2,4) | done | -
 T6 | S5,S17,S20,S24,S25 | writer (background mvohlgh6-a-iacw): verifier blocker + advisories | done | d84f58a
 
@@ -107,3 +107,4 @@ L24. T10: background writer mvpbq32t-1-ee77 failed ("assistant reported an error
 
 L25. User: "2.3 si dale y une a main y push y corre las migraciones dejalo actualizado a lo que hicimos"
 L26. T11: RED 4 failed (3 query cases + route 400) -> GREEN 10/10; reorder route maps TaskRuleError via taskRuleErrorResponse. S21 integrity test fixture updated to give the version the reordered tasks. Callers checked: ProjectTasksTab sends the full version list; WizardStep6Confirm sends all created tasks of the new project (a failed task creation now makes reorder 400, previously a partial reorder; wizard ignores the result). Full jest 173 suites / 1474 tests, tsc 0.
+L27. T12: migration 022 applied locally (npm run db:migrate). Production Neon pre-check: 22 applied, only 022 pending, 426 deliveries, 0 duplicate (event_id, recipient_email) pairs. Applied with NODE_ENV=production and DATABASE_URL passed explicitly (db/migrate.ts stops at .env.local). Post-check: uq_delivery_event_recipient present, _migrations has 23 rows. Then merged fix/bug-review-2025 into main (--no-ff) and pushed origin main.
