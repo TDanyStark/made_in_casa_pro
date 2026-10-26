@@ -248,7 +248,12 @@ describe("no interpolated values in SQL (S21)", () => {
   });
 
   it("reorderProjectTasks() passes the adjustment id as a parameter", async () => {
-    mockExecute.mockResolvedValue({ rows: [] });
+    mockExecute.mockResolvedValue({
+      rows: [
+        { id: 3, status: "not_started", order_index: 1 },
+        { id: 4, status: "waiting", order_index: 0 },
+      ],
+    });
     routeTx();
 
     await reorderProjectTasks(1, [3, 4], 7);

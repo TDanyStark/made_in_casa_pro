@@ -611,6 +611,19 @@ export async function reorderProjectTasks(
   adjustmentId?: number | null
 ): Promise<number[]> {
   const currentTasks = await getTasksByProject(projectId, adjustmentId);
+
+  // The list must hold every task of the version exactly once; a partial list
+  // would leave duplicated order_index values and an ambiguous sequence.
+  const currentIds = new Set(currentTasks.map((t) => t.id));
+  const requestedIds = new Set(orderedIds);
+  if (
+    requestedIds.size !== orderedIds.length ||
+    requestedIds.size !== currentIds.size ||
+    orderedIds.some((tid) => !currentIds.has(tid))
+  ) {
+    throw new TaskRuleError("La lista debe incluir todas las tareas de la versión, una sola vez", 400);
+  }
+
   const completedTaskIds = currentTasks.filter(t => t.status === "completed").map(t => t.id);
 
   // Business Rule: Completed tasks must not change their position relative to others

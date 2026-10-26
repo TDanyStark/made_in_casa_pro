@@ -6,6 +6,7 @@ import { reorderProjectTasks } from "@/lib/queries/projectTasks";
 import { cookies } from "next/headers";
 import { decrypt } from "@/lib/session";
 import { dispatchReadyForActivatedTasks, parseNotifyParam } from "../taskReadyNotifications";
+import { taskRuleErrorResponse } from "../[tid]/taskStateChange";
 
 const schema = z.object({
   orderedIds: z.array(z.number().int().positive()).min(1),
@@ -44,6 +45,8 @@ export async function POST(request: NextRequest, { params }: Params) {
 
     return NextResponse.json({ success: true });
   } catch (error) {
+    const ruleResponse = taskRuleErrorResponse(error);
+    if (ruleResponse) return ruleResponse;
     console.error("Error reordering tasks:", error);
     return NextResponse.json({ error: "Error al reordenar tareas" }, { status: 500 });
   }

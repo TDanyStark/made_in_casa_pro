@@ -60,6 +60,10 @@ S41. "2.6 me parece bien" — apply the S33 recommendation: whether a task cost 
 S42. "3.7 si dale, todo lo que sea buenas practicas y mantenibilidad, bienvenido sea" — WizardStep3Products search uses the shared useDebouncedSearch hook.
 S43. "5. si no se esta usando borralo" — delete unused markAdjustmentAsCompleted and its tests.
 
+### Round 4 (T11)
+S44. "2.3 si dale" — reorder rejects a list that does not contain every task of the version exactly once: 400 "La lista debe incluir todas las tareas de la versión, una sola vez", nothing written.
+S45. "une a main y push y corre las migraciones dejalo actualizado a lo que hicimos" — merge fix/bug-review-2025 into main, apply pending migrations (local and production), push main.
+
 ## Tasks
 T1 | S1-S10 | writer A (background) | done | 9ab2e27, 89b13bb
 T2 | S11-S22 | writer B (background mvogtpyc-6-5dv5) | done | 5e30515, b145eba, e44553e
@@ -70,6 +74,8 @@ T7 | S26-S31,T6 | independent verify mvohu1hb-b-aaih (items 2,4) | done | -
 T8 | S27 | inline: keep cents in parseCopAmount, no rounding on sale price edit | done | (this commit)
 T9 | S32-S40 | writer (background mvpa8h6u-1-j8ih) | done | de5f204, 554d612
 T10 | S41-S43 | inline (writer mvpbq32t-1-ee77 failed with no changes) | done | see L24
+T11 | S44 | inline | done | (this commit)
+T12 | S45 | inline: migrate, merge, push | in progress | -
 T5 | S1-S25 | independent verify mvohewgo-9-lsjb (items 1,2,4) | done | -
 T6 | S5,S17,S20,S24,S25 | writer (background mvohlgh6-a-iacw): verifier blocker + advisories | done | d84f58a
 
@@ -98,3 +104,6 @@ L21. S33 review: isInternalTask (taskCost.ts:47-50) vs computeTaskCost (project-
 L22. User (round 3): "2.6 me parece bien 2.7 si esta bien 2.1 en teoria si, si no quien la ejecuta? incluso las de cotizacion una vez se cotiza queda asignado al que se elije 2.3 esto sigo sin entenderlo explicame bien este fallo 3.7 si dale, todo lo que sea buenas practicas y mantenibilidad, bienvenido sea 2.6 explicame bien de que trata esto 5. si no se esta usando borralo 6. espera que todo quede ok"
 L23. Decisions: 2.1 confirmed -> current PATCH auto-assignment (least-loaded in area when assignee cleared) is correct, no change. 2.7 no change. 2.3 explanation owed again (no change until user decides). 6: no push/PR yet.
 L24. T10: background writer mvpbq32t-1-ee77 failed ("assistant reported an error") with no changes; done inline. S41: isInternalTask now delegates to computeTaskCost precedence; locked row selects accepted_quote_price; getTaskCost editable = completed && !internal. Existing pin "internal assignee is not editable" narrowed to no declared cost/quote. RED 5 -> GREEN 51/51. S43: markAdjustmentAsCompleted and its tests deleted (no callers). S42: WizardStep3Products uses useDebouncedSearch(400); RED with previous code (filter stayed until debounce) -> GREEN. Full jest 173 suites / 1470 tests, tsc 0, lint 2 pre-existing warnings.
+
+L25. User: "2.3 si dale y une a main y push y corre las migraciones dejalo actualizado a lo que hicimos"
+L26. T11: RED 4 failed (3 query cases + route 400) -> GREEN 10/10; reorder route maps TaskRuleError via taskRuleErrorResponse. S21 integrity test fixture updated to give the version the reordered tasks. Callers checked: ProjectTasksTab sends the full version list; WizardStep6Confirm sends all created tasks of the new project (a failed task creation now makes reorder 400, previously a partial reorder; wizard ignores the result). Full jest 173 suites / 1474 tests, tsc 0.
