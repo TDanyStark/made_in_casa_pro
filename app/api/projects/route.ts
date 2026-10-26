@@ -30,6 +30,8 @@ const nullableTextSchema = z
 const projectSchema = z.object({
   title: z.string().min(1, "El título es requerido").max(300),
   brand_id: z.coerce.number().int().positive("La marca es requerida"),
+  /** Marcas adicionales del mismo cliente; en PATCH reemplaza el conjunto completo */
+  additional_brand_ids: z.array(z.coerce.number().int().positive()).max(50).optional(),
   manager_id: z.coerce.number().int().positive("El gerente es requerido"),
   product_id: z.coerce.number().int().positive().optional().nullable(),
   campaign_id: z.coerce.number().int().positive().optional().nullable(),

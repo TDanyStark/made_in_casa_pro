@@ -14,7 +14,7 @@ S8. Reads: project responses include `additional_brands: {id, name}[]`; the proj
 
 ## Tasks
 T1 | S2,S3,S6,S8 | migration 023 `project_brands`; queries: select `additional_brands`, validate + insert on create, replace on update, brand filters match links; query tests | inline | done (RED 10 failed -> GREEN; queries 428 passed; tsc 0) | commit pending
-T2 | S3,S6,S7 | API: POST/PATCH zod `additional_brand_ids`, domain error codes/status; route tests | inline | pending
+T2 | S3,S6,S7 | API: POST/PATCH zod `additional_brand_ids`, domain error codes/status; route tests | inline | done (RED 4 failed -> GREEN; api/projects 285 passed; tsc 0)
 T3 | S6,S7,S8 | UI: AdditionalBrandsSelect (react-select multi, client-filtered), wizard step 1 + confirm, ProjectHeader display, ProjectBrandsCard edit in detail; component tests; README | inline | pending
 
 ## Log

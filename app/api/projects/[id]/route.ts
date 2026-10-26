@@ -59,6 +59,8 @@ const patchSchema = z.object({
    * y aquí se devuelve 400.
    */
   manager_id: z.coerce.number().int().positive().optional(),
+  /** Marcas adicionales del mismo cliente; en PATCH reemplaza el conjunto completo */
+  additional_brand_ids: z.array(z.coerce.number().int().positive()).max(50).optional(),
   campaign_id: z.coerce.number().int().positive().nullable().optional(),
   drive_folder_id: z.string().nullable().optional(),
   drive_folder_url: driveFolderUrlSchema,
