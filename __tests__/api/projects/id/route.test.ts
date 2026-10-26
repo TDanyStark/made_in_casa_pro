@@ -9,6 +9,7 @@ jest.mock('@/lib/services/api-auth', () => ({
 
 jest.mock('@/lib/queries/projects', () => ({
   getProjectDetail: jest.fn(),
+  userCanAccessProject: jest.fn(),
   updateProject: jest.fn(),
   deleteProject: jest.fn(),
 }));
@@ -329,5 +330,66 @@ describe('PATCH /api/projects/[id]', () => {
       expect(res.status).toBe(403);
       expect(mockUpdateProject).not.toHaveBeenCalled();
     });
+  });
+});
+
+// S5: project detail is only visible to non-operations roles with access to the project.
+describe('GET /api/projects/[id] access', () => {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { GET } = require('@/api/projects/[id]/route');
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { getProjectDetail, userCanAccessProject } = require('@/lib/queries/projects');
+  const { PROJECT_VIEW_ROLES } = jest.requireActual('@/lib/role-groups');
+
+  const callGet = (id = '10') =>
+    GET(new NextRequest(`http://localhost/api/projects/${id}`), { params: Promise.resolve({ id }) });
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockValidateHttpMethod.mockReturnValue({ isValidMethod: true, response: undefined });
+    (getProjectDetail as jest.Mock).mockResolvedValue({ id: 10, title: 'P' });
+  });
+
+  it('returns the project to an operations role without the access check (previous behavior)', async () => {
+    mockValidateApiRole.mockResolvedValue({ isAuthorized: true, userRole: 3, response: undefined } as never);
+
+    const res = await callGet();
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ id: 10, title: 'P' });
+    expect(mockValidateApiRole).toHaveBeenCalledWith(expect.anything(), PROJECT_VIEW_ROLES);
+    expect(userCanAccessProject).not.toHaveBeenCalled();
+  });
+
+  it('returns 403 to a collaborator without access and does not load the project', async () => {
+    mockValidateApiRole.mockResolvedValue({ isAuthorized: true, userRole: 4, response: undefined } as never);
+    (userCanAccessProject as jest.Mock).mockResolvedValue(false);
+
+    const res = await callGet();
+
+    expect(res.status).toBe(403);
+    expect(await res.json()).toEqual({ error: 'No tienes acceso a este proyecto' });
+    expect(userCanAccessProject).toHaveBeenCalledWith(10, 77, 4);
+    expect(getProjectDetail).not.toHaveBeenCalled();
+  });
+
+  it('returns the project to a collaborator with access', async () => {
+    mockValidateApiRole.mockResolvedValue({ isAuthorized: true, userRole: 4, response: undefined } as never);
+    (userCanAccessProject as jest.Mock).mockResolvedValue(true);
+
+    const res = await callGet();
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ id: 10, title: 'P' });
+  });
+
+  it('returns 404 when the project does not exist (previous behavior)', async () => {
+    mockValidateApiRole.mockResolvedValue({ isAuthorized: true, userRole: 1, response: undefined } as never);
+    (getProjectDetail as jest.Mock).mockResolvedValue(null);
+
+    const res = await callGet();
+
+    expect(res.status).toBe(404);
+    expect(await res.json()).toEqual({ error: 'Proyecto no encontrado' });
   });
 });

@@ -4,9 +4,11 @@ import { cookies } from "next/headers";
 import { decrypt } from "@/lib/session";
 import { validateApiRole, validateHttpMethod } from "@/lib/services/api-auth";
 import { domainErrorResponse } from "@/lib/services/api-errors";
-import { getProjectDetail, updateProject, deleteProject } from "@/lib/queries/projects";
+import { getProjectDetail, updateProject, deleteProject, userCanAccessProject } from "@/lib/queries/projects";
 import {
+  hasAnyRole,
   LEADERSHIP_ROLES,
+  OPERATIONS_ROLES,
   PROJECT_EDIT_ROLES,
   PROJECT_VIEW_ROLES,
 } from "@/lib/role-groups";
@@ -78,7 +80,21 @@ export async function GET(request: NextRequest, { params }: Params) {
   if (!roleValidation.isAuthorized) return roleValidation.response;
 
   const { id } = await params;
-  const project = await getProjectDetail(parseInt(id));
+  const projectId = parseInt(id);
+
+  // Roles fuera de operaciones (colaborador) solo ven proyectos donde tienen acceso.
+  if (!hasAnyRole(roleValidation.userRole, OPERATIONS_ROLES)) {
+    const cookie = (await cookies()).get("session")?.value;
+    const session = cookie ? await decrypt(cookie) : null;
+    const allowed = session?.id
+      ? await userCanAccessProject(projectId, Number(session.id), roleValidation.userRole)
+      : false;
+    if (!allowed) {
+      return NextResponse.json({ error: "No tienes acceso a este proyecto" }, { status: 403 });
+    }
+  }
+
+  const project = await getProjectDetail(projectId);
   if (!project) return NextResponse.json({ error: "Proyecto no encontrado" }, { status: 404 });
   return NextResponse.json(project);
 }

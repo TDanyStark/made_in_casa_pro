@@ -8,7 +8,7 @@ import {
 } from '@/lib/queries/skills';
 import { SkillType } from '@/lib/definitions';
 import { validateApiRole, validateHttpMethod } from "@/lib/services/api-auth";
-import { ITEMS_PER_PAGE } from "@/config/constants";
+import { parsePagination } from "@/lib/utils/pagination";
 import { AUTHENTICATED_ROLES, LEADERSHIP_ROLES } from '@/lib/role-groups';
 
 // Schema for validating skill data
@@ -31,8 +31,6 @@ export async function GET(request: NextRequest) {
   try {
     const url = new URL(request.url);
     const id = url.searchParams.get("id");
-    const page = parseInt(url.searchParams.get("page") || "1");
-    const limit = parseInt(url.searchParams.get("limit") || ITEMS_PER_PAGE.toString());
     const search = url.searchParams.get("search");
     const user_id = url.searchParams.get("user_id") ? parseInt(url.searchParams.get("user_id") as string) : undefined;
     
@@ -46,8 +44,13 @@ export async function GET(request: NextRequest) {
         );
       }
       return NextResponse.json(skill);
-    } 
-    else if (search || page > 1 || user_id) {
+    }
+
+    // Pagination is validated for list requests only (id lookups ignore it)
+    const pagination = parsePagination(url.searchParams);
+    if (!pagination.success) return pagination.response;
+    const { page, limit } = pagination;
+    if (search || page > 1 || user_id) {
       // If search or pagination is needed
       const { skills, total } = await getSkillsWithPagination({
         search: search || undefined,

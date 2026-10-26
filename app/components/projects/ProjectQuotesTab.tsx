@@ -9,6 +9,7 @@ import { formatDHM } from "@/lib/utils/time";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { SafeHtml } from "@/components/ui/safe-html";
 import {
   Card,
   CardContent,
@@ -80,13 +81,15 @@ export function ProjectQuotesTab({ projectId, canEdit }: Props) {
   const [inviteUserId, setInviteUserId] = useState<string>("");
   const [inviting, setInviting] = useState(false);
   const [processingQuoteId, setProcessingQuoteId] = useState<number | null>(null);
+  const [isRemovingInvitation, setIsRemovingInvitation] = useState(false);
 
   // All tasks for this project — filtered to those with requires_quote=1 or blocked
-  const { data: allTasks = [], isLoading: isLoadingTasks } = useQuery<ProjectTaskType[]>({
+  const { data: allTasks = [], isLoading: isLoadingTasks, isError: isTasksError } = useQuery<ProjectTaskType[]>({
     queryKey: ["project-tasks", projectId],
     queryFn: async () => {
       const res = await get<ProjectTaskType[]>(`projects/${projectId}/tasks`);
-      return res.ok ? (res.data ?? []) : [];
+      if (!res.ok) throw new Error(res.error);
+      return res.data ?? [];
     },
     staleTime: 1000 * 60,
   });
@@ -104,7 +107,8 @@ export function ProjectQuotesTab({ projectId, canEdit }: Props) {
       const params = new URLSearchParams({ only_external: "1" });
       if (inviteDialogTask?.area_id) params.set("area_id", inviteDialogTask.area_id.toString());
       const res = await get<CollaboratorOption[]>(`collaborators?${params}`);
-      return res.ok ? (res.data?.map(u => ({ ...u, is_internal: Boolean(u.is_internal) })) ?? []) : [];
+      if (!res.ok) throw new Error(res.error);
+      return res.data?.map(u => ({ ...u, is_internal: Boolean(u.is_internal) })) ?? [];
     },
     enabled: !!inviteDialogTask,
   });
@@ -131,6 +135,8 @@ export function ProjectQuotesTab({ projectId, canEdit }: Props) {
   };
 
   const handleRemoveInvitation = async (taskId: number, userId: number) => {
+    if (isRemovingInvitation) return;
+    setIsRemovingInvitation(true);
     try {
       const res = await del(`projects/${projectId}/tasks/${taskId}/quotes`, {
         user_id: userId,
@@ -140,6 +146,8 @@ export function ProjectQuotesTab({ projectId, canEdit }: Props) {
       queryClient.invalidateQueries({ queryKey: ["task-quotes", taskId] });
     } catch {
       toast.error("Error al eliminar invitación");
+    } finally {
+      setIsRemovingInvitation(false);
     }
   };
 
@@ -186,6 +194,12 @@ export function ProjectQuotesTab({ projectId, canEdit }: Props) {
     );
   }
 
+  if (isTasksError) {
+    return (
+      <div className="text-center py-8 text-destructive">Error al cargar las cotizaciones</div>
+    );
+  }
+
   if (quoteTasks.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-16 text-center border rounded-lg border-dashed">
@@ -210,6 +224,7 @@ export function ProjectQuotesTab({ projectId, canEdit }: Props) {
           onAccept={(qid) => handleAcceptQuote(task.id, qid)}
           onReject={(qid) => handleRejectQuote(task.id, qid)}
           onRemoveInvitation={(uid) => handleRemoveInvitation(task.id, uid)}
+          isRemovingInvitation={isRemovingInvitation}
           processingQuoteId={processingQuoteId}
         />
       ))}
@@ -282,6 +297,7 @@ interface TaskQuoteCardProps {
   onAccept: (quoteId: number) => void;
   onReject: (quoteId: number) => void;
   onRemoveInvitation: (userId: number) => void;
+  isRemovingInvitation: boolean;
   processingQuoteId: number | null;
 }
 
@@ -293,13 +309,15 @@ function TaskQuoteCard({
   onAccept,
   onReject,
   onRemoveInvitation,
+  isRemovingInvitation,
   processingQuoteId,
 }: TaskQuoteCardProps) {
-  const { data: quoteData, isLoading } = useQuery<QuoteData>({
+  const { data: quoteData, isLoading, isError } = useQuery<QuoteData>({
     queryKey: ["task-quotes", task.id],
     queryFn: async () => {
       const res = await get<QuoteData>(`projects/${projectId}/tasks/${task.id}/quotes`);
-      return res.ok ? (res.data as unknown as QuoteData) : { quotes: [], invitations: [] };
+      if (!res.ok) throw new Error(res.error);
+      return res.data as unknown as QuoteData;
     },
     staleTime: 1000 * 30,
   });
@@ -338,6 +356,8 @@ function TaskQuoteCard({
       <CardContent className="space-y-4">
         {isLoading ? (
           <Skeleton className="h-16 w-full" />
+        ) : isError ? (
+          <p className="text-sm text-destructive text-center py-4">Error al cargar las cotizaciones</p>
         ) : (
           <>
             {/* Invitations list */}
@@ -373,7 +393,13 @@ function TaskQuoteCard({
                         {canEdit && !hasAccepted && !quote && (
                           <AlertDialog>
                             <AlertDialogTrigger asChild>
-                              <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground hover:text-destructive">
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-6 w-6 text-muted-foreground hover:text-destructive"
+                                aria-label={`Quitar invitación de ${inv.user_name}`}
+                                disabled={isRemovingInvitation}
+                              >
                                 <X className="h-3.5 w-3.5" />
                               </Button>
                             </AlertDialogTrigger>
@@ -388,6 +414,7 @@ function TaskQuoteCard({
                                 <AlertDialogCancel>Cancelar</AlertDialogCancel>
                                 <AlertDialogAction
                                   className="bg-destructive text-destructive-foreground"
+                                  disabled={isRemovingInvitation}
                                   onClick={() => onRemoveInvitation(inv.user_id)}
                                 >
                                   Quitar
@@ -468,9 +495,9 @@ function TaskQuoteCard({
                       </div>
 
                       {quote.notes && (
-                        <div
+                        <SafeHtml
                           className="prose prose-sm dark:prose-invert max-w-none text-sm text-muted-foreground"
-                          dangerouslySetInnerHTML={{ __html: quote.notes }}
+                          html={quote.notes}
                         />
                       )}
                     </div>

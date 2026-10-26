@@ -184,13 +184,6 @@ describe("PATCH /api/projects/[id]/tasks/[tid] task.ready notifications", () => 
     mockGetProjectTaskById.mockResolvedValueOnce({ ...existingTask, status: "waiting" } as never);
     mockResolveProjectTaskAssignment.mockResolvedValueOnce(5);
     mockUpdateProjectTask.mockResolvedValueOnce({ ...existingTask, status: "not_started", assigned_user_id: 5 } as never);
-    const { db } = jest.requireMock("@/lib/db") as { db: { transaction: jest.Mock } };
-    db.transaction.mockResolvedValueOnce({
-      execute: jest.fn().mockResolvedValue(undefined),
-      commit: jest.fn().mockResolvedValue(undefined),
-      rollback: jest.fn().mockResolvedValue(undefined),
-    });
-
     const response = await callPatch({ assigned_user_id: 5, status: "not_started", quoter_ids: [12] }, "?notify=false");
 
     expect(response.status).toBe(200);
@@ -265,6 +258,12 @@ describe("DELETE /api/projects/[id]/tasks/[tid] task.ready notifications", () =>
     return response;
   }
 
+  /** Task 10 (the deleted one) belongs to project 15; other ids come from `others`. */
+  function mockTasksById(others: Record<number, unknown> = {}) {
+    mockGetProjectTaskById.mockImplementation((async (taskId: number) =>
+      taskId === 10 ? existingTask : others[taskId] ?? null) as never);
+  }
+
   beforeEach(() => {
     jest.clearAllMocks();
     mockValidateHttpMethod.mockReturnValue({ isValidMethod: true, response: undefined });
@@ -272,11 +271,12 @@ describe("DELETE /api/projects/[id]/tasks/[tid] task.ready notifications", () =>
     mockCookies.mockResolvedValue({ get: jest.fn().mockReturnValue({ value: "session-token" }) } as never);
     mockDecrypt.mockResolvedValue({ id: 3, email: "admin@test.com", rol_id: 1 } as never);
     mockDispatchNotification.mockResolvedValue(undefined);
+    mockTasksById();
   });
 
   it("dispatches task.ready for the task activated by the deletion when it has an assignee", async () => {
     mockDeleteProjectTask.mockResolvedValueOnce([11] as never);
-    mockGetProjectTaskById.mockResolvedValueOnce({ ...existingTask, id: 11, status: "not_started", assigned_user_id: 8 } as never);
+    mockTasksById({ 11: { ...existingTask, id: 11, status: "not_started", assigned_user_id: 8 } });
 
     const response = await callDelete();
 
@@ -294,7 +294,7 @@ describe("DELETE /api/projects/[id]/tasks/[tid] task.ready notifications", () =>
 
   it("?notify=false deletes the task but sends no task.ready", async () => {
     mockDeleteProjectTask.mockResolvedValueOnce([11] as never);
-    mockGetProjectTaskById.mockResolvedValue({ ...existingTask, id: 11, status: "not_started", assigned_user_id: 8 } as never);
+    mockTasksById({ 11: { ...existingTask, id: 11, status: "not_started", assigned_user_id: 8 } });
 
     const response = await callDelete("?notify=false");
 
@@ -327,7 +327,7 @@ describe("DELETE /api/projects/[id]/tasks/[tid] task.ready notifications", () =>
     await callDelete();
 
     mockDeleteProjectTask.mockResolvedValueOnce([11] as never);
-    mockGetProjectTaskById.mockResolvedValueOnce({ ...existingTask, id: 11, status: "not_started", assigned_user_id: null } as never);
+    mockTasksById({ 11: { ...existingTask, id: 11, status: "not_started", assigned_user_id: null } });
     await callDelete();
 
     expect(mockDispatchNotification).not.toHaveBeenCalled();
@@ -340,42 +340,36 @@ describe("PATCH /api/projects/[id]/tasks/[tid] — pause/resume permissions (S7)
     mockValidateHttpMethod.mockReturnValue({ isValidMethod: true, response: undefined });
     mockCookies.mockResolvedValue({ get: jest.fn().mockReturnValue({ value: "session-token" }) } as never);
     mockUpdateProjectTask.mockResolvedValue({ ...existingTask } as never);
+    // Real role check: PATCH only authorizes operations roles (bug-review S11).
+    mockValidateApiRole.mockImplementation((async (_req: unknown, roles: readonly number[]) =>
+      roles.includes(4)
+        ? { isAuthorized: true, userRole: 4, response: undefined }
+        : { isAuthorized: false, userRole: 4, response: new Response(null, { status: 403 }) }) as never);
   });
 
   it.each([
-    ["paused", "in_progress"],
-    ["in_progress", "paused"],
-  ])("rejects a collaborator who is not the assignee setting %s", async (status, from) => {
-    mockValidateApiRole.mockResolvedValue({ isAuthorized: true, userRole: 4, response: undefined } as never);
-    mockDecrypt.mockResolvedValue({ id: 99 } as never);
+    ["paused", "in_progress", 99],
+    ["in_progress", "paused", 99],
+    ["paused", "in_progress", 4],
+  ])("rejects a collaborator setting %s from %s (user %i) and updates nothing", async (status, from, userId) => {
+    mockDecrypt.mockResolvedValue({ id: userId } as never);
     mockGetProjectTaskById.mockResolvedValue({ ...existingTask, status: from } as never);
 
     const response = await callPatch({ status });
 
     expect(response.status).toBe(403);
-    expect(await response.json()).toEqual({ error: "No tienes permiso para pausar o reanudar esta tarea" });
     expect(mockUpdateProjectTask).not.toHaveBeenCalled();
   });
 
-  it("lets the assignee pause their own task", async () => {
-    mockValidateApiRole.mockResolvedValue({ isAuthorized: true, userRole: 4, response: undefined } as never);
-    mockDecrypt.mockResolvedValue({ id: 4 } as never);
+  it("lets a leadership role pause a task in progress", async () => {
+    mockValidateApiRole.mockResolvedValue({ isAuthorized: true, userRole: 2, response: undefined } as never);
+    mockDecrypt.mockResolvedValue({ id: 3 } as never);
     mockGetProjectTaskById.mockResolvedValue({ ...existingTask, status: "in_progress" } as never);
 
     const response = await callPatch({ status: "paused" });
 
     expect(response.status).toBe(200);
-    expect(mockUpdateProjectTask).toHaveBeenCalledWith(10, expect.objectContaining({ status: "paused" }), 4);
-  });
-
-  it("lets a collaborator edit other fields without the pause/resume check (previous behavior)", async () => {
-    mockValidateApiRole.mockResolvedValue({ isAuthorized: true, userRole: 4, response: undefined } as never);
-    mockDecrypt.mockResolvedValue({ id: 99 } as never);
-    mockGetProjectTaskById.mockResolvedValue({ ...existingTask, status: "in_progress" } as never);
-
-    const response = await callPatch({ title: "Nuevo título" });
-
-    expect(response.status).toBe(200);
+    expect(mockUpdateProjectTask).toHaveBeenCalledWith(10, expect.objectContaining({ status: "paused" }), 3);
   });
 
   it("rejects pausing a task that is not in progress and updates nothing", async () => {

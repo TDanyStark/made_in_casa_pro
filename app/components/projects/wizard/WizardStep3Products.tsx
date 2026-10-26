@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { debounce } from "lodash";
+import { useDebouncedSearch } from "@/hooks/useDebouncedSearch";
 import CreatableSelect from "react-select/creatable";
 import { get } from "@/lib/services/apiService";
 import { ProductType, ApiResponseWithPagination } from "@/lib/definitions";
@@ -25,19 +25,20 @@ interface Props {
 }
 
 export function WizardStep3Products({ state, onNext, onBack }: Props) {
-  const [search, setSearch] = useState("");
+  const { searchTerm: search, handleInputChange } = useDebouncedSearch(400);
   const [product, setProduct] = useState<ProductType | null>(state.product);
   const [error, setError] = useState("");
   const [isCreatingProduct, setIsCreatingProduct] = useState(false);
   const [newProductName, setNewProductName] = useState("");
 
-  const { data: productOptions = [], isLoading } = useQuery({
+  const { data: productOptions = [], isLoading, isError } = useQuery({
     queryKey: ["products-search", search],
     queryFn: async () => {
       const params = new URLSearchParams({ page: "1", limit: "30", is_active: "1" });
       if (search) params.set("search", search);
       const res = await get<ApiResponseWithPagination<ProductType[]>>(`products?${params}`);
-      if (!res.ok || !res.data) return [];
+      if (!res.ok) throw new Error(res.error);
+      if (!res.data) return [];
       return ((res.data as unknown as { data: ProductType[] }).data ?? []).map(
         (p): ProductOption => ({
           value: p.id,
@@ -50,7 +51,6 @@ export function WizardStep3Products({ state, onNext, onBack }: Props) {
     staleTime: 1000 * 60,
   });
 
-  const debouncedSearch = debounce((v: string) => setSearch(v), 400);
 
   const selectProduct = (opt: ProductOption | null) => {
     if (!opt) return;
@@ -90,13 +90,13 @@ export function WizardStep3Products({ state, onNext, onBack }: Props) {
           options={productOptions}
           value={null}
           onChange={(opt) => selectProduct(opt as ProductOption | null)}
-          onInputChange={(v) => debouncedSearch(v)}
+          onInputChange={handleInputChange}
           onCreateOption={handleCreateProduct}
           formatCreateLabel={(inputValue) => `Crear producto "${inputValue}"`}
           isLoading={isLoading}
           placeholder="Buscar o crear producto..."
           noOptionsMessage={({ inputValue }) =>
-            inputValue ? "Sin resultados" : "Escribe para buscar"
+            isError ? "Error al cargar los productos" : inputValue ? "Sin resultados" : "Escribe para buscar"
           }
           controlShouldRenderValue={false}
           formatOptionLabel={(opt: ProductOption) => (

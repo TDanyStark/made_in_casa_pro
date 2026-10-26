@@ -83,6 +83,13 @@ export async function createProjectAdjustment(data: {
 }): Promise<ProjectAdjustmentType> {
   const transaction = await db.transaction("write");
   try {
+    // Lock the project so concurrent creations never get the same version number.
+    // NO KEY UPDATE does not conflict with the KEY SHARE lock of FK inserts (avoids deadlocks).
+    await transaction.execute({
+      sql: `SELECT id FROM projects WHERE id = $1 FOR NO KEY UPDATE`,
+      args: [data.project_id],
+    });
+
     // Determine the next version number
     const maxVersionResult = await transaction.execute({
       sql: `SELECT MAX(version_number) as max_v FROM project_adjustments WHERE project_id = $1`,
@@ -115,7 +122,6 @@ export async function createProjectAdjustment(data: {
 
     await transaction.commit();
     revalidatePath(`/projects/${data.project_id}`);
-    
     return insertResult.rows[0] as unknown as ProjectAdjustmentType;
   } catch (error) {
     await transaction.rollback();
@@ -124,29 +130,12 @@ export async function createProjectAdjustment(data: {
   }
 }
 
-export async function markAdjustmentAsCompleted(adjustmentId: number, projectId: number): Promise<void> {
-  const transaction = await db.transaction("write");
-  try {
-    await transaction.execute({
-      sql: `UPDATE project_adjustments SET status = 'completed', completed_at = CURRENT_TIMESTAMP WHERE id = $1`,
-      args: [adjustmentId],
-    });
-
-    await transaction.commit();
-    revalidatePath(`/projects/${projectId}`);
-  } catch (error) {
-    await transaction.rollback();
-    console.error("Error completing project adjustment:", error);
-    throw error;
-  }
-}
-
 export async function deleteProjectAdjustment(adjustmentId: number, projectId: number): Promise<void> {
   const transaction = await db.transaction("write");
   try {
     const adjCheck = await transaction.execute({
-      sql: `SELECT status FROM project_adjustments WHERE id = $1`,
-      args: [adjustmentId],
+      sql: `SELECT status FROM project_adjustments WHERE id = $1 AND project_id = $2`,
+      args: [adjustmentId, projectId],
     });
     const adjustment = adjCheck.rows[0] as unknown as { status: string } | undefined;
     if (!adjustment) {
@@ -166,8 +155,8 @@ export async function deleteProjectAdjustment(adjustmentId: number, projectId: n
     }
 
     await transaction.execute({
-      sql: `DELETE FROM project_adjustments WHERE id = $1`,
-      args: [adjustmentId],
+      sql: `DELETE FROM project_adjustments WHERE id = $1 AND project_id = $2`,
+      args: [adjustmentId, projectId],
     });
 
     await transaction.commit();

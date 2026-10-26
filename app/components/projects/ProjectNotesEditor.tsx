@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import dynamic from "next/dynamic";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { SafeHtml } from "@/components/ui/safe-html";
 import { toast } from "sonner";
 import { Loader2, Check } from "lucide-react";
 import { patch } from "@/lib/services/apiService";
@@ -28,6 +29,18 @@ export function ProjectNotesEditor({ projectId, initialContent, canEdit = true, 
   const [isChanged, setIsChanged] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
+  const [syncedInitialContent, setSyncedInitialContent] = useState(initialContent);
+  const [editorRevision, setEditorRevision] = useState(0);
+
+  // Re-sincroniza con datos nuevos del servidor si no hay ediciones sin guardar.
+  if (initialContent !== syncedInitialContent) {
+    setSyncedInitialContent(initialContent);
+    if (content === originalContent && content !== initialContent) {
+      setContent(initialContent);
+      setOriginalContent(initialContent);
+      setEditorRevision((revision) => revision + 1);
+    }
+  }
 
   // Determine if editing is allowed: either canEdit is true (default) OR readOnly is false
   const canEditProject = canEdit && !readOnly;
@@ -72,6 +85,7 @@ export function ProjectNotesEditor({ projectId, initialContent, canEdit = true, 
       </div>
       {canEditProject ? (
         <RichTextEditor
+          key={editorRevision}
           value={content}
           onChange={setContent}
           placeholder="Agrega notas, objetivos o contexto del proyecto..."
@@ -81,9 +95,9 @@ export function ProjectNotesEditor({ projectId, initialContent, canEdit = true, 
         />
       ) : (
         content ? (
-          <div
+          <SafeHtml
             className="prose prose-sm dark:prose-invert max-w-none rounded-md border bg-muted/20 p-4 text-sm"
-            dangerouslySetInnerHTML={{ __html: content }}
+            html={content}
           />
         ) : (
           <div className="p-4 rounded-md border bg-muted/20 text-sm">

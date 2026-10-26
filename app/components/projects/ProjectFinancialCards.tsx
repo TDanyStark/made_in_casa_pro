@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { INVALID_COP_AMOUNT_MESSAGE, parseCopAmount } from "@/lib/utils/cop-amount";
 import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Clock, List, Pencil, TrendingDown, TrendingUp, Wallet } from "lucide-react";
@@ -87,8 +88,11 @@ export function ProjectFinancialCards({ projectId, canEditSalePrice }: Props) {
   };
 
   const saveSalePrice = async () => {
-    const clean = draft.replace(/[^0-9.]/g, "");
-    const salePrice = clean === "" ? null : Number(clean);
+    const salePrice = parseCopAmount(draft);
+    if (salePrice === undefined) {
+      toast.error(INVALID_COP_AMOUNT_MESSAGE);
+      return;
+    }
     setIsSaving(true);
     try {
       const res = await patch<ProjectFinancialsView>(`projects/${projectId}/financials`, {

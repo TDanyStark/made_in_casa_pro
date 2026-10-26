@@ -40,6 +40,11 @@ function createTransport() {
   });
 }
 
+/** Removes CR/LF so a display name can never inject an extra header line. */
+function cleanDisplayName(name?: string | null): string {
+  return (name ?? "").replace(/[\r\n]+/g, " ").trim();
+}
+
 function stripHtml(html: string): string {
   return html.replace(/<[^>]+>/g, " ").replace(/\s{2,}/g, " ").trim();
 }
@@ -56,11 +61,11 @@ export class SystemEmailProvider implements EmailProvider {
   }): Promise<{ messageId?: string | null; gmailThreadId?: string | null }> {
     const transport = createTransport();
 
+    // Address objects let nodemailer RFC 2047-encode non-ASCII names and escape quotes itself.
+    const toName = cleanDisplayName(message.to.name);
     const mailOptions: Parameters<typeof transport.sendMail>[0] = {
-      from: `"${from.name}" <${from.email}>`,
-      to: message.to.name
-        ? `"${message.to.name}" <${message.to.email}>`
-        : message.to.email,
+      from: { name: cleanDisplayName(from.name), address: from.email },
+      to: toName ? { name: toName, address: message.to.email } : message.to.email,
       subject: message.subject,
       html: message.html,
       text: message.text ?? stripHtml(message.html),

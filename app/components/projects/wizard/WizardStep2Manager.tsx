@@ -35,14 +35,15 @@ export function WizardStep2Manager({ state, onNext, onBack }: Props) {
   // Co-responsables del MISMO cliente del proyecto, excepto el gerente
   // principal. `limit` lo respeta ahora el endpoint (antes truncaba a
   // ITEMS_PER_PAGE en silencio) y `client_id` impide mezclar laboratorios.
-  const { data: allManagers = [], isLoading } = useQuery({
+  const { data: allManagers = [], isLoading, isError } = useQuery({
     queryKey: ["managers-all-for-comanager", state.manager_id, state.client_id],
     queryFn: async () => {
       if (!state.client_id) return [];
       const res = await get<ApiResponseWithPagination<ManagerType[]>>(
         `managers?limit=200&client_id=${state.client_id}`
       );
-      if (!res.ok || !res.data) return [];
+      if (!res.ok) throw new Error(res.error);
+      if (!res.data) return [];
       const data = (res.data as unknown as { data: ManagerType[] }).data ?? [];
       return data
         .filter((m) => m.id !== state.manager_id)
@@ -111,7 +112,7 @@ export function WizardStep2Manager({ state, onNext, onBack }: Props) {
           onChange={(opt) => addCoManager(opt as ManagerOption | null)}
           isLoading={isLoading}
           placeholder="Buscar gerente para agregar como co-responsable..."
-          noOptionsMessage={() => "No hay gerentes disponibles"}
+          noOptionsMessage={() => (isError ? "Error al cargar los gerentes" : "No hay gerentes disponibles")}
           formatOptionLabel={(opt: ManagerOption) => (
             <div>
               <p className="text-sm font-medium">{opt.label}</p>

@@ -124,106 +124,51 @@ describe("POST /api/projects/[id]/tasks — canonical initial status", () => {
     expect(mockDispatchNotification).not.toHaveBeenCalled();
   });
 
-  it("resolves to not_started when the task queue for the adjustment has no active tasks, even without an explicit status in the request (UI must not send a hardcoded 'waiting')", async () => {
-    // order_index query: not the first task in the adjustment
-    mockDbExecute.mockResolvedValueOnce({ rows: [{ next_order: 2 }] } as never);
-    // active-tasks-count query: every previous task in this adjustment is done
-    mockDbExecute.mockResolvedValueOnce({ rows: [{ cnt: "0" }] } as never);
-
+  // Order, initial status and the blocked-by-quote rule are computed inside
+  // createProjectTask's locked transaction (projectTasks.integrity.test.ts).
+  it("lets createProjectTask compute the initial status when the request sends none (no hardcoded 'waiting')", async () => {
     mockResolveProjectTaskAssignment.mockResolvedValue(null);
-    mockCreateProjectTask.mockResolvedValue({
-      id: 99,
-      project_id: 15,
-      status: "not_started",
-    } as never);
+    mockCreateProjectTask.mockResolvedValue({ id: 99, project_id: 15, status: "not_started" } as never);
 
-    const res = await callPost({
-      title: "Tarea sin estado explícito",
-      adjustment_id: 9,
-      requires_quote: 0,
-    });
-    const data = await res.json();
+    const res = await callPost({ title: "Tarea sin estado explícito", adjustment_id: 9, requires_quote: 0 });
 
     expect(res.status).toBe(201);
-    expect(data.status).toBe("not_started");
+    expect((await res.json()).status).toBe("not_started");
     expect(mockCreateProjectTask).toHaveBeenCalledWith(
-      expect.objectContaining({ status: "not_started" })
+      expect.objectContaining({ status: undefined, adjustment_id: 9, assigned_user_id: null })
     );
+    expect(mockCreateProjectTask.mock.calls[0][0]).not.toHaveProperty("order_index");
+    expect(mockDbExecute).not.toHaveBeenCalled();
+    expect(mockDbTransaction).not.toHaveBeenCalled();
   });
 
-  it("forces status to blocked for requires_quote tasks with no resolved assignee, regardless of the computed default status", async () => {
-    // order_index query: first task in the adjustment -> defaultStatus would be not_started
-    mockDbExecute.mockResolvedValueOnce({ rows: [{ next_order: 0 }] } as never);
-
+  it("passes requires_quote, the resolved assignee, the quoters and the creator to createProjectTask", async () => {
     mockResolveProjectTaskAssignment.mockResolvedValue(null);
-    mockCreateProjectTask.mockResolvedValue({
-      id: 100,
-      project_id: 15,
-      status: "blocked",
-      task_flag: "new",
-    } as never);
-
-    // isBlockedByQuote branch opens a write transaction to log the transition.
-    const mockTransaction = {
-      execute: jest.fn().mockResolvedValue(undefined),
-      commit: jest.fn().mockResolvedValue(undefined),
-      rollback: jest.fn().mockResolvedValue(undefined),
-    };
-    mockDbTransaction.mockResolvedValue(mockTransaction as never);
-    mockCookies.mockResolvedValue({
-      get: jest.fn().mockReturnValue({ value: "session-token" }),
-    } as never);
+    mockCreateProjectTask.mockResolvedValue({ id: 100, project_id: 15, status: "blocked", task_flag: "new" } as never);
+    mockCookies.mockResolvedValue({ get: jest.fn().mockReturnValue({ value: "session-token" }) } as never);
     mockDecrypt.mockResolvedValue({ id: 3, email: "admin@test.com", rol_id: 1 } as never);
 
-    const res = await callPost({
-      title: "Tarea que requiere cotización",
-      adjustment_id: 9,
-      requires_quote: 1,
-    });
-    const data = await res.json();
+    const res = await callPost({ title: "Tarea que requiere cotización", adjustment_id: 9, requires_quote: 1, quoter_ids: [12] });
 
     expect(res.status).toBe(201);
-    expect(data.status).toBe("blocked");
+    expect((await res.json()).status).toBe("blocked");
     expect(mockCreateProjectTask).toHaveBeenCalledWith(
-      expect.objectContaining({ status: "blocked", requires_quote: 1 })
+      expect.objectContaining({ requires_quote: 1, assigned_user_id: null, quoter_ids: [12], created_by: 3 })
     );
-    expect(mockTransaction.commit).toHaveBeenCalled();
   });
 
-  it("resolves to waiting (not not_started) when a predecessor task in the same adjustment is blocked — a blocked task occupies the queue's turn", async () => {
-    // order_index query: not the first task in the adjustment
-    mockDbExecute.mockResolvedValueOnce({ rows: [{ next_order: 2 }] } as never);
-    // active-tasks-count query: one predecessor is 'blocked' (pending quote) — must count as active
-    mockDbExecute.mockResolvedValueOnce({ rows: [{ cnt: "1" }] } as never);
-
+  it("returns 500, sends no quote.requested and recalculates nothing when the task or its invitations cannot be saved (S19)", async () => {
     mockResolveProjectTaskAssignment.mockResolvedValue(null);
-    mockCreateProjectTask.mockResolvedValue({
-      id: 102,
-      project_id: 15,
-      status: "waiting",
-    } as never);
+    mockCreateProjectTask.mockRejectedValue(new Error("insert failed"));
+    mockCookies.mockResolvedValue({ get: jest.fn().mockReturnValue({ value: "session-token" }) } as never);
+    mockDecrypt.mockResolvedValue({ id: 3, email: "admin@test.com", rol_id: 1 } as never);
 
-    const res = await callPost({
-      title: "Tarea detrás de una bloqueada",
-      adjustment_id: 9,
-      requires_quote: 0,
-    });
-    const data = await res.json();
+    const res = await callPost({ title: "Con cotizadores", adjustment_id: 9, requires_quote: 1, quoter_ids: [12] });
 
-    expect(res.status).toBe(201);
-    expect(data.status).toBe("waiting");
-    expect(mockCreateProjectTask).toHaveBeenCalledWith(
-      expect.objectContaining({ status: "waiting" })
-    );
-
-    // The active-count query must include 'blocked' in its IN(...) filter so a
-    // blocked predecessor is counted as occupying the queue.
-    expect(mockDbExecute).toHaveBeenNthCalledWith(
-      2,
-      expect.objectContaining({
-        sql: expect.stringContaining("'blocked'"),
-      })
-    );
+    expect(res.status).toBe(500);
+    expect(await res.json()).toEqual({ error: "Error al crear tarea" });
+    expect(mockDispatchNotification).not.toHaveBeenCalled();
+    expect(recalculateProgressAndNotify).not.toHaveBeenCalled();
   });
 
   describe("task.ready notification on creation", () => {
@@ -239,7 +184,6 @@ describe("POST /api/projects/[id]/tasks — canonical initial status", () => {
     }
 
     it("dispatches task.assigned and then task.ready when the first task is created not_started with an assignee", async () => {
-      mockDbExecute.mockResolvedValueOnce({ rows: [{ next_order: 0 }] } as never);
       mockResolveProjectTaskAssignment.mockResolvedValue(7);
       mockCreateProjectTask.mockResolvedValue({
         id: 200,
@@ -267,8 +211,6 @@ describe("POST /api/projects/[id]/tasks — canonical initial status", () => {
     });
 
     it("dispatches only task.assigned for a task created in 'waiting'", async () => {
-      mockDbExecute.mockResolvedValueOnce({ rows: [{ next_order: 2 }] } as never);
-      mockDbExecute.mockResolvedValueOnce({ rows: [{ cnt: "1" }] } as never);
       mockResolveProjectTaskAssignment.mockResolvedValue(7);
       mockCreateProjectTask.mockResolvedValue({
         id: 201,
@@ -284,7 +226,6 @@ describe("POST /api/projects/[id]/tasks — canonical initial status", () => {
     });
 
     it("?notify=false silences task.assigned and task.ready but still sends quote.requested", async () => {
-      mockDbExecute.mockResolvedValueOnce({ rows: [{ next_order: 0 }] } as never);
       mockResolveProjectTaskAssignment.mockResolvedValue(7);
       mockCreateProjectTask.mockResolvedValue({
         id: 203,
@@ -292,12 +233,6 @@ describe("POST /api/projects/[id]/tasks — canonical initial status", () => {
         status: "not_started",
         assigned_user_id: 7,
       } as never);
-      mockDbTransaction.mockResolvedValue({
-        execute: jest.fn().mockResolvedValue(undefined),
-        commit: jest.fn().mockResolvedValue(undefined),
-        rollback: jest.fn().mockResolvedValue(undefined),
-      } as never);
-
       const res = await callPost({ title: "Silenciosa", adjustment_id: 9, quoter_ids: [12] }, "15", "?notify=false");
 
       expect(res.status).toBe(201);
@@ -313,7 +248,6 @@ describe("POST /api/projects/[id]/tasks — canonical initial status", () => {
     });
 
     it("recalculates progress through the ready-to-close helper with notify on by default", async () => {
-      mockDbExecute.mockResolvedValueOnce({ rows: [{ next_order: 0 }] } as never);
       mockResolveProjectTaskAssignment.mockResolvedValue(null);
       mockCreateProjectTask.mockResolvedValue({
         id: 204,
@@ -339,7 +273,6 @@ describe("POST /api/projects/[id]/tasks — canonical initial status", () => {
     });
 
     it("does not dispatch task.ready when the created not_started task has no assignee", async () => {
-      mockDbExecute.mockResolvedValueOnce({ rows: [{ next_order: 0 }] } as never);
       mockResolveProjectTaskAssignment.mockResolvedValue(null);
       mockCreateProjectTask.mockResolvedValue({
         id: 202,
@@ -356,8 +289,6 @@ describe("POST /api/projects/[id]/tasks — canonical initial status", () => {
   });
 
   it("still honors an explicit status sent by the caller (e.g. admin tooling), untouched by the default-status computation", async () => {
-    mockDbExecute.mockResolvedValueOnce({ rows: [{ next_order: 3 }] } as never);
-    mockDbExecute.mockResolvedValueOnce({ rows: [{ cnt: "1" }] } as never); // an active task exists
 
     mockResolveProjectTaskAssignment.mockResolvedValue(7);
     mockCreateProjectTask.mockResolvedValue({
@@ -419,19 +350,16 @@ describe("POST /api/projects/[id]/tasks — version is mandatory", () => {
 
   it("returns 201 using the latest version (previous behavior) when adjustment_id is omitted", async () => {
     mockResolveTaskAdjustmentId.mockResolvedValue(4);
-    mockDbExecute.mockResolvedValueOnce({ rows: [{ next_order: 0 }] } as never);
     mockCreateProjectTask.mockResolvedValue({ id: 120, project_id: 15, status: "not_started", adjustment_id: 4 } as never);
 
     const res = await callPost({ title: "Sin adjustment_id" });
 
     expect(res.status).toBe(201);
     expect(mockResolveTaskAdjustmentId).toHaveBeenCalledWith(15, undefined, expect.anything(), "latest");
-    expect(mockDbExecute).toHaveBeenNthCalledWith(1, expect.objectContaining({ args: [15, 4] }));
     expect(mockCreateProjectTask).toHaveBeenCalledWith(expect.objectContaining({ adjustment_id: 4 }));
   });
 
   it("keeps an explicit adjustment_id unchanged (previous behavior)", async () => {
-    mockDbExecute.mockResolvedValueOnce({ rows: [{ next_order: 0 }] } as never);
     mockCreateProjectTask.mockResolvedValue({ id: 121, project_id: 15, status: "not_started", adjustment_id: 9 } as never);
 
     const res = await callPost({ title: "Con versión", adjustment_id: 9 });
@@ -442,7 +370,7 @@ describe("POST /api/projects/[id]/tasks — version is mandatory", () => {
   });
 
   it("still returns 500 for unrelated errors", async () => {
-    mockDbExecute.mockRejectedValueOnce(new Error("db down"));
+    mockCreateProjectTask.mockRejectedValueOnce(new Error("db down"));
 
     const res = await callPost({ title: "Falla", adjustment_id: 9 });
 

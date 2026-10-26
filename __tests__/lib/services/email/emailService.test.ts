@@ -7,8 +7,7 @@ jest.mock("@/lib/queries/userEmailConnections", () => ({
 }));
 
 jest.mock("@/lib/queries/notificationDeliveries", () => ({
-  createNotificationDelivery: jest.fn(),
-  getDeliveryCountByEventAndRecipient: jest.fn(),
+  claimNotificationDelivery: jest.fn(),
   markDeliverySent: jest.fn(),
   markDeliveryFailed: jest.fn(),
 }));
@@ -38,18 +37,17 @@ jest.mock("@/lib/services/email/systemEmailProvider", () => ({
 import { sendEmail } from "@/lib/services/email/emailService";
 import { getUserEmailConnection } from "@/lib/queries/userEmailConnections";
 import {
-  createNotificationDelivery,
-  getDeliveryCountByEventAndRecipient,
+  claimNotificationDelivery,
   markDeliverySent,
   markDeliveryFailed,
 } from "@/lib/queries/notificationDeliveries";
 import { getOrCreateThread, updateThreadExternalIds } from "@/lib/queries/projectEmailThreads";
 import { GmailEmailProvider } from "@/lib/services/email/gmailEmailProvider";
 import { SystemEmailProvider } from "@/lib/services/email/systemEmailProvider";
+import { notifLog } from "@/lib/services/notificationLogger";
 
 const mockGetUserEmailConnection = getUserEmailConnection as jest.MockedFunction<typeof getUserEmailConnection>;
-const mockCreateDelivery = createNotificationDelivery as jest.MockedFunction<typeof createNotificationDelivery>;
-const mockGetDeliveryCount = getDeliveryCountByEventAndRecipient as jest.MockedFunction<typeof getDeliveryCountByEventAndRecipient>;
+const mockClaimDelivery = claimNotificationDelivery as jest.MockedFunction<typeof claimNotificationDelivery>;
 const mockMarkSent = markDeliverySent as jest.MockedFunction<typeof markDeliverySent>;
 const mockMarkFailed = markDeliveryFailed as jest.MockedFunction<typeof markDeliveryFailed>;
 const mockGetOrCreateThread = getOrCreateThread as jest.MockedFunction<typeof getOrCreateThread>;
@@ -76,8 +74,7 @@ const baseThread = {
 describe("sendEmail()", () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    mockCreateDelivery.mockResolvedValue({ id: 42 } as never);
-    mockGetDeliveryCount.mockResolvedValue(0);
+    mockClaimDelivery.mockResolvedValue({ id: 42 } as never);
     mockMarkSent.mockResolvedValue(undefined);
     mockMarkFailed.mockResolvedValue(undefined);
     mockGetOrCreateThread.mockResolvedValue(baseThread);
@@ -124,7 +121,7 @@ describe("sendEmail()", () => {
 
     await sendEmail({ senderUserId: 7, message: baseMessage, eventId: 10, recipientUserId: 3 });
 
-    expect(mockCreateDelivery).toHaveBeenCalledWith(
+    expect(mockClaimDelivery).toHaveBeenCalledWith(
       expect.objectContaining({ event_id: 10, recipient_user_id: 3, recipient_email: "recipient@test.com" })
     );
     expect(mockMarkSent).toHaveBeenCalledWith(42, expect.any(Object));
@@ -166,20 +163,39 @@ describe("sendEmail()", () => {
     );
   });
 
-  it("skips sending a duplicate (event, recipient) delivery and returns a sentinel result", async () => {
+  it("skips sending when the (event, recipient) delivery is already claimed (S23)", async () => {
     mockGetUserEmailConnection.mockResolvedValue(connectedConnection);
-    mockGetDeliveryCount.mockResolvedValue(1);
+    mockClaimDelivery.mockResolvedValue(null);
 
     const result = await sendEmail({ senderUserId: 7, message: baseMessage, eventId: 10 });
 
-    expect(mockGetDeliveryCount).toHaveBeenCalledWith(10, "recipient@test.com");
+    expect(mockClaimDelivery).toHaveBeenCalledWith(
+      expect.objectContaining({ event_id: 10, recipient_email: "recipient@test.com" })
+    );
     expect(result).toEqual({
       deliveryId: -1,
       provider: "gmail",
       gmailThreadId: null,
       messageId: null,
     });
-    expect(mockCreateDelivery).not.toHaveBeenCalled();
+    expect(GmailEmailProvider).not.toHaveBeenCalled();
+    expect(SystemEmailProvider).not.toHaveBeenCalled();
+    expect(mockMarkSent).not.toHaveBeenCalled();
+    expect(mockMarkFailed).not.toHaveBeenCalled();
+  });
+
+  it("does not send when claiming the delivery fails in the DB (S23)", async () => {
+    mockGetUserEmailConnection.mockResolvedValue(connectedConnection);
+    mockClaimDelivery.mockRejectedValue(new Error("connection refused"));
+
+    await expect(
+      sendEmail({ senderUserId: 7, message: baseMessage, eventId: 10 })
+    ).rejects.toThrow("connection refused");
+
+    expect(notifLog.error).toHaveBeenCalledWith(
+      "sendEmail",
+      expect.stringContaining("event=10 recipient=recipient@test.com")
+    );
     expect(GmailEmailProvider).not.toHaveBeenCalled();
     expect(SystemEmailProvider).not.toHaveBeenCalled();
     expect(mockMarkSent).not.toHaveBeenCalled();

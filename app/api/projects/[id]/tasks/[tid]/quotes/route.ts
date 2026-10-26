@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { validateApiRole, validateHttpMethod } from "@/lib/services/api-auth";
-import { AUTHENTICATED_ROLES, OPERATIONS_ROLES } from "@/lib/role-groups";
+import { AUTHENTICATED_ROLES, hasAnyRole, OPERATIONS_ROLES } from "@/lib/role-groups";
+import { getProjectTaskById } from "@/lib/queries/projectTasks";
+import { userCanAccessProject } from "@/lib/queries/projects";
 import {
   getTaskQuotes,
   getTaskQuoteInvitations,
@@ -26,7 +28,8 @@ type Params = { params: Promise<{ id: string; tid: string }> };
 /**
  * GET /api/projects/[id]/tasks/[tid]/quotes
  * Returns quotes and invitations for a task.
- * ADMIN, DIRECTIVO, COMERCIAL can see all; COLABORADOR sees only their own invitations/quotes.
+ * ADMIN, DIRECTIVO, FINANCIERO, COMERCIAL can see all; COLABORADOR needs access to the
+ * task's project and sees only their own invitations/quotes.
  */
 export async function GET(request: NextRequest, { params }: Params) {
   const methodValidation = validateHttpMethod(request, ["GET"]);
@@ -44,10 +47,20 @@ export async function GET(request: NextRequest, { params }: Params) {
 
     // Get current user ID if collaborator
     let currentUserId: number | null = null;
-    if (isCollaborator) {
+    if (!hasAnyRole(userRole, OPERATIONS_ROLES)) {
       const cookie = (await cookies()).get("session")?.value;
       const session = cookie ? await decrypt(cookie) : null;
       currentUserId = session?.id ?? null;
+
+      // Non-operations roles need access to the task's project.
+      const task = await getProjectTaskById(taskId);
+      if (!task) return NextResponse.json({ error: "Tarea no encontrada" }, { status: 404 });
+      const allowed = currentUserId
+        ? await userCanAccessProject(task.project_id, Number(currentUserId), userRole)
+        : false;
+      if (!allowed) {
+        return NextResponse.json({ error: "No tienes acceso a este proyecto" }, { status: 403 });
+      }
     }
 
     const [quotes, invitations] = await Promise.all([

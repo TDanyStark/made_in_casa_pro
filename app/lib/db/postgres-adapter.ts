@@ -35,6 +35,21 @@ export class PostgresAdapter implements DbAdapter {
         await client.query("BEGIN");
       }
 
+      // The connection goes back to the pool exactly once. Once the transaction
+      // finished (committed, rolled back, or failed while doing so), a later
+      // commit/rollback is a no-op, so a catch block that rolls back after a
+      // successful commit cannot release the connection twice.
+      let finished = false;
+      const finish = async (statement: "COMMIT" | "ROLLBACK") => {
+        if (finished) return;
+        finished = true;
+        try {
+          await client.query(statement);
+        } finally {
+          client.release();
+        }
+      };
+
       const transaction: DbTransaction = {
         async execute(
           query: string | { sql: string; args?: unknown[] }
@@ -49,12 +64,10 @@ export class PostgresAdapter implements DbAdapter {
           };
         },
         async commit() {
-          await client.query("COMMIT");
-          client.release();
+          await finish("COMMIT");
         },
         async rollback() {
-          await client.query("ROLLBACK");
-          client.release();
+          await finish("ROLLBACK");
         },
       };
 

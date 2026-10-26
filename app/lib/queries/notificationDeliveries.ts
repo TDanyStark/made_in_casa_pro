@@ -37,44 +37,25 @@ export type NotificationDeliveryDetailType = NotificationDeliveryType & {
 export const MAX_RETRY_COUNT = 3;
 
 /**
- * Returns the number of non-skipped deliveries already recorded for a given
- * (event_id, recipient_email) pair. Used to enforce idempotency — prevents
- * sending the same notification twice if dispatchNotification is called more
- * than once for the same event.
+ * Atomically claims the (event_id, recipient_email) pair by inserting a
+ * 'pending' delivery. Relies on the UNIQUE constraint from migration 022:
+ * returns the new row when this caller won the claim, or null when a delivery
+ * for the pair already exists (duplicate dispatch). DB errors are rethrown so
+ * the caller never sends an email it could not record.
  */
-export async function getDeliveryCountByEventAndRecipient(
-  eventId: number,
-  recipientEmail: string
-): Promise<number> {
-  try {
-    const result = await db.execute({
-      sql: `
-        SELECT COUNT(*) AS cnt
-        FROM notification_deliveries
-        WHERE event_id = $1 AND recipient_email = $2 AND status != 'skipped'
-      `,
-      args: [eventId, recipientEmail],
-    });
-    const row = result.rows[0] as unknown as { cnt: number | string };
-    return Number(row?.cnt ?? 0);
-  } catch (error) {
-    console.error("Error checking delivery idempotency:", error);
-    return 0;
-  }
-}
-
-export async function createNotificationDelivery(data: {
+export async function claimNotificationDelivery(data: {
   event_id: number;
   recipient_user_id?: number | null;
   recipient_email: string;
   sender_user_id?: number | null;
   provider?: DeliveryProvider;
-}): Promise<NotificationDeliveryType> {
+}): Promise<NotificationDeliveryType | null> {
   try {
     const result = await db.execute({
       sql: `
         INSERT INTO notification_deliveries (event_id, recipient_user_id, recipient_email, sender_user_id, provider, status)
         VALUES ($1, $2, $3, $4, $5, 'pending')
+        ON CONFLICT (event_id, recipient_email) DO NOTHING
         RETURNING id, event_id, recipient_user_id, recipient_email, sender_user_id, provider, status, error, gmail_thread_id, message_id, sent_at, created_at, retry_count, last_attempt_at
       `,
       args: [
@@ -85,9 +66,10 @@ export async function createNotificationDelivery(data: {
         data.provider ?? "gmail",
       ],
     });
+    if (result.rows.length === 0) return null;
     return result.rows[0] as unknown as NotificationDeliveryType;
   } catch (error) {
-    console.error("Error creating notification delivery:", error);
+    console.error("Error claiming notification delivery:", error);
     throw error;
   }
 }

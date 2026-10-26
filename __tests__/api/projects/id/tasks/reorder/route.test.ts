@@ -8,6 +8,14 @@ jest.mock("@/lib/services/api-auth", () => ({
 }));
 
 jest.mock("@/lib/queries/projectTasks", () => ({
+  TaskRuleError: class TaskRuleError extends Error {
+    status: number;
+    constructor(message: string, status: number) {
+      super(message);
+      this.name = "TaskRuleError";
+      this.status = status;
+    }
+  },
   reorderProjectTasks: jest.fn(),
   getProjectTaskById: jest.fn(),
 }));
@@ -109,6 +117,29 @@ describe("POST /api/projects/[id]/tasks/reorder task.ready notifications", () =>
     mockGetProjectTaskById.mockResolvedValueOnce({ id: 22, project_id: 15, status: "not_started", assigned_user_id: null } as never);
     await callPost({ orderedIds: [22, 21] });
 
+    expect(mockDispatch).not.toHaveBeenCalled();
+  });
+});
+
+// S44 (2.3): an incomplete list is a client error, not a 500.
+describe("POST /api/projects/[id]/tasks/reorder incomplete list", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockValidateHttpMethod.mockReturnValue({ isValidMethod: true, response: undefined });
+    mockValidateApiRole.mockResolvedValue({ isAuthorized: true, userRole: 1, response: undefined } as never);
+  });
+
+  it("returns 400 with the rule message and sends no notification", async () => {
+    const error = Object.assign(new Error("La lista debe incluir todas las tareas de la versión, una sola vez"), {
+      name: "TaskRuleError",
+      status: 400,
+    });
+    mockReorder.mockRejectedValueOnce(error);
+
+    const res = await callPost({ orderedIds: [3, 1], adjustment_id: 4 });
+
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: "La lista debe incluir todas las tareas de la versión, una sola vez" });
     expect(mockDispatch).not.toHaveBeenCalled();
   });
 });

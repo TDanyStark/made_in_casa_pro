@@ -6,11 +6,10 @@ jest.mock('@/lib/services/api-auth', () => ({
   validateHttpMethod: jest.fn(() => ({ isValidMethod: true })),
   validateApiRole: jest.fn(async () => ({ isAuthorized: true, userRole: 1 })),
 }));
-jest.mock('@/lib/queries/users', () => ({
-  getUserById: jest.fn(),
-  getUserByEmail: jest.fn(),
-  updateUser: jest.fn(),
-}));
+jest.mock('@/lib/queries/users', () => {
+  const findUserById = jest.fn();
+  return { getUserById: findUserById, findUserById, getUserByEmail: jest.fn(), updateUser: jest.fn() };
+});
 jest.mock('next/cache', () => ({ revalidatePath: jest.fn() }));
 jest.mock('bcrypt', () => ({ hash: jest.fn() }));
 

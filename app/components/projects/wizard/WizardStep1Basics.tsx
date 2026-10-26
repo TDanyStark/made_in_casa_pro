@@ -88,12 +88,13 @@ export function WizardStep1Basics({ state, onNext }: Props) {
   });
 
   // Full brand detail — auto-resolves manager + client when a brand is selected
-  const { data: brandDetail, isLoading: isLoadingDetail } = useQuery<BrandDetail | null>({
+  const { data: brandDetail, isLoading: isLoadingDetail, isError: brandDetailError } = useQuery<BrandDetail | null>({
     queryKey: ["brand-detail", selectedBrand?.value],
     queryFn: async () => {
       if (!selectedBrand?.value) return null;
       const res = await get<BrandDetail>(`brands/${selectedBrand.value}`);
-      return res.ok ? (res.data as unknown as BrandDetail) : null;
+      if (!res.ok) throw new Error(res.error);
+      return res.data as unknown as BrandDetail;
     },
     enabled: !!selectedBrand?.value,
     staleTime: 1000 * 60,
@@ -239,6 +240,10 @@ export function WizardStep1Basics({ state, onNext }: Props) {
                     {brandDetail.client_info?.name ?? "Sin cliente"}
                   </span>
                 </div>
+              </Card>
+            ) : brandDetailError ? (
+              <Card className="p-4 text-sm text-destructive">
+                Error al cargar la información de la marca
               </Card>
             ) : null}
           </div>

@@ -197,3 +197,48 @@ describe("ProjectFinancialCards", () => {
     expect(screen.queryByText("Horas")).not.toBeInTheDocument();
   });
 });
+
+// S27: COP amounts are integers; dots/commas are thousands separators, never decimals.
+describe("ProjectFinancialCards — sale price parsing (S27)", () => {
+  async function typeAndSave(value: string) {
+    mockPatch.mockResolvedValue({ ok: true, data: summary });
+    renderCards();
+    await userEvent.click(await screen.findByRole("button", { name: "Editar precio de venta" }));
+    const input = screen.getByLabelText("Precio de venta del proyecto");
+    await userEvent.clear(input);
+    if (value) await userEvent.type(input, value);
+    await userEvent.click(screen.getByRole("button", { name: "Guardar" }));
+  }
+
+  it.each([
+    ["1.500.000", 1500000],
+    ["1.500", 1500],
+    ["$ 2.000.000", 2000000],
+    ["2,500,000", 2500000],
+    ["750000", 750000],
+  ])("sends %s as %i", async (typed, expected) => {
+    await typeAndSave(typed);
+    await waitFor(() => expect(mockPatch).toHaveBeenCalledWith("projects/10/financials", { sale_price: expected }));
+  });
+
+  it("sends null when the field is cleared", async () => {
+    await typeAndSave("");
+    await waitFor(() => expect(mockPatch).toHaveBeenCalledWith("projects/10/financials", { sale_price: null }));
+  });
+
+  it.each(["abc", "12abc", "."])("rejects %s with an error toast and no request", async (typed) => {
+    await typeAndSave(typed);
+    await waitFor(() =>
+      expect(mockToastError).toHaveBeenCalledWith("Ingresa un precio válido en pesos (solo números)")
+    );
+    expect(mockPatch).not.toHaveBeenCalled();
+    expect(screen.getByLabelText("Precio de venta del proyecto")).toBeInTheDocument();
+  });
+
+  it("pre-fills the editor with the current integer price", async () => {
+    renderCards();
+    await userEvent.click(await screen.findByRole("button", { name: "Editar precio de venta" }));
+    expect(screen.getByLabelText("Precio de venta del proyecto")).toHaveValue("1500000");
+  });
+});
+

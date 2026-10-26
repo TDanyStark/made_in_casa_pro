@@ -9,8 +9,12 @@ export const USER_GMAIL_SCOPES = [
   "https://www.googleapis.com/auth/gmail.send",
 ];
 
+/** Cookie y ruta del callback del OAuth de Gmail por usuario (anti-CSRF). */
+export const GMAIL_OAUTH_STATE_COOKIE = "gmail_oauth_state";
+export const GMAIL_OAUTH_CALLBACK_PATH = "/api/user-email/google/callback";
+
 export function getUserGmailRedirectUri(appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000") {
-  return `${appUrl}/api/user-email/google/callback`;
+  return `${appUrl}${GMAIL_OAUTH_CALLBACK_PATH}`;
 }
 
 export async function createUserGmailOAuthClient(appUrl?: string) {
@@ -27,10 +31,11 @@ export async function createUserGmailOAuthClient(appUrl?: string) {
   );
 }
 
-export async function generateUserGmailAuthUrl(appUrl?: string) {
+export async function generateUserGmailAuthUrl(appUrl: string | undefined, state: string) {
   const oauth2Client = await createUserGmailOAuthClient(appUrl);
 
   return oauth2Client.generateAuthUrl({
+    state,
     access_type: "offline",
     prompt: "consent",
     scope: USER_GMAIL_SCOPES,

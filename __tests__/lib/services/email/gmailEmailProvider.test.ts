@@ -159,3 +159,58 @@ describe("GmailEmailProvider", () => {
     expect(mockMarkEmailConnectionInvalid).toHaveBeenCalledWith(7, expect.stringContaining("invalid_grant"));
   });
 });
+
+describe("GmailEmailProvider — From/To display names (S24)", () => {
+  beforeEach(async () => {
+    jest.clearAllMocks();
+    mockGetUserEmailConnection.mockResolvedValue(connectedConnection);
+    // Drop any queued one-off rejection left by earlier tests
+    const { __sendMock } = (await import("googleapis")) as never as { __sendMock: jest.Mock };
+    __sendMock.mockReset();
+    __sendMock.mockResolvedValue({ data: { id: "gmail-msg-id", threadId: "gmail-thread-id" } });
+  });
+
+  async function sendAndReadHeaders(fromName: string, toName?: string) {
+    const { __sendMock } = (await import("googleapis")) as never as { __sendMock: jest.Mock };
+    await new GmailEmailProvider(7).send({
+      from: { email: "user@gmail.com", name: fromName },
+      message: {
+        to: { email: "recipient@test.com", ...(toName !== undefined ? { name: toName } : {}) },
+        subject: "Hola",
+        html: "<p>x</p>",
+      },
+    });
+    const raw = __sendMock.mock.calls[__sendMock.mock.calls.length - 1][0].requestBody.raw as string;
+    const decoded = Buffer.from(raw.replace(/-/g, "+").replace(/_/g, "/"), "base64").toString("utf8");
+    const headers = decoded.split("\r\n\r\n")[0].split("\r\n");
+    return {
+      from: headers.find((h) => h.startsWith("From: ")),
+      to: headers.find((h) => h.startsWith("To: ")),
+    };
+  }
+
+  const b64 = (v: string) => `=?UTF-8?B?${Buffer.from(v, "utf8").toString("base64")}?=`;
+
+  it("RFC 2047 encodes non-ASCII display names in From and To", async () => {
+    const { from, to } = await sendAndReadHeaders("Made in Casa — Ñoño", "José Peña");
+    expect(from).toBe(`From: ${b64("Made in Casa — Ñoño")} <user@gmail.com>`);
+    expect(to).toBe(`To: ${b64("José Peña")} <recipient@test.com>`);
+  });
+
+  it("escapes quotes and backslashes in ASCII display names", async () => {
+    const { from, to } = await sendAndReadHeaders('Ana "La Jefa"', 'Back\\slash "x"');
+    expect(from).toBe('From: "Ana \\"La Jefa\\"" <user@gmail.com>');
+    expect(to).toBe('To: "Back\\\\slash \\"x\\"" <recipient@test.com>');
+  });
+
+  it("strips CR/LF from display names so no header can be injected", async () => {
+    const { from } = await sendAndReadHeaders("Evil\r\nBcc: x@y.com");
+    expect(from).toBe('From: "Evil Bcc: x@y.com" <user@gmail.com>');
+  });
+
+  it("keeps plain names quoted and a bare address when To has no name", async () => {
+    const { from, to } = await sendAndReadHeaders("Daniel");
+    expect(from).toBe('From: "Daniel" <user@gmail.com>');
+    expect(to).toBe("To: recipient@test.com");
+  });
+});

@@ -17,6 +17,7 @@ import { CollaboratorTasksList } from "./CollaboratorTasksList";
 import { SubmitQuoteModal } from "@/components/quotes/SubmitQuoteModal";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
+import { SafeHtml } from "@/components/ui/safe-html";
 import { Button } from "@/components/ui/button";
 import { ChevronDown, ChevronUp, HardDrive, ExternalLink } from "lucide-react";
 import { format } from "date-fns";
@@ -43,21 +44,23 @@ export function CollaboratorProjectView({
   const [quoteModalOpen, setQuoteModalOpen] = useState(false);
 
   // ── Adjustments (versions) ──────────────────────────────────────────────────
-  const { data: adjustments = [], isLoading: adjustmentsLoading } = useQuery({
+  const { data: adjustments = [], isLoading: adjustmentsLoading, isError: adjustmentsError } = useQuery({
     queryKey: ["project-adjustments", projectId],
     queryFn: async () => {
       const res = await get<ProjectAdjustmentType[]>(`projects/${projectId}/adjustments`);
-      return res.ok ? (res.data ?? []) : [];
+      if (!res.ok) throw new Error(res.error);
+      return res.data ?? [];
     },
     staleTime: 1000 * 60,
   });
 
   // ── Collaborator quotes ─────────────────────────────────────────────────────
-  const { data: quoteData, isLoading: quotesLoading } = useQuery({
+  const { data: quoteData, isLoading: quotesLoading, isError: quotesError } = useQuery({
     queryKey: ["collaborator-project-quotes", projectId, currentUserId],
     queryFn: async () => {
       const res = await get<{ quotes: TaskQuoteType[] }>(`projects/${projectId}/collaborator-quotes`);
-      return res.ok ? res.data : null;
+      if (!res.ok) throw new Error(res.error);
+      return res.data ?? null;
     },
     staleTime: 1000 * 60,
   });
@@ -107,6 +110,9 @@ export function CollaboratorProjectView({
         </TabsList>
 
         <TabsContent value="tasks" className="mt-6">
+          {adjustmentsError || quotesError ? (
+            <div className="text-center py-8 text-destructive">Error al cargar las tareas del proyecto</div>
+          ) : (
           <div className="space-y-4">
             {allVersions.map((adj, index) => (
               <CollaboratorVersionAccordion
@@ -120,6 +126,7 @@ export function CollaboratorProjectView({
               />
             ))}
           </div>
+          )}
         </TabsContent>
 
         <TabsContent value="notes" className="mt-6">
@@ -253,9 +260,9 @@ function CollaboratorVersionAccordion({
               <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5">
                 Notas del ajuste
               </p>
-              <div
+              <SafeHtml
                 className="text-sm prose prose-sm dark:prose-invert max-w-none"
-                dangerouslySetInnerHTML={{ __html: adjustment.notes }}
+                html={adjustment.notes}
               />
             </div>
           )}

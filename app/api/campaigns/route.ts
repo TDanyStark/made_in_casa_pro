@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { validateApiRole, validateHttpMethod } from "@/lib/services/api-auth";
 import { getCampaignsWithPagination, createCampaign } from "@/lib/queries/campaigns";
-import { ITEMS_PER_PAGE } from "@/config/constants";
+import { parsePagination } from "@/lib/utils/pagination";
 import { AUTHENTICATED_ROLES, OPERATIONS_ROLES } from "@/lib/role-groups";
 
 const campaignSchema = z.object({
@@ -18,8 +18,9 @@ export async function GET(request: NextRequest) {
   if (!roleValidation.isAuthorized) return roleValidation.response;
 
   const url = new URL(request.url);
-  const page = parseInt(url.searchParams.get("page") || "1");
-  const limit = parseInt(url.searchParams.get("limit") || ITEMS_PER_PAGE.toString());
+  const pagination = parsePagination(url.searchParams);
+  if (!pagination.success) return pagination.response;
+  const { page, limit } = pagination;
   const search = url.searchParams.get("search") || undefined;
   const clientIdParam = url.searchParams.get("client_id");
   const clientId = clientIdParam ? parseInt(clientIdParam) : undefined;

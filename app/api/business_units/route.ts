@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { createBusinessUnit, getBusinessUnitsWithPagination } from "@/lib/queries/businessUnits";
-import { ITEMS_PER_PAGE } from "@/config/constants";
+import { parsePagination } from "@/lib/utils/pagination";
 import { validateApiRole, validateHttpMethod } from "@/lib/services/api-auth";
 import { AUTHENTICATED_ROLES, OPERATIONS_ROLES } from "@/lib/role-groups";
 
@@ -66,8 +66,9 @@ export async function GET(request: NextRequest) {
 
   try {
     const url = new URL(request.url);
-    const page = parseInt(url.searchParams.get("page") || "1");
-    const limit = parseInt(url.searchParams.get("limit") || ITEMS_PER_PAGE.toString());
+    const pagination = parsePagination(url.searchParams);
+    if (!pagination.success) return pagination.response;
+    const { page, limit } = pagination;
     const search = url.searchParams.get("search");
     
     // Get paginated results

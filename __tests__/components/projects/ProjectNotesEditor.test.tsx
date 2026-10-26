@@ -1,7 +1,12 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 
 jest.mock("next/dynamic", () => () => {
-  const MockRichTextEditor = ({ value }: { value: string }) => <div data-testid="rich-text-editor">{value}</div>;
+  const MockRichTextEditor = ({ value, onChange }: { value: string; onChange: (v: string) => void }) => (
+    <div>
+      <div data-testid="rich-text-editor">{value}</div>
+      <button type="button" onClick={() => onChange("<p>edición local</p>")}>editar</button>
+    </div>
+  );
   MockRichTextEditor.displayName = "MockRichTextEditor";
   return MockRichTextEditor;
 });
@@ -66,5 +71,46 @@ describe("ProjectNotesEditor", () => {
     );
 
     expect(screen.getByText(/sin notas/i)).toBeInTheDocument();
+  });
+
+  it("strips script and event-handler payloads in read-only mode", () => {
+    const { container } = render(
+      <ProjectNotesEditor
+        projectId={7}
+        initialContent={'<p>ok</p><img src=x onerror="alert(1)"><script>alert(2)</script>'}
+        readOnly={true}
+      />
+    );
+
+    expect(screen.getByText("ok")).toBeInTheDocument();
+    expect(container.querySelector("img")).toBeNull();
+    expect(container.querySelector("script")).toBeNull();
+  });
+
+  it("re-syncs from new initialContent when there are no unsaved edits", () => {
+    const { rerender } = render(
+      <ProjectNotesEditor projectId={7} initialContent="<p>v1</p>" readOnly={true} />
+    );
+    rerender(<ProjectNotesEditor projectId={7} initialContent="<p>v2</p>" readOnly={true} />);
+
+    expect(screen.getByText("v2")).toBeInTheDocument();
+    expect(screen.queryByText("v1")).not.toBeInTheDocument();
+  });
+
+  it("re-syncs the editable editor when there are no unsaved edits", () => {
+    const { rerender } = render(<ProjectNotesEditor projectId={7} initialContent="<p>v1</p>" />);
+    rerender(<ProjectNotesEditor projectId={7} initialContent="<p>v2</p>" />);
+
+    expect(screen.getByTestId("rich-text-editor")).toHaveTextContent("<p>v2</p>");
+    expect(screen.queryByText(/guardar cambios/i)).not.toBeInTheDocument();
+  });
+
+  it("keeps unsaved edits when new initialContent arrives", () => {
+    const { rerender } = render(<ProjectNotesEditor projectId={7} initialContent="<p>v1</p>" />);
+    fireEvent.click(screen.getByText("editar"));
+    rerender(<ProjectNotesEditor projectId={7} initialContent="<p>v2</p>" />);
+
+    expect(screen.getByTestId("rich-text-editor")).toHaveTextContent("<p>edición local</p>");
+    expect(screen.getByText(/guardar cambios/i)).toBeInTheDocument();
   });
 });

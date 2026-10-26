@@ -66,6 +66,7 @@ jest.mock("@/components/ui/skeleton", () => ({
 }));
 
 import { CollaboratorProjectView } from "@/components/projects/CollaboratorProjectView";
+import { get } from "@/lib/services/apiService";
 import { UserRole } from "@/lib/definitions";
 
 const v1Adjustment = {
@@ -129,5 +130,52 @@ describe("CollaboratorProjectView", () => {
     expect(mockUseQuery).toHaveBeenCalledWith(
       expect.objectContaining({ queryKey: ["collaborator-project-quotes", 15, 9] })
     );
+  });
+
+  const renderView = () =>
+    render(
+      <CollaboratorProjectView
+        projectId={15}
+        project={{ id: 15, title: "Proyecto cotizable", notes: "" } as never}
+        tasks={[]}
+        invitedTaskIds={[]}
+        userRole={UserRole.COLABORADOR}
+        currentUserId={9}
+      />
+    );
+
+  it("query functions throw when the API fails instead of returning empty data", async () => {
+    (get as jest.Mock).mockResolvedValue({ ok: false, status: 401, error: "No autorizado" });
+    renderView();
+    const queryFns = mockUseQuery.mock.calls.map(([options]) => options.queryFn);
+    expect(queryFns).toHaveLength(2);
+    for (const queryFn of queryFns) {
+      await expect(queryFn()).rejects.toThrow("No autorizado");
+    }
+  });
+
+  it.each(["project-adjustments", "collaborator-project-quotes"])(
+    "shows an error state when %s fails",
+    (failingKey) => {
+      mockUseQuery.mockImplementation(({ queryKey }: { queryKey: unknown[] }) =>
+        queryKey[0] === failingKey
+          ? { data: undefined, isLoading: false, isError: true }
+          : { data: queryKey[0] === "project-adjustments" ? [v1Adjustment] : { quotes: [] }, isLoading: false }
+      );
+      renderView();
+      expect(screen.getByText("Error al cargar las tareas del proyecto")).toBeInTheDocument();
+      expect(screen.queryByText("Versión 1 (Original)")).not.toBeInTheDocument();
+    }
+  );
+
+  it("renders adjustment notes sanitized", () => {
+    mockUseQuery.mockImplementation(({ queryKey }: { queryKey: unknown[] }) =>
+      queryKey[0] === "project-adjustments"
+        ? { data: [{ ...v1Adjustment, notes: '<p><u>ajuste</u></p><img src=x onerror="alert(1)">' }], isLoading: false }
+        : { data: { quotes: [] }, isLoading: false }
+    );
+    const { container } = renderView();
+    expect(screen.getByText("ajuste").tagName).toBe("U");
+    expect(container.querySelector("img")).toBeNull();
   });
 });

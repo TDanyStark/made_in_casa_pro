@@ -3,6 +3,8 @@ import { google } from "googleapis";
 import { validateApiRole, validateHttpMethod } from "@/lib/services/api-auth";
 import { getAppSettings } from "@/lib/queries/settings";
 import { ADMIN_ONLY_ROLES } from "@/lib/role-groups";
+import { createOAuthState, setOAuthStateCookie } from "@/lib/session";
+import { DRIVE_OAUTH_STATE_COOKIE, DRIVE_OAUTH_CALLBACK_PATH } from "./oauth-state";
 
 /**
  * GET /api/settings/google
@@ -26,7 +28,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const redirectUri = `${process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000"}/api/settings/google/callback`;
+    const redirectUri = `${process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000"}${DRIVE_OAUTH_CALLBACK_PATH}`;
 
     const oauth2Client = new google.auth.OAuth2(
       settings.google_oauth_client_id,
@@ -34,7 +36,10 @@ export async function GET(request: NextRequest) {
       redirectUri
     );
 
+    // Anti-CSRF: el callback solo acepta la respuesta con este mismo state.
+    const state = createOAuthState();
     const authUrl = oauth2Client.generateAuthUrl({
+      state,
       access_type: "offline",   // required to get a refresh_token
       prompt: "consent",        // force consent screen so refresh_token is always returned
       scope: [
@@ -43,7 +48,12 @@ export async function GET(request: NextRequest) {
       ],
     });
 
-    return NextResponse.redirect(authUrl);
+    return setOAuthStateCookie(
+      NextResponse.redirect(authUrl),
+      DRIVE_OAUTH_STATE_COOKIE,
+      state,
+      DRIVE_OAUTH_CALLBACK_PATH
+    );
   } catch (error) {
     console.error("Error generating Google auth URL:", error);
     return NextResponse.json({ error: "Error al generar URL de autorización" }, { status: 500 });

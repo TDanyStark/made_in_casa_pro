@@ -1,11 +1,13 @@
 "use client";
 
 import { useLayoutEffect, useRef, useState } from "react";
+import { INVALID_COP_AMOUNT_MESSAGE, parseCopAmount } from "@/lib/utils/cop-amount";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { SafeHtml } from "@/components/ui/safe-html";
 import { ProjectTaskType } from "@/lib/definitions";
 import { formatProgressMinutes } from "@/lib/task-progress";
 import { get, patch } from "@/lib/services/apiService";
@@ -85,7 +87,7 @@ function TaskCostSection({
   const detail = data ? describeTaskCost(data) : null;
   const correction = data ? describeCorrection(data) : null;
   const canEdit = canEditCost && Boolean(data?.editable);
-  const cleanDraft = draft.replace(/[^0-9.]/g, "");
+  const isDraftEmpty = draft.trim() === "";
 
   const startEditing = () => {
     setDraft(data ? String(data.cost) : "");
@@ -93,11 +95,16 @@ function TaskCostSection({
   };
 
   const saveCost = async () => {
-    if (cleanDraft === "") return;
+    const amount = parseCopAmount(draft);
+    if (amount === null) return;
+    if (amount === undefined) {
+      toast.error(INVALID_COP_AMOUNT_MESSAGE);
+      return;
+    }
     setIsSaving(true);
     try {
       const res = await patch<TaskCost>(`projects/${projectId}/tasks/${taskId}/cost`, {
-        completion_cost: Number(cleanDraft),
+        completion_cost: amount,
       });
       if (!res.ok || !res.data) throw new Error(res.error || "Error al corregir el costo de la tarea");
       queryClient.setQueryData(queryKey, res.data);
@@ -148,7 +155,7 @@ function TaskCostSection({
               disabled={isSaving}
               autoFocus
             />
-            <Button type="submit" size="xs" disabled={isSaving || cleanDraft === ""}>
+            <Button type="submit" size="xs" disabled={isSaving || isDraftEmpty}>
               Guardar
             </Button>
             <Button type="button" size="xs" variant="ghost" onClick={() => setIsEditing(false)} disabled={isSaving}>
@@ -317,9 +324,9 @@ export function TaskDeliverableDialog({
                 Notas de entrega
               </p>
               {hasDeliveryNotes ? (
-                <div
+                <SafeHtml
                   className="prose prose-sm dark:prose-invert max-w-none max-h-64 overflow-y-auto rounded-md border bg-muted/20 p-4 text-sm"
-                  dangerouslySetInnerHTML={{ __html: task.delivery_notes ?? "" }}
+                  html={task.delivery_notes}
                 />
               ) : (
                 <p className="text-sm text-muted-foreground">No se registraron notas de entrega.</p>

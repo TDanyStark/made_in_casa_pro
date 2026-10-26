@@ -17,6 +17,21 @@ interface SiigoErrorResponse {
   }[];
 }
 
+/** Tiempo máximo de espera por una respuesta de Siigo. */
+export const SIIGO_REQUEST_TIMEOUT_MS = 15_000;
+
+/**
+ * Lee el cuerpo de error de Siigo sin romper si no es JSON (p. ej. HTML de un 502).
+ * Devuelve null cuando el cuerpo no se puede interpretar como JSON.
+ */
+export async function readSiigoErrorBody(response: Response): Promise<unknown | null> {
+  try {
+    return JSON.parse(await response.text());
+  } catch {
+    return null;
+  }
+}
+
 // Almacena el token y su fecha de expiración
 let tokenData: {
   accessToken: string;
@@ -46,7 +61,6 @@ const isTokenExpired = (): boolean => {
 export async function getSiigoToken(): Promise<string> {
   // Si ya tenemos un token válido, lo devolvemos
   if (tokenData.accessToken && !isTokenExpired()) {
-    console.log('Token de Siigo reutilizado', tokenData);
     return tokenData.accessToken;
   }
 
@@ -69,12 +83,13 @@ export async function getSiigoToken(): Promise<string> {
         username,
         access_key: accessKey
       }),
-      cache: 'no-store'
+      cache: 'no-store',
+      signal: AbortSignal.timeout(SIIGO_REQUEST_TIMEOUT_MS),
     });
 
     if (!response.ok) {
-      const errorData = await response.json() as SiigoErrorResponse;
-      throw new Error(`Error al autenticar con Siigo: ${errorData.Errors?.[0]?.Message || response.statusText}`);
+      const errorData = await readSiigoErrorBody(response) as SiigoErrorResponse | null;
+      throw new Error(`Error al autenticar con Siigo: ${errorData?.Errors?.[0]?.Message || response.statusText}`);
     }
 
     const data = await response.json() as SiigoAuthResponse;

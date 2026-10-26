@@ -1,6 +1,8 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { get } from '@/lib/services/apiService';
 import { SiigoCustomerType } from '@/lib/services/siigo/SiigoDefinitions';
 import { Loader2, Search, ChevronLeft, ChevronRight, Phone, Mail } from "lucide-react";
 import { Input } from "@/components/ui/input";
@@ -15,45 +17,38 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 
+const PAGE_SIZE = 10;
+
+interface SiigoCustomersResponse {
+  results?: SiigoCustomerType[];
+  pagination?: { total_results: number; page_size: number };
+}
 
 export default function SiigoCustomersList() {
-  const [customers, setCustomers] = useState<SiigoCustomerType[]>([]);
+  // `inputValue` es lo que se escribe; `searchTerm` solo cambia al enviar el formulario.
+  const [inputValue, setInputValue] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
-  const [isLoading, setIsLoading] = useState(true);
   const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [totalResults, setTotalResults] = useState(0);
 
-  async function fetchCustomers(pageNum = 1, term = '') {
-    setIsLoading(true);
-    try {
-      let url = `/api/siigo/customers?page=${pageNum}&pageSize=10`;
-      if (term) {
-        url += `&term=${encodeURIComponent(term)}`;
-      }
-      
-      const response = await fetch(url);
-      if (!response.ok) throw new Error('Error al cargar clientes');
-      
-      const data = await response.json();
-      setCustomers(data.results || []);
-      setTotalPages(Math.ceil(data.pagination.total_results / data.pagination.page_size));
-      setTotalResults(data.pagination.total_results);
-    } catch (error) {
-      console.error('Error al cargar clientes de Siigo:', error);
-    } finally {
-      setIsLoading(false);
-    }
-  }
+  const { data, isLoading, isError } = useQuery({
+    queryKey: ['siigo-customers', page, searchTerm],
+    queryFn: async () => {
+      let url = `siigo/customers?page=${page}&pageSize=${PAGE_SIZE}`;
+      if (searchTerm) url += `&term=${encodeURIComponent(searchTerm)}`;
+      const res = await get<SiigoCustomersResponse>(url);
+      if (!res.ok) throw new Error(res.error);
+      return res.data as SiigoCustomersResponse;
+    },
+  });
 
-  useEffect(() => {
-    fetchCustomers(page, searchTerm);
-  }, [page, searchTerm]);
+  const customers = data?.results ?? [];
+  const totalResults = data?.pagination?.total_results ?? customers.length;
+  const totalPages = Math.max(1, Math.ceil(totalResults / (data?.pagination?.page_size || PAGE_SIZE)));
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
     setPage(1);
-    fetchCustomers(1, searchTerm);
+    setSearchTerm(inputValue.trim());
   };
 
   const handlePrevPage = () => {
@@ -76,8 +71,8 @@ export default function SiigoCustomersList() {
       <form onSubmit={handleSearch} className="flex gap-2">
         <Input
           placeholder="Buscar por nombre o identificación..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
+          value={inputValue}
+          onChange={(e) => setInputValue(e.target.value)}
           className="max-w-xs"
         />
         <Button type="submit" size="sm" variant="secondary">
@@ -89,6 +84,10 @@ export default function SiigoCustomersList() {
       {isLoading ? (
         <div className="flex justify-center py-8">
           <Loader2 className="h-8 w-8 animate-spin text-gray-500" />
+        </div>
+      ) : isError ? (
+        <div className="text-center py-8 text-destructive">
+          Error al cargar los clientes de Siigo
         </div>
       ) : customers.length === 0 ? (
         <div className="text-center py-8 text-gray-500">

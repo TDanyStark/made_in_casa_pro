@@ -14,7 +14,7 @@ type UserLoginFormProps = {
 };
 
 export function UserLoginForm({ redirectTo = null }: UserLoginFormProps) {
-  const [state, action, pending] = useActionState(login, {errors: {}, submittedData: {email: "", password: ""}});
+  const [state, action, pending] = useActionState(login, {errors: {}, submittedData: {email: ""}});
   return (
     <div className="grid gap-6">
       <form action={action}>
@@ -51,7 +51,6 @@ export function UserLoginForm({ redirectTo = null }: UserLoginFormProps) {
                 type="password"
                 autoComplete="current-password"
                 required
-                defaultValue={state?.submittedData?.password || ""}
               />
               {state?.errors && "password" in state.errors && (
                 <p className="text-xs text-red-500">{state.errors.password}</p>

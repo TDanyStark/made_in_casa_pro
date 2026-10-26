@@ -19,7 +19,6 @@ export type FormState =
       message?: string
       submittedData?: {
         email?: string
-        password?: string
       }
     }
   | undefined

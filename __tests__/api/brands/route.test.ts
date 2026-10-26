@@ -1,0 +1,75 @@
+/**
+ * @jest-environment node
+ */
+
+jest.mock("@/lib/services/api-auth", () => ({
+  validateHttpMethod: jest.fn(),
+  validateApiRole: jest.fn(),
+}));
+
+jest.mock("@/lib/queries/brands", () => ({
+  createBrand: jest.fn(),
+  getBrandById: jest.fn(),
+  getBrandsWithPagination: jest.fn(),
+}));
+
+jest.mock("@/lib/queries/managers", () => ({ getManagerById: jest.fn() }));
+
+import { NextRequest } from "next/server";
+import { GET } from "@/api/brands/route";
+import { validateApiRole, validateHttpMethod } from "@/lib/services/api-auth";
+import * as queries from "@/lib/queries/brands";
+import { ITEMS_PER_PAGE } from "@/config/constants";
+
+const mockList = queries.getBrandsWithPagination as jest.Mock;
+const rows = [{ id: 1 }, { id: 2 }, { id: 3 }];
+
+function req(query: string) {
+  return new NextRequest(`http://localhost/api/brands${query ? `?${query}` : ""}`);
+}
+
+describe("GET /api/brands — pagination (S25)", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    (validateHttpMethod as jest.Mock).mockReturnValue({ isValidMethod: true, response: undefined });
+    (validateApiRole as jest.Mock).mockResolvedValue({ isAuthorized: true, userRole: 1, response: undefined });
+    mockList.mockResolvedValue({ brands: rows, total: 3 });
+  });
+
+  it.each(["page=0", "page=abc", "limit=0", "limit=abc", "limit=501"])(
+    "returns 400 { error } for %s without querying the DB",
+    async (bad) => {
+      const res = await GET(req("" + bad));
+      expect(res!.status).toBe(400);
+      expect(await res!.json()).toEqual({ error: "Parámetros de paginación inválidos" });
+      for (const fn of Object.values(queries).filter(jest.isMockFunction)) expect(fn).not.toHaveBeenCalled();
+    }
+  );
+
+  it("keeps the previous default page/limit behaviour", async () => {
+    const res = await GET(req(""));
+    expect(res!.status).toBe(200);
+    expect(await res!.json()).toEqual({
+      data: rows,
+      pageCount: Math.ceil(3 / ITEMS_PER_PAGE),
+      currentPage: 1,
+      total: 3,
+    });
+    expect(mockList).toHaveBeenCalledWith({ managerId: undefined, clientId: undefined, page: 1, limit: ITEMS_PER_PAGE, search: undefined });
+  });
+
+  it("keeps accepting limit=500 used by the my-tasks brand filter", async () => {
+    const res = await GET(req("limit=500"));
+    expect(res!.status).toBe(200);
+    expect(await res!.json()).toEqual({ data: rows, pageCount: 1, currentPage: 1, total: 3 });
+    expect(mockList).toHaveBeenCalledWith(expect.objectContaining({ page: 1, limit: 500 }));
+  });
+
+  it("id lookups ignore page/limit as before", async () => {
+    (queries.getBrandById as jest.Mock).mockResolvedValue({ id: 5 });
+    const res = await GET(req("id=5&page=0"));
+    expect(res!.status).toBe(200);
+    expect(await res!.json()).toEqual({ id: 5 });
+    expect(mockList).not.toHaveBeenCalled();
+  });
+});

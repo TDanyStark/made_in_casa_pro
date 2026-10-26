@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import CreatableSelect from "react-select/creatable";
-import { debounce } from "lodash";
+import { useDebouncedSearch } from "@/hooks/useDebouncedSearch";
 import { useGetEndpointQueryClient } from "@/hooks/useGetEndpointQueryClient";
 import { useStableSelectOptions } from "@/hooks/useStableSelectOptions";
 import {
@@ -67,7 +67,7 @@ export function BusinessUnitBrandSelect(props: BusinessUnitBrandSelectProps) {
     standalone = false
   } = props;
 
-  const [searchTerm, setSearchTerm] = useState("");
+  const { searchTerm, handleInputChange } = useDebouncedSearch();
   const [isCreatingBusinessUnit, setIsCreatingBusinessUnit] = useState(false);
   const [selectedValue, setSelectedValue] = useState<number | undefined>(props.standalone && props.value ? props.value : undefined);
   const queryClient = useQueryClient();
@@ -90,16 +90,6 @@ export function BusinessUnitBrandSelect(props: BusinessUnitBrandSelectProps) {
 
   const { options: businessUnitOptions, pinOption } =
     useStableSelectOptions<BusinessUnitOption>(fetchedOptions);
-
-  const debouncedSearch = debounce((value: string) => {
-    setSearchTerm(value);
-  }, 500);
-
-  const handleInputChange = (inputValue: string) => {
-    if (inputValue.trim()) {
-      debouncedSearch(inputValue);
-    }
-  };
 
   // Handle selecting an existing business unit for a brand
   const handleSelectBusinessUnit = async (businessUnitId: number) => {

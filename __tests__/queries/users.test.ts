@@ -9,10 +9,12 @@ import { db } from '@/lib/db';
 import {
   getUsers,
   getUserById,
+  findUserById,
   getUserByEmail,
   createUser,
   deleteUser,
   updateUser,
+  UserEmailTakenError,
 } from '@/lib/queries/users';
 import { ColaboradorType } from '@/lib/definitions';
 
@@ -197,5 +199,62 @@ describe('updateUser()', () => {
       .mockResolvedValueOnce(makeResult([updatedRow]));
     const result = await updateUser('1', { name: 'New Name' });
     expect(result).toEqual(updatedRow);
+  });
+
+  // S32: a unique violation on users.email is reported as a duplicate email.
+  it('throws UserEmailTakenError when PostgreSQL rejects the email as duplicated (23505)', async () => {
+    const pgError = Object.assign(new Error('duplicate key value violates unique constraint "uq_users_email"'), {
+      code: '23505',
+      constraint: 'uq_users_email',
+    });
+    mockExecute.mockRejectedValueOnce(pgError);
+
+    const promise = updateUser('1', { email: 'taken@test.com' });
+
+    await expect(promise).rejects.toBeInstanceOf(UserEmailTakenError);
+    // PATCH /api/users/[id] recognizes it by name.
+    await expect(promise).rejects.toMatchObject({ name: 'UserEmailTakenError' });
+    await expect(promise).rejects.toThrow('El correo electrónico ya está en uso');
+    expect(mockExecute).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps the generic message for other database errors (previous behavior)', async () => {
+    mockExecute.mockRejectedValueOnce(Object.assign(new Error('connection lost'), { code: '08006' }));
+
+    await expect(updateUser('1', { email: 'x@test.com' })).rejects.toThrow('No se pudo actualizar el usuario');
+  });
+});
+
+// S4/S8 support: getUserByEmail exposes is_active; findUserById returns null when missing.
+describe('getUserByEmail() is_active', () => {
+  it('maps is_active to a boolean', async () => {
+    mockExecute.mockResolvedValueOnce(makeResult([
+      { id: 1, name: 'Ana', email: 'ana@test.com', password: 'hash', rol_id: 1, is_active: 0 },
+    ]));
+    const [user] = await getUserByEmail('ana@test.com');
+    expect(user.is_active).toBe(false);
+  });
+});
+
+describe('findUserById()', () => {
+  it('returns null when the user does not exist', async () => {
+    mockExecute.mockResolvedValueOnce(makeResult([]));
+    await expect(findUserById(999)).resolves.toBeNull();
+  });
+
+  it('returns the mapped user when it exists', async () => {
+    mockExecute.mockResolvedValueOnce(makeResult([{
+      id: 1, name: 'Juan', email: 'juan@test.com', password: 'hash',
+      rol_id: 4, area_id: null, is_internal: 1, is_active: 1,
+      monthly_salary: null, must_change_password: 0, last_login: null, created_at: null,
+    }]));
+    const user = await findUserById(1);
+    expect(user?.email).toBe('juan@test.com');
+    expect(user?.is_active).toBe(true);
+  });
+
+  it('throws a generic error when the query fails', async () => {
+    mockExecute.mockRejectedValueOnce(new Error('DB error'));
+    await expect(findUserById(1)).rejects.toThrow('No se pudo obtener el usuario');
   });
 });

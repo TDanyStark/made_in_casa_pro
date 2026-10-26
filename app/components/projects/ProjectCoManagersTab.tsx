@@ -49,13 +49,14 @@ export function ProjectCoManagersTab({ projectId, clientId, mainManagerId, coMan
 
   // `limit` ahora sí lo respeta el endpoint, y `client_id` evita ofrecer
   // gerentes de otro laboratorio como co-responsables.
-  const { data: allManagers = [], isLoading } = useQuery({
+  const { data: allManagers = [], isLoading, isError } = useQuery({
     queryKey: ["managers-all", clientId],
     queryFn: async () => {
       const res = await get<ApiResponseWithPagination<ManagerType[]>>(
         `managers?limit=200&client_id=${clientId}`
       );
-      if (!res.ok || !res.data) return [];
+      if (!res.ok) throw new Error(res.error);
+      if (!res.data) return [];
       return ((res.data as unknown as { data: ManagerType[] }).data ?? [])
         .filter((m) => m.id !== mainManagerId && !coManagers.find((cm) => cm.id === m.id!))
         .map((m): ManagerOption => ({ value: m.id!, label: m.name, email: m.email }));
@@ -104,6 +105,7 @@ export function ProjectCoManagersTab({ projectId, clientId, mainManagerId, coMan
               onChange={(opt) => setSelectedOption(opt as ManagerOption | null)}
               isLoading={isLoading}
               placeholder="Buscar gerente para agregar..."
+              noOptionsMessage={() => (isError ? "Error al cargar los gerentes" : "No options")}
               formatOptionLabel={(opt: ManagerOption) => (
                 <div>
                   <p className="text-sm font-medium">{opt.label}</p>

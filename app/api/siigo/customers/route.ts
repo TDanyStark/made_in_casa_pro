@@ -1,14 +1,35 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSiigoCustomers, searchSiigoCustomersByName, searchSiigoCustomerByIdentification } from '@/lib/queries/siigo-customers';
+import { validateApiRole, validateHttpMethod } from '@/lib/services/api-auth';
+import { OPERATIONS_ROLES } from '@/lib/role-groups';
+import { parsePagination } from '@/lib/utils/pagination';
+
+/** Siigo API default and maximum `page_size`. */
+const SIIGO_DEFAULT_PAGE_SIZE = 25;
+const SIIGO_MAX_PAGE_SIZE = 100;
 
 /**
  * GET /api/siigo/customers
  * Endpoint para obtener clientes de Siigo con filtros opcionales
  */
 export async function GET(request: NextRequest) {
+  const methodValidation = validateHttpMethod(request, ['GET']);
+  if (!methodValidation.isValidMethod) return methodValidation.response;
+
+  const roleValidation = await validateApiRole(request, OPERATIONS_ROLES);
+  if (!roleValidation.isAuthorized) return roleValidation.response;
+
   const searchParams = request.nextUrl.searchParams;
-  const page = parseInt(searchParams.get('page') || '1');
-  const pageSize = parseInt(searchParams.get('pageSize') || '25');
+  // parsePagination validates `page`/`limit`; this endpoint names the size `pageSize`.
+  const pagination = parsePagination(
+    new URLSearchParams({
+      page: searchParams.get('page') ?? '',
+      limit: searchParams.get('pageSize') || String(SIIGO_DEFAULT_PAGE_SIZE),
+    }),
+    { maxLimit: SIIGO_MAX_PAGE_SIZE }
+  );
+  if (!pagination.success) return pagination.response;
+  const { page, limit: pageSize } = pagination;
   const term = searchParams.get('term') || '';
   
   try {

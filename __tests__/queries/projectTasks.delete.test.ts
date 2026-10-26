@@ -229,11 +229,12 @@ describe('deleteProjectTask()', () => {
 
     await deleteProjectTask(1);
 
-    // The SELECT for remaining tasks must filter by adjustment_id = 7
+    // The SELECT for remaining tasks must filter by adjustment_id = 7 (as a parameter)
     expect(mockTransaction.execute).toHaveBeenNthCalledWith(
       2,
       expect.objectContaining({
-        sql: expect.stringContaining('adjustment_id = 7'),
+        sql: expect.stringContaining('adjustment_id = $2'),
+        args: [1, 7],
       })
     );
 

@@ -25,9 +25,11 @@ jest.mock('next/headers', () => ({
 }));
 
 import { NextRequest } from 'next/server';
-import { POST } from '@/api/projects/route';
+import { GET, POST } from '@/api/projects/route';
+import { ITEMS_PER_PAGE } from '@/config/constants';
+import { UserRole } from '@/lib/definitions';
 import { validateApiRole, validateHttpMethod } from '@/lib/services/api-auth';
-import { createProject } from '@/lib/queries/projects';
+import { createProject, getProjectsWithPagination } from '@/lib/queries/projects';
 import { decrypt } from '@/lib/session';
 import { cookies } from 'next/headers';
 import { syncProjectDriveAccess } from '@/lib/services/projectDriveAccess';
@@ -156,5 +158,61 @@ describe('POST /api/projects', () => {
       id: 9,
       driveWarning: { code: 'DRIVE_ACCESS_SYNC_FAILED' },
     });
+  });
+});
+
+async function callGet(req: NextRequest) {
+  const response = await GET(req);
+  if (!response) throw new Error('GET handler returned undefined');
+  return response;
+}
+
+describe('GET /api/projects', () => {
+  const mockGetProjects = getProjectsWithPagination as jest.MockedFunction<typeof getProjectsWithPagination>;
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockValidateHttpMethod.mockReturnValue({ isValidMethod: true, response: undefined });
+    mockValidateApiRole.mockResolvedValue({
+      isAuthorized: true,
+      userRole: 1 as never,
+      response: undefined,
+    } as never);
+    mockCookies.mockResolvedValue({
+      get: jest.fn().mockReturnValue({ value: 'fake-cookie' }),
+    } as never);
+    mockDecrypt.mockResolvedValue({ id: 77, rol_id: 1 } as never);
+    mockGetProjects.mockResolvedValue({ projects: [], total: 0 } as never);
+  });
+
+  it.each(['page=0', 'page=abc', 'limit=0', 'limit=abc', 'limit=101'])(
+    'rejects invalid pagination %s with 400 and does not query',
+    async (qs) => {
+      const res = await callGet(new NextRequest(`http://localhost/api/projects?${qs}`));
+      expect(res.status).toBe(400);
+      expect(await res.json()).toEqual({ error: 'Parámetros de paginación inválidos' });
+      expect(mockGetProjects).not.toHaveBeenCalled();
+    }
+  );
+
+  it('keeps the default paginated response', async () => {
+    mockGetProjects.mockResolvedValue({ projects: [{ id: 1 }], total: 1 } as never);
+    const res = await callGet(new NextRequest('http://localhost/api/projects'));
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ data: [{ id: 1 }], pageCount: 1, currentPage: 1, total: 1 });
+    expect(mockGetProjects).toHaveBeenCalledWith(
+      expect.objectContaining({ page: 1, limit: ITEMS_PER_PAGE, assignedUserId: undefined, createdById: undefined })
+    );
+  });
+
+  it('scopes visibility by the database role, not the JWT role', async () => {
+    mockValidateApiRole.mockResolvedValue({
+      isAuthorized: true,
+      userRole: UserRole.COLABORADOR,
+      response: undefined,
+    } as never);
+    mockDecrypt.mockResolvedValue({ id: 77, rol_id: UserRole.ADMIN } as never);
+    await callGet(new NextRequest('http://localhost/api/projects'));
+    expect(mockGetProjects).toHaveBeenCalledWith(expect.objectContaining({ assignedUserId: 77 }));
   });
 });

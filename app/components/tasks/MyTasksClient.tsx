@@ -291,11 +291,12 @@ export function MyTasksClient() {
   });
 
   // Brands for filter dropdown
-  const { data: brandsData } = useQuery({
+  const { data: brandsData, isError: brandsError } = useQuery({
     queryKey: ["brands-for-filter"],
     queryFn: async () => {
       const res = await get<ApiResponseWithPagination<BrandType[]>>("brands?limit=500");
-      if (!res.ok || !res.data) return [];
+      if (!res.ok) throw new Error(res.error);
+      if (!res.data) return [];
 
       const rows = (res.data as unknown as { data?: Array<BrandType & { brand_name?: string }> })
         .data;
@@ -309,11 +310,12 @@ export function MyTasksClient() {
   const brands = (brandsData || []).filter((brand) => brand.id && brand.name);
 
   // Creator users (roles con alcance operativo)
-  const { data: assignableUsers = [] } = useQuery({
+  const { data: assignableUsers = [], isError: usersError } = useQuery({
     queryKey: ["assignable-users"],
     queryFn: async () => {
       const res = await get<{ data: UserType[] }>("users/assignable");
-      return res.ok ? res.data?.data || [] : [];
+      if (!res.ok) throw new Error(res.error);
+      return res.data?.data || [];
     },
   });
   const creatorUsers = useMemo(
@@ -501,7 +503,8 @@ export function MyTasksClient() {
   const openValidate = async (task: MyTaskRowPaginated) => {
     try {
       const res = await get<MyTaskRowPaginated[]>(`projects/${task.project_id}/tasks`);
-      const allTasks = res.ok ? (res.data ?? []) : [];
+      if (!res.ok) throw new Error(res.error);
+      const allTasks = res.data ?? [];
       const siblings = allTasks
         .filter((t) => t.project_id === task.project_id)
         .sort((a, b) => a.order_index - b.order_index);
@@ -741,6 +744,11 @@ export function MyTasksClient() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Marca: todas</SelectItem>
+              {brandsError && (
+                <SelectItem value="brands-error" disabled>
+                  Error al cargar las marcas
+                </SelectItem>
+              )}
               {brands.map((brand) => (
                 <SelectItem key={brand.id} value={String(brand.id)}>
                   {brand.name}
@@ -765,6 +773,11 @@ export function MyTasksClient() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Creador: todos</SelectItem>
+              {usersError && (
+                <SelectItem value="users-error" disabled>
+                  Error al cargar los usuarios
+                </SelectItem>
+              )}
               {creatorUsers.map((user) => (
                 <SelectItem key={user.id} value={String(user.id)}>
                   {user.name}

@@ -69,7 +69,7 @@ describe('startTask()', () => {
     expect(result.success).toBe(true);
     expect(result.error).toBeUndefined();
     expect(calls()).toContainEqual(
-      expect.objectContaining({ sql: expect.stringContaining("status = 'in_progress'"), args: [10] })
+      expect.objectContaining({ sql: expect.stringContaining("SET status = $2"), args: [10, 'in_progress'] })
     );
     expect(mockTransaction.commit).toHaveBeenCalledTimes(1);
   });

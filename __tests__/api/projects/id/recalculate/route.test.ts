@@ -58,3 +58,30 @@ describe("POST /api/projects/[id]/recalculate", () => {
     expect(await res!.json()).toEqual({ error: "Error al recalcular progreso" });
   });
 });
+
+// S6: recalculation is restricted to PROJECT_EDIT_ROLES.
+describe("POST /api/projects/[id]/recalculate roles", () => {
+  it("validates POST and PROJECT_EDIT_ROLES", async () => {
+    mockRecalc.mockResolvedValue(10);
+    const { PROJECT_EDIT_ROLES } = jest.requireActual("@/lib/role-groups");
+
+    await callPost();
+
+    expect(validateHttpMethod).toHaveBeenCalledWith(expect.anything(), ["POST"]);
+    expect(validateApiRole).toHaveBeenCalledWith(expect.anything(), PROJECT_EDIT_ROLES);
+  });
+
+  it("returns the role response and does not recalculate for a collaborator", async () => {
+    const { NextResponse } = jest.requireActual("next/server");
+    (validateApiRole as jest.Mock).mockResolvedValue({
+      isAuthorized: false,
+      userRole: 4,
+      response: NextResponse.json({ error: "Acceso prohibido" }, { status: 403 }),
+    });
+
+    const res = await callPost();
+
+    expect(res!.status).toBe(403);
+    expect(mockRecalc).not.toHaveBeenCalled();
+  });
+});

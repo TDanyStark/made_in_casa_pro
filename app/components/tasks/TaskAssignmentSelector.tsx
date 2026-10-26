@@ -97,11 +97,12 @@ export function TaskAssignmentSelector({
   projectId,
 }: Props) {
   // For "auto" mode, only show areas that have at least one active internal collaborator
-  const { data: areasForAuto = [] } = useQuery<AreaType[]>({
+  const { data: areasForAuto = [], isError: areasError } = useQuery<AreaType[]>({
     queryKey: ["areas-with-active-internals"],
     queryFn: async () => {
       const res = await get<{ data: AreaType[] }>("areas?with_active_internals=1");
-      return res.ok ? ((res.data as unknown as { data: AreaType[] })?.data ?? []) : [];
+      if (!res.ok) throw new Error(res.error);
+      return (res.data as unknown as { data: AreaType[] })?.data ?? [];
     },
     staleTime: 1000 * 60 * 5,
   });
@@ -109,28 +110,30 @@ export function TaskAssignmentSelector({
   const areas = areasForAuto;
 
   // External collaborators (for "requires_quote" quoter selection)
-  const { data: externalUsers = [] } = useQuery<UserOption[]>({
+  const { data: externalUsers = [], isError: externalUsersError } = useQuery<UserOption[]>({
     queryKey: ["external-collaborators-for-quote"],
     queryFn: async () => {
       const res = await get<UserOption[]>(`collaborators?only_external=1`);
-      return res.ok ? (res.data ?? []) : [];
+      if (!res.ok) throw new Error(res.error);
+      return res.data ?? [];
     },
     enabled: requiresQuote,
     staleTime: 1000 * 60 * 5,
   });
 
   // All active users (for "specific" mode)
-  const { data: allUsers = [] } = useQuery<UserOption[]>({
+  const { data: allUsers = [], isError: allUsersError } = useQuery<UserOption[]>({
     queryKey: ["all-users-for-assignment"],
     queryFn: async () => {
       const res = await get<UserOption[]>(`collaborators?all_users=1`);
-      return res.ok ? (res.data ?? []) : [];
+      if (!res.ok) throw new Error(res.error);
+      return res.data ?? [];
     },
     enabled: assignMode === "specific",
     staleTime: 1000 * 60 * 2,
   });
 
-  const { data: previewUser, isLoading: isLoadingPreview } = useQuery<{ id: number; name: string } | null>({
+  const { data: previewUser, isLoading: isLoadingPreview, isError: isPreviewError } = useQuery<{ id: number; name: string } | null>({
     queryKey: ["least-loaded-preview", assignMode, areaId, projectId],
     queryFn: async () => {
       const params = new URLSearchParams();
@@ -143,7 +146,8 @@ export function TaskAssignmentSelector({
         return null;
       }
       const res = await get<{ data: { id: number; name: string } | null }>(`users/least-loaded?${params}`);
-      return res.ok ? ((res.data as unknown as { data: { id: number; name: string } | null })?.data ?? null) : null;
+      if (!res.ok) throw new Error(res.error);
+      return (res.data as unknown as { data: { id: number; name: string } | null })?.data ?? null;
     },
     enabled: (assignMode === "auto" && !!areaId) || (assignMode === "commercial" && !!projectId),
   });
@@ -230,6 +234,8 @@ export function TaskAssignmentSelector({
                     <div className="mt-2 flex items-center gap-1.5 text-xs text-primary font-medium bg-primary/10 px-2 py-1 rounded">
                       {isLoadingPreview ? (
                         <span className="flex items-center gap-1"><Zap className="h-3 w-3 animate-pulse" /> Resolviendo...</span>
+                      ) : isPreviewError ? (
+                        <span className="flex items-center gap-1 text-destructive"><X className="h-3 w-3" /> Error al resolver la asignación</span>
                       ) : previewUser ? (
                         <span className="flex items-center gap-1"><UserCheck className="h-3 w-3" /> Se asignará a: {previewUser.name}</span>
                       ) : (
@@ -261,6 +267,8 @@ export function TaskAssignmentSelector({
                     <div className="mt-2 flex items-center gap-1.5 text-xs text-primary font-medium bg-primary/10 px-2 py-1 rounded">
                       {isLoadingPreview ? (
                         <span className="flex items-center gap-1"><Zap className="h-3 w-3 animate-pulse" /> Buscando...</span>
+                      ) : isPreviewError ? (
+                        <span className="flex items-center gap-1 text-destructive"><X className="h-3 w-3" /> Error al resolver la asignación</span>
                       ) : previewUser ? (
                         <span className="flex items-center gap-1"><UserCheck className="h-3 w-3" /> Se asignará a: {previewUser.name}</span>
                       ) : (
@@ -320,6 +328,9 @@ export function TaskAssignmentSelector({
                   ))}
                 </SelectContent>
               </Select>
+              {areasError && (
+                <p className="text-xs text-destructive mt-1">Error al cargar las áreas</p>
+              )}
               {!areaId && (
                 <p className="text-xs text-muted-foreground mt-1">
                   Si no seleccionas área, la auto-asignación no podrá ejecutarse.
@@ -449,6 +460,9 @@ export function TaskAssignmentSelector({
               </Command>
             </PopoverContent>
           </Popover>
+          {allUsersError && (
+            <p className="text-xs text-destructive mt-1">Error al cargar las personas</p>
+          )}
         </div>
       )}
 
@@ -473,7 +487,11 @@ export function TaskAssignmentSelector({
             </div>
           )}
 
-          {externalUsers.length === 0 ? (
+          {externalUsersError ? (
+            <p className="text-xs text-destructive bg-muted/50 rounded-md px-3 py-2">
+              Error al cargar los colaboradores externos
+            </p>
+          ) : externalUsers.length === 0 ? (
             <p className="text-xs text-muted-foreground bg-muted/50 rounded-md px-3 py-2">
               No hay colaboradores externos activos en el sistema.
             </p>

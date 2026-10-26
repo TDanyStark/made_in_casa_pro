@@ -15,9 +15,11 @@ export function checkRoutePermission(
   currentPath: string, 
   userRole: UserRole
 ): boolean {
-  // Verificar si hay una coincidencia exacta
-  if (routePermissions[currentPath]?.includes(userRole)) {
-    return true;
+  // Una ruta estática exacta es autoritativa: si existe (p. ej. /projects/create),
+  // no se consultan los patrones dinámicos (p. ej. /projects/[id]).
+  const exactRoles = routePermissions[currentPath];
+  if (exactRoles) {
+    return exactRoles.includes(userRole);
   }
 
   // Verificar patrones de ruta dinámica (por ejemplo, clients/[id])

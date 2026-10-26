@@ -90,3 +90,28 @@ describe('reorderProjectTasks() activated ids', () => {
     await expect(reorderProjectTasks(1, [1, 2], 9)).resolves.toEqual([]);
   });
 });
+
+// S44 (2.3): the ordered list must contain every task of the version exactly once.
+describe('reorderProjectTasks() list completeness', () => {
+  const current = [
+    { id: 1, status: 'not_started', order_index: 0 },
+    { id: 2, status: 'waiting', order_index: 1 },
+    { id: 3, status: 'waiting', order_index: 2 },
+  ];
+
+  it.each([
+    ['a partial list', [3, 1]],
+    ['a repeated id', [3, 1, 1]],
+    ['an id from outside the version', [3, 2, 9]],
+  ])('rejects %s with a 400 rule error and writes nothing', async (_label, orderedIds) => {
+    mockExecute.mockResolvedValueOnce(makeResult(current));
+
+    await expect(reorderProjectTasks(15, orderedIds, 4)).rejects.toMatchObject({
+      name: 'TaskRuleError',
+      status: 400,
+      message: 'La lista debe incluir todas las tareas de la versión, una sola vez',
+    });
+    expect(db.transaction).not.toHaveBeenCalled();
+    expect(mockTransaction.execute).not.toHaveBeenCalled();
+  });
+});

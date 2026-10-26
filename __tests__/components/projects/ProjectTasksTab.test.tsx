@@ -2,11 +2,25 @@ import React from "react";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
+const mockQueryFns: Record<string, () => Promise<unknown>> = {};
+let mockTasksError = false;
+
 jest.mock("@tanstack/react-query", () => ({
   useQueryClient: () => ({
     invalidateQueries: jest.fn(),
   }),
-  useQuery: ({ queryKey }: { queryKey: unknown[] }) => {
+  useQuery: ({ queryKey, queryFn }: { queryKey: unknown[]; queryFn: () => Promise<unknown> }) => {
+    mockQueryFns[String(queryKey[0])] = queryFn;
+    if (String(queryKey[0]) === "project-tasks" && mockTasksError) {
+      return {
+        data: undefined,
+        isLoading: false,
+        isError: true,
+        isFetching: false,
+        refetch: jest.fn(),
+        dataUpdatedAt: 0,
+      };
+    }
     if (String(queryKey[0]) === "task-cost") {
       return {
         data: { cost: 15000, internal: true, minutes: 30, hourly_rate: 30000, source: "frozen_rate" },
@@ -218,6 +232,26 @@ describe("ProjectTasksTab — task cost in the eye dialog (S7)", () => {
     await openEye(role);
     expect(screen.getByText("Sin descripción")).toBeInTheDocument();
     expect(screen.queryByText("Costo de la tarea")).not.toBeInTheDocument();
+  });
+});
+
+describe("ProjectTasksTab — load errors (S28)", () => {
+  afterEach(() => {
+    mockTasksError = false;
+  });
+
+  it("the tasks query throws when the API fails instead of returning []", async () => {
+    const { get } = jest.requireMock("@/lib/services/apiService") as { get: jest.Mock };
+    get.mockResolvedValue({ ok: false, status: 403, error: "Sin acceso" });
+    render(<ProjectTasksTab projectId={7} productName="Producto" canEdit={false} currentUserRole={1} />);
+    await expect(mockQueryFns["project-tasks"]()).rejects.toThrow("Sin acceso");
+  });
+
+  it("shows an error state instead of 'No hay tareas aún.'", () => {
+    mockTasksError = true;
+    render(<ProjectTasksTab projectId={7} productName="Producto" canEdit={false} currentUserRole={1} />);
+    expect(screen.getByText("Error al cargar las tareas")).toBeInTheDocument();
+    expect(screen.queryByText("No hay tareas aún.")).not.toBeInTheDocument();
   });
 });
 

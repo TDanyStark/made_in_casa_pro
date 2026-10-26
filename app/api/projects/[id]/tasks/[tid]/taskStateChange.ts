@@ -7,6 +7,18 @@ import { AUTHENTICATED_ROLES, TASK_OVERRIDE_ROLES } from "@/lib/role-groups";
 
 type Params = { params: Promise<{ id: string; tid: string }> };
 
+/**
+ * Translates a TaskRuleError thrown by the task/quote queries into its HTTP
+ * response (`{ error }` with the rule's 400/404/409). Returns null for any other
+ * error. Matches by name so module mocks of the query layer keep working.
+ */
+export function taskRuleErrorResponse(error: unknown): NextResponse | null {
+  if (!(error instanceof Error) || error.name !== "TaskRuleError") return null;
+  const status = (error as Error & { status?: unknown }).status;
+  if (typeof status !== "number") return null;
+  return NextResponse.json({ error: error.message }, { status });
+}
+
 type StateChangeResult = { success: boolean; error?: string; pausedTaskIds?: number[] };
 
 interface StateChangeConfig {

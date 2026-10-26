@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import CreatableSelect from "react-select/creatable";
-import { debounce } from "lodash";
+import { useDebouncedSearch } from "@/hooks/useDebouncedSearch";
 import { post } from "@/lib/services/apiService";
 import { SkillType } from "@/lib/definitions";
 import { toast } from "sonner";
@@ -32,7 +32,7 @@ const SkillSelect = ({
   user_id,
   onSkillAdded,
 }: SkillSelectProps) => {
-  const [searchTerm, setSearchTerm] = useState("");
+  const { searchTerm, handleInputChange, resetSearch } = useDebouncedSearch();
   const [skillOptions, setSkillOptions] = useState<SkillOption[]>([]);
   const [isCreatingSkill, setIsCreatingSkill] = useState(false);
   const { data, isLoading: isLoadingSkills } =
@@ -45,15 +45,6 @@ const SkillSelect = ({
 
   const queryClient = useQueryClient();
 
-  const debouncedSearch = debounce((value: string) => {
-    setSearchTerm(value);
-  }, 500);
-
-  const handleInputChange = (inputValue: string) => {
-    if (inputValue.trim()) {
-      debouncedSearch(inputValue);
-    }
-  };
   useEffect(() => {
     if (skills && skills.length > 0) {
       const options = skills.map((skill: SkillType) => ({
@@ -100,7 +91,7 @@ const SkillSelect = ({
       toast.error("Error al crear la habilidad");
     } finally {
       // limpiar el campo de búsqueda
-      setSearchTerm("");
+      resetSearch();
       setIsCreatingSkill(false);
     }
   };
@@ -160,10 +151,6 @@ const SkillSelect = ({
     }
   };
 
-  const handleResetSearch = () => {
-    setSearchTerm("");
-  };
-
   return (
     <div className={className}>
       {label && (
@@ -179,7 +166,7 @@ const SkillSelect = ({
         }
         onInputChange={handleInputChange}
         onCreateOption={handleCreateSkill}
-        onBlur={handleResetSearch}
+        onBlur={resetSearch}
         formatCreateLabel={(inputValue) => `Crear habilidad "${inputValue}"`}
         isDisabled={disabled}
         classNamePrefix="react-select"

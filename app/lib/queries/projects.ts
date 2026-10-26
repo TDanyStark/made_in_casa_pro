@@ -75,14 +75,16 @@ export async function getProjectById(id: number): Promise<ProjectType | null> {
 
 /**
  * Determina si un usuario puede acceder a un proyecto específico según su rol.
- *   - Colaborador: solo si tiene al menos una tarea asignada en el proyecto.
+ *   - Colaborador: solo si tiene al menos una tarea asignada en el proyecto
+ *     (o, con `includeQuoteInvitations`, si fue invitado a cotizar una tarea del proyecto).
  *   - Comercial: solo si es el creador del proyecto.
  *   - Otros roles (admin, directivo, financiero): acceso total.
  */
 export async function userCanAccessProject(
   projectId: number,
   userId: number,
-  roleId: number
+  roleId: number,
+  options?: { includeQuoteInvitations?: boolean }
 ): Promise<boolean> {
   // Admin, Directivo y Financiero ven todo
   if (
@@ -103,10 +105,16 @@ export async function userCanAccessProject(
     }
 
     if (roleId === UserRole.COLABORADOR) {
-      const result = await db.execute({
-        sql: `SELECT 1 FROM project_tasks WHERE project_id = $1 AND assigned_user_id = $2 LIMIT 1`,
-        args: [projectId, userId],
-      });
+      const sql = options?.includeQuoteInvitations
+        ? `SELECT 1 WHERE EXISTS (
+             SELECT 1 FROM project_tasks WHERE project_id = $1 AND assigned_user_id = $2
+           ) OR EXISTS (
+             SELECT 1 FROM task_quote_invitations tqi
+             JOIN project_tasks pt ON pt.id = tqi.task_id
+             WHERE pt.project_id = $1 AND tqi.user_id = $2
+           )`
+        : `SELECT 1 FROM project_tasks WHERE project_id = $1 AND assigned_user_id = $2 LIMIT 1`;
+      const result = await db.execute({ sql, args: [projectId, userId] });
       return result.rows.length > 0;
     }
 
@@ -382,40 +390,49 @@ export async function createProject(data: {
     const clientId = await getBrandClientId(data.brand_id);
     await assertManagerBelongsToClient(data.manager_id, clientId);
 
-    const result = await db.execute({
-      sql: `
-        INSERT INTO projects
-          (title, brand_id, manager_id, client_id, product_id, campaign_id, drive_folder_id, drive_folder_url, notes, ideal_delivery_at, oc, billing_closed_at, status, created_by)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
-        RETURNING id
-      `,
-      args: [
-        data.title,
-        data.brand_id,
-        data.manager_id,
-        clientId,
-        data.product_id ?? null,
-        data.campaign_id ?? null,
-        data.drive_folder_id ?? null,
-        data.drive_folder_url ?? null,
-        data.notes ?? null,
-        data.ideal_delivery_at ?? null,
-        data.oc ?? null,
-        data.billing_closed_at ?? null,
-        data.status ?? "active",
-        data.created_by ?? null,
-      ],
-    });
-    const id = Number(result.rows[0]?.id);
+    // The project and its V1 version are created together or not at all.
+    let id: number;
+    const transaction = await db.transaction("write");
+    try {
+      const result = await transaction.execute({
+        sql: `
+          INSERT INTO projects
+            (title, brand_id, manager_id, client_id, product_id, campaign_id, drive_folder_id, drive_folder_url, notes, ideal_delivery_at, oc, billing_closed_at, status, created_by)
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+          RETURNING id
+        `,
+        args: [
+          data.title,
+          data.brand_id,
+          data.manager_id,
+          clientId,
+          data.product_id ?? null,
+          data.campaign_id ?? null,
+          data.drive_folder_id ?? null,
+          data.drive_folder_url ?? null,
+          data.notes ?? null,
+          data.ideal_delivery_at ?? null,
+          data.oc ?? null,
+          data.billing_closed_at ?? null,
+          data.status ?? "active",
+          data.created_by ?? null,
+        ],
+      });
+      id = Number(result.rows[0]?.id);
 
-    // Initialize V1 adjustment record
-    await db.execute({
-      sql: `
-        INSERT INTO project_adjustments (project_id, version_number, status, drive_folder_id, drive_folder_url)
-        VALUES ($1, 1, 'active', $2, $3)
-      `,
-      args: [id, data.drive_folder_id ?? null, data.drive_folder_url ?? null],
-    });
+      // Initialize V1 adjustment record
+      await transaction.execute({
+        sql: `
+          INSERT INTO project_adjustments (project_id, version_number, status, drive_folder_id, drive_folder_url)
+          VALUES ($1, 1, 'active', $2, $3)
+        `,
+        args: [id, data.drive_folder_id ?? null, data.drive_folder_url ?? null],
+      });
+      await transaction.commit();
+    } catch (error) {
+      await transaction.rollback();
+      throw error;
+    }
 
     revalidatePath("/projects");
     const created = await getProjectById(id);

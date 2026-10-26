@@ -7,7 +7,8 @@ import { TaskVersionError } from "@/lib/definitions";
 import { db } from "@/lib/db";
 import { cookies } from "next/headers";
 import { decrypt } from "@/lib/session";
-import { AUTHENTICATED_ROLES, OPERATIONS_ROLES } from "@/lib/role-groups";
+import { AUTHENTICATED_ROLES, hasAnyRole, OPERATIONS_ROLES } from "@/lib/role-groups";
+import { userCanAccessProject } from "@/lib/queries/projects";
 import {
   dispatchNotification,
   NOTIFICATION_EVENTS,
@@ -40,7 +41,20 @@ export async function GET(request: NextRequest, { params }: Params) {
   if (!roleValidation.isAuthorized) return roleValidation.response;
 
   const { id } = await params;
-  
+  const projectId = parseInt(id);
+
+  // Roles fuera de operaciones (colaborador) solo ven proyectos donde tienen acceso.
+  if (!hasAnyRole(roleValidation.userRole, OPERATIONS_ROLES)) {
+    const cookie = (await cookies()).get("session")?.value;
+    const session = cookie ? await decrypt(cookie) : null;
+    const allowed = session?.id
+      ? await userCanAccessProject(projectId, Number(session.id), roleValidation.userRole)
+      : false;
+    if (!allowed) {
+      return NextResponse.json({ error: "No tienes acceso a este proyecto" }, { status: 403 });
+    }
+  }
+
   const searchParams = request.nextUrl.searchParams;
   let adjustmentId: number | null | undefined = undefined;
   
@@ -53,7 +67,7 @@ export async function GET(request: NextRequest, { params }: Params) {
     }
   }
 
-  const tasks = await getTasksByProject(parseInt(id), adjustmentId);
+  const tasks = await getTasksByProject(projectId, adjustmentId);
   return NextResponse.json(tasks);
 }
 
@@ -84,98 +98,38 @@ export async function POST(request: NextRequest, { params }: Params) {
 
     await assertLatestTaskVersion(projectId, adjustmentId);
 
-    // 2. Get next order_index for this project and adjustment
-    const orderResult = await db.execute({
-      sql: `SELECT COALESCE(MAX(order_index), -1) + 1 AS next_order FROM project_tasks WHERE project_id = $1 AND adjustment_id = $2`,
-      args: [projectId, adjustmentId],
-    });
-    const nextOrder = Number((orderResult.rows[0] as unknown as { next_order: number }).next_order);
-    
-    // 3. Resolve assignment before creation
+    // 2. Resolve assignment before creation
     const resolvedAssignedUserId = await resolveProjectTaskAssignment(projectId, {
       assigned_user_id: validation.data.assigned_user_id,
       area_id: validation.data.area_id,
       assign_to_commercial: validation.data.assign_to_commercial,
     });
 
-    // 4. Determine initial status
-    // Use not_started when: it's the first task, or all existing tasks are done
-    // (no task in an active state is blocking the queue). Otherwise waiting.
-    // 'blocked' MUST count as active here: tasks are strictly sequential per
-    // project + adjustment_id, so a predecessor stuck on 'blocked' (e.g. an
-    // unresolved quote) still occupies the queue's turn — a new task must wait
-    // behind it, not jump ahead into 'not_started'.
-    let defaultStatus: "not_started" | "waiting" = "waiting";
-    if (nextOrder === 0) {
-      defaultStatus = "not_started";
-    } else {
-      const activeResult = await db.execute({
-        sql: `SELECT COUNT(*) AS cnt FROM project_tasks
-              WHERE project_id = $1 AND adjustment_id = $2
-                AND status IN ('not_started', 'in_progress', 'paused', 'waiting', 'blocked')`,
-        args: [projectId, adjustmentId],
-      });
-      const activeCount = Number((activeResult.rows[0] as unknown as { cnt: string }).cnt);
-      if (activeCount === 0) defaultStatus = "not_started";
-    }
+    const cookie = (await cookies()).get("session")?.value;
+    const session = cookie ? await decrypt(cookie) : null;
+    const currentUserId = session?.id ? Number(session.id) : null;
 
-    let initialStatus = validation.data.status ?? defaultStatus;
-    const isBlockedByQuote = (initialStatus === "not_started" || initialStatus === "in_progress") && 
-                             Number(validation.data.requires_quote) === 1 && 
-                             !resolvedAssignedUserId;
-    
-    if (isBlockedByQuote) {
-      initialStatus = "blocked";
-    }
-
+    // 3. Order, initial status, insert and quoter invitations run in one
+    // transaction (createProjectTask): a failed invitation creates nothing and
+    // sends no email.
     const task = await createProjectTask({
       project_id: projectId,
       title: validation.data.title,
       description: validation.data.description ?? null,
       area_id: validation.data.area_id ?? null,
       assigned_user_id: resolvedAssignedUserId,
-      status: initialStatus,
+      status: validation.data.status,
       task_type: validation.data.task_type ?? "execution",
       task_flag: validation.data.task_flag ?? "new",
       requires_quote: validation.data.requires_quote ?? 0,
       assign_to_commercial: validation.data.assign_to_commercial ?? 0,
-      order_index: nextOrder,
       adjustment_id: adjustmentId,
+      quoter_ids: validation.data.quoter_ids,
+      created_by: currentUserId,
     });
     const driveWarning = resolvedAssignedUserId
       ? await syncProjectDriveAccess(projectId)
       : null;
-
-    // 5. Handle quoter invitations and transition log
-    const cookie = (await cookies()).get("session")?.value;
-    const session = cookie ? await decrypt(cookie) : null;
-    const currentUserId = session?.id ? Number(session.id) : null;
-
-    if (validation.data.quoter_ids.length > 0 || isBlockedByQuote) {
-      const transaction = await db.transaction("write");
-      try {
-        if (validation.data.quoter_ids.length > 0) {
-          for (const quoterId of validation.data.quoter_ids) {
-            await transaction.execute({
-              sql: `INSERT INTO task_quote_invitations (task_id, user_id, invited_by) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING`,
-              args: [task.id, quoterId, currentUserId],
-            });
-          }
-        }
-
-        if (isBlockedByQuote && currentUserId) {
-          await transaction.execute({
-            sql: `INSERT INTO task_transitions (task_id, project_id, from_status, to_status, from_flag, to_flag, moved_by, notes)
-                  VALUES ($1, $2, NULL, $3, NULL, $4, $5, $6)`,
-            args: [task.id, projectId, "blocked", task.task_flag, currentUserId, "Requiere cotización de colaborador externo"],
-          });
-        }
-        await transaction.commit();
-      } catch (err) {
-        await transaction.rollback();
-        console.error("Error persisting invitations/transitions:", err);
-      }
-    }
 
     // notify=false (project wizard) also silences project.ready_to_close.
     await recalculateProgressAndNotify(projectId, currentUserId, { notify: notifyParam.notify });

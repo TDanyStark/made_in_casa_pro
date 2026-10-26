@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { validateApiRole, validateHttpMethod } from "@/lib/services/api-auth";
-import { getProjectById } from "@/lib/queries/projects";
+import { getProjectById, userCanAccessProject } from "@/lib/queries/projects";
 import {
   createProjectAdjustment,
   getAdjustmentsByProject,
@@ -14,7 +14,7 @@ import { getAdminAndLeadershipEmails } from "@/lib/queries/users";
 import { decrypt } from "@/lib/session";
 import { cookies } from "next/headers";
 import { db } from "@/lib/db";
-import { AUTHENTICATED_ROLES, OPERATIONS_ROLES } from "@/lib/role-groups";
+import { AUTHENTICATED_ROLES, hasAnyRole, OPERATIONS_ROLES } from "@/lib/role-groups";
 import {
   dispatchNotification,
   NOTIFICATION_EVENTS,
@@ -67,6 +67,22 @@ export async function GET(
     if (isNaN(projectId)) {
       return NextResponse.json({ error: "ID de proyecto inválido" }, { status: 400 });
     }
+
+    // Roles fuera de operaciones (colaborador) solo ven proyectos donde tienen acceso.
+    // Los invitados a cotizar también: la vista /my-quotes/projects/[id] lee esta lista.
+    if (!hasAnyRole(roleValidation.userRole, OPERATIONS_ROLES)) {
+      const cookie = (await cookies()).get("session")?.value;
+      const session = cookie ? await decrypt(cookie) : null;
+      const allowed = session?.id
+        ? await userCanAccessProject(projectId, Number(session.id), roleValidation.userRole, {
+            includeQuoteInvitations: true,
+          })
+        : false;
+      if (!allowed) {
+        return NextResponse.json({ error: "No tienes acceso a este proyecto" }, { status: 403 });
+      }
+    }
+
     const adjustments = await getAdjustmentsByProject(projectId);
     return NextResponse.json(adjustments);
   } catch (error) {

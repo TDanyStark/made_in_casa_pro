@@ -5,6 +5,7 @@ import { UserRole } from "@/lib/definitions";
 
 const mockReplace = jest.fn();
 const mockGet = jest.fn();
+const mockQueryFns: Record<string, () => Promise<unknown>> = {};
 
 jest.mock("lucide-react", () => new Proxy({}, {
   get: (_, iconName: string) => {
@@ -23,8 +24,9 @@ jest.mock("next/navigation", () => ({
 jest.mock("@tanstack/react-query", () => ({
   useQueryClient: () => ({ invalidateQueries: jest.fn() }),
   useMutation: () => ({ mutate: jest.fn(), isPending: false }),
-  useQuery: ({ queryKey }: { queryKey: unknown[] }) => {
+  useQuery: ({ queryKey, queryFn }: { queryKey: unknown[]; queryFn: () => Promise<unknown> }) => {
     const key = String(queryKey[0]);
+    mockQueryFns[key] = queryFn;
     if (key === "tasks-command-center") {
       return {
         data: {
@@ -261,4 +263,13 @@ describe("TasksCommandCenterClient", () => {
 
     expect(screen.getByTestId("deliverable-dialog")).toHaveAttribute("data-can-edit-cost", expected);
   });
+
+  it.each(["areas-with-internals", "assignable-users"])(
+    "%s query throws when the API fails instead of returning []",
+    async (key) => {
+      mockGet.mockResolvedValue({ ok: false, status: 500, error: "Error interno" });
+      render(<TasksCommandCenterClient userRole={1 as UserRole} />);
+      await expect(mockQueryFns[key]()).rejects.toThrow("Error interno");
+    }
+  );
 });

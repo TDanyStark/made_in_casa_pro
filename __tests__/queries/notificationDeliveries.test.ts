@@ -6,14 +6,13 @@ jest.mock('@/lib/db', () => ({
 
 import { db } from '@/lib/db';
 import {
-  createNotificationDelivery,
+  claimNotificationDelivery,
   markDeliverySent,
   markDeliveryFailed,
   markDeliverySkipped,
   getDeliveriesByEvent,
   getDeliveriesByUser,
   getDeliveriesByProject,
-  getDeliveryCountByEventAndRecipient,
   resetDeliveryForRetry,
   MAX_RETRY_COUNT,
 } from '@/lib/queries/notificationDeliveries';
@@ -34,36 +33,48 @@ beforeEach(() => {
   jest.clearAllMocks();
 });
 
-describe('createNotificationDelivery()', () => {
-  it('inserts delivery with pending status by default', async () => {
-    mockExecute.mockResolvedValueOnce(makeResult([{
-      id: 1, event_id: 10, recipient_user_id: 5, recipient_email: 'to@example.com',
-      sender_user_id: 3, provider: 'gmail', status: 'pending', error: null,
-      gmail_thread_id: null, message_id: null, sent_at: null, created_at: '2026-01-01',
-    }]));
-    const result = await createNotificationDelivery({
+describe('claimNotificationDelivery() — atomic idempotency (S23)', () => {
+  const row = {
+    id: 1, event_id: 10, recipient_user_id: 5, recipient_email: 'to@example.com',
+    sender_user_id: 3, provider: 'gmail', status: 'pending', error: null,
+    gmail_thread_id: null, message_id: null, sent_at: null, created_at: '2026-01-01',
+  };
+
+  it('inserts a pending delivery with ON CONFLICT (event_id, recipient_email) DO NOTHING', async () => {
+    mockExecute.mockResolvedValueOnce(makeResult([row]));
+    const result = await claimNotificationDelivery({
       event_id: 10,
       recipient_user_id: 5,
       recipient_email: 'to@example.com',
       sender_user_id: 3,
     });
-    expect(result.status).toBe('pending');
-    expect(mockExecute).toHaveBeenCalledWith(expect.objectContaining({
-      sql: expect.stringContaining('INSERT INTO notification_deliveries'),
-    }));
+    expect(result).toEqual(row);
+    expect(mockExecute).toHaveBeenCalledTimes(1);
+    const call = mockExecute.mock.calls[0][0] as unknown as { sql: string; args: unknown[] };
+    expect(call.sql).toContain('INSERT INTO notification_deliveries');
+    expect(call.sql).toMatch(/ON CONFLICT \(event_id, recipient_email\) DO NOTHING/);
+    expect(call.sql).toContain('RETURNING id');
+    expect(call.args).toEqual([10, 5, 'to@example.com', 3, 'gmail']);
+  });
+
+  it('returns null when the pair is already claimed (no row returned)', async () => {
+    mockExecute.mockResolvedValueOnce(makeResult([]));
+    const result = await claimNotificationDelivery({ event_id: 10, recipient_email: 'to@example.com' });
+    expect(result).toBeNull();
+  });
+
+  it('rethrows DB errors so the caller does not send', async () => {
+    mockExecute.mockRejectedValueOnce(new Error('DB down'));
+    await expect(
+      claimNotificationDelivery({ event_id: 10, recipient_email: 'to@example.com' })
+    ).rejects.toThrow('DB down');
   });
 
   it('defaults to gmail provider when not specified', async () => {
-    mockExecute.mockResolvedValueOnce(makeResult([{
-      id: 1, event_id: 10, recipient_user_id: null, recipient_email: 'to@example.com',
-      sender_user_id: null, provider: 'gmail', status: 'pending', error: null,
-      gmail_thread_id: null, message_id: null, sent_at: null, created_at: '2026-01-01',
-    }]));
-    const result = await createNotificationDelivery({
-      event_id: 10,
-      recipient_email: 'to@example.com',
-    });
-    expect(result.provider).toBe('gmail');
+    mockExecute.mockResolvedValueOnce(makeResult([row]));
+    await claimNotificationDelivery({ event_id: 10, recipient_email: 'to@example.com' });
+    const call = mockExecute.mock.calls[0][0] as unknown as { args: unknown[] };
+    expect(call.args).toEqual([10, null, 'to@example.com', null, 'gmail']);
   });
 });
 
@@ -188,38 +199,6 @@ describe('getDeliveriesByProject()', () => {
     mockExecute.mockRejectedValueOnce(new Error('DB error'));
     const result = await getDeliveriesByProject(15);
     expect(result).toEqual([]);
-  });
-});
-
-describe('getDeliveryCountByEventAndRecipient() — idempotency', () => {
-  it('returns count of non-skipped deliveries for the event+recipient pair', async () => {
-    mockExecute.mockResolvedValueOnce(makeResult([{ cnt: 1 }]));
-    const count = await getDeliveryCountByEventAndRecipient(10, 'to@example.com');
-    expect(count).toBe(1);
-    expect(mockExecute).toHaveBeenCalledWith(expect.objectContaining({
-      sql: expect.stringContaining("WHERE event_id = $1 AND recipient_email = $2"),
-      args: [10, 'to@example.com'],
-    }));
-  });
-
-  it('returns 0 when no deliveries exist', async () => {
-    mockExecute.mockResolvedValueOnce(makeResult([{ cnt: 0 }]));
-    const count = await getDeliveryCountByEventAndRecipient(99, 'nobody@test.com');
-    expect(count).toBe(0);
-  });
-
-  it('returns 0 on DB error (safe fallback)', async () => {
-    mockExecute.mockRejectedValueOnce(new Error('DB error'));
-    const count = await getDeliveryCountByEventAndRecipient(10, 'to@example.com');
-    expect(count).toBe(0);
-  });
-
-  it('excludes skipped deliveries from count', async () => {
-    mockExecute.mockResolvedValueOnce(makeResult([{ cnt: 0 }]));
-    await getDeliveryCountByEventAndRecipient(10, 'to@example.com');
-    expect(mockExecute).toHaveBeenCalledWith(expect.objectContaining({
-      sql: expect.stringContaining("status != 'skipped'"),
-    }));
   });
 });
 

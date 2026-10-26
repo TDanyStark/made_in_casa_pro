@@ -1,11 +1,20 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { getUserById, getUserByEmail, updateUser } from "@/lib/queries/users";
+import { findUserById, getUserByEmail, updateUser } from "@/lib/queries/users";
 import { revalidatePath } from "next/cache";
 import { validateApiRole, validateHttpMethod } from "@/lib/services/api-auth";
 import { ColaboradorType } from "@/lib/definitions";
 import bcrypt from "bcrypt";
 import { ADMIN_ONLY_ROLES } from "@/lib/role-groups";
+
+const USER_NOT_FOUND = "Usuario no encontrado";
+
+/** Nunca devolver el hash de la contraseña al cliente. */
+function withoutPassword<T extends { password?: unknown }>(user: T) {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const { password, ...rest } = user;
+  return rest;
+}
 
 // Schema para validar los datos de actualización de usuario
 const userUpdateSchema = z.object({
@@ -55,9 +64,10 @@ export async function PATCH(
       validationResult.data;
 
     // Comprobar si el usuario existe
-    const userResult = await getUserById(Number(id));
-    
-    const existingUser = userResult;
+    const existingUser = await findUserById(Number(id));
+    if (!existingUser) {
+      return NextResponse.json({ error: USER_NOT_FOUND }, { status: 404 });
+    }
 
     // Si se está actualizando el email, verificar que no esté en uso por otro usuario
     if (email && email !== existingUser.email) {
@@ -85,7 +95,7 @@ export async function PATCH(
       must_change_password === undefined &&
       monthly_salary === undefined
     ) {
-      return NextResponse.json(existingUser);
+      return NextResponse.json(withoutPassword(existingUser));
     }
 
     // Preparar los datos de actualización
@@ -108,11 +118,15 @@ export async function PATCH(
     revalidatePath(`/admin/users/${id}`);
     revalidatePath(`/admin/users`);
 
-    return NextResponse.json(updatedUser);
+    return NextResponse.json(withoutPassword(updatedUser));
   } catch (error) {
+    // The pre-check above can race with another update; the DB unique index decides.
+    if (error instanceof Error && error.name === "UserEmailTakenError") {
+      return NextResponse.json({ error: error.message }, { status: 409 });
+    }
     console.error("Error actualizando usuario:", error);
     return NextResponse.json(
-      { error: "Error al actualizar el usuario: " + error },
+      { error: "Error al actualizar el usuario" },
       { status: 500 }
     );
   }
@@ -139,17 +153,16 @@ export async function GET(
     const { id } = await params;
 
     // Obtener usuario por ID
-    const userResult = await getUserById(Number(id));
+    const user = await findUserById(Number(id));
+    if (!user) {
+      return NextResponse.json({ error: USER_NOT_FOUND }, { status: 404 });
+    }
 
-    // Eliminar el campo de contraseña antes de devolver el usuario
-    const user = userResult;
-    delete user.password;
-
-    return NextResponse.json(user);
+    return NextResponse.json(withoutPassword(user));
   } catch (error) {
     console.error("Error obteniendo usuario:", error);
     return NextResponse.json(
-      { error: "Error al obtener el usuario: " + error },
+      { error: "Error al obtener el usuario" },
       { status: 500 }
     );
   }

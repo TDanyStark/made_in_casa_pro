@@ -13,6 +13,8 @@ jest.mock("@/lib/services/api-session", () => ({
 
 jest.mock("@/lib/services/userGmailOAuth", () => ({
   generateUserGmailAuthUrl: jest.fn(),
+  GMAIL_OAUTH_STATE_COOKIE: "gmail_oauth_state",
+  GMAIL_OAUTH_CALLBACK_PATH: "/api/user-email/google/callback",
 }));
 
 import { NextRequest } from "next/server";
@@ -51,7 +53,21 @@ describe("GET /api/user-email/google", () => {
     expect(res.status).toBe(307);
     expect(res.headers.get("location")).toBe("https://accounts.google.com/o/oauth2/auth");
     expect(mockValidateApiRole).toHaveBeenCalledWith(req, AUTHENTICATED_ROLES);
-    expect(mockGenerateUserGmailAuthUrl).toHaveBeenCalledWith("http://localhost:3000");
+    expect(mockGenerateUserGmailAuthUrl).toHaveBeenCalledWith("http://localhost:3000", expect.any(String));
+  });
+
+  // S3: the Gmail OAuth flow carries a random state stored in a short-lived httpOnly cookie.
+  it("stores the OAuth state passed to Google in an httpOnly sameSite=lax cookie", async () => {
+    const res = await callGet(new NextRequest("http://localhost/api/user-email/google"));
+
+    const state = mockGenerateUserGmailAuthUrl.mock.calls[0][1] as string;
+    expect(state.length).toBeGreaterThanOrEqual(32);
+    const cookie = res.cookies.get("gmail_oauth_state");
+    expect(cookie?.value).toBe(state);
+    expect(cookie?.httpOnly).toBe(true);
+    expect(cookie?.sameSite).toBe("lax");
+    expect(cookie?.maxAge).toBeGreaterThan(0);
+    expect(cookie?.maxAge).toBeLessThanOrEqual(600);
   });
 
   it("returns unauthorized when there is no active session", async () => {

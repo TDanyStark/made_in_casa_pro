@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { SafeHtml } from "@/components/ui/safe-html";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
   Briefcase, 
@@ -24,6 +25,15 @@ import {
   FolderOpen
 } from "lucide-react";
 import Link from "next/link";
+
+// Mismo formato que el resto de la app (es-CO, hora de Bogotá).
+const formatQuoteDate = (iso: string) =>
+  new Date(iso).toLocaleDateString("es-CO", {
+    timeZone: "America/Bogota",
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  });
 
 interface MyQuotesData {
   quotes: TaskQuoteType[];
@@ -116,7 +126,7 @@ export function MyQuotesClient() {
                   <CardContent className="pt-4 space-y-4">
                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
                       <Calendar className="h-4 w-4" />
-                      Invitado el: {new Date(inv.invited_at).toLocaleDateString()}
+                      Invitado el: {formatQuoteDate(inv.invited_at)}
                     </div>
                     {inv.invited_by_name && (
                       <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -171,7 +181,7 @@ export function MyQuotesClient() {
                       </Badge>
                     </div>
                     <CardDescription>
-                      Propuesta enviada el {new Date(quote.created_at).toLocaleDateString()}
+                      Propuesta enviada el {formatQuoteDate(quote.created_at)}
                     </CardDescription>
                   </CardHeader>
                   <CardContent className="pt-4 space-y-3">
@@ -184,9 +194,9 @@ export function MyQuotesClient() {
                       Tiempo estimado: {formatDHM(quote.delivery_minutes)}
                     </div>
                     {quote.notes && (
-                      <div 
+                      <SafeHtml
                         className="text-sm text-muted-foreground italic border-t pt-2 line-clamp-2"
-                        dangerouslySetInnerHTML={{ __html: quote.notes }}
+                        html={quote.notes}
                       />
                     )}
                     {quote.status === "pending" && (

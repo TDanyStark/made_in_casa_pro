@@ -6,6 +6,7 @@ import { submitQuote } from "@/lib/queries/taskQuotes";
 import { decrypt } from "@/lib/session";
 import { cookies } from "next/headers";
 import { dispatchNotification, NOTIFICATION_EVENTS } from "@/lib/services/notificationEngine";
+import { taskRuleErrorResponse } from "../../taskStateChange";
 
 const bodySchema = QuoteSubmissionSchema;
 
@@ -58,6 +59,8 @@ export async function POST(request: NextRequest, { params }: Params) {
 
     return NextResponse.json(quote, { status: 201 });
   } catch (error) {
+    const ruleResponse = taskRuleErrorResponse(error);
+    if (ruleResponse) return ruleResponse;
     const message = error instanceof Error ? error.message : "Error al enviar cotización";
     console.error("Error submitting quote:", error);
     return NextResponse.json({ error: message }, { status: 500 });

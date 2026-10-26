@@ -4,7 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { useMemo, useState } from "react";
-import { debounce } from "lodash";
+import { useDebouncedSearch } from "@/hooks/useDebouncedSearch";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -53,12 +53,10 @@ export function ChangeManager({ brandId, managerId, clientId, onSuccess }: Props
 
   const [isCreatingManager, setIsCreatingManager] = useState(false);
   const [newManagerName, setNewManagerName] = useState("");
-  const [searchTerm, setSearchTerm] = useState("");
+  const { searchTerm, handleInputChange } = useDebouncedSearch();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { refresh } = useRouter();
   const queryClient = useQueryClient()
-
-
 
   // Query para gerentes usando React Query
   const { data, isLoading: isLoadingManagers } = useGetEndpointQueryClient<ManagerType>({
@@ -83,18 +81,6 @@ export function ChangeManager({ brandId, managerId, clientId, onSuccess }: Props
     () => createManagerOptionFormatter(),
     []
   );
-
-  // Implementar debounce para la búsqueda
-  const debouncedSearch = debounce((value: string) => {
-    setSearchTerm(value);
-  }, 500);
-
-  // Actualizar la búsqueda cuando cambia el texto
-  const handleInputChange = (inputValue: string) => {
-    if (inputValue.trim()) {
-      debouncedSearch(inputValue);
-    }
-  };
 
   const handleSubmit = form.handleSubmit(async (data) => {
     // si el manager_id es el mismo al actual no hacer la peticion

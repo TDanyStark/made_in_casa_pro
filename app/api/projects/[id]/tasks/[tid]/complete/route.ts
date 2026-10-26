@@ -11,6 +11,7 @@ import {
   NOTIFICATION_EVENTS,
   recalculateProgressAndNotify,
 } from "@/lib/services/notificationEngine";
+import { taskRuleErrorResponse } from "../taskStateChange";
 
 const bodySchema = z.object({
   notes: z.string().optional().nullable(),
@@ -132,6 +133,8 @@ export async function POST(request: NextRequest, { params }: Params) {
       blockedReason: result.blockedReason ?? null,
     });
   } catch (error) {
+    const ruleResponse = taskRuleErrorResponse(error);
+    if (ruleResponse) return ruleResponse;
     const message = error instanceof Error ? error.message : "Error al completar tarea";
     console.error("Error completing task:", error);
     return NextResponse.json({ error: message }, { status: 500 });
