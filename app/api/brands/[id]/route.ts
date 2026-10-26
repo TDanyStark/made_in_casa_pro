@@ -7,8 +7,32 @@ import { domainErrorResponse } from "@/lib/services/api-errors";
 import { OPERATIONS_ROLES } from "@/lib/role-groups";
 import { cookies } from "next/headers";
 import { decrypt } from "@/lib/session";
+import { syncProjectDriveAccess } from "@/lib/services/projectDriveAccess";
+import type { DriveSyncWarning } from "@/lib/definitions";
 
 // Schema for validating brand update data
+/**
+ * Re-sincroniza el acceso a Drive de los proyectos que cambiaron de gerente.
+ * Best effort: un fallo nunca bloquea el cambio de marca; se devuelve como aviso.
+ */
+async function syncReassignedProjectsDrive(
+  projectIds: number[]
+): Promise<DriveSyncWarning | null> {
+  let warning: DriveSyncWarning | null = null;
+  for (const projectId of projectIds) {
+    try {
+      warning = (await syncProjectDriveAccess(projectId)) ?? warning;
+    } catch {
+      console.warn("DRIVE_ACCESS_SYNC_FAILED", { projectId });
+      warning = {
+        code: "DRIVE_ACCESS_SYNC_FAILED",
+        message: "No se pudieron sincronizar todos los accesos de Google Drive.",
+      };
+    }
+  }
+  return warning;
+}
+
 const brandUpdateSchema = z.object({
   name: z.string().min(1).optional(),
   manager_id: z.coerce.number().int().positive().optional(),
@@ -94,16 +118,18 @@ export async function PATCH(
       return NextResponse.json(existingBrand);
     }
 
-    // El actor queda registrado en brand_manager_history si cambia el gerente
+    // El actor queda registrado en brand_manager_history y en el historial de
+    // cada proyecto que pasa al nuevo gerente
     const cookie = (await cookies()).get("session")?.value;
     const session = cookie ? await decrypt(cookie) : null;
 
     // Update brand using the model function
-    const updatedBrand = await updateBrand(
+    const { brand: updatedBrand, reassignedProjectIds } = await updateBrand(
       id,
       { name, manager_id, business_unit_id },
       session?.id ?? null
     );
+    const driveWarning = await syncReassignedProjectsDrive(reassignedProjectIds);
 
     // Revalidate paths
     revalidatePath(`/brands/${id}`);
@@ -112,7 +138,11 @@ export async function PATCH(
       revalidatePath(`/clients/${existingBrand.client_id}`);
     }
 
-    return NextResponse.json(updatedBrand);
+    return NextResponse.json({
+      ...updatedBrand,
+      reassigned_projects: reassignedProjectIds.length,
+      ...(driveWarning ? { driveWarning } : {}),
+    });
   } catch (error) {
     const domain = domainErrorResponse(error);
     if (domain) return domain;

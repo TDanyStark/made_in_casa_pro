@@ -64,14 +64,10 @@ export async function POST(request: NextRequest, { params }: Params) {
       shareEmails,
     });
 
-    const updated = await updateProject(
-      projectId,
-      {
-        drive_folder_id: result.projectFolderId,
-        drive_folder_url: result.projectFolderUrl,
-      },
-      session?.id ?? null
-    );
+    const updated = await updateProject(projectId, {
+      drive_folder_id: result.projectFolderId,
+      drive_folder_url: result.projectFolderUrl,
+    });
 
     if (!updated) {
       return NextResponse.json({ error: "Proyecto no encontrado" }, { status: 404 });

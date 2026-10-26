@@ -4,6 +4,7 @@ import { BrandManagerHistoryEntry, BrandType } from "../definitions";
 import { getManagerById } from "./managers";
 import { DomainError } from "../errors";
 import { ITEMS_PER_PAGE } from "@/config/constants";
+import { cascadeBrandManagerToProjects } from "./projects";
 
 export async function getBrandsByManagerId(managerId: string) {
   try {
@@ -157,6 +158,11 @@ export async function createBrand(brandData: Omit<BrandType, "id">) {
  * se derivaba del gerente, así que reasignar a un gerente de otro laboratorio
  * movía la marca de cliente en silencio.
  *
+ * Cambiar el gerente es la ÚNICA forma de cambiar el gerente de sus proyectos:
+ * en la misma transacción que el UPDATE y `brand_manager_history`, todos los
+ * proyectos cuya marca principal es esta pasan al nuevo gerente (con su fila en
+ * `project_manager_history`). Devuelve sus ids para re-sincronizar Drive.
+ *
  * @param changedBy id del usuario que ejecuta el cambio (auditoría)
  */
 export async function updateBrand(
@@ -164,7 +170,7 @@ export async function updateBrand(
   updateData: Partial<BrandType>,
   changedBy?: number | null,
   reason?: string | null
-) {
+): Promise<{ brand: BrandType | null; reassignedProjectIds: number[] }> {
   try {
     const { name, manager_id, business_unit_id } = updateData;
     const updates = [];
@@ -172,13 +178,15 @@ export async function updateBrand(
 
     // Si hay un cambio de manager, necesitamos el estado actual antes de actualizar
     let currentBrand = null;
+    let managerChanged = false;
     if (manager_id) {
       currentBrand = await getBrandById(id);
       if (!currentBrand) {
         throw new DomainError("BRAND_NOT_FOUND", "La marca no existe");
       }
 
-      if (currentBrand.manager_id !== manager_id) {
+      managerChanged = Number(currentBrand.manager_id) !== Number(manager_id);
+      if (managerChanged) {
         const newManager = await getManagerById(manager_id.toString());
         if (!newManager) {
           throw new DomainError(
@@ -225,12 +233,10 @@ export async function updateBrand(
           args,
         });
 
-        // Si hay cambio de manager, registrar en la tabla de historial
-        if (
-          manager_id &&
-          currentBrand &&
-          currentBrand.manager_id !== manager_id
-        ) {
+        // Si hay cambio de manager, registrar en la tabla de historial y pasar
+        // los proyectos de la marca al nuevo gerente
+        let reassignedProjectIds: number[] = [];
+        if (managerChanged && currentBrand) {
           await transaction.execute({
             sql: `INSERT INTO brand_manager_history
                     (brand_id, previous_manager_id, new_manager_id, changed_by, reason, changed_at)
@@ -243,6 +249,13 @@ export async function updateBrand(
               reason ?? null,
             ],
           });
+          reassignedProjectIds = await cascadeBrandManagerToProjects(
+            transaction,
+            id,
+            Number(manager_id),
+            changedBy,
+            reason
+          );
         }
 
         // Confirmar transacción
@@ -257,8 +270,11 @@ export async function updateBrand(
         if (currentBrand?.client_id) {
           revalidatePath(`/clients/${currentBrand.client_id}`);
         }
+        if (reassignedProjectIds.length > 0) {
+          revalidatePath("/projects");
+        }
 
-        return updatedBrand;
+        return { brand: updatedBrand, reassignedProjectIds };
       } catch (error) {
         // Deshacer transacción en caso de error
         await transaction.rollback();
@@ -267,7 +283,7 @@ export async function updateBrand(
     }
 
     // If no fields to update, just return the existing brand
-    return getBrandById(id);
+    return { brand: await getBrandById(id), reassignedProjectIds: [] };
   } catch (error) {
     console.error("Error updating brand:", error);
     throw error;

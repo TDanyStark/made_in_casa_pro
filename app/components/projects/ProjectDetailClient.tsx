@@ -132,14 +132,9 @@ export function ProjectDetailClient({ projectId, userRole, currentUserId }: Prop
         </TabsContent>
 
         <TabsContent value="info" className="mt-6 space-y-6">
-          <ProjectManagerCard
-            project={project}
-            canEdit={canEdit && project.status !== 'completed'}
-          />
-          <ProjectBrandsCard
-            project={project}
-            canEdit={canEdit && project.status !== 'completed'}
-          />
+          <ProjectManagerCard project={project} />
+          {/* Las marcas asociadas se pueden editar incluso con el proyecto completado */}
+          <ProjectBrandsCard project={project} canEdit={canEdit} />
           <ProjectInfoTab project={project} canEdit={canEdit && project.status !== 'completed'} />
         </TabsContent>
 

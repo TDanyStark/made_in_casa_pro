@@ -140,7 +140,7 @@ describe('project queries metadata fields', () => {
     // INSERT del proyecto y de su V1 en la misma transacción
     mockTransaction.execute.mockResolvedValueOnce(makeResult([{ id: 15 }]));
     mockExecute
-      .mockResolvedValueOnce(makeResult([{ client_id: 7 }])) // cliente de la marca
+      .mockResolvedValueOnce(makeResult([{ client_id: 7, manager_id: 3 }])) // marca: cliente y gerente
       .mockResolvedValueOnce(makeResult([{ client_id: 7 }])) // cliente del gerente
       .mockResolvedValueOnce(
         makeResult([
@@ -189,7 +189,7 @@ describe('project queries metadata fields', () => {
 
   it('createProject rejects a manager from a client other than the brand client', async () => {
     mockExecute
-      .mockResolvedValueOnce(makeResult([{ client_id: 7 }]))  // marca -> cliente 7
+      .mockResolvedValueOnce(makeResult([{ client_id: 7, manager_id: 3 }]))  // marca -> cliente 7
       .mockResolvedValueOnce(makeResult([{ client_id: 99 }])); // gerente -> cliente 99
 
     await expect(
@@ -318,136 +318,61 @@ describe('automatic completion of the latest version', () => {
   });
 });
 
-describe('reasignación de gerente del proyecto', () => {
-  /** Proyecto 9: gerente 3, cliente 7. */
+describe('gerente del proyecto: lo define su marca principal', () => {
+  // Spec: odd/tasks/brand-owned-project-manager.md — S3, S5
   const CURRENT_PROJECT = { id: 9, status: 'active', manager_id: 3, client_id: 7 };
 
-  it('actualiza manager_id y audita el cambio en la misma transacción', async () => {
+  it('S3: updateProject ya no reasigna el gerente aunque llegue manager_id', async () => {
     mockExecute
-      .mockResolvedValueOnce(makeResult([CURRENT_PROJECT]))   // getProjectById
-      .mockResolvedValueOnce(makeResult([{ client_id: 7 }]))  // gerente nuevo, mismo cliente
-      .mockResolvedValueOnce(makeResult([CURRENT_PROJECT]));  // getProjectById final
+      .mockResolvedValueOnce(makeResult([CURRENT_PROJECT]))  // getProjectById
+      .mockResolvedValueOnce(makeResult([]))                 // UPDATE
+      .mockResolvedValueOnce(makeResult([CURRENT_PROJECT])); // getProjectById final
 
-    await updateProject(9, { manager_id: 12 }, 77, 'Traslado de Monica');
+    await updateProject(9, { title: 'Nuevo título', manager_id: 12 } as never);
 
-    const sqls = mockTransaction.execute.mock.calls.map(
-      (call) => call[0] as { sql: string; args: unknown[] }
-    );
-    expect(sqls[0].sql).toContain('manager_id = $1');
-    expect(sqls[1].sql).toContain('INSERT INTO project_manager_history');
-    expect(sqls[1].args).toEqual([9, 3, 12, 77, 'Traslado de Monica']);
-    expect(mockTransaction.commit).toHaveBeenCalled();
-  });
-
-  // ── Invariante: reasignar el gerente NUNCA mueve el proyecto de cliente ────
-
-  it('rechaza un gerente de otro cliente sin tocar el proyecto', async () => {
-    mockExecute
-      .mockResolvedValueOnce(makeResult([CURRENT_PROJECT]))
-      .mockResolvedValueOnce(makeResult([{ client_id: 99 }]));
-
-    await expect(updateProject(9, { manager_id: 12 }))
-      .rejects.toMatchObject({ code: 'MANAGER_CLIENT_MISMATCH' });
     expect(db.transaction).not.toHaveBeenCalled();
+    const sqls = mockExecute.mock.calls.map((call) => call[0] as { sql: string; args: unknown[] });
+    expect(sqls).toHaveLength(3);
+    expect(sqls[1].sql).toBe('UPDATE projects SET title = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2');
+    expect(sqls[1].args).toEqual(['Nuevo título', 9]);
+    expect(sqls.some((call) => call.sql.includes('SELECT client_id FROM managers'))).toBe(false);
+    expect(sqls.some((call) => call.sql.includes('project_manager_history'))).toBe(false);
   });
 
-  it('no ejecuta ningún UPDATE cuando el gerente es de otro cliente', async () => {
-    mockExecute
-      .mockResolvedValueOnce(makeResult([CURRENT_PROJECT]))   // getProjectById
-      .mockResolvedValueOnce(makeResult([{ client_id: 99 }])); // gerente -> cliente 99
+  it('S5: createProject rechaza un gerente distinto al de la marca principal sin escribir', async () => {
+    mockExecute.mockResolvedValueOnce(makeResult([{ client_id: 7, manager_id: 4 }])); // marca
+
+    const promise = createProject({ title: 'Proyecto', brand_id: 2, manager_id: 3 });
+
+    await expect(promise).rejects.toMatchObject({
+      name: 'DomainError',
+      code: 'MANAGER_NOT_BRAND_MANAGER',
+      message: 'El gerente del proyecto debe ser el gerente de su marca principal',
+    });
+    expect(mockExecute).toHaveBeenCalledTimes(1);
+    expect(db.transaction).not.toHaveBeenCalled();
+    expect(mockTransaction.execute).not.toHaveBeenCalled();
+  });
+
+  it('S5: createProject rechaza el proyecto si la marca principal no tiene gerente', async () => {
+    mockExecute.mockResolvedValueOnce(makeResult([{ client_id: 7, manager_id: null }]));
 
     await expect(
-      updateProject(9, { manager_id: 12, title: 'Nuevo título' })
-    ).rejects.toMatchObject({ code: 'MANAGER_CLIENT_MISMATCH' });
-
-    // Solo las dos lecturas: la validación corta antes de construir el UPDATE,
-    // así que ni siquiera el `title` del mismo patch llega a escribirse.
-    expect(mockExecute).toHaveBeenCalledTimes(2);
-    const sqls = mockExecute.mock.calls.map((call) => (call[0] as { sql: string }).sql);
-    expect(sqls.some((sql) => sql.includes('UPDATE projects'))).toBe(false);
-    expect(mockTransaction.execute).not.toHaveBeenCalled();
-    expect(mockTransaction.commit).not.toHaveBeenCalled();
-  });
-
-  it('rechaza un gerente inexistente antes de escribir', async () => {
-    mockExecute
-      .mockResolvedValueOnce(makeResult([CURRENT_PROJECT]))
-      .mockResolvedValueOnce(makeResult([])); // el gerente no existe
-
-    await expect(updateProject(9, { manager_id: 404 }))
-      .rejects.toMatchObject({ code: 'MANAGER_NOT_FOUND' });
-    expect(mockExecute).toHaveBeenCalledTimes(2);
+      createProject({ title: 'Proyecto', brand_id: 2, manager_id: 3 })
+    ).rejects.toMatchObject({ code: 'MANAGER_NOT_BRAND_MANAGER' });
     expect(db.transaction).not.toHaveBeenCalled();
   });
 
-  it('un cambio válido escribe en project_manager_history y no toca client_id', async () => {
-    mockExecute
-      .mockResolvedValueOnce(makeResult([CURRENT_PROJECT]))   // getProjectById
-      .mockResolvedValueOnce(makeResult([{ client_id: 7 }]))  // gerente nuevo, mismo cliente
-      .mockResolvedValueOnce(makeResult([CURRENT_PROJECT]));  // getProjectById final
+  it('S5: lee el gerente de la marca principal junto a su cliente', async () => {
+    mockExecute.mockResolvedValueOnce(makeResult([{ client_id: 7, manager_id: 4 }]));
 
-    await updateProject(9, { manager_id: 12 }, 77, 'Reasignación');
+    await expect(
+      createProject({ title: 'Proyecto', brand_id: 2, manager_id: 3 })
+    ).rejects.toMatchObject({ code: 'MANAGER_NOT_BRAND_MANAGER' });
 
-    const calls = mockTransaction.execute.mock.calls.map(
-      (call) => call[0] as { sql: string; args: unknown[] }
-    );
-
-    const update = calls.find((call) => call.sql.includes('UPDATE projects'));
-    expect(update).toBeDefined();
-    expect(update!.sql).toContain('manager_id = $1');
-    // El cliente del proyecto es suyo: cambiar de responsable no lo reescribe.
-    expect(update!.sql).not.toContain('client_id');
-
-    const history = calls.find((call) =>
-      call.sql.includes('INSERT INTO project_manager_history')
-    );
-    expect(history).toBeDefined();
-    expect(history!.args).toEqual([9, 3, 12, 77, 'Reasignación']);
-
-    // La validación se hizo contra projects.client_id, no contra el gerente.
-    const managerCheck = mockExecute.mock.calls[1]?.[0] as { sql: string; args: unknown[] };
-    expect(managerCheck.sql).toContain('SELECT client_id FROM managers WHERE id = $1');
-    expect(managerCheck.args).toEqual([12]);
-    expect(mockTransaction.commit).toHaveBeenCalledTimes(1);
-  });
-
-  it('registra previous_manager_id null cuando el proyecto no tenía gerente', async () => {
-    mockExecute
-      .mockResolvedValueOnce(makeResult([{ ...CURRENT_PROJECT, manager_id: null }]))
-      .mockResolvedValueOnce(makeResult([{ client_id: 7 }]))
-      .mockResolvedValueOnce(makeResult([CURRENT_PROJECT]));
-
-    await updateProject(9, { manager_id: 12 });
-
-    const history = mockTransaction.execute.mock.calls
-      .map((call) => call[0] as { sql: string; args: unknown[] })
-      .find((call) => call.sql.includes('INSERT INTO project_manager_history'));
-    expect(history!.args).toEqual([9, null, 12, null, null]);
-  });
-
-  it('no abre transacción ni audita cuando el gerente es el mismo', async () => {
-    mockExecute
-      .mockResolvedValueOnce(makeResult([CURRENT_PROJECT]))
-      .mockResolvedValueOnce(makeResult([]))
-      .mockResolvedValueOnce(makeResult([CURRENT_PROJECT]));
-
-    await updateProject(9, { manager_id: 3, title: 'Nuevo título' });
-
-    expect(db.transaction).not.toHaveBeenCalled();
-    const updateSql = (mockExecute.mock.calls[1]?.[0] as { sql: string }).sql;
-    expect(updateSql).not.toContain('manager_id');
-  });
-
-  it('hace rollback si falla la auditoría', async () => {
-    mockExecute
-      .mockResolvedValueOnce(makeResult([CURRENT_PROJECT]))
-      .mockResolvedValueOnce(makeResult([{ client_id: 7 }]));
-    mockTransaction.execute
-      .mockResolvedValueOnce(makeResult([]))
-      .mockRejectedValueOnce(new Error('TX error'));
-
-    await expect(updateProject(9, { manager_id: 12 })).rejects.toThrow('TX error');
-    expect(mockTransaction.rollback).toHaveBeenCalled();
+    const lookup = mockExecute.mock.calls[0][0] as { sql: string; args: unknown[] };
+    expect(lookup.sql).toBe('SELECT client_id, manager_id FROM brands WHERE id = $1');
+    expect(lookup.args).toEqual([2]);
   });
 });
 

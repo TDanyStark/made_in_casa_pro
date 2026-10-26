@@ -10,6 +10,7 @@ import {
   UserRole,
 } from "../definitions";
 import { DomainError } from "../errors";
+import type { DbTransaction } from "../db/types";
 import { buildWhereClause, buildPaginationArgs, parseTotal } from "../db/query-helpers";
 import { ITEMS_PER_PAGE } from "@/config/constants";
 import {
@@ -335,21 +336,30 @@ export async function getProjectsWithPagination({
 
 // ─── Reglas de cliente / gerente ─────────────────────────────────────────────
 
-/** Devuelve el cliente dueño de una marca. Lanza si la marca no existe. */
-async function getBrandClientId(brandId: number): Promise<number> {
+/**
+ * Devuelve el cliente y el gerente de la marca principal de un proyecto.
+ * Lanza si la marca no existe.
+ */
+async function getPrincipalBrand(
+  brandId: number
+): Promise<{ clientId: number; managerId: number | null }> {
   const result = await db.execute({
-    sql: `SELECT client_id FROM brands WHERE id = $1`,
+    sql: `SELECT client_id, manager_id FROM brands WHERE id = $1`,
     args: [brandId],
   });
   if (result.rows.length === 0) {
     throw new DomainError("BRAND_NOT_FOUND", "La marca especificada no existe");
   }
-  return Number((result.rows[0] as { client_id: number }).client_id);
+  const row = result.rows[0] as { client_id: number; manager_id: number | null };
+  return {
+    clientId: Number(row.client_id),
+    managerId: row.manager_id === null ? null : Number(row.manager_id),
+  };
 }
 
 /**
  * Un proyecto solo puede tener como responsable a un gerente del MISMO cliente.
- * Es la regla que impide que reasignar el gerente mueva el proyecto de cliente.
+ * Es la regla que impide que el gerente mueva el proyecto de cliente.
  */
 async function assertManagerBelongsToClient(
   managerId: number,
@@ -396,9 +406,16 @@ export async function createProject(data: {
   created_by?: number | null;
 }): Promise<ProjectType> {
   try {
-    // El cliente del proyecto lo determina la MARCA, que es la fuente de verdad
-    // desde la migración 012. No se deriva del gerente.
-    const clientId = await getBrandClientId(data.brand_id);
+    // La marca principal es la fuente de verdad del cliente (migración 012) y
+    // del gerente: el proyecto nace con el gerente actual de su marca.
+    const brand = await getPrincipalBrand(data.brand_id);
+    const clientId = brand.clientId;
+    if (brand.managerId === null || Number(data.manager_id) !== brand.managerId) {
+      throw new DomainError(
+        "MANAGER_NOT_BRAND_MANAGER",
+        "El gerente del proyecto debe ser el gerente de su marca principal"
+      );
+    }
     await assertManagerBelongsToClient(data.manager_id, clientId);
     const additionalBrandIds = await validateAdditionalBrands(
       data.additional_brand_ids ?? [],
@@ -465,19 +482,14 @@ export async function createProject(data: {
 /**
  * Actualiza un proyecto.
  *
- * `manager_id` es actualizable desde la migración 014, con dos reglas:
- *   - el nuevo gerente debe pertenecer al mismo `projects.client_id`
- *     (si no, `DomainError("MANAGER_CLIENT_MISMATCH")`);
- *   - el cambio queda auditado en `project_manager_history` dentro de la misma
- *     transacción que el UPDATE.
- *
- * @param changedBy id del usuario que ejecuta el cambio (auditoría)
+ * `manager_id` NO es actualizable aquí: el gerente de un proyecto es siempre el
+ * de su marca principal y cambia solo al reasignar la marca (`updateBrand`, que
+ * llama a `cascadeBrandManagerToProjects`).
  */
 export async function updateProject(
   id: number,
   data: Partial<{
     title: string;
-    manager_id: number;
     product_id: number | null;
     campaign_id: number | null;
     drive_folder_id: string | null;
@@ -490,26 +502,18 @@ export async function updateProject(
     progress: number;
     /** Reemplaza el conjunto completo de marcas adicionales */
     additional_brand_ids: number[];
-  }>,
-  changedBy?: number | null,
-  reason?: string | null
+  }>
 ): Promise<ProjectType | null> {
   try {
     const currentProject = await getProjectById(id);
     if (!currentProject) return null;
-    if (currentProject.status === 'completed' && data.status !== 'in_adjustments' && data.status !== 'archived' && data.status !== 'active') {
+    // Las marcas asociadas son un vínculo informativo: se pueden editar aun
+    // con el proyecto completado, siempre que sea lo único que cambia.
+    const onlyAdditionalBrands = Object.entries(data).every(
+      ([key, value]) => key === "additional_brand_ids" || value === undefined
+    );
+    if (!onlyAdditionalBrands && currentProject.status === 'completed' && data.status !== 'in_adjustments' && data.status !== 'archived' && data.status !== 'active') {
        throw new Error("No se pueden editar proyectos completados");
-    }
-
-    const managerChanged =
-      data.manager_id !== undefined &&
-      Number(data.manager_id) !== Number(currentProject.manager_id);
-
-    if (managerChanged) {
-      await assertManagerBelongsToClient(
-        Number(data.manager_id),
-        Number(currentProject.client_id)
-      );
     }
 
     const additionalBrandIds =
@@ -526,7 +530,6 @@ export async function updateProject(
 
     const fields: Array<[string, unknown]> = [
       ["title", data.title],
-      ["manager_id", managerChanged ? data.manager_id : undefined],
       ["product_id", data.product_id],
       ["campaign_id", data.campaign_id],
       ["drive_folder_id", data.drive_folder_id],
@@ -556,28 +559,13 @@ export async function updateProject(
 
     const updateSql = `UPDATE projects SET ${updates.join(", ")} WHERE id = $${args.length}`;
 
-    if (managerChanged || additionalBrandIds !== undefined) {
-      // El UPDATE, la auditoría del gerente y el reemplazo de marcas adicionales
-      // van en la misma transacción: un proyecto no puede cambiar de
-      // responsable sin dejar rastro, ni quedar con marcas a medio aplicar.
+    if (additionalBrandIds !== undefined) {
+      // El UPDATE y el reemplazo de marcas adicionales van en la misma
+      // transacción: un proyecto no puede quedar con marcas a medio aplicar.
       const transaction = await db.transaction("write");
       try {
         await transaction.execute({ sql: updateSql, args });
-        if (additionalBrandIds !== undefined) {
-          await replaceProjectBrands(transaction, id, additionalBrandIds);
-        }
-        if (managerChanged) await transaction.execute({
-          sql: `INSERT INTO project_manager_history
-                  (project_id, previous_manager_id, new_manager_id, changed_by, reason)
-                VALUES ($1, $2, $3, $4, $5)`,
-          args: [
-            id,
-            currentProject.manager_id ?? null,
-            data.manager_id,
-            changedBy ?? null,
-            reason ?? null,
-          ],
-        });
+        await replaceProjectBrands(transaction, id, additionalBrandIds);
         await transaction.commit();
       } catch (error) {
         await transaction.rollback();
@@ -594,6 +582,71 @@ export async function updateProject(
     console.error("Error updating project:", error);
     throw error;
   }
+}
+
+/** Cambia el gerente de un proyecto y lo audita en `project_manager_history`. */
+export async function reassignProjectManager(
+  transaction: DbTransaction,
+  project: {
+    projectId: number;
+    previousManagerId: number | null;
+    newManagerId: number;
+  },
+  changedBy: number | null | undefined,
+  reason: string | null | undefined
+): Promise<void> {
+  await transaction.execute({
+    sql: `UPDATE projects SET manager_id = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2`,
+    args: [project.newManagerId, project.projectId],
+  });
+  await transaction.execute({
+    sql: `INSERT INTO project_manager_history
+            (project_id, previous_manager_id, new_manager_id, changed_by, reason)
+          VALUES ($1, $2, $3, $4, $5)`,
+    args: [
+      project.projectId,
+      project.previousManagerId,
+      project.newManagerId,
+      changedBy ?? null,
+      reason ?? null,
+    ],
+  });
+}
+
+/**
+ * El gerente de un proyecto es el de su marca principal: al cambiar el gerente
+ * de una marca, TODOS sus proyectos (cualquier estado) pasan al nuevo gerente,
+ * cada uno con su fila en `project_manager_history`. Corre dentro de la
+ * transacción del cambio de marca. Devuelve los ids de los proyectos movidos.
+ */
+export async function cascadeBrandManagerToProjects(
+  transaction: DbTransaction,
+  brandId: number | string,
+  newManagerId: number,
+  changedBy: number | null | undefined,
+  reason: string | null | undefined
+): Promise<number[]> {
+  const result = await transaction.execute({
+    sql: `SELECT id, manager_id FROM projects
+           WHERE brand_id = $1 AND manager_id IS DISTINCT FROM $2
+           ORDER BY id
+           FOR UPDATE`,
+    args: [brandId, newManagerId],
+  });
+  const rows = result.rows as unknown as Array<{ id: number; manager_id: number | null }>;
+  for (const row of rows) {
+    await reassignProjectManager(
+      transaction,
+      {
+        projectId: Number(row.id),
+        previousManagerId: row.manager_id === null ? null : Number(row.manager_id),
+        newManagerId: Number(newManagerId),
+      },
+      changedBy,
+      reason
+    );
+  }
+  return rows.map((row) => Number(row.id));
 }
 
 /**

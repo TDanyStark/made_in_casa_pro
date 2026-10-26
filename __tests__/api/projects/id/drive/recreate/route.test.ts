@@ -125,8 +125,7 @@ describe("POST /api/projects/[id]/drive/recreate", () => {
       {
         drive_folder_id: "folder-123",
         drive_folder_url: "https://drive.google.com/drive/folders/folder-123",
-      },
-      7
+      }
     );
   });
 
@@ -160,8 +159,7 @@ describe("POST /api/projects/[id]/drive/recreate", () => {
       {
         drive_folder_id: "existing-folder-456",
         drive_folder_url: "https://drive.google.com/drive/folders/existing-folder-456",
-      },
-      7
+      }
     );
   });
 

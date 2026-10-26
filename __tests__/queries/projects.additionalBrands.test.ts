@@ -74,7 +74,7 @@ describe("reads", () => {
 describe("createProject", () => {
   function primeCreate() {
     mockExecute
-      .mockResolvedValueOnce(rows([{ client_id: 7 }])) // principal brand client
+      .mockResolvedValueOnce(rows([{ client_id: 7, manager_id: 3 }])) // principal brand client + manager
       .mockResolvedValueOnce(rows([{ client_id: 7 }])); // manager client
   }
 
@@ -187,4 +187,27 @@ describe("updateProject", () => {
     const all = [...mockExecute.mock.calls, ...mockTransaction.execute.mock.calls].map(([q]) => (q as Query).sql);
     expect(all.some((s) => s.includes("project_brands") && !s.includes("AS additional_brands"))).toBe(false);
   });
+
+  it("a completed project accepts a change of additional brands only", async () => {
+    const completed = { ...current, status: "completed" };
+    mockExecute
+      .mockResolvedValueOnce(rows([completed]))
+      .mockResolvedValueOnce(rows([{ id: 5, client_id: 7 }]))
+      .mockResolvedValue(rows([completed]));
+
+    await updateProject(9, { additional_brand_ids: [5] });
+
+    expect(txSql().join("\n")).toContain("INSERT INTO project_brands");
+    expect(mockTransaction.commit).toHaveBeenCalledTimes(1);
+  });
+
+  it("a completed project still rejects other fields sent with the brands", async () => {
+    mockExecute.mockResolvedValueOnce(rows([{ ...current, status: "completed" }]));
+
+    await expect(updateProject(9, { title: "Nuevo", additional_brand_ids: [5] })).rejects.toThrow(
+      "No se pueden editar proyectos completados"
+    );
+    expect(db.transaction).not.toHaveBeenCalled();
+  });
 });
+

@@ -2,6 +2,7 @@
  * @jest-environment node
  */
 // Spec: odd/tasks/project-additional-brands.md — S9, S10
+// Spec: odd/tasks/brand-owned-project-manager.md — S4
 
 jest.mock("@/lib/services/api-auth", () => ({
   validateHttpMethod: jest.fn(() => ({ isValidMethod: true })),
@@ -64,7 +65,6 @@ describe("POST /api/managers/[id]/transfer", () => {
       previous_client_id: 5,
       new_client_id: 9,
       reassigned_brands: 2,
-      reassigned_projects: 1,
       followed_projects: 3,
     };
     mockTransfer.mockResolvedValue(result);
@@ -72,7 +72,6 @@ describe("POST /api/managers/[id]/transfer", () => {
     const res = await post({
       target_client_id: 9,
       brand_reassignments: [{ brand_id: 4, new_manager_id: 11 }],
-      project_reassignments: [{ project_id: 20, new_manager_id: 12 }],
     });
 
     expect(res.status).toBe(200);
@@ -83,10 +82,29 @@ describe("POST /api/managers/[id]/transfer", () => {
         targetClientId: 9,
         changedBy: 77,
         brandReassignments: [{ brand_id: 4, new_manager_id: 11 }],
-        projectReassignments: [{ project_id: 20, new_manager_id: 12 }],
       })
     );
+    expect(mockTransfer.mock.calls[0][0]).not.toHaveProperty("projectReassignments");
   });
+
+  it.each([[[{ project_id: 20, new_manager_id: 12 }]], [[]]])(
+    "S4: rechaza project_reassignments=%j con 400 sin trasladar",
+    async (projectReassignments) => {
+      const res = await post({
+        target_client_id: 9,
+        brand_reassignments: [{ brand_id: 4, new_manager_id: 11 }],
+        project_reassignments: projectReassignments,
+      });
+
+      expect(res.status).toBe(400);
+      const body = await res.json();
+      expect(body.error).toBe("Datos inválidos");
+      expect(body.details.project_reassignments._errors).toEqual([
+        "Los proyectos siguen al nuevo gerente de su marca; no se reasignan por separado",
+      ]);
+      expect(mockTransfer).not.toHaveBeenCalled();
+    }
+  );
 
   it("mantiene la validación de Zod (400 sin cliente destino)", async () => {
     const res = await post({});
