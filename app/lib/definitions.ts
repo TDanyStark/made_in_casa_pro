@@ -191,10 +191,8 @@ export type ManagerTransferResult = {
   reassigned_brands: number;
   /** Proyectos entregados a un sucesor; se quedan en el cliente que el gerente deja. */
   reassigned_projects: number;
-  /** Marcas sin sucesor: viajan con el gerente al nuevo cliente. */
-  moved_brands: number;
-  /** Proyectos sin sucesor: siguen a su marca al nuevo cliente. */
-  moved_projects: number;
+  /** Proyectos sin reasignación explícita: pasan al nuevo gerente de su marca principal. */
+  followed_projects: number;
 };
 
 export type BrandsAndManagersType = {

@@ -49,12 +49,10 @@ jest.mock('@tanstack/react-query', () => ({
 // nativos que escriben en el mismo campo del formulario.
 jest.mock('@/components/clients/ClientSelect', () => ({
   ClientSelect: ({
-    control,
     name,
     label,
     excludeClientId,
   }: {
-    control: { _formValues: Record<string, unknown> };
     name: string;
     label?: string;
     excludeClientId?: number;
@@ -158,6 +156,15 @@ const preview: ManagerTransferPreview = {
   ],
 };
 
+async function assignAllBrands(user: ReturnType<typeof userEvent.setup>) {
+  for (const brand of preview.brands) {
+    await user.selectOptions(
+      screen.getByTestId(`manager-select-brand_reassignments.${brand.id}`),
+      '11'
+    );
+  }
+}
+
 function renderDialog() {
   return render(
     <TransferManagerDialog managerId={2} open onOpenChange={jest.fn()} />
@@ -186,10 +193,17 @@ describe('TransferManagerDialog', () => {
     expect(screen.getByText('Proyectos activos')).toBeInTheDocument();
     expect(screen.getByText('Nulytelly 2026')).toBeInTheDocument();
 
-    // Nada tiene sucesor todavía: todo se trasladaría con el gerente.
+    // S9: ninguna marca tiene nuevo gerente todavía: el traslado se bloquea.
     expect(
-      screen.getByText(/2 marca\(s\) y 1 proyecto\(s\) sin sucesor/i)
+      screen.getByText(
+        /2 marca\(s\) sin nuevo gerente\. Asigna uno a cada marca: las marcas se quedan en Adium Co\./i
+      )
     ).toBeInTheDocument();
+    // S10: los proyectos sin elección siguen al nuevo gerente de su marca.
+    expect(
+      screen.getByText(/Los proyectos sin elección pasan al nuevo gerente de su marca/i)
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/se trasladarán junto al gerente/i)).not.toBeInTheDocument();
   });
 
   it('shows the skeleton while the preview loads', () => {
@@ -209,8 +223,9 @@ describe('TransferManagerDialog', () => {
         manager: preview.manager,
         previous_client_id: 2,
         new_client_id: 1,
-        reassigned_brands: 1,
+        reassigned_brands: 2,
         reassigned_projects: 1,
+        followed_projects: 0,
       },
     });
 
@@ -220,6 +235,10 @@ describe('TransferManagerDialog', () => {
     await user.selectOptions(
       screen.getByTestId('manager-select-brand_reassignments.5'),
       '11'
+    );
+    await user.selectOptions(
+      screen.getByTestId('manager-select-brand_reassignments.6'),
+      '12'
     );
     await user.selectOptions(
       screen.getByTestId('manager-select-project_reassignments.11'),
@@ -238,12 +257,17 @@ describe('TransferManagerDialog', () => {
         target_client_id: 1,
         email: 'monica@abbott.com',
         reason: 'Cambio de laboratorio',
-        brand_reassignments: [{ brand_id: 5, new_manager_id: 11 }],
+        brand_reassignments: [
+          { brand_id: 5, new_manager_id: 11 },
+          { brand_id: 6, new_manager_id: 12 },
+        ],
         project_reassignments: [{ project_id: 11, new_manager_id: 11 }],
       });
     });
 
-    expect(mockToastSuccess).toHaveBeenCalled();
+    expect(mockToastSuccess).toHaveBeenCalledWith(
+      'Gerente trasladado. 2 marca(s) y 1 proyecto(s) reasignados; 0 proyecto(s) siguieron al nuevo gerente de su marca.'
+    );
     expect(mockInvalidateQueries).toHaveBeenCalledWith({
       queryKey: ['manager-history', 2],
     });
@@ -264,6 +288,7 @@ describe('TransferManagerDialog', () => {
     renderDialog();
 
     await user.selectOptions(screen.getByTestId('client-select'), '1');
+    await assignAllBrands(user);
     await user.type(
       screen.getByLabelText(/correo corporativo nuevo/i),
       'ocupado@abbott.com'
@@ -290,6 +315,50 @@ describe('TransferManagerDialog', () => {
       );
     });
     expect(mockPost).not.toHaveBeenCalled();
+  });
+
+  it('S9: blocks the submit until every brand has a new manager and names the missing ones', async () => {
+    const user = userEvent.setup();
+    renderDialog();
+
+    await user.selectOptions(screen.getByTestId('client-select'), '1');
+    await user.selectOptions(
+      screen.getByTestId('manager-select-brand_reassignments.5'),
+      '11'
+    );
+    await user.click(screen.getByRole('button', { name: /trasladar gerente/i }));
+
+    await waitFor(() => {
+      expect(mockToastError).toHaveBeenCalledWith(
+        'Asigna un nuevo gerente a todas las marcas antes del traslado: Gastrum'
+      );
+    });
+    expect(mockPost).not.toHaveBeenCalled();
+  });
+
+  it('S9: surfaces the server message naming the brands without successor (400)', async () => {
+    const user = userEvent.setup();
+    mockPost.mockResolvedValue({
+      ok: false,
+      status: 400,
+      error: 'Asigna un nuevo gerente a todas las marcas antes del traslado: Marca X',
+      data: {
+        error: 'Asigna un nuevo gerente a todas las marcas antes del traslado: Marca X',
+        code: 'BRANDS_WITHOUT_SUCCESSOR',
+      },
+    });
+
+    renderDialog();
+    await user.selectOptions(screen.getByTestId('client-select'), '1');
+    await assignAllBrands(user);
+    await user.click(screen.getByRole('button', { name: /trasladar gerente/i }));
+
+    await waitFor(() => {
+      expect(mockToastError).toHaveBeenCalledWith(
+        'Asigna un nuevo gerente a todas las marcas antes del traslado: Marca X'
+      );
+    });
+    expect(mockToastSuccess).not.toHaveBeenCalled();
   });
 
   // This dialog renders a dynamic number of ManagerSelects (one per brand +
