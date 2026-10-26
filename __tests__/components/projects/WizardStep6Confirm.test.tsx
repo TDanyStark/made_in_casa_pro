@@ -64,6 +64,7 @@ const baseState = {
   co_manager_ids: [],
   co_manager_names: [],
   co_manager_emails: [],
+  additional_brands: [],
   product: { id: 5, name: 'Producto X' } as never,
   task_overrides: [],
   extra_tasks: [],
@@ -334,5 +335,22 @@ describe('WizardStep6Confirm — task notifications', () => {
     await waitFor(() => expect(mockToastError).toHaveBeenCalledWith('no se pudo'));
     expect(mockPost).not.toHaveBeenCalledWith('projects/44/tasks/notify-created', expect.anything());
     expect(mockPush).not.toHaveBeenCalled();
+  });
+
+  it('S7: sends the associated brands as additional_brand_ids', async () => {
+    mockPost
+      .mockResolvedValueOnce({ ok: true, data: { projectFolderId: 'drive-1', projectFolderUrl: 'https://drive.test/folder' } })
+      .mockResolvedValueOnce({ ok: true, data: { id: 44 } })
+      .mockResolvedValueOnce({ ok: true, data: {} });
+    const user = userEvent.setup();
+
+    render(<WizardStep6Confirm state={{ ...baseState, additional_brands: [{ id: 5, name: 'B' }, { id: 6, name: 'C' }] }} onBack={jest.fn()} />);
+    await user.click(screen.getByRole('button', { name: /crear proyecto/i }));
+
+    await waitFor(() => {
+      expect(mockPost).toHaveBeenCalledWith('projects', expect.objectContaining({ brand_id: 2, additional_brand_ids: [5, 6] }));
+    });
+    // Drive keeps using the principal brand (S4)
+    expect(mockPost).toHaveBeenNthCalledWith(1, 'drive/create-folder', expect.objectContaining({ brandName: 'Marca Uno' }));
   });
 });

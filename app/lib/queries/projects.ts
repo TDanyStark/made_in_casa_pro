@@ -12,6 +12,13 @@ import {
 import { DomainError } from "../errors";
 import { buildWhereClause, buildPaginationArgs, parseTotal } from "../db/query-helpers";
 import { ITEMS_PER_PAGE } from "@/config/constants";
+import {
+  ADDITIONAL_BRANDS_SELECT,
+  PROJECT_BRAND_FILTER_SQL,
+  insertProjectBrands,
+  replaceProjectBrands,
+  validateAdditionalBrands,
+} from "./projectBrands";
 
 // ─── Shared SELECT fragments ─────────────────────────────────────────────────
 
@@ -41,7 +48,8 @@ const PROJECT_SELECT = `
   u.name           AS created_by_name,
   p.created_at,
   p.updated_at,
-  p.completed_at
+  p.completed_at,
+  ${ADDITIONAL_BRANDS_SELECT}
 `;
 
 // El cliente sale de `projects.client_id` (migración 012), NO del gerente.
@@ -284,7 +292,8 @@ export async function getProjectsWithPagination({
     const { whereSQL, args } = buildWhereClause([
       { sql: "unaccent(p.title) ILIKE unaccent($)", value: search ? `%${search}%` : undefined },
       { sql: "p.status = $", value: status },
-      { sql: "p.brand_id = $", value: brandId },
+      // Marca principal o adicional
+      { sql: PROJECT_BRAND_FILTER_SQL, value: brandId },
       { sql: "p.manager_id = $", value: managerId },
       { sql: "p.client_id = $", value: clientId },
       { sql: "p.campaign_id = $", value: campaignId },
@@ -372,6 +381,8 @@ async function assertManagerBelongsToClient(
 export async function createProject(data: {
   title: string;
   brand_id: number;
+  /** Marcas adicionales del mismo cliente (project_brands) */
+  additional_brand_ids?: number[];
   manager_id: number;
   product_id?: number | null;
   campaign_id?: number | null;
@@ -389,6 +400,11 @@ export async function createProject(data: {
     // desde la migración 012. No se deriva del gerente.
     const clientId = await getBrandClientId(data.brand_id);
     await assertManagerBelongsToClient(data.manager_id, clientId);
+    const additionalBrandIds = await validateAdditionalBrands(
+      data.additional_brand_ids ?? [],
+      data.brand_id,
+      clientId
+    );
 
     // The project and its V1 version are created together or not at all.
     let id: number;
@@ -428,6 +444,7 @@ export async function createProject(data: {
         `,
         args: [id, data.drive_folder_id ?? null, data.drive_folder_url ?? null],
       });
+      await insertProjectBrands(transaction, id, additionalBrandIds);
       await transaction.commit();
     } catch (error) {
       await transaction.rollback();
@@ -471,6 +488,8 @@ export async function updateProject(
     billing_closed_at: string | null;
     status: ProjectStatus;
     progress: number;
+    /** Reemplaza el conjunto completo de marcas adicionales */
+    additional_brand_ids: number[];
   }>,
   changedBy?: number | null,
   reason?: string | null
@@ -492,6 +511,15 @@ export async function updateProject(
         Number(currentProject.client_id)
       );
     }
+
+    const additionalBrandIds =
+      data.additional_brand_ids !== undefined
+        ? await validateAdditionalBrands(
+            data.additional_brand_ids,
+            Number(currentProject.brand_id),
+            Number(currentProject.client_id)
+          )
+        : undefined;
 
     const updates: string[] = [];
     const args: unknown[] = [];
@@ -518,7 +546,9 @@ export async function updateProject(
       }
     }
 
-    if (updates.length === 0) return getProjectById(id);
+    if (updates.length === 0 && additionalBrandIds === undefined) {
+      return getProjectById(id);
+    }
 
     // always bump updated_at
     updates.push("updated_at = CURRENT_TIMESTAMP");
@@ -526,13 +556,17 @@ export async function updateProject(
 
     const updateSql = `UPDATE projects SET ${updates.join(", ")} WHERE id = $${args.length}`;
 
-    if (managerChanged) {
-      // El UPDATE y su registro de auditoría van en la misma transacción:
-      // un proyecto no puede cambiar de responsable sin dejar rastro.
+    if (managerChanged || additionalBrandIds !== undefined) {
+      // El UPDATE, la auditoría del gerente y el reemplazo de marcas adicionales
+      // van en la misma transacción: un proyecto no puede cambiar de
+      // responsable sin dejar rastro, ni quedar con marcas a medio aplicar.
       const transaction = await db.transaction("write");
       try {
         await transaction.execute({ sql: updateSql, args });
-        await transaction.execute({
+        if (additionalBrandIds !== undefined) {
+          await replaceProjectBrands(transaction, id, additionalBrandIds);
+        }
+        if (managerChanged) await transaction.execute({
           sql: `INSERT INTO project_manager_history
                   (project_id, previous_manager_id, new_manager_id, changed_by, reason)
                 VALUES ($1, $2, $3, $4, $5)`,

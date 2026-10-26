@@ -110,6 +110,7 @@ export function WizardStep6Confirm({ state, onBack }: Props) {
       const projectRes = await post<ProjectType>("projects", {
         title: state.title,
         brand_id: state.brand_id,
+        additional_brand_ids: state.additional_brands.map((brand) => brand.id),
         manager_id: state.manager_id,
         campaign_id: state.campaign_id ?? null,
         drive_folder_id: drive.projectFolderId,

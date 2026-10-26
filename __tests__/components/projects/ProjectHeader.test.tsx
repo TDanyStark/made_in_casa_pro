@@ -178,4 +178,18 @@ describe("ProjectHeader", () => {
     });
     expect(mockSetQueryData).not.toHaveBeenCalled();
   });
+
+  it("S8: shows the associated brands next to the principal brand", () => {
+    render(<ProjectHeader project={{ ...project, additional_brands: [{ id: 8, name: "Marca B" }, { id: 9, name: "Marca C" }] }} />);
+
+    expect(screen.getByText("Marca")).toBeInTheDocument();
+    expect(screen.getByText("+ Marca B, Marca C")).toBeInTheDocument();
+  });
+
+  it("S8: without associated brands shows only the principal brand", () => {
+    render(<ProjectHeader project={project} />);
+
+    expect(screen.queryByText(/^\+ /)).not.toBeInTheDocument();
+  });
 });
+

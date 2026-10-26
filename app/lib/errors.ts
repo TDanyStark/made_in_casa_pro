@@ -17,6 +17,12 @@ export type DomainErrorCode =
   | "SAME_CLIENT"
   | "CLIENT_NOT_FOUND"
   | "BRAND_NOT_FOUND"
+  /** Una marca adicional del proyecto pertenece a otro cliente */
+  | "BRAND_CLIENT_MISMATCH"
+  /** La marca principal se envió también como marca adicional */
+  | "ADDITIONAL_BRAND_IS_PRINCIPAL"
+  /** El traslado dejaría marcas (o proyectos vía su marca) con el gerente que se va */
+  | "BRANDS_WITHOUT_SUCCESSOR"
   | "PROJECT_NOT_FOUND";
 
 export class DomainError extends Error {
@@ -43,5 +49,8 @@ export const DOMAIN_ERROR_STATUS: Record<DomainErrorCode, number> = {
   SAME_CLIENT: 400,
   CLIENT_NOT_FOUND: 404,
   BRAND_NOT_FOUND: 404,
+  BRAND_CLIENT_MISMATCH: 400,
+  ADDITIONAL_BRAND_IS_PRINCIPAL: 400,
+  BRANDS_WITHOUT_SUCCESSOR: 400,
   PROJECT_NOT_FOUND: 404,
 };

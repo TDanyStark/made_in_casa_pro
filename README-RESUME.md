@@ -55,6 +55,7 @@ clients (laboratorios)
   └── managers          gerente de contacto del cliente
 brands                  marca comercial       → client_id, manager_id
 projects                proyecto sobre marca  → client_id, brand_id, manager_id
+  └── project_brands    marcas asociadas      → brand_id (mismo cliente)
   └── project_tasks     tareas ejecutables    → task_quotes, task_transitions
 ```
 
@@ -121,20 +122,25 @@ Un gerente es **siempre la misma fila** en `managers`: trasladarlo es un
 `UPDATE managers SET client_id` más una fila de historial, nunca una fila
 duplicada.
 
-Reglas al trasladar:
+Reglas al trasladar (las marcas **nunca** cambian de cliente; solo cambia su gerente):
 
 | Caso | Resultado |
 |------|-----------|
-| Marca / proyecto **con sucesor** asignado | Se queda en el cliente viejo y cambia de gerente |
-| Marca **sin sucesor** | Viaja con el gerente: `brands.client_id` = cliente destino |
-| Proyecto **sin sucesor** | Sigue a **su marca**: `projects.client_id` = `brands.client_id` |
+| Marca del gerente **con sucesor** | Se queda en su cliente y cambia de gerente (+ `brand_manager_history`) |
+| Marca del gerente **sin sucesor** | El traslado se **rechaza** (`BRANDS_WITHOUT_SUCCESSOR`, 400) nombrando las marcas; no se escribe nada |
+| Proyecto con **reasignación explícita** | Pasa al gerente elegido (tiene prioridad) |
+| Proyecto del gerente **sin elección** | Pasa al nuevo gerente de **su marca principal** (+ `project_manager_history`), en cualquier estado |
+
+`brands.client_id` y `projects.client_id` nunca se modifican en un traslado. Si
+la marca principal de un proyecto quedara sin gerente o con el gerente que se va,
+la transacción falla cerrada (`BRANDS_WITHOUT_SUCCESSOR`) y hace `rollback`.
 
 Orden obligatorio dentro de la única transacción:
 
-1. Reasignar marcas y proyectos a sus sucesores (+ `brand_manager_history` /
-   `project_manager_history`).
-2. Mover al cliente destino las marcas que siguen apuntando al gerente.
-3. Recalcular el cliente de los proyectos a partir del de su marca.
+1. Reasignar las marcas a sus sucesores (+ `brand_manager_history`).
+2. Reasignar los proyectos elegidos explícitamente (+ `project_manager_history`).
+3. Pasar el resto de proyectos del gerente al nuevo gerente de su marca principal
+   (+ `project_manager_history`).
 4. `UPDATE managers SET client_id` (y email / teléfono si cambian).
 5. Insertar en `manager_client_history`.
 
@@ -144,11 +150,34 @@ quedarían apuntando a un laboratorio que ya no es el suyo. Cualquier fallo hace
 
 Validaciones previas (fuera de la transacción, solo lecturas): `MANAGER_NOT_FOUND`,
 `SAME_CLIENT`, `CLIENT_NOT_FOUND`, `EMAIL_IN_USE` (`managers.email` es UNIQUE
-global) y `MANAGER_CLIENT_MISMATCH` cuando la marca/proyecto o el sucesor no son
-del cliente que se está dejando, o cuando el sucesor es el propio gerente.
+global), `MANAGER_CLIENT_MISMATCH` cuando la marca/proyecto o el sucesor no son
+del cliente que se está dejando, o cuando el sucesor es el propio gerente, y
+`BRANDS_WITHOUT_SUCCESSOR` cuando alguna marca del gerente no tiene sucesor
+(mensaje: "Asigna un nuevo gerente a todas las marcas antes del traslado: Marca A, Marca B").
 
 El resultado devuelve `reassigned_brands` / `reassigned_projects` (lo heredado por
-sucesores) y `moved_brands` / `moved_projects` (lo que viajó con el gerente).
+sucesores elegidos) y `followed_projects` (proyectos que pasaron al nuevo gerente
+de su marca). El diálogo de traslado exige un nuevo gerente por marca antes de enviar.
+
+### Marcas asociadas de un proyecto
+
+`projects.brand_id` es la **marca principal**: define cliente, gerente, carpeta de
+Drive y la línea "Marca" de los correos, igual que antes. Un proyecto puede además
+vincularse a **marcas asociadas** en `project_brands` (migración
+`023_project_brands.sql`).
+
+- `POST /api/projects` y `PATCH /api/projects/[id]` aceptan
+  `additional_brand_ids: number[]`; en PATCH reemplaza el conjunto completo
+  (`[]` quita todas).
+- Reglas (`app/lib/queries/projectBrands.ts`): marcas existentes
+  (`BRAND_NOT_FOUND` → 404), del mismo `projects.client_id`
+  (`BRAND_CLIENT_MISMATCH` → 400) y distintas de la principal
+  (`ADDITIONAL_BRAND_IS_PRINCIPAL` → 400). Si falla, no se escribe nada.
+- Las respuestas de proyecto incluyen `additional_brands: {id, name}[]`; filtrar
+  proyectos o "Mis tareas" por `brand_id` incluye los proyectos asociados a esa marca.
+- El traslado de gerentes no modifica `project_brands`.
+- UI: paso 1 del wizard ("Marcas asociadas") y tarjeta "Marcas" en la pestaña de
+  información del proyecto.
 
 ### Reasignación de gerente en un proyecto
 

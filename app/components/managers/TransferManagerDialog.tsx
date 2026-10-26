@@ -41,9 +41,9 @@ import {
  * Traslado de un gerente a otro cliente.
  *
  * El gerente es SIEMPRE la misma fila en `managers`: trasladarlo no lo duplica.
- * Como `brands.client_id` / `projects.client_id` son columnas propias, sus
- * marcas y proyectos NO cambian de cliente solos: o se les asigna un sucesor
- * del cliente actual, o se van con el gerente al cliente destino.
+ * Las marcas nunca cambian de cliente: cada marca necesita un nuevo gerente del
+ * cliente actual antes del traslado, y los proyectos sin elección explícita
+ * pasan al nuevo gerente de su marca principal.
  */
 
 type TransferFormValues = {
@@ -150,10 +150,10 @@ export function TransferManagerDialog({
   const brandAssignments = form.watch("brand_reassignments");
   const projectAssignments = form.watch("project_reassignments");
 
-  const brandsMoving = brands.filter(
+  const brandsWithoutSuccessor = brands.filter(
     (brand) => !brandAssignments?.[String(brand.id)]
-  ).length;
-  const projectsMoving = projects.filter(
+  );
+  const projectsFollowingBrand = projects.filter(
     (project) => !projectAssignments?.[String(project.id)]
   ).length;
 
@@ -164,6 +164,26 @@ export function TransferManagerDialog({
         message: "Selecciona el cliente destino",
       });
       toast.error("Selecciona el cliente destino");
+      return;
+    }
+
+    // Las marcas nunca cambian de cliente: ninguna puede quedarse con el
+    // gerente que se va (el endpoint lo rechaza igual con 400).
+    const missingBrands = brands.filter(
+      (brand) => !values.brand_reassignments?.[String(brand.id)]
+    );
+    if (missingBrands.length > 0) {
+      for (const brand of missingBrands) {
+        form.setError(
+          `brand_reassignments.${brand.id}` as FieldPath<TransferFormValues>,
+          { type: "required", message: "Asigna el nuevo gerente de esta marca" }
+        );
+      }
+      toast.error(
+        `Asigna un nuevo gerente a todas las marcas antes del traslado: ${missingBrands
+          .map((brand) => brand.name)
+          .join(", ")}`
+      );
       return;
     }
 
@@ -209,7 +229,7 @@ export function TransferManagerDialog({
     const result = res.data as unknown as ManagerTransferResult;
 
     toast.success(
-      `Gerente trasladado. ${result.reassigned_brands} marca(s) y ${result.reassigned_projects} proyecto(s) reasignados.`
+      `Gerente trasladado. ${result.reassigned_brands} marca(s) y ${result.reassigned_projects} proyecto(s) reasignados; ${result.followed_projects} proyecto(s) siguieron al nuevo gerente de su marca.`
     );
 
     queryClient.invalidateQueries({ queryKey: ["manager-transfer-preview"] });
@@ -246,8 +266,9 @@ export function TransferManagerDialog({
           <DialogTitle>Trasladar a otro cliente</DialogTitle>
           <DialogDescription>
             El gerente conserva su historial. Sus marcas y proyectos se quedan en{" "}
-            {preview?.current_client?.name ?? "el cliente actual"} salvo que los
-            traslades con él.
+            {preview?.current_client?.name ?? "el cliente actual"}: cada marca
+            necesita un nuevo gerente y sus proyectos lo siguen salvo que elijas
+            otro.
           </DialogDescription>
         </DialogHeader>
 
@@ -367,7 +388,7 @@ export function TransferManagerDialog({
                           `brand_reassignments.${brand.id}` as FieldPath<TransferFormValues>
                         }
                         label={brand.name}
-                        placeholder="Sin sucesor — se traslada con el gerente"
+                        placeholder="Selecciona el nuevo gerente de la marca"
                         clientId={currentClientId}
                         isClearable
                       />
@@ -387,7 +408,7 @@ export function TransferManagerDialog({
                           `project_reassignments.${project.id}` as FieldPath<TransferFormValues>
                         }
                         label={project.title}
-                        placeholder="Sin sucesor — se traslada con el gerente"
+                        placeholder="Sin elección — sigue al nuevo gerente de su marca"
                         clientId={currentClientId}
                         isClearable
                       />
@@ -395,17 +416,22 @@ export function TransferManagerDialog({
                   </section>
                 )}
 
-                {(brandsMoving > 0 || projectsMoving > 0) && (
+                {brandsWithoutSuccessor.length > 0 && (
                   <p
                     className="flex gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-xs text-amber-900 dark:text-amber-200"
                     role="status"
                   >
                     <AlertTriangle className="h-4 w-4 shrink-0" />
                     <span>
-                      {brandsMoving} marca(s) y {projectsMoving} proyecto(s) sin
-                      sucesor asignado se trasladarán junto al gerente al nuevo
-                      cliente.
+                      {`${brandsWithoutSuccessor.length} marca(s) sin nuevo gerente. Asigna uno a cada marca: las marcas se quedan en ${preview.current_client?.name ?? "el cliente actual"}.`}
                     </span>
+                  </p>
+                )}
+
+                {projectsFollowingBrand > 0 && (
+                  <p className="text-xs text-muted-foreground" role="note">
+                    Los proyectos sin elección pasan al nuevo gerente de su marca
+                    ({projectsFollowingBrand} proyecto(s)).
                   </p>
                 )}
               </form>

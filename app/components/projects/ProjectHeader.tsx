@@ -85,6 +85,11 @@ export function ProjectHeader({ project }: Props) {
           </h1>
           <p className="text-muted-foreground text-sm">
             <span className="font-medium text-foreground">{project.brand_name}</span>
+            {project.additional_brands && project.additional_brands.length > 0 && (
+              <span className="ml-1 text-xs">
+                {`+ ${project.additional_brands.map((b) => b.name).join(", ")}`}
+              </span>
+            )}
             {project.client_name && <span> · {project.client_name}</span>}
           </p>
         </div>
