@@ -21,10 +21,18 @@ jest.mock("@/lib/services/apiService", () => ({
 // capture the `onCreateOption` callback the component wires up, the same way
 // a user typing + clicking "Crear producto ..." would trigger it.
 let capturedOnCreateOption: ((inputValue: string) => void) | undefined;
+let capturedOnInputChange: ((inputValue: string) => void) | undefined;
+let capturedOptions: { label?: string }[] | undefined;
 jest.mock("react-select/creatable", () => ({
   __esModule: true,
-  default: (props: { onCreateOption?: (inputValue: string) => void }) => {
+  default: (props: {
+    onCreateOption?: (inputValue: string) => void;
+    onInputChange?: (inputValue: string) => void;
+    options?: { label?: string }[];
+  }) => {
     capturedOnCreateOption = props.onCreateOption;
+    capturedOnInputChange = props.onInputChange;
+    capturedOptions = props.options;
     return <div data-testid="product-select" />;
   },
 }));
@@ -154,5 +162,50 @@ describe("WizardStep3Products — inline product creation autoselect", () => {
     expect(onNext).toHaveBeenCalledWith({
       product: expect.objectContaining({ id: 999, name: "Producto Nuevo" }),
     });
+  });
+});
+
+// S42: the product search uses the shared debounced search hook.
+describe("WizardStep3Products product search", () => {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { get: mockGet } = require("@/lib/services/apiService") as { get: jest.Mock };
+  const searchedTerms = () =>
+    mockGet.mock.calls.map(([url]) => new URLSearchParams(String(url).split("?")[1]).get("search"));
+
+  beforeEach(() => {
+    jest.useFakeTimers();
+    mockGet.mockClear();
+  });
+  afterEach(() => jest.useRealTimers());
+
+  it("searches the typed term after the debounce (previous behavior)", async () => {
+    renderWizardStep3();
+    await waitFor(() => expect(mockGet).toHaveBeenCalled());
+    act(() => capturedOnInputChange?.("cam"));
+    await act(async () => { jest.advanceTimersByTime(600); });
+    await waitFor(() => expect(searchedTerms()).toContain("cam"));
+  });
+
+  it("clears the filter at once when the input is emptied, dropping the pending search", async () => {
+    mockGet.mockImplementation(async (url: string) => {
+      const term = new URLSearchParams(String(url).split("?")[1]).get("search") ?? "all";
+      return { ok: true, data: { data: [{ id: term.length, name: `product-${term}`, is_active: 1 }] } };
+    });
+    const labels = () => (capturedOptions ?? []).map((o) => o.label);
+    renderWizardStep3();
+    await waitFor(() => expect(labels().join()).toContain("product-all"));
+    act(() => capturedOnInputChange?.("cam"));
+    await act(async () => { jest.advanceTimersByTime(600); });
+    await waitFor(() => expect(labels().join()).toContain("product-cam"));
+
+    act(() => capturedOnInputChange?.("camis"));
+    act(() => capturedOnInputChange?.(""));
+
+    // No debounce wait (and no waitFor, which advances fake timers): the cached unfiltered list is back at once.
+    expect(labels().join()).toContain("product-all");
+    await act(async () => { jest.advanceTimersByTime(600); });
+    expect(searchedTerms()).not.toContain("camis");
+    mockGet.mockReset();
+    mockGet.mockResolvedValue({ ok: true, data: { data: [] } });
   });
 });

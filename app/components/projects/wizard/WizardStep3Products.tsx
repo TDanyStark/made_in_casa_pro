@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { debounce } from "lodash";
+import { useDebouncedSearch } from "@/hooks/useDebouncedSearch";
 import CreatableSelect from "react-select/creatable";
 import { get } from "@/lib/services/apiService";
 import { ProductType, ApiResponseWithPagination } from "@/lib/definitions";
@@ -25,7 +25,7 @@ interface Props {
 }
 
 export function WizardStep3Products({ state, onNext, onBack }: Props) {
-  const [search, setSearch] = useState("");
+  const { searchTerm: search, handleInputChange } = useDebouncedSearch(400);
   const [product, setProduct] = useState<ProductType | null>(state.product);
   const [error, setError] = useState("");
   const [isCreatingProduct, setIsCreatingProduct] = useState(false);
@@ -51,7 +51,6 @@ export function WizardStep3Products({ state, onNext, onBack }: Props) {
     staleTime: 1000 * 60,
   });
 
-  const debouncedSearch = debounce((v: string) => setSearch(v), 400);
 
   const selectProduct = (opt: ProductOption | null) => {
     if (!opt) return;
@@ -91,7 +90,7 @@ export function WizardStep3Products({ state, onNext, onBack }: Props) {
           options={productOptions}
           value={null}
           onChange={(opt) => selectProduct(opt as ProductOption | null)}
-          onInputChange={(v) => debouncedSearch(v)}
+          onInputChange={handleInputChange}
           onCreateOption={handleCreateProduct}
           formatCreateLabel={(inputValue) => `Crear producto "${inputValue}"`}
           isLoading={isLoading}
