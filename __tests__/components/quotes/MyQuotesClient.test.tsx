@@ -35,4 +35,28 @@ describe('MyQuotesClient', () => {
     expect(container.querySelector('img')).toBeNull();
     expect(container.querySelector('script')).toBeNull();
   });
+
+  // S40: dates use the es-CO format (Bogotá time) like the rest of the app.
+  it('formats invitation and quote dates in es-CO', async () => {
+    mockGet.mockResolvedValue({
+      ok: true,
+      status: 200,
+      data: {
+        invitations: [{
+          id: 2, task_id: 9, project_id: 4, task_title: 'Banner', project_name: 'Proyecto',
+          invited_at: '2026-03-05T15:00:00Z', invited_by_name: null,
+        }],
+        quotes: [{
+          id: 1, task_title: 'Logo', status: 'pending', created_at: '2026-01-15T15:00:00Z', price: 1500000,
+          delivery_minutes: 60, notes: null,
+        }],
+      },
+    });
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(<QueryClientProvider client={client}><MyQuotesClient /></QueryClientProvider>);
+
+    expect(await screen.findByText(/Invitado el: 5 de marzo de 2026/)).toBeInTheDocument();
+    expect(screen.getByText('Propuesta enviada el 15 de enero de 2026')).toBeInTheDocument();
+    expect(screen.getByText(/Precio: \$1\.500\.000/)).toBeInTheDocument();
+  });
 });

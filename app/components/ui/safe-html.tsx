@@ -11,7 +11,10 @@ const ALLOWED_TAGS = [
   "a", "code", "pre", "blockquote", "br", "hr",
 ];
 const ALLOWED_ATTR = ["href"];
-const ALLOWED_URI_REGEXP = /^(?:https?:|mailto:)/i;
+// http(s), mailto, anclas (#...) y rutas relativas al sitio (/...). Se excluyen
+// "//" y "/\" porque el navegador los trata como URL de otro dominio.
+// DOMPurify quita los espacios/controles antes de probar la expresión.
+const ALLOWED_URI_REGEXP = /^(?:https?:|mailto:|#|\/(?![/\\]))/i;
 
 let hookInstalled = false;
 

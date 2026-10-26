@@ -35,6 +35,34 @@ describe('SafeHtml', () => {
     expect(links[2]).not.toHaveAttribute('href');
   });
 
+  // S39: safe relative paths and in-page anchors are kept.
+  it('keeps relative paths and anchors with rel noopener', () => {
+    const { container } = render(
+      <SafeHtml html={'<a href="/projects/5">p</a><a href="#seccion">s</a><a href="/">r</a>'} />
+    );
+    const links = container.querySelectorAll('a');
+    expect(links[0]).toHaveAttribute('href', '/projects/5');
+    expect(links[1]).toHaveAttribute('href', '#seccion');
+    expect(links[2]).toHaveAttribute('href', '/');
+    links.forEach((link) => expect(link).toHaveAttribute('rel', 'noopener noreferrer'));
+  });
+
+  it.each([
+    ['protocol-relative', '//evil.com'],
+    ['backslash protocol-relative', '/\\evil.com'],
+    ['whitespace-split protocol-relative', '/\t/evil.com'],
+    ['entity-encoded protocol-relative', '&#47;&#47;evil.com'],
+    ['javascript:', 'javascript:alert(1)'],
+    ['entity-encoded javascript:', '&#106;avascript:alert(1)'],
+    ['tab-split javascript:', 'java\tscript:alert(1)'],
+    ['uppercase JAVASCRIPT:', 'JAVASCRIPT:alert(1)'],
+    ['data:', 'data:text/html,<script>alert(1)</script>'],
+    ['vbscript:', 'vbscript:msgbox(1)'],
+  ])('drops a %s href', (_label, href) => {
+    const out = sanitizeHtml(`<a href="${href}">x</a>`);
+    expect(out).toBe('<a rel="noopener noreferrer">x</a>');
+  });
+
   it('drops inline event handlers and style on allowed tags', () => {
     expect(sanitizeHtml('<p onclick="x()" style="color:red">t</p>')).toBe('<p>t</p>');
   });

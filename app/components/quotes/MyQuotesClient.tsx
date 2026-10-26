@@ -26,6 +26,15 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 
+// Mismo formato que el resto de la app (es-CO, hora de Bogotá).
+const formatQuoteDate = (iso: string) =>
+  new Date(iso).toLocaleDateString("es-CO", {
+    timeZone: "America/Bogota",
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  });
+
 interface MyQuotesData {
   quotes: TaskQuoteType[];
   invitations: TaskQuoteInvitationType[];
@@ -117,7 +126,7 @@ export function MyQuotesClient() {
                   <CardContent className="pt-4 space-y-4">
                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
                       <Calendar className="h-4 w-4" />
-                      Invitado el: {new Date(inv.invited_at).toLocaleDateString()}
+                      Invitado el: {formatQuoteDate(inv.invited_at)}
                     </div>
                     {inv.invited_by_name && (
                       <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -172,7 +181,7 @@ export function MyQuotesClient() {
                       </Badge>
                     </div>
                     <CardDescription>
-                      Propuesta enviada el {new Date(quote.created_at).toLocaleDateString()}
+                      Propuesta enviada el {formatQuoteDate(quote.created_at)}
                     </CardDescription>
                   </CardHeader>
                   <CardContent className="pt-4 space-y-3">
