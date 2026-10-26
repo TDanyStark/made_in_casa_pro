@@ -44,6 +44,17 @@ S29. "Borrar el texto del select no quita el filtro" + debounce rebuilt each ren
 S30. "SiigoCustomersList hace una petición por tecla, respuestas fuera de orden, fetch ad-hoc."
 S31. "ProjectNotesEditor ignora datos nuevos" + "doble click en borrar" + "useFetchWithParameters puede llamar a localhost".
 
+### Round 2 (T9)
+S32. "2.4 arreglalo" — "Actualizar un usuario con un email repetido devuelve error 500 en vez de 409." Duplicate email on user update returns 409 { error }.
+S33. "2.6 revisalo" — "Dos funciones deciden de forma distinta si una tarea es 'interna' y podrían no coincidir." Review only; report evidence and a recommendation.
+S34. "2.7 revisalo" — "Reintentar un correo nunca fuerza el remitente del sistema." Review only; report evidence and a recommendation.
+S35. "2.8 arreglalo" — "Si falta SESSION_SECRET, la app arranca igual y no avisa." Missing/empty SESSION_SECRET fails with a clear error instead of signing with an empty key.
+S36. "3.1 arreglalo" — "Al editar una tarea, las invitaciones a cotizar se guardan antes que la tarea, así que no es atómico." Invitations and task update commit or roll back together.
+S37. "3.2 Arreglalo" — "Al rechazar una validación, no se comprueba que la tarea a corregir sea de la misma versión del proyecto." Target task must share the validation task's adjustment version, else 400.
+S38. "3.3 Arreglalo" — "Marcar como completado un ajuste de otro proyecto no cambia nada, pero responde 'éxito'." Returns 404 when no row matches the project.
+S39. "3.6 Dale" — "SafeHtml quita los enlaces relativos y los anclas." Keep safe relative paths (/...) and anchors (#...) without allowing protocol-relative (//) or dangerous schemes.
+S40. "3.8 Arreglalo" — "En 'Mis cotizaciones', las fechas no usan el formato es-CO." Dates use es-CO.
+
 ## Tasks
 T1 | S1-S10 | writer A (background) | done | 9ab2e27, 89b13bb
 T2 | S11-S22 | writer B (background mvogtpyc-6-5dv5) | done | 5e30515, b145eba, e44553e
@@ -52,6 +63,7 @@ T3b | S25 app/api/projects/route.ts (+ S4 visibility by DB role) | inline | done
 T4 | S26-S31 + UserLoginForm password follow-up | writer D (background mvogu9zw-8-ybvf) + inline follow-up | done | 7e2e4a8, e1b673c
 T7 | S26-S31,T6 | independent verify mvohu1hb-b-aaih (items 2,4) | done | -
 T8 | S27 | inline: keep cents in parseCopAmount, no rounding on sale price edit | done | (this commit)
+T9 | S32-S40 | writer (background mvpa8h6u-1-j8ih) | done | de5f204, 554d612
 T5 | S1-S25 | independent verify mvohewgo-9-lsjb (items 1,2,4) | done | -
 T6 | S5,S17,S20,S24,S25 | writer (background mvohlgh6-a-iacw): verifier blocker + advisories | done | d84f58a
 
@@ -73,3 +85,7 @@ L14. Not changed on purpose: axios now unused in app code (dependency removal le
 L15. Native review: inspect offered review.start for target sha256:a3624306...; START returned consent declined_this_candidate by the human (no lineage created). Candidate left without native review by that decision.
 L16. Verify mvohu1hb-b-aaih on e1b673c: S26, S28-S31 and T6 met (XSS vectors blocked, server renders empty div, query errors never crash pages, invitation EXISTS matches schema, FOR NO KEY UPDATE avoids FK deadlock). BLOCKER S27: parseCopAmount stripped cents ("1500.5" -> 15005), so editing a decimal task cost multiplied it. Advisories: relative/anchor hrefs dropped by SafeHtml; sale price rounded on edit. Scratch left at $TMPDIR/tmp.U1sEmGROqk.
 L17. T8 inline: RED 4 failed (cop-amount.test.ts cents cases) + 1 failed (decimal cost round-trip in TaskDeliverableDialog) -> GREEN; last separator followed by 1-2 digits is cents; sale price edit no longer rounds. Full jest 170 suites / 1434 tests, tsc 0, eslint clean.
+L18. User (round 2): "2. Las tareas deben de tener un asignado no? 2.2 si es normal que pase eso 2.3 no entiendo esto - expolicanmelo 2.4 arreglalo 2.5 no pasa nada 2.6 revisalo 2.7 revisalo 2.8 arreglalo 3. 3.1 arreglalo 3.2 Arreglalo 3.3 Arreglalo 3.4 Da igual creo yo 3.5 Creo que da igual si la firma es correcta 3.6 Dale 3.7 no entiendo explicamelo 3.8 Arreglalo 4. migraste y hiciste push a main?"
+L19. Not done by user decision: 2.2 (normal), 2.5 (no impact), 3.4, 3.5. Explanations owed: 2.1, 2.3, 3.7. Answer to 4: no migration run and no push; branch fix/bug-review-2025 is local only, origin/main still at 641c4a1. 2.3 evidence: ProjectTasksTab.tsx:550 sends the full ordered list for the version, so the partial-list risk only applies to direct API calls.
+L20. T9 done: RED 19 failed -> GREEN 51 suites / 403 focused; full jest 173 suites / 1465 tests; tsc 0; lint 0 (2 pre-existing warnings). S32 409 "El correo electrónico ya está en uso" (existing route wording); S35 session key read lazily, throws "SESSION_SECRET no está configurado"; S36 invitations written inside updateProjectTask transaction, failure -> 500 "Error al actualizar tarea"; S37 same-version check 400; S38 RETURNING id -> "Ajuste no encontrado" (function has no caller/endpoint in app/); S39 # and single-/ hrefs allowed; S40 es-CO dates. Commits de5f204 (UI), 554d612 (backend).
+L21. S33 review: isInternalTask (taskCost.ts:47-50) vs computeTaskCost (project-financials.ts:58-61) disagree for completed tasks with no frozen rate, internal assignee and a completion_cost/accepted quote: UI shows an external cost that cannot be corrected (editable=false, PATCH rejected as internal). Recommendation: derive editable/rejection from computeTaskCost(row).internal. S34 review: no caller sets forceSystemSender; retry falls back to SMTP only when Gmail is disconnected; Gmail quota/limit failures retry on Gmail until MAX_RETRY_COUNT. Recommendation: no change now; optional system-sender choice on retry or remove dead field.
