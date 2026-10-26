@@ -45,6 +45,11 @@ export function ProjectManagerCard({
           Gerente principal
         </h3>
         <p className="text-sm">{project.manager_name}</p>
+        {project.created_manager_name && (
+          <p className="text-xs text-muted-foreground">
+            {`Al crearse: ${project.created_manager_name} (${project.client_name})`}
+          </p>
+        )}
         <p className="text-xs text-muted-foreground">
           {`Para cambiar el gerente, reasigna la marca ${project.brand_name} a otro gerente.`}
         </p>

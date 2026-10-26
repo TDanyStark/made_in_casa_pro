@@ -207,6 +207,19 @@ El gerente de un proyecto es **siempre el gerente actual de su marca principal**
 El `client_id` del proyecto nunca se toca. El historial se consulta en
 `GET /api/projects/[id]/manager-history`.
 
+#### Datos actuales vs. datos de la creación
+
+| Columna | Qué es | ¿Cambia? |
+|---------|--------|-----------|
+| `manager_id` | Gerente **actual** = gerente de la marca principal | Sí, por cascada al reasignar la marca o en un traslado |
+| `created_manager_id` | Gerente con el que se **creó** el proyecto (migración 025) | No: lo fija `createProject` (igual a `manager_id`) y nada más lo escribe |
+| `client_id` | Cliente con el que se **creó** el proyecto | No |
+
+El gerente y el cliente actuales se leen desde la marca (la marca pertenece a un
+gerente, y el gerente a un cliente). Las respuestas de proyecto incluyen
+`created_manager_id` y `created_manager_name`; la tarjeta "Gerente principal"
+muestra además la línea "Al crearse: {gerente} ({cliente})".
+
 ## Carpetas de Drive de proyectos
 
 Cada proyecto puede vincularse a una carpeta de Google Drive bajo la jerarquía
@@ -524,6 +537,13 @@ de cada proyecto con el de su marca principal (en cualquier estado; marcas sin
 gerente se omiten), registrando antes cada cambio en `project_manager_history`
 con el motivo "Alineación con el gerente de la marca principal (migración 024)".
 Es idempotente. Revisa qué proyectos cambiarían antes de aplicarla en producción.
+
+`025_project_created_manager.sql` agrega `projects.created_manager_id` (NOT NULL,
+`ON DELETE RESTRICT`) y la rellena con el `previous_manager_id` de la fila más
+antigua de `project_manager_history` (por `changed_at`, desempate por `id`) o,
+si no hay historial o ese valor es NULL, con el `manager_id` actual. Debe
+correr **después** de la 024, para que los proyectos alineados ahí conserven
+su gerente original. No toca `updated_at`. Es idempotente.
 
 ### Variables de entorno
 

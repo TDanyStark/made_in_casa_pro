@@ -305,8 +305,13 @@ export type ProjectType = {
   brand_name: string;
   /** Marcas adicionales vinculadas (mismo cliente), ordenadas por nombre */
   additional_brands?: ProjectBrandRef[];
+  /** Gerente actual: siempre el de la marca principal (cambia por cascada) */
   manager_id: number;
   manager_name: string;
+  /** Gerente con el que se creó el proyecto: fijo (migración 025) */
+  created_manager_id: number;
+  created_manager_name: string | null;
+  /** Cliente de la creación: fijo */
   client_id: number;
   client_name: string;
   campaign_id: number | null;

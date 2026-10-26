@@ -16,7 +16,7 @@ S8. Choice "Actual y, aparte, «Creado con»": project responses include `create
 T1 | — | allow editing associated brands on completed projects (previous request) | inline | done 4ee4ea7 (full Jest 1513 passed; tsc 0; eslint 0)
 T2 | S1,S2,S3,S4,S5,S6 | brand change cascade + Drive sync, remove manual project manager change (API, query, card), transfer without per-project choice, creation check, migration 024; tests; README | gentle-ai-worker | done (full Jest 181/1525; tsc 0; eslint 0; independent verify S1-S6 PASS)
 
-T3 | S7,S8 | migration 025 created_manager_id + backfill, createProject, PROJECT_SELECT, type, ProjectManagerCard line; tests; README | gentle-ai-worker | pending
+T3 | S7,S8 | migration 025 created_manager_id + backfill, createProject, PROJECT_SELECT, type, ProjectManagerCard line; tests; README | gentle-ai-worker | done (RED 8 -> GREEN; full Jest 182/1536; tsc 0; eslint 0)
 
 ## Log
 L1. "una cosa, cuando ya esta creado un proyecto puedo agregarle mas marcas?" → "no veo donde se agregan mas" (screenshot: project 80 completed, card read-only) → choice "Permitir editarlas también en completados" → T1.
