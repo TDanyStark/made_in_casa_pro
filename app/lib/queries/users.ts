@@ -233,6 +233,23 @@ export async function getUsersWithPagination({
   }
 }
 
+/** Same wording as the duplicate-email pre-check of PATCH /api/users/[id]. */
+export const USER_EMAIL_TAKEN_MESSAGE = 'El correo electrónico ya está en uso';
+
+/** The email belongs to another user (PostgreSQL unique violation on users.email). */
+export class UserEmailTakenError extends Error {
+  constructor(message = USER_EMAIL_TAKEN_MESSAGE) {
+    super(message);
+    this.name = 'UserEmailTakenError';
+  }
+}
+
+function isUniqueEmailViolation(error: unknown): boolean {
+  if (!error || typeof error !== 'object') return false;
+  const { code, constraint } = error as { code?: unknown; constraint?: unknown };
+  return code === '23505' && (constraint === undefined || constraint === 'uq_users_email');
+}
+
 export async function updateUser(userId: string, data: {
   name?: string;
   email?: string;
@@ -342,6 +359,7 @@ export async function updateUser(userId: string, data: {
     return result.rows[0];
   } catch (error) {
     console.error(`Error al actualizar el usuario con ID ${userId}:`, error);
+    if (isUniqueEmailViolation(error)) throw new UserEmailTakenError();
     throw new Error('No se pudo actualizar el usuario');
   }
 }

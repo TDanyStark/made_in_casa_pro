@@ -52,12 +52,23 @@ describe("createProjectAdjustment()", () => {
 
 describe("markAdjustmentAsCompleted()", () => {
   it("only updates the adjustment of the given project", async () => {
-    mockTransaction.execute.mockResolvedValue({ rows: [] });
+    mockTransaction.execute.mockResolvedValue({ rows: [{ id: 30 }] });
 
     await markAdjustmentAsCompleted(30, 15);
 
     expect(calls()[0].sql).toMatch(/WHERE id = \$1 AND project_id = \$2/);
     expect(calls()[0].args).toEqual([30, 15]);
+    expect(mockTransaction.commit).toHaveBeenCalledTimes(1);
+  });
+
+  // S38: an adjustment of another project (or a missing one) is not a success.
+  it("throws 'Ajuste no encontrado' and commits nothing when no row matches the project", async () => {
+    mockTransaction.execute.mockResolvedValue({ rows: [] });
+
+    await expect(markAdjustmentAsCompleted(30, 15)).rejects.toThrow("Ajuste no encontrado");
+
+    expect(mockTransaction.commit).not.toHaveBeenCalled();
+    expect(mockTransaction.rollback).toHaveBeenCalledTimes(1);
   });
 });
 

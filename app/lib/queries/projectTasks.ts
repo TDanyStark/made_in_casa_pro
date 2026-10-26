@@ -312,12 +312,7 @@ export async function createProjectTask(data: NewProjectTaskInput): Promise<Proj
       pausedProjectIds = paused.map((p) => p.project_id);
     }
 
-    for (const quoterId of quoterIds) {
-      await tx.execute({
-        sql: `INSERT INTO task_quote_invitations (task_id, user_id, invited_by) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING`,
-        args: [id, quoterId, createdBy],
-      });
-    }
+    await insertQuoteInvitations(tx, id, quoterIds, createdBy);
 
     if (isBlockedByQuote && createdBy) {
       await tx.execute({
@@ -342,6 +337,35 @@ export async function createProjectTask(data: NewProjectTaskInput): Promise<Proj
 
 // ─── Update ───────────────────────────────────────────────────────────────────
 
+async function insertQuoteInvitations(
+  tx: DbTransaction,
+  taskId: number,
+  quoterIds: number[],
+  invitedBy: number | null
+): Promise<void> {
+  for (const quoterId of quoterIds) {
+    await tx.execute({
+      sql: `INSERT INTO task_quote_invitations (task_id, user_id, invited_by) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING`,
+      args: [taskId, quoterId, invitedBy],
+    });
+  }
+}
+
+/** Replaces the whole invitation set of a task inside the caller's transaction. */
+async function replaceQuoteInvitations(
+  tx: DbTransaction,
+  taskId: number,
+  quoterIds: number[],
+  invitedBy: number | null
+): Promise<void> {
+  await tx.execute({
+    sql: `DELETE FROM task_quote_invitations WHERE task_id = $1`,
+    args: [taskId],
+  });
+  await insertQuoteInvitations(tx, taskId, quoterIds, invitedBy);
+}
+
+
 export async function updateProjectTask(
   id: number,
   data: Partial<{
@@ -355,9 +379,13 @@ export async function updateProjectTask(
     requires_quote: number;
     assign_to_commercial: number;
   }>,
-  movedByUserId: number | null = null
+  movedByUserId: number | null = null,
+  options: { quoterIds?: number[] } = {}
 ): Promise<ProjectTaskType | null> {
   try {
+    // quoterIds replaces the task's quote invitations in the same transaction
+    // as the task update: both are saved or neither is.
+    const { quoterIds } = options;
     const currentTask = await getProjectTaskById(id);
     if (!currentTask) return null;
 
@@ -405,17 +433,19 @@ export async function updateProjectTask(
       }
     }
 
-    if (updates.length === 0) return currentTask;
+    if (updates.length === 0 && quoterIds === undefined) return currentTask;
 
     // Business rule validation: Validation task cannot be in first position
     if (data.task_type === "validation" && currentTask.order_index === 0) {
       throw new Error("Una tarea de validación no puede ser la primera tarea del proyecto.");
     }
 
-    updates.push("updated_at = CURRENT_TIMESTAMP");
-    args.push(id);
-
-    const updateSql = `UPDATE project_tasks SET ${updates.join(", ")} WHERE id = $${args.length}`;
+    let updateSql: string | null = null;
+    if (updates.length > 0) {
+      updates.push("updated_at = CURRENT_TIMESTAMP");
+      args.push(id);
+      updateSql = `UPDATE project_tasks SET ${updates.join(", ")} WHERE id = $${args.length}`;
+    }
 
     // Single in-progress rule: a task entering 'in_progress' (or changing
     // owner while in progress) pauses the assignee's other in-progress tasks.
@@ -426,26 +456,32 @@ export async function updateProjectTask(
       (currentTask.status !== "in_progress" || finalAssignee !== currentTask.assigned_user_id);
 
     let pausedProjectIds: number[] = [];
-    if (entersInProgress && finalAssignee) {
+    const pauseAssignee = entersInProgress && finalAssignee ? finalAssignee : null;
+    if (pauseAssignee || quoterIds !== undefined) {
       const tx = await db.transaction("write");
       try {
-        // Same lock order as changeTaskStatus (task row, then user row) so a
-        // concurrent start/resume of this task cannot deadlock with PATCH.
-        await tx.execute({
-          sql: `SELECT id FROM project_tasks
-                WHERE id = $1
-                FOR UPDATE`,
-          args: [id],
-        });
-        const paused = await pauseOtherInProgressTasks(tx, finalAssignee, id, movedByUserId);
-        await tx.execute({ sql: updateSql, args });
+        if (pauseAssignee) {
+          // Same lock order as changeTaskStatus (task row, then user row) so a
+          // concurrent start/resume of this task cannot deadlock with PATCH.
+          await tx.execute({
+            sql: `SELECT id FROM project_tasks
+                  WHERE id = $1
+                  FOR UPDATE`,
+            args: [id],
+          });
+          const paused = await pauseOtherInProgressTasks(tx, pauseAssignee, id, movedByUserId);
+          pausedProjectIds = paused.map((p) => p.project_id);
+        }
+        if (updateSql) await tx.execute({ sql: updateSql, args });
+        if (quoterIds !== undefined) {
+          await replaceQuoteInvitations(tx, id, quoterIds, movedByUserId);
+        }
         await tx.commit();
-        pausedProjectIds = paused.map((p) => p.project_id);
       } catch (error) {
         await tx.rollback();
         throw error;
       }
-    } else {
+    } else if (updateSql) {
       await db.execute({ sql: updateSql, args });
     }
 
@@ -1023,7 +1059,7 @@ export async function createRejectionLoopTasks(
       args: [rejectedValidationTaskId, projectId],
     }),
     db.execute({
-      sql: `SELECT id, order_index FROM project_tasks WHERE id = $1 AND project_id = $2`,
+      sql: `SELECT id, order_index, adjustment_id FROM project_tasks WHERE id = $1 AND project_id = $2`,
       args: [targetTaskId, projectId],
     }),
   ]);
@@ -1032,7 +1068,13 @@ export async function createRejectionLoopTasks(
   if (taskMResult.rows.length === 0) throw new Error("Tarea destino no encontrada");
 
   const taskN = taskNResult.rows[0] as unknown as { id: number; order_index: number; task_flag: string; status: string; adjustment_id: number | null };
-  const taskM = taskMResult.rows[0] as unknown as { id: number; order_index: number };
+  const taskM = taskMResult.rows[0] as unknown as { id: number; order_index: number; adjustment_id: number | null };
+
+  // The task sent back for correction must belong to the validation task's version.
+  const versionOf = (adjustmentId: number | null | undefined) => (adjustmentId == null ? null : Number(adjustmentId));
+  if (versionOf(taskM.adjustment_id) !== versionOf(taskN.adjustment_id)) {
+    throw new TaskRuleError("La tarea a corregir debe pertenecer a la misma versión", 400);
+  }
 
   // The task sent back for correction must come before the validation task.
   if (Number(taskM.order_index) >= Number(taskN.order_index)) {

@@ -184,13 +184,6 @@ describe("PATCH /api/projects/[id]/tasks/[tid] task.ready notifications", () => 
     mockGetProjectTaskById.mockResolvedValueOnce({ ...existingTask, status: "waiting" } as never);
     mockResolveProjectTaskAssignment.mockResolvedValueOnce(5);
     mockUpdateProjectTask.mockResolvedValueOnce({ ...existingTask, status: "not_started", assigned_user_id: 5 } as never);
-    const { db } = jest.requireMock("@/lib/db") as { db: { transaction: jest.Mock } };
-    db.transaction.mockResolvedValueOnce({
-      execute: jest.fn().mockResolvedValue(undefined),
-      commit: jest.fn().mockResolvedValue(undefined),
-      rollback: jest.fn().mockResolvedValue(undefined),
-    });
-
     const response = await callPatch({ assigned_user_id: 5, status: "not_started", quoter_ids: [12] }, "?notify=false");
 
     expect(response.status).toBe(200);

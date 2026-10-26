@@ -120,6 +120,10 @@ export async function PATCH(
 
     return NextResponse.json(withoutPassword(updatedUser));
   } catch (error) {
+    // The pre-check above can race with another update; the DB unique index decides.
+    if (error instanceof Error && error.name === "UserEmailTakenError") {
+      return NextResponse.json({ error: error.message }, { status: 409 });
+    }
     console.error("Error actualizando usuario:", error);
     return NextResponse.json(
       { error: "Error al actualizar el usuario" },

@@ -133,10 +133,14 @@ export async function createProjectAdjustment(data: {
 export async function markAdjustmentAsCompleted(adjustmentId: number, projectId: number): Promise<void> {
   const transaction = await db.transaction("write");
   try {
-    await transaction.execute({
-      sql: `UPDATE project_adjustments SET status = 'completed', completed_at = CURRENT_TIMESTAMP WHERE id = $1 AND project_id = $2`,
+    const updated = await transaction.execute({
+      sql: `UPDATE project_adjustments SET status = 'completed', completed_at = CURRENT_TIMESTAMP WHERE id = $1 AND project_id = $2 RETURNING id`,
       args: [adjustmentId, projectId],
     });
+    // An adjustment of another project (or a missing one) is not a success.
+    if (updated.rows.length === 0) {
+      throw new Error("Ajuste no encontrado");
+    }
 
     await transaction.commit();
     revalidatePath(`/projects/${projectId}`);

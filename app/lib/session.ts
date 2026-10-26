@@ -4,8 +4,20 @@ import { cookies } from "next/headers";
 import type { NextRequest, NextResponse } from "next/server";
 import { UserRole } from "./definitions";
 
-const secretKey = process.env.SESSION_SECRET;
-const encodedKey = new TextEncoder().encode(secretKey);
+export const SESSION_SECRET_MISSING_MESSAGE = "SESSION_SECRET no está configurado";
+
+/**
+ * Clave de firma de la sesión. Se lee al usarla (no al importar el módulo) para
+ * que build y tests sin la variable no fallen; nunca firma ni verifica con una
+ * clave vacía.
+ */
+function getSessionKey(): Uint8Array {
+  const secret = process.env.SESSION_SECRET;
+  if (!secret || !secret.trim()) {
+    throw new Error(SESSION_SECRET_MISSING_MESSAGE);
+  }
+  return new TextEncoder().encode(secret);
+}
 
 // Define el tipo para la sesión
 export interface SessionData extends JWTPayload {
@@ -20,12 +32,14 @@ export async function encrypt(payload: SessionData | undefined) {
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
     .setExpirationTime("7d")
-    .sign(encodedKey);
+    .sign(getSessionKey());
 }
 
 export async function decrypt(session: string | undefined = ""): Promise<SessionData | null> {
+  // Fuera del try: una configuración faltante no es una sesión inválida.
+  const key = getSessionKey();
   try {
-    const { payload } = await jwtVerify(session, encodedKey, {
+    const { payload } = await jwtVerify(session, key, {
       algorithms: ["HS256"],
     });
     return payload as SessionData;

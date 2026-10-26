@@ -226,7 +226,9 @@ describe("createRejectionLoopTasks() — clones keep the version", () => {
       if (sql.includes("SELECT id, order_index, task_flag, status, adjustment_id FROM project_tasks")) {
         return result([{ id: 10, order_index: 3, task_flag: "new", status: "in_progress", adjustment_id: taskNAdjustmentId }]);
       }
-      if (sql.includes("SELECT id, order_index FROM project_tasks")) return result([{ id: 7, order_index: 2 }]);
+      if (/SELECT id, order_index(, adjustment_id)? FROM project_tasks/.test(sql)) {
+        return result([{ id: 7, order_index: 2, adjustment_id: taskNAdjustmentId }]);
+      }
       if (sql.includes("SELECT * FROM project_tasks")) {
         return result([
           { id: 7, title: "M", task_type: "execution", order_index: 2, assigned_user_id: null },

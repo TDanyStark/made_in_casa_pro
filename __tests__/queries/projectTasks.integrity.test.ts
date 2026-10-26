@@ -151,13 +151,18 @@ describe("completeTask() locks and re-checks the task inside the transaction (S1
 });
 
 describe("createRejectionLoopTasks() (S16)", () => {
-  function routeRejection(target: { id: number; order_index: number }, lockedStatus = "in_progress") {
+  function routeRejection(
+    target: { id: number; order_index: number; adjustment_id?: number | null },
+    lockedStatus = "in_progress"
+  ) {
     mockExecute.mockImplementation(async (q: Query) => {
       const sql = sqlOf(q);
       if (sql.includes("SELECT id, order_index, task_flag, status, adjustment_id FROM project_tasks")) {
         return { rows: [{ id: 10, order_index: 3, task_flag: "new", status: "in_progress", adjustment_id: 7 }] };
       }
-      if (sql.includes("SELECT id, order_index FROM project_tasks")) return { rows: [target] };
+      if (/SELECT id, order_index(, adjustment_id)? FROM project_tasks/.test(sql)) {
+        return { rows: [{ adjustment_id: 7, ...target }] };
+      }
       if (sql.includes("SELECT * FROM project_tasks")) {
         return {
           rows: [
@@ -208,6 +213,22 @@ describe("createRejectionLoopTasks() (S16)", () => {
     expect(txCalls().filter((q) => /INSERT INTO project_tasks/.test(sqlOf(q)))).toHaveLength(2);
     expect(mockTransaction.commit).toHaveBeenCalledTimes(1);
     expect(result.firstCorrectionTask.id).toBe(88);
+  });
+
+  // S37: the task sent back must belong to the validation task's version.
+  it.each([
+    ["another version", 8],
+    ["no version (legacy)", null],
+  ])("rejects a target from %s with 400 and writes nothing", async (_label, adjustmentId) => {
+    routeRejection({ id: 7, order_index: 2, adjustment_id: adjustmentId });
+
+    await expect(createRejectionLoopTasks(1, 10, 7, 5)).rejects.toMatchObject({
+      name: "TaskRuleError",
+      message: "La tarea a corregir debe pertenecer a la misma versión",
+      status: 400,
+    });
+    expect(mockDbTransaction).not.toHaveBeenCalled();
+    expect(allSql().some((sql) => /INSERT INTO|UPDATE project_tasks/.test(sql))).toBe(false);
   });
 });
 

@@ -155,41 +155,30 @@ describe("PATCH /api/projects/[id]/tasks/[tid] — operations roles only", () =>
   });
 });
 
-describe("PATCH /api/projects/[id]/tasks/[tid] — quoter invitations (S19)", () => {
-  it("returns 500, does not update the task and sends no quote.requested when saving invitations fails", async () => {
+// S19 + S36: invitations are written by updateProjectTask in the task's own
+// transaction; the route never writes them separately.
+describe("PATCH /api/projects/[id]/tasks/[tid] — quoter invitations (S19, S36)", () => {
+  it("returns 500 and sends no quote.requested when the task + invitations transaction fails", async () => {
     actAs(1, 3);
-    const tx = {
-      execute: jest.fn().mockRejectedValueOnce(new Error("insert failed")),
-      commit: jest.fn(),
-      rollback: jest.fn().mockResolvedValue(undefined),
-    };
-    mockTransaction.mockResolvedValue(tx);
+    mockUpdate.mockRejectedValue(new Error("insert failed"));
 
     const res = (await PATCH(request("PATCH", { title: "Otro", quoter_ids: [12] }), ctx()))!;
 
     expect(res.status).toBe(500);
-    expect(await res.json()).toEqual({ error: "Error al guardar las invitaciones a cotizar" });
-    expect(tx.rollback).toHaveBeenCalled();
-    expect(tx.commit).not.toHaveBeenCalled();
-    expect(mockUpdate).not.toHaveBeenCalled();
+    expect(await res.json()).toEqual({ error: "Error al actualizar tarea" });
+    expect(mockUpdate).toHaveBeenCalledWith(10, { title: "Otro" }, 3, { quoterIds: [12] });
+    expect(mockTransaction).not.toHaveBeenCalled();
     expect(mockDispatch).not.toHaveBeenCalled();
   });
 
-  it("saves the invitations and sends quote.requested when the save succeeds (previous behavior)", async () => {
+  it("passes the invitations to the task update and sends quote.requested when it succeeds (previous behavior)", async () => {
     actAs(1, 3);
-    const tx = {
-      execute: jest.fn().mockResolvedValue({ rows: [] }),
-      commit: jest.fn().mockResolvedValue(undefined),
-      rollback: jest.fn().mockResolvedValue(undefined),
-    };
-    mockTransaction.mockResolvedValue(tx);
 
     const res = (await PATCH(request("PATCH", { quoter_ids: [12] }), ctx()))!;
 
     expect(res.status).toBe(200);
-    expect(tx.execute).toHaveBeenCalledWith({ sql: expect.stringContaining("DELETE FROM task_quote_invitations"), args: [10] });
-    expect(tx.execute).toHaveBeenCalledWith({ sql: expect.stringContaining("INSERT INTO task_quote_invitations"), args: [10, 12, 3] });
-    expect(tx.commit).toHaveBeenCalled();
+    expect(mockUpdate).toHaveBeenCalledWith(10, {}, 3, { quoterIds: [12] });
+    expect(mockTransaction).not.toHaveBeenCalled();
     expect(mockDispatch).toHaveBeenCalledWith(expect.objectContaining({ eventType: "quote.requested", inviteeUserId: 12 }));
   });
 });

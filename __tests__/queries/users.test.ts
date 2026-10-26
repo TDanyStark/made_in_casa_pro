@@ -14,6 +14,7 @@ import {
   createUser,
   deleteUser,
   updateUser,
+  UserEmailTakenError,
 } from '@/lib/queries/users';
 import { ColaboradorType } from '@/lib/definitions';
 
@@ -198,6 +199,29 @@ describe('updateUser()', () => {
       .mockResolvedValueOnce(makeResult([updatedRow]));
     const result = await updateUser('1', { name: 'New Name' });
     expect(result).toEqual(updatedRow);
+  });
+
+  // S32: a unique violation on users.email is reported as a duplicate email.
+  it('throws UserEmailTakenError when PostgreSQL rejects the email as duplicated (23505)', async () => {
+    const pgError = Object.assign(new Error('duplicate key value violates unique constraint "uq_users_email"'), {
+      code: '23505',
+      constraint: 'uq_users_email',
+    });
+    mockExecute.mockRejectedValueOnce(pgError);
+
+    const promise = updateUser('1', { email: 'taken@test.com' });
+
+    await expect(promise).rejects.toBeInstanceOf(UserEmailTakenError);
+    // PATCH /api/users/[id] recognizes it by name.
+    await expect(promise).rejects.toMatchObject({ name: 'UserEmailTakenError' });
+    await expect(promise).rejects.toThrow('El correo electrónico ya está en uso');
+    expect(mockExecute).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps the generic message for other database errors (previous behavior)', async () => {
+    mockExecute.mockRejectedValueOnce(Object.assign(new Error('connection lost'), { code: '08006' }));
+
+    await expect(updateUser('1', { email: 'x@test.com' })).rejects.toThrow('No se pudo actualizar el usuario');
   });
 });
 

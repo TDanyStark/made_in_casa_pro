@@ -8,7 +8,6 @@ import {
   resolveProjectTaskAssignment,
 } from "@/lib/queries/projectTasks";
 import { userCanAccessProject } from "@/lib/queries/projects";
-import { db } from "@/lib/db";
 import { cookies } from "next/headers";
 import { decrypt } from "@/lib/session";
 import { AUTHENTICATED_ROLES, hasAnyRole, OPERATIONS_ROLES } from "@/lib/role-groups";
@@ -120,30 +119,9 @@ export async function PATCH(request: NextRequest, { params }: Params) {
       return NextResponse.json({ error: "Solo se pueden pausar tareas en progreso" }, { status: 400 });
     }
 
-    // Quoter invitations are saved first: when they fail nothing else changes
-    // and no quote.requested is sent.
-    if (validation.data.quoter_ids !== undefined) {
-      const transaction = await db.transaction("write");
-      try {
-        await transaction.execute({
-          sql: `DELETE FROM task_quote_invitations WHERE task_id = $1`,
-          args: [taskId],
-        });
-        for (const quoterId of validation.data.quoter_ids) {
-          await transaction.execute({
-            sql: `INSERT INTO task_quote_invitations (task_id, user_id, invited_by) VALUES ($1, $2, $3)`,
-            args: [taskId, quoterId, currentUserId],
-          });
-        }
-        await transaction.commit();
-      } catch (err) {
-        await transaction.rollback();
-        console.error("Error syncing quoter invitations:", err);
-        return NextResponse.json({ error: "Error al guardar las invitaciones a cotizar" }, { status: 500 });
-      }
-    }
-
-    const updateData = { ...validation.data };
+    // Quoter invitations are written by updateProjectTask in the same
+    // transaction as the task: a failure saves neither and sends no quote.requested.
+    const { quoter_ids: quoterIds, ...updateData } = validation.data;
 
     // Re-resolve assignment if mode or area changes
     const modeChanged = validation.data.assign_to_commercial !== undefined && validation.data.assign_to_commercial !== existingTask.assign_to_commercial;
@@ -166,7 +144,9 @@ export async function PATCH(request: NextRequest, { params }: Params) {
       updateData.status = "blocked";
     }
 
-    const updated = await updateProjectTask(taskId, updateData, currentUserId);
+    const updated = quoterIds === undefined
+      ? await updateProjectTask(taskId, updateData, currentUserId)
+      : await updateProjectTask(taskId, updateData, currentUserId, { quoterIds });
     if (!updated) return NextResponse.json({ error: "Tarea no encontrada" }, { status: 404 });
     const assignmentChanged = updated.assigned_user_id !== existingTask.assigned_user_id;
     const driveWarning = assignmentChanged && updated.assigned_user_id
@@ -213,8 +193,8 @@ export async function PATCH(request: NextRequest, { params }: Params) {
       }
     }
 
-    if (currentUserId && validation.data.quoter_ids !== undefined) {
-      for (const quoterId of validation.data.quoter_ids) {
+    if (currentUserId && quoterIds !== undefined) {
+      for (const quoterId of quoterIds) {
         await dispatchNotification({
           eventType: NOTIFICATION_EVENTS.QUOTE_REQUESTED,
           actorUserId: currentUserId,
