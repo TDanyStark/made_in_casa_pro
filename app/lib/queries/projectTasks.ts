@@ -238,7 +238,9 @@ export async function createProjectTask(data: NewProjectTaskInput): Promise<Proj
     // A task never exists without a version: default to the project's base version.
     const adjustmentId = await resolveTaskAdjustmentId(data.project_id, data.adjustment_id, tx);
 
-    await tx.execute({ sql: `SELECT id FROM projects WHERE id = $1 FOR UPDATE`, args: [data.project_id] });
+    // NO KEY UPDATE: serializes order_index computation without conflicting with the
+    // KEY SHARE lock that FK inserts referencing projects take (avoids deadlocks).
+    await tx.execute({ sql: `SELECT id FROM projects WHERE id = $1 FOR NO KEY UPDATE`, args: [data.project_id] });
 
     const orderResult = await tx.execute({
       sql: `SELECT COALESCE(MAX(order_index), -1) + 1 AS next_order FROM project_tasks WHERE project_id = $1 AND adjustment_id = $2`,

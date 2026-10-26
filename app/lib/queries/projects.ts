@@ -75,14 +75,16 @@ export async function getProjectById(id: number): Promise<ProjectType | null> {
 
 /**
  * Determina si un usuario puede acceder a un proyecto específico según su rol.
- *   - Colaborador: solo si tiene al menos una tarea asignada en el proyecto.
+ *   - Colaborador: solo si tiene al menos una tarea asignada en el proyecto
+ *     (o, con `includeQuoteInvitations`, si fue invitado a cotizar una tarea del proyecto).
  *   - Comercial: solo si es el creador del proyecto.
  *   - Otros roles (admin, directivo, financiero): acceso total.
  */
 export async function userCanAccessProject(
   projectId: number,
   userId: number,
-  roleId: number
+  roleId: number,
+  options?: { includeQuoteInvitations?: boolean }
 ): Promise<boolean> {
   // Admin, Directivo y Financiero ven todo
   if (
@@ -103,10 +105,16 @@ export async function userCanAccessProject(
     }
 
     if (roleId === UserRole.COLABORADOR) {
-      const result = await db.execute({
-        sql: `SELECT 1 FROM project_tasks WHERE project_id = $1 AND assigned_user_id = $2 LIMIT 1`,
-        args: [projectId, userId],
-      });
+      const sql = options?.includeQuoteInvitations
+        ? `SELECT 1 WHERE EXISTS (
+             SELECT 1 FROM project_tasks WHERE project_id = $1 AND assigned_user_id = $2
+           ) OR EXISTS (
+             SELECT 1 FROM task_quote_invitations tqi
+             JOIN project_tasks pt ON pt.id = tqi.task_id
+             WHERE pt.project_id = $1 AND tqi.user_id = $2
+           )`
+        : `SELECT 1 FROM project_tasks WHERE project_id = $1 AND assigned_user_id = $2 LIMIT 1`;
+      const result = await db.execute({ sql, args: [projectId, userId] });
       return result.rows.length > 0;
     }
 

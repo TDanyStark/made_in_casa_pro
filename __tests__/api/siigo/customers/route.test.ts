@@ -51,4 +51,38 @@ describe("GET /api/siigo/customers", () => {
     expect(res.status).toBe(403);
     expect(getSiigoCustomers).not.toHaveBeenCalled();
   });
+
+  // S25: page/pageSize are validated before calling Siigo.
+  it.each([
+    ["page=0"],
+    ["page=abc"],
+    ["page=1.5"],
+    ["pageSize=0"],
+    ["pageSize=abc"],
+    ["pageSize=101"],
+  ])("returns 400 and does not call Siigo for %s", async (query) => {
+    const res = (await GET(new NextRequest(`http://localhost/api/siigo/customers?${query}`)))!;
+
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: "Parámetros de paginación inválidos" });
+    expect(getSiigoCustomers).not.toHaveBeenCalled();
+  });
+
+  it("keeps the default page 1 and pageSize 25 when none are sent", async () => {
+    (getSiigoCustomers as jest.Mock).mockResolvedValue({ results: [] });
+
+    const res = (await GET(new NextRequest("http://localhost/api/siigo/customers")))!;
+
+    expect(res.status).toBe(200);
+    expect(getSiigoCustomers).toHaveBeenCalledWith({ page: 1, pageSize: 25 });
+  });
+
+  it("accepts the Siigo maximum pageSize of 100", async () => {
+    (getSiigoCustomers as jest.Mock).mockResolvedValue({ results: [] });
+
+    const res = (await GET(new NextRequest("http://localhost/api/siigo/customers?pageSize=100")))!;
+
+    expect(res.status).toBe(200);
+    expect(getSiigoCustomers).toHaveBeenCalledWith({ page: 1, pageSize: 100 });
+  });
 });

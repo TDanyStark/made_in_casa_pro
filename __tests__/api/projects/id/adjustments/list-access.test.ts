@@ -1,7 +1,7 @@
 /**
  * @jest-environment node
  */
-// S11: the adjustments list is only visible to non-operations roles with access to the project.
+// S5: the adjustments list is only visible to non-operations roles with access to the project.
 jest.mock("@/lib/services/api-auth", () => ({
   validateHttpMethod: jest.fn(),
   validateApiRole: jest.fn(),
@@ -71,7 +71,7 @@ describe("GET /api/projects/[id]/adjustments access", () => {
 
     expect(res.status).toBe(403);
     expect(await res.json()).toEqual({ error: "No tienes acceso a este proyecto" });
-    expect(userCanAccessProject).toHaveBeenCalledWith(12, 21, 4);
+    expect(userCanAccessProject).toHaveBeenCalledWith(12, 21, 4, { includeQuoteInvitations: true });
     expect(getAdjustmentsByProject).not.toHaveBeenCalled();
   });
 
@@ -83,5 +83,19 @@ describe("GET /api/projects/[id]/adjustments access", () => {
 
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual(adjustments);
+  });
+
+  it("returns the adjustments to a COLABORADOR invited to quote a task without assigned tasks", async () => {
+    mockRole.mockResolvedValue({ isAuthorized: true, userRole: 4, response: undefined });
+    (userCanAccessProject as jest.Mock).mockImplementation(
+      async (_p: number, _u: number, _r: number, options?: { includeQuoteInvitations?: boolean }) =>
+        options?.includeQuoteInvitations === true
+    );
+
+    const res = (await callGet())!;
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual(adjustments);
+    expect(getAdjustmentsByProject).toHaveBeenCalledWith(12);
   });
 });

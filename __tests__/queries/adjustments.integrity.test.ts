@@ -40,7 +40,7 @@ describe("createProjectAdjustment()", () => {
     const adjustment = await createProjectAdjustment({ project_id: 15 });
 
     const sqls = calls().map((q) => q.sql);
-    const lock = sqls.findIndex((sql) => /FROM projects WHERE id = \$1 FOR UPDATE/.test(sql));
+    const lock = sqls.findIndex((sql) => /FROM projects WHERE id = \$1 FOR NO KEY UPDATE$/.test(sql));
     const max = sqls.findIndex((sql) => /MAX\(version_number\)/.test(sql));
     expect(lock).toBe(0);
     expect(calls()[0].args).toEqual([15]);

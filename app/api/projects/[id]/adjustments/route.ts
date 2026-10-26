@@ -69,11 +69,14 @@ export async function GET(
     }
 
     // Roles fuera de operaciones (colaborador) solo ven proyectos donde tienen acceso.
+    // Los invitados a cotizar también: la vista /my-quotes/projects/[id] lee esta lista.
     if (!hasAnyRole(roleValidation.userRole, OPERATIONS_ROLES)) {
       const cookie = (await cookies()).get("session")?.value;
       const session = cookie ? await decrypt(cookie) : null;
       const allowed = session?.id
-        ? await userCanAccessProject(projectId, Number(session.id), roleValidation.userRole)
+        ? await userCanAccessProject(projectId, Number(session.id), roleValidation.userRole, {
+            includeQuoteInvitations: true,
+          })
         : false;
       if (!allowed) {
         return NextResponse.json({ error: "No tienes acceso a este proyecto" }, { status: 403 });

@@ -84,8 +84,9 @@ export async function createProjectAdjustment(data: {
   const transaction = await db.transaction("write");
   try {
     // Lock the project so concurrent creations never get the same version number.
+    // NO KEY UPDATE does not conflict with the KEY SHARE lock of FK inserts (avoids deadlocks).
     await transaction.execute({
-      sql: `SELECT id FROM projects WHERE id = $1 FOR UPDATE`,
+      sql: `SELECT id FROM projects WHERE id = $1 FOR NO KEY UPDATE`,
       args: [data.project_id],
     });
 

@@ -285,7 +285,7 @@ describe("createProjectTask() computes order and status inside one locked transa
     await createProjectTask(base);
 
     const calls = txCalls().map(sqlOf);
-    const lock = calls.findIndex((sql) => /FROM projects WHERE id = \$1 FOR UPDATE/.test(sql));
+    const lock = calls.findIndex((sql) => /FROM projects WHERE id = \$1 FOR NO KEY UPDATE$/.test(sql));
     const order = calls.findIndex((sql) => ORDER.test(sql));
     const insert = txCall(/INSERT INTO project_tasks/)!;
     expect(lock).toBeGreaterThanOrEqual(0);
