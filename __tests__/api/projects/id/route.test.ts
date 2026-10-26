@@ -14,7 +14,7 @@ jest.mock('@/lib/queries/projects', () => ({
   deleteProject: jest.fn(),
 }));
 
-// El PATCH lee la sesión para registrar `changed_by` en project_manager_history
+// El GET lee la sesión para comprobar el acceso de colaboradores
 jest.mock('next/headers', () => ({
   cookies: jest.fn(async () => ({ get: () => ({ value: 'session-cookie' }) })),
 }));
@@ -23,11 +23,16 @@ jest.mock('@/lib/session', () => ({
   decrypt: jest.fn(async () => ({ id: 77, rol_id: 1 })),
 }));
 
+jest.mock('@/lib/services/projectDriveAccess', () => ({
+  syncProjectDriveAccess: jest.fn(),
+}));
+
 import { NextRequest } from 'next/server';
 import { PATCH } from '@/api/projects/[id]/route';
 import { validateApiRole, validateHttpMethod } from '@/lib/services/api-auth';
 import { updateProject } from '@/lib/queries/projects';
 import { DomainError } from '@/lib/errors';
+import { syncProjectDriveAccess } from '@/lib/services/projectDriveAccess';
 
 const mockValidateHttpMethod = validateHttpMethod as jest.MockedFunction<typeof validateHttpMethod>;
 const mockValidateApiRole = validateApiRole as jest.MockedFunction<typeof validateApiRole>;
@@ -70,8 +75,7 @@ describe('PATCH /api/projects/[id]', () => {
       {
         billing_closed_at: '2026-04-20T17:00:00.000Z',
         oc: 'OC-900',
-      },
-      77 // changed_by tomado de la sesión
+      }
     );
   });
 
@@ -97,8 +101,7 @@ describe('PATCH /api/projects/[id]', () => {
         ideal_delivery_at: null,
         billing_closed_at: null,
         oc: null,
-      },
-      77
+      }
     );
   });
 
@@ -114,44 +117,49 @@ describe('PATCH /api/projects/[id]', () => {
     const res = await callPatch(req);
 
     expect(res.status).toBe(200);
-    expect(mockUpdateProject).toHaveBeenCalledWith(10, { status: 'in_adjustments' }, 77);
+    expect(mockUpdateProject).toHaveBeenCalledWith(10, { status: 'in_adjustments' });
   });
 
-  it('accepts manager_id and forwards the session user as changed_by', async () => {
-    mockUpdateProject.mockResolvedValue({ id: 10 } as never);
-
+  // Spec: odd/tasks/brand-owned-project-manager.md — S3
+  it.each([
+    [{ manager_id: 12 }],
+    [{ manager_id: 12, title: 'Nuevo título' }],
+    [{ manager_id: null }],
+  ])('S3: rejects %j with 400 and writes nothing', async (body) => {
     const req = new NextRequest('http://localhost/api/projects/10', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ manager_id: 12 }),
+      body: JSON.stringify(body),
     });
 
     const res = await callPatch(req);
 
-    expect(res.status).toBe(200);
-    expect(mockUpdateProject).toHaveBeenCalledWith(10, { manager_id: 12 }, 77);
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({
+      error: 'El gerente del proyecto se cambia reasignando su marca',
+    });
+    expect(mockUpdateProject).not.toHaveBeenCalled();
+    expect(syncProjectDriveAccess).not.toHaveBeenCalled();
   });
 
-  it('returns 400 with a clear message when the manager belongs to another client', async () => {
+  it('keeps translating domain errors from updateProject to 4xx', async () => {
     mockUpdateProject.mockRejectedValue(
-      new DomainError(
-        'MANAGER_CLIENT_MISMATCH',
-        'El gerente pertenece a otro cliente. Un proyecto solo puede asignarse a gerentes de su mismo cliente.'
-      )
+      new DomainError('BRAND_CLIENT_MISMATCH', 'La marca pertenece a otro cliente')
     );
 
     const req = new NextRequest('http://localhost/api/projects/10', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ manager_id: 999 }),
+      body: JSON.stringify({ additional_brand_ids: [99] }),
     });
 
     const res = await callPatch(req);
-    const data = await res.json();
 
     expect(res.status).toBe(400);
-    expect(data.code).toBe('MANAGER_CLIENT_MISMATCH');
-    expect(data.error).toMatch(/otro cliente/i);
+    expect(await res.json()).toEqual({
+      error: 'La marca pertenece a otro cliente',
+      code: 'BRAND_CLIENT_MISMATCH',
+    });
   });
 
   it('rejects invalid project metadata datetime values', async () => {
@@ -191,8 +199,7 @@ describe('PATCH /api/projects/[id]', () => {
         {
           drive_folder_url: 'https://drive.google.com/drive/folders/abc123XYZ_-',
           drive_folder_id: 'abc123XYZ_-',
-        },
-        77
+        }
       );
     });
 
@@ -216,8 +223,7 @@ describe('PATCH /api/projects/[id]', () => {
         {
           drive_folder_url: 'https://drive.google.com/drive/u/0/folders/newFolderId',
           drive_folder_id: 'newFolderId',
-        },
-        77
+        }
       );
     });
 
@@ -274,8 +280,7 @@ describe('PATCH /api/projects/[id]', () => {
         {
           drive_folder_url: null,
           drive_folder_id: null,
-        },
-        77
+        }
       );
     });
 
@@ -293,7 +298,7 @@ describe('PATCH /api/projects/[id]', () => {
       const res = await callPatch(req);
 
       expect(res.status).toBe(200);
-      expect(mockUpdateProject).toHaveBeenCalledWith(10, { drive_folder_url: null }, 77);
+      expect(mockUpdateProject).toHaveBeenCalledWith(10, { drive_folder_url: null });
     });
 
     it('leaves drive_folder_url untouched when omitted from the body (no regression)', async () => {
@@ -308,7 +313,7 @@ describe('PATCH /api/projects/[id]', () => {
       const res = await callPatch(req);
 
       expect(res.status).toBe(200);
-      expect(mockUpdateProject).toHaveBeenCalledWith(10, { title: 'Nuevo título' }, 77);
+      expect(mockUpdateProject).toHaveBeenCalledWith(10, { title: 'Nuevo título' });
     });
 
     it('rejects the request when the caller lacks PROJECT_EDIT_ROLES', async () => {

@@ -74,7 +74,7 @@ describe("reads", () => {
 describe("createProject", () => {
   function primeCreate() {
     mockExecute
-      .mockResolvedValueOnce(rows([{ client_id: 7 }])) // principal brand client
+      .mockResolvedValueOnce(rows([{ client_id: 7, manager_id: 3 }])) // principal brand client + manager
       .mockResolvedValueOnce(rows([{ client_id: 7 }])); // manager client
   }
 

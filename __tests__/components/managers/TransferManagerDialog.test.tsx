@@ -199,10 +199,17 @@ describe('TransferManagerDialog', () => {
         /2 marca\(s\) sin nuevo gerente\. Asigna uno a cada marca: las marcas se quedan en Adium Co\./i
       )
     ).toBeInTheDocument();
-    // S10: los proyectos sin elección siguen al nuevo gerente de su marca.
+    // S4: los proyectos siempre siguen al nuevo gerente de su marca; se listan
+    // solo como información, sin elegir otro gerente por proyecto.
     expect(
-      screen.getByText(/Los proyectos sin elección pasan al nuevo gerente de su marca/i)
+      screen.getByText(
+        'Los proyectos pasan al nuevo gerente de su marca principal (1 proyecto(s)).'
+      )
     ).toBeInTheDocument();
+    expect(
+      screen.queryByTestId('manager-select-project_reassignments.11')
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText(/sin elección/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/se trasladarán junto al gerente/i)).not.toBeInTheDocument();
   });
 
@@ -214,7 +221,7 @@ describe('TransferManagerDialog', () => {
     expect(screen.queryByText('Proyectos activos')).not.toBeInTheDocument();
   });
 
-  it('submits the transfer with brand and project reassignments', async () => {
+  it('submits the transfer with brand reassignments only (S4)', async () => {
     const user = userEvent.setup();
     mockPost.mockResolvedValue({
       ok: true,
@@ -224,8 +231,7 @@ describe('TransferManagerDialog', () => {
         previous_client_id: 2,
         new_client_id: 1,
         reassigned_brands: 2,
-        reassigned_projects: 1,
-        followed_projects: 0,
+        followed_projects: 1,
       },
     });
 
@@ -239,10 +245,6 @@ describe('TransferManagerDialog', () => {
     await user.selectOptions(
       screen.getByTestId('manager-select-brand_reassignments.6'),
       '12'
-    );
-    await user.selectOptions(
-      screen.getByTestId('manager-select-project_reassignments.11'),
-      '11'
     );
     await user.type(
       screen.getByLabelText(/correo corporativo nuevo/i),
@@ -261,12 +263,11 @@ describe('TransferManagerDialog', () => {
           { brand_id: 5, new_manager_id: 11 },
           { brand_id: 6, new_manager_id: 12 },
         ],
-        project_reassignments: [{ project_id: 11, new_manager_id: 11 }],
       });
     });
 
     expect(mockToastSuccess).toHaveBeenCalledWith(
-      'Gerente trasladado. 2 marca(s) y 1 proyecto(s) reasignados; 0 proyecto(s) siguieron al nuevo gerente de su marca.'
+      'Gerente trasladado. 2 marca(s) reasignada(s); 1 proyecto(s) siguieron al nuevo gerente de su marca.'
     );
     expect(mockInvalidateQueries).toHaveBeenCalledWith({
       queryKey: ['manager-history', 2],
@@ -361,8 +362,8 @@ describe('TransferManagerDialog', () => {
     expect(mockToastSuccess).not.toHaveBeenCalled();
   });
 
-  // This dialog renders a dynamic number of ManagerSelects (one per brand +
-  // one per project) — content can be genuinely long. Unlike
+  // This dialog renders a dynamic number of ManagerSelects (one per brand)
+  // plus the read-only project list — content can be genuinely long. Unlike
   // CreateBrandModal/CreateClientModal (short, fixed content — clipping was
   // simply removed there), this dialog still needs a height limit + scroll,
   // but that scroll must NOT live on DialogContent itself (which would clip

@@ -352,24 +352,6 @@ describe('transferManager()', () => {
     expect(result.reassigned_brands).toBe(1);
   });
 
-  it('reasigna proyectos al sucesor y escribe project_manager_history', async () => {
-    queueBaseReads();
-    mockExecute.mockResolvedValueOnce(makeResult([{ id: 11, client_id: 5, manager_id: 2 }])); // proyecto
-    mockExecute.mockResolvedValueOnce(makeResult([{ client_id: 5 }]));                        // sucesor
-    mockExecute.mockResolvedValueOnce(makeResult([]));
-
-    const result = await transferManager({
-      managerId: 2,
-      targetClientId: 9,
-      projectReassignments: [{ project_id: 11, new_manager_id: 11 }],
-    });
-
-    const sql = transactionSql();
-    expect(sql.some((s) => s.includes('UPDATE projects SET manager_id'))).toBe(true);
-    expect(sql.some((s) => s.includes('INSERT INTO project_manager_history'))).toBe(true);
-    expect(result.reassigned_projects).toBe(1);
-  });
-
   it('rechaza un sucesor que no pertenece al cliente que se está dejando', async () => {
     queueBaseReads();
     mockExecute.mockResolvedValueOnce(makeResult([{ id: 4, client_id: 5, manager_id: 2 }]));
@@ -402,19 +384,6 @@ describe('transferManager()', () => {
       managerId: 2,
       targetClientId: 9,
       brandReassignments: [{ brand_id: 4, new_manager_id: 2 }],
-    })).rejects.toMatchObject({ code: 'MANAGER_CLIENT_MISMATCH' });
-    expect(db.transaction).not.toHaveBeenCalled();
-  });
-
-  it('rechaza un sucesor de proyecto que pertenece a otro cliente', async () => {
-    queueBaseReads();
-    mockExecute.mockResolvedValueOnce(makeResult([{ id: 11, client_id: 5, manager_id: 2 }]));
-    mockExecute.mockResolvedValueOnce(makeResult([{ client_id: 99 }])); // sucesor de otro cliente
-
-    await expect(transferManager({
-      managerId: 2,
-      targetClientId: 9,
-      projectReassignments: [{ project_id: 11, new_manager_id: 50 }],
     })).rejects.toMatchObject({ code: 'MANAGER_CLIENT_MISMATCH' });
     expect(db.transaction).not.toHaveBeenCalled();
   });
@@ -514,9 +483,10 @@ describe('transferManager()', () => {
       previous_client_id: 5,
       new_client_id: 9,
       reassigned_brands: 2,
-      reassigned_projects: 0,
       followed_projects: 0,
     }));
+    // S4: ya no hay reasignación explícita de proyectos
+    expect(result).not.toHaveProperty('reassigned_projects');
     expect(result).not.toHaveProperty('moved_brands');
     expect(result).not.toHaveProperty('moved_projects');
     expectNoClientMoves();
@@ -585,42 +555,89 @@ describe('transferManager()', () => {
     ]);
 
     expect(result.followed_projects).toBe(3);
-    expect(result.reassigned_projects).toBe(0);
     expectNoClientMoves();
   });
 
-  it('S10: la reasignación explícita de proyecto tiene prioridad sobre la marca', async () => {
+  it('S4: ignora cualquier elección explícita de proyecto: todos siguen al nuevo gerente de su marca', async () => {
     queueBaseReads();
     mockExecute.mockResolvedValueOnce(makeResult([{ id: 4, client_id: 5, manager_id: 2 }]));  // marca
     mockExecute.mockResolvedValueOnce(makeResult([{ client_id: 5 }]));                        // sucesor
-    mockExecute.mockResolvedValueOnce(makeResult([{ id: 20, client_id: 5, manager_id: 2 }])); // proyecto
-    mockExecute.mockResolvedValueOnce(makeResult([{ client_id: 5 }]));                        // sucesor
     queueManagedBrands([{ id: 4, name: 'Nulytelly' }]);
     mockExecute.mockResolvedValueOnce(makeResult([]));
-    // Tras la reasignación explícita, el proyecto 20 ya no apunta al gerente:
-    // la lectura de seguidores solo devuelve el 21.
-    followerProjects([{ id: 21, title: 'Otro', brand_manager_id: 11 }]);
+    followerProjects([
+      { id: 20, title: 'Elegido antes', brand_manager_id: 11 },
+      { id: 21, title: 'Otro', brand_manager_id: 11 },
+    ]);
 
     const result = await transferManager({
       managerId: 2,
       targetClientId: 9,
       brandReassignments: [{ brand_id: 4, new_manager_id: 11 }],
       projectReassignments: [{ project_id: 20, new_manager_id: 12 }],
-    });
+    } as never);
 
-    const explicit = indexOfStatement('UPDATE projects SET manager_id');
-    const lookup = indexOfStatement('LEFT JOIN brands b ON b.id = p.brand_id');
+    // Ninguna lectura de proyectos por id fuera de la transacción
+    const outside = mockExecute.mock.calls.map((call) => (call[0] as { sql: string }).sql);
+    expect(outside.some((s) => s.includes('FROM projects'))).toBe(false);
+
     const reassignBrand = indexOfStatement('UPDATE brands SET manager_id');
-    // Marcas primero, luego elecciones explícitas, luego el resto sigue a su marca.
-    expect(reassignBrand).toBeLessThan(explicit);
-    expect(explicit).toBeLessThan(lookup);
+    const lookup = indexOfStatement('LEFT JOIN brands b ON b.id = p.brand_id');
+    expect(reassignBrand).toBeLessThan(lookup);
 
     const updates = transactionCalls()
       .filter((call) => call.sql.includes('UPDATE projects SET manager_id'))
       .map((call) => call.args);
-    expect(updates).toEqual([[12, 20], [11, 21]]);
-    expect(result.reassigned_projects).toBe(1);
-    expect(result.followed_projects).toBe(1);
+    expect(updates).toEqual([[11, 20], [11, 21]]);
+    expect(result.followed_projects).toBe(2);
+    expect(result).not.toHaveProperty('reassigned_projects');
+  });
+
+  it('S1/S4: una marca reasignada mueve TODOS sus proyectos, aunque su gerente no sea el que se va, sin historial doble', async () => {
+    queueBaseReads();
+    mockExecute.mockResolvedValueOnce(makeResult([{ id: 4, client_id: 5, manager_id: 2 }])); // marca
+    mockExecute.mockResolvedValueOnce(makeResult([{ client_id: 5 }]));                       // sucesor
+    queueManagedBrands([{ id: 4, name: 'Nulytelly' }]);
+    mockExecute.mockResolvedValueOnce(makeResult([]));
+    mockTransaction.execute.mockImplementation(async (stmt: { sql: string }) => {
+      if (/FROM projects/.test(stmt.sql) && /FOR UPDATE/.test(stmt.sql)) {
+        // Proyectos de la marca 4: uno del gerente que se va, otro de un tercero (7)
+        return makeResult([{ id: 30, manager_id: 7 }, { id: 31, manager_id: 2 }]);
+      }
+      if (stmt.sql.includes('LEFT JOIN brands b ON b.id = p.brand_id')) {
+        // Tras la cascada solo quedan con el gerente que se va proyectos de otras marcas
+        return makeResult([{ id: 20, title: 'Otra marca', brand_manager_id: 13 }]);
+      }
+      return makeResult([]);
+    });
+
+    const result = await transferManager({
+      managerId: 2,
+      targetClientId: 9,
+      changedBy: 77,
+      reason: 'Traslado',
+      brandReassignments: [{ brand_id: 4, new_manager_id: 11 }],
+    });
+
+    const calls = transactionCalls();
+    const cascade = calls.find((c) => /FROM projects/.test(c.sql) && /FOR UPDATE/.test(c.sql))!;
+    expect(cascade.sql).toContain('brand_id = $1');
+    expect(cascade.sql).not.toMatch(/status/);
+    expect(cascade.args).toEqual([4, 11]);
+    // Marca primero, luego su cascada, luego los demás proyectos del gerente
+    expect(indexOfStatement('UPDATE brands SET manager_id')).toBeLessThan(calls.indexOf(cascade));
+    expect(calls.indexOf(cascade)).toBeLessThan(indexOfStatement('LEFT JOIN brands b ON b.id = p.brand_id'));
+
+    const updates = calls.filter((c) => c.sql.includes('UPDATE projects SET manager_id'));
+    expect(updates.map((c) => c.args)).toEqual([[11, 30], [11, 31], [13, 20]]);
+    const history = calls.filter((c) => c.sql.includes('INSERT INTO project_manager_history'));
+    expect(history.map((c) => c.args)).toEqual([
+      [30, 7, 11, 77, 'Traslado'],
+      [31, 2, 11, 77, 'Traslado'],
+      [20, 2, 13, 77, 'Traslado'],
+    ]);
+    expect(result.followed_projects).toBe(3);
+    expect(mockTransaction.commit).toHaveBeenCalledTimes(1);
+    expectNoClientMoves();
   });
 
   it('S10: falla cerrado si la marca principal de un proyecto no tiene un nuevo gerente', async () => {
@@ -646,30 +663,28 @@ describe('transferManager()', () => {
     queueBaseReads();
     mockExecute.mockResolvedValueOnce(makeResult([{ id: 4, client_id: 5, manager_id: 2 }]));  // marca
     mockExecute.mockResolvedValueOnce(makeResult([{ client_id: 5 }]));                        // sucesor
-    mockExecute.mockResolvedValueOnce(makeResult([{ id: 11, client_id: 5, manager_id: 2 }])); // proyecto
-    mockExecute.mockResolvedValueOnce(makeResult([{ client_id: 5 }]));                        // sucesor
     queueManagedBrands([{ id: 4, name: 'Nulytelly' }]);
     mockExecute.mockResolvedValueOnce(makeResult([]));
+    followerProjects([{ id: 11, title: 'Proyecto', brand_manager_id: 11 }]);
 
     await transferManager({
       managerId: 2,
       targetClientId: 9,
       brandReassignments: [{ brand_id: 4, new_manager_id: 11 }],
-      projectReassignments: [{ project_id: 11, new_manager_id: 11 }],
     });
 
     const reassignBrand = indexOfStatement('UPDATE brands SET manager_id');
-    const reassignProject = indexOfStatement('UPDATE projects SET manager_id');
     const followers = indexOfStatement('LEFT JOIN brands b ON b.id = p.brand_id');
     const moveManager = indexOfStatement('UPDATE managers SET client_id = $1');
     const managerHistory = indexOfStatement('INSERT INTO manager_client_history');
 
     // Si el gerente se moviera primero, los sucesores validados contra el
     // cliente viejo quedarían apuntando a un laboratorio que ya no es el suyo.
+    const reassignProject = indexOfStatement('UPDATE projects SET manager_id');
     expect(reassignBrand).toBeGreaterThanOrEqual(0);
-    expect(reassignProject).toBeGreaterThan(reassignBrand);
-    expect(followers).toBeGreaterThan(reassignProject);
-    expect(moveManager).toBeGreaterThan(followers);
+    expect(followers).toBeGreaterThan(reassignBrand);
+    expect(reassignProject).toBeGreaterThan(followers);
+    expect(moveManager).toBeGreaterThan(reassignProject);
     expect(managerHistory).toBeGreaterThan(moveManager);
   });
 
@@ -692,8 +707,9 @@ describe('transferManager()', () => {
     expect(mockTransaction.rollback).not.toHaveBeenCalled();
 
     const sql = transactionSql();
-    // 2 reasignación de marca + 1 lectura de proyectos + 2 gerente
-    expect(sql).toHaveLength(5);
+    // 2 reasignación de marca + 1 lectura de sus proyectos (cascada)
+    // + 1 lectura de los demás proyectos del gerente + 2 gerente
+    expect(sql).toHaveLength(6);
     expect(sql.some((s) => s.includes('INSERT INTO manager_client_history'))).toBe(true);
     expectNoClientMoves();
 

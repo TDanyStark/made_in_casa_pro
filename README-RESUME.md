@@ -126,10 +126,9 @@ Reglas al trasladar (las marcas **nunca** cambian de cliente; solo cambia su ger
 
 | Caso | Resultado |
 |------|-----------|
-| Marca del gerente **con sucesor** | Se queda en su cliente y cambia de gerente (+ `brand_manager_history`) |
+| Marca del gerente **con sucesor** | Se queda en su cliente y cambia de gerente (+ `brand_manager_history`); **todos** sus proyectos (cualquier estado y gerente actual) pasan al sucesor (+ `project_manager_history`) |
 | Marca del gerente **sin sucesor** | El traslado se **rechaza** (`BRANDS_WITHOUT_SUCCESSOR`, 400) nombrando las marcas; no se escribe nada |
-| Proyecto con **reasignación explícita** | Pasa al gerente elegido (tiene prioridad) |
-| Proyecto del gerente **sin elección** | Pasa al nuevo gerente de **su marca principal** (+ `project_manager_history`), en cualquier estado |
+| Otro proyecto del gerente (marca no reasignada en el traslado) | Pasa al gerente actual de **su marca principal** (+ `project_manager_history`), en cualquier estado. No hay elección por proyecto |
 
 `brands.client_id` y `projects.client_id` nunca se modifican en un traslado. Si
 la marca principal de un proyecto quedara sin gerente o con el gerente que se va,
@@ -137,12 +136,13 @@ la transacción falla cerrada (`BRANDS_WITHOUT_SUCCESSOR`) y hace `rollback`.
 
 Orden obligatorio dentro de la única transacción:
 
-1. Reasignar las marcas a sus sucesores (+ `brand_manager_history`).
-2. Reasignar los proyectos elegidos explícitamente (+ `project_manager_history`).
-3. Pasar el resto de proyectos del gerente al nuevo gerente de su marca principal
-   (+ `project_manager_history`).
-4. `UPDATE managers SET client_id` (y email / teléfono si cambian).
-5. Insertar en `manager_client_history`.
+1. Reasignar las marcas a sus sucesores (+ `brand_manager_history`) y, por cada
+   una, pasar todos sus proyectos al sucesor (`cascadeBrandManagerToProjects`,
+   + `project_manager_history`).
+2. Pasar los proyectos restantes del gerente al gerente de su marca principal
+   (+ `project_manager_history`). Los ya movidos en el paso 1 no se repiten.
+3. `UPDATE managers SET client_id` (y email / teléfono si cambian).
+4. Insertar en `manager_client_history`.
 
 Si se invirtiera el orden, los sucesores —validados contra el cliente viejo—
 quedarían apuntando a un laboratorio que ya no es el suyo. Cualquier fallo hace
@@ -150,14 +150,16 @@ quedarían apuntando a un laboratorio que ya no es el suyo. Cualquier fallo hace
 
 Validaciones previas (fuera de la transacción, solo lecturas): `MANAGER_NOT_FOUND`,
 `SAME_CLIENT`, `CLIENT_NOT_FOUND`, `EMAIL_IN_USE` (`managers.email` es UNIQUE
-global), `MANAGER_CLIENT_MISMATCH` cuando la marca/proyecto o el sucesor no son
+global), `MANAGER_CLIENT_MISMATCH` cuando la marca o el sucesor no son
 del cliente que se está dejando, o cuando el sucesor es el propio gerente, y
 `BRANDS_WITHOUT_SUCCESSOR` cuando alguna marca del gerente no tiene sucesor
 (mensaje: "Asigna un nuevo gerente a todas las marcas antes del traslado: Marca A, Marca B").
 
-El resultado devuelve `reassigned_brands` / `reassigned_projects` (lo heredado por
-sucesores elegidos) y `followed_projects` (proyectos que pasaron al nuevo gerente
-de su marca). El diálogo de traslado exige un nuevo gerente por marca antes de enviar.
+El endpoint ya no acepta `project_reassignments` (400 "Datos inválidos" si se
+envía). El resultado devuelve `reassigned_brands` (marcas heredadas por sus
+sucesores) y `followed_projects` (**todos** los proyectos que cambiaron de
+gerente en el traslado: los de las marcas reasignadas más los demás del gerente). El diálogo de traslado exige un nuevo gerente por marca antes de enviar y
+lista los proyectos del gerente solo como información.
 
 ### Marcas asociadas de un proyecto
 
@@ -181,11 +183,29 @@ vincularse a **marcas asociadas** en `project_brands` (migración
 
 ### Reasignación de gerente en un proyecto
 
-`updateProject` (`app/lib/queries/projects.ts`) detecta el cambio de
-`manager_id`, valida con `assertManagerBelongsToClient` contra
-`projects.client_id` y ejecuta el `UPDATE` junto al insert en
-`project_manager_history` en la misma transacción. El `client_id` del proyecto no
-se toca. El historial se consulta en `GET /api/projects/[id]/manager-history`.
+El gerente de un proyecto es **siempre el gerente actual de su marca principal**
+(`projects.brand_id`). Solo cambia reasignando la marca:
+
+- `updateBrand` (`PATCH /api/brands/[id]`, botón "Asignar Nuevo Gerente" de la
+  marca), en **una sola transacción**: actualiza la marca, escribe
+  `brand_manager_history` (con `changed_at`; sirve para saber quién era el
+  gerente de la marca cuando se creó cada proyecto) y pasa **todos** los
+  proyectos de la marca, en cualquier estado, al nuevo gerente con una fila en
+  `project_manager_history` cada uno (`cascadeBrandManagerToProjects`). Si algo
+  falla, `rollback` completo.
+- Tras confirmar, la ruta re-sincroniza el acceso a Drive de esos proyectos
+  (best effort: un fallo se devuelve como `driveWarning`, nunca bloquea). La
+  respuesta incluye `reassigned_projects` (cuántos proyectos cambiaron).
+- `PATCH /api/projects/[id]` con `manager_id` → 400
+  `{ error: "El gerente del proyecto se cambia reasignando su marca" }`, sin
+  escribir nada. La tarjeta "Gerente principal" del proyecto es de solo lectura
+  y remite a la marca.
+- `POST /api/projects` exige que `manager_id` sea el gerente de la marca
+  principal; si no, `MANAGER_NOT_BRAND_MANAGER` → 400 ("El gerente del proyecto
+  debe ser el gerente de su marca principal") sin escribir nada.
+
+El `client_id` del proyecto nunca se toca. El historial se consulta en
+`GET /api/projects/[id]/manager-history`.
 
 ## Carpetas de Drive de proyectos
 
@@ -498,6 +518,12 @@ Elige la base de datos según `NODE_ENV`:
 
 La aplicación (`app/lib/db/index.ts`) usa el mismo criterio, salvo que en
 desarrollo cae a `DATABASE_URL` si `DATABASE_LOCAL_URL` no está definida.
+
+`024_align_project_manager_with_brand.sql` **reescribe datos**: alinea el gerente
+de cada proyecto con el de su marca principal (en cualquier estado; marcas sin
+gerente se omiten), registrando antes cada cambio en `project_manager_history`
+con el motivo "Alineación con el gerente de la marca principal (migración 024)".
+Es idempotente. Revisa qué proyectos cambiarían antes de aplicarla en producción.
 
 ### Variables de entorno
 

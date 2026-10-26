@@ -23,7 +23,8 @@ export type DomainErrorCode =
   | "ADDITIONAL_BRAND_IS_PRINCIPAL"
   /** El traslado dejaría marcas (o proyectos vía su marca) con el gerente que se va */
   | "BRANDS_WITHOUT_SUCCESSOR"
-  | "PROJECT_NOT_FOUND";
+  /** El gerente de un proyecto nuevo no es el gerente de su marca principal */
+  | "MANAGER_NOT_BRAND_MANAGER";
 
 export class DomainError extends Error {
   readonly code: DomainErrorCode;
@@ -52,5 +53,5 @@ export const DOMAIN_ERROR_STATUS: Record<DomainErrorCode, number> = {
   BRAND_CLIENT_MISMATCH: 400,
   ADDITIONAL_BRAND_IS_PRINCIPAL: 400,
   BRANDS_WITHOUT_SUCCESSOR: 400,
-  PROJECT_NOT_FOUND: 404,
+  MANAGER_NOT_BRAND_MANAGER: 400,
 };

@@ -103,7 +103,7 @@ describe("PATCH /api/projects/[id] additional_brand_ids", () => {
     const res = await patch({ additional_brand_ids: [] });
 
     expect(res.status).toBe(200);
-    expect(mockUpdate).toHaveBeenCalledWith(10, { additional_brand_ids: [] }, 77);
+    expect(mockUpdate).toHaveBeenCalledWith(10, { additional_brand_ids: [] });
   });
 
   it("rejects a non-array value with 400 without updating", async () => {

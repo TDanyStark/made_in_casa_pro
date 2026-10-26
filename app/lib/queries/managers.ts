@@ -6,11 +6,10 @@ import {
   ManagerTransferPreview,
   ManagerTransferResult,
   ManagerType,
-  ProjectReassignment,
 } from "../definitions";
 import { DomainError } from "../errors";
-import type { DbTransaction } from "../db/types";
 import { ITEMS_PER_PAGE } from "@/config/constants";
+import { cascadeBrandManagerToProjects, reassignProjectManager } from "./projects";
 
 export async function getManagerByEmail(email: string) {
   try {
@@ -251,11 +250,6 @@ export interface TransferManagerInput {
   changedBy?: number | null;
   /** Marcas del cliente VIEJO que heredan otro gerente del cliente viejo */
   brandReassignments?: BrandReassignment[];
-  /**
-   * Proyectos del cliente VIEJO que heredan otro gerente del cliente viejo.
-   * Tienen prioridad: el resto sigue al nuevo gerente de su marca principal.
-   */
-  projectReassignments?: ProjectReassignment[];
 }
 
 /**
@@ -265,8 +259,10 @@ export interface TransferManagerInput {
  * `UPDATE managers SET client_id` más una fila de historial, nunca una fila
  * duplicada. Las marcas nunca cambian de cliente (`brands.client_id` y
  * `projects.client_id` no se tocan): cada marca del gerente necesita un
- * sucesor de ESE cliente o el traslado se rechaza, y cada proyecto del gerente
- * sin reasignación explícita pasa al nuevo gerente de su marca principal.
+ * sucesor de ESE cliente o el traslado se rechaza. Cada marca reasignada mueve
+ * todos sus proyectos a su sucesor (`cascadeBrandManagerToProjects`), y el resto
+ * de proyectos del gerente pasa al gerente de su marca principal (no hay
+ * elección por proyecto: su gerente es el de su marca).
  *
  * Todo ocurre en una única transacción: o se traslada con sus reasignaciones y
  * su auditoría completas, o no se traslada.
@@ -280,7 +276,6 @@ export async function transferManager({
   reason,
   changedBy,
   brandReassignments = [],
-  projectReassignments = [],
 }: TransferManagerInput): Promise<ManagerTransferResult> {
   // ── Validaciones previas (fuera de la transacción, solo lecturas) ─────────
   const managerResult = await db.execute({
@@ -327,15 +322,10 @@ export async function transferManager({
     }
   }
 
-  // Las marcas / proyectos a reasignar deben ser del cliente VIEJO y su nuevo
-  // responsable también, o el traslado movería datos históricos de cliente.
+  // Las marcas a reasignar deben ser del cliente VIEJO y su nuevo responsable
+  // también, o el traslado movería datos históricos de cliente.
   const brandRows = await resolveBrandReassignments(
     brandReassignments,
-    previousClientId,
-    managerId
-  );
-  const projectRows = await resolveProjectReassignments(
-    projectReassignments,
     previousClientId,
     managerId
   );
@@ -363,15 +353,21 @@ export async function transferManager({
           reason ?? null,
         ],
       });
+      // Reasignar una marca es un cambio de gerente de marca: TODOS sus
+      // proyectos (cualquier estado y gerente actual) pasan a su sucesor.
+      const moved = await cascadeBrandManagerToProjects(
+        transaction,
+        brand.brandId,
+        brand.newManagerId,
+        changedBy,
+        reason
+      );
+      followedProjectsCount += moved.length;
     }
 
-    for (const project of projectRows) {
-      await reassignProjectManager(transaction, project, changedBy, reason);
-    }
-
-    // El resto de proyectos del gerente sigue al gerente (ya reasignado) de su
-    // marca principal. Se lee tras las reasignaciones explícitas, que así
-    // conservan la prioridad: esos proyectos ya no apuntan a este gerente.
+    // El resto de proyectos del gerente (de marcas no reasignadas en este
+    // traslado) sigue al gerente de su marca principal. Los de las marcas
+    // reasignadas ya no apuntan a él, así que no se auditan dos veces.
     const followers = await transaction.execute({
       sql: `SELECT p.id, p.title, b.manager_id AS brand_manager_id
               FROM projects p
@@ -414,7 +410,7 @@ export async function transferManager({
         reason
       );
     }
-    followedProjectsCount = followerRows.length;
+    followedProjectsCount += followerRows.length;
 
     const managerUpdates = [`client_id = $1`];
     const managerArgs: unknown[] = [targetClientId];
@@ -466,7 +462,6 @@ export async function transferManager({
     previous_client_id: previousClientId,
     new_client_id: Number(targetClientId),
     reassigned_brands: brandRows.length,
-    reassigned_projects: projectRows.length,
     followed_projects: followedProjectsCount,
   };
 }
@@ -496,35 +491,6 @@ async function assertEveryBrandHasSuccessor(
         .join(", ")}`
     );
   }
-}
-
-/** Cambia el gerente de un proyecto y lo audita en `project_manager_history`. */
-async function reassignProjectManager(
-  transaction: DbTransaction,
-  project: {
-    projectId: number;
-    previousManagerId: number | null;
-    newManagerId: number;
-  },
-  changedBy: number | null | undefined,
-  reason: string | null | undefined
-) {
-  await transaction.execute({
-    sql: `UPDATE projects SET manager_id = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2`,
-    args: [project.newManagerId, project.projectId],
-  });
-  await transaction.execute({
-    sql: `INSERT INTO project_manager_history
-            (project_id, previous_manager_id, new_manager_id, changed_by, reason)
-          VALUES ($1, $2, $3, $4, $5)`,
-    args: [
-      project.projectId,
-      project.previousManagerId,
-      project.newManagerId,
-      changedBy ?? null,
-      reason ?? null,
-    ],
-  });
 }
 
 /**
@@ -577,59 +543,6 @@ async function resolveBrandReassignments(
       // brand_manager_history.previous_manager_id es NOT NULL. Si la marca no
       // tuviera gerente, el gerente saliente es el previo por convención.
       previousManagerId: Number(brand.manager_id ?? managerId),
-      newManagerId: Number(item.new_manager_id),
-    });
-  }
-
-  return resolved;
-}
-
-/** Igual que `resolveBrandReassignments` pero para proyectos. */
-async function resolveProjectReassignments(
-  reassignments: ProjectReassignment[],
-  previousClientId: number,
-  managerId: number
-) {
-  const resolved: Array<{
-    projectId: number;
-    previousManagerId: number | null;
-    newManagerId: number;
-  }> = [];
-
-  for (const item of reassignments) {
-    const projectResult = await db.execute({
-      sql: `SELECT id, client_id, manager_id FROM projects WHERE id = $1`,
-      args: [item.project_id],
-    });
-    if (projectResult.rows.length === 0) {
-      throw new DomainError(
-        "PROJECT_NOT_FOUND",
-        `El proyecto ${item.project_id} no existe`
-      );
-    }
-    const project = projectResult.rows[0] as unknown as {
-      id: number;
-      client_id: number;
-      manager_id: number | null;
-    };
-
-    if (Number(project.client_id) !== previousClientId) {
-      throw new DomainError(
-        "MANAGER_CLIENT_MISMATCH",
-        `El proyecto ${item.project_id} no pertenece al cliente que deja el gerente`
-      );
-    }
-
-    await assertSuccessorBelongsToClient(
-      item.new_manager_id,
-      previousClientId,
-      managerId
-    );
-
-    resolved.push({
-      projectId: Number(project.id),
-      previousManagerId:
-        project.manager_id === null ? null : Number(project.manager_id),
       newManagerId: Number(item.new_manager_id),
     });
   }

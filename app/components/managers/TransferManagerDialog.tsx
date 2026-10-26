@@ -34,7 +34,6 @@ import {
   BrandReassignment,
   ManagerTransferPreview,
   ManagerTransferResult,
-  ProjectReassignment,
 } from "@/lib/definitions";
 
 /**
@@ -42,8 +41,8 @@ import {
  *
  * El gerente es SIEMPRE la misma fila en `managers`: trasladarlo no lo duplica.
  * Las marcas nunca cambian de cliente: cada marca necesita un nuevo gerente del
- * cliente actual antes del traslado, y los proyectos sin elección explícita
- * pasan al nuevo gerente de su marca principal.
+ * cliente actual antes del traslado, y los proyectos pasan siempre al nuevo
+ * gerente de su marca principal (se listan solo como información).
  */
 
 type TransferFormValues = {
@@ -53,7 +52,6 @@ type TransferFormValues = {
   started_at: string;
   reason: string;
   brand_reassignments: Record<string, number | undefined>;
-  project_reassignments: Record<string, number | undefined>;
 };
 
 const EMPTY_VALUES: TransferFormValues = {
@@ -63,7 +61,6 @@ const EMPTY_VALUES: TransferFormValues = {
   started_at: "",
   reason: "",
   brand_reassignments: {},
-  project_reassignments: {},
 };
 
 /** Mensajes accionables por código de dominio devuelto por el endpoint. */
@@ -73,27 +70,22 @@ const ERROR_MESSAGES: Record<string, string> = {
   SAME_CLIENT:
     "El gerente ya pertenece a ese cliente. Elige un cliente destino diferente.",
   MANAGER_CLIENT_MISMATCH:
-    "Alguno de los sucesores elegidos pertenece a otro cliente. Solo puedes dejar marcas y proyectos a gerentes del cliente actual.",
+    "Alguno de los sucesores elegidos pertenece a otro cliente. Solo puedes dejar marcas a gerentes del cliente actual.",
   CLIENT_NOT_FOUND: "El cliente destino ya no existe.",
   MANAGER_NOT_FOUND: "El gerente ya no existe.",
   BRAND_NOT_FOUND: "Una de las marcas a reasignar ya no existe.",
-  PROJECT_NOT_FOUND: "Uno de los proyectos a reasignar ya no existe.",
 };
 
 /** Convierte `{ "12": 5, "13": undefined }` en la lista que espera el endpoint. */
-function toReassignments<K extends "brand_id" | "project_id">(
-  raw: Record<string, number | undefined>,
-  key: K
-): Array<Record<K | "new_manager_id", number>> {
+function toBrandReassignments(
+  raw: Record<string, number | undefined>
+): BrandReassignment[] {
   return Object.entries(raw ?? {})
     .filter(([, newManagerId]) => Boolean(newManagerId))
-    .map(
-      ([id, newManagerId]) =>
-        ({
-          [key]: Number(id),
-          new_manager_id: Number(newManagerId),
-        }) as Record<K | "new_manager_id", number>
-    );
+    .map(([id, newManagerId]) => ({
+      brand_id: Number(id),
+      new_manager_id: Number(newManagerId),
+    }));
 }
 
 interface Props {
@@ -148,14 +140,10 @@ export function TransferManagerDialog({
   const projects = preview?.projects ?? [];
 
   const brandAssignments = form.watch("brand_reassignments");
-  const projectAssignments = form.watch("project_reassignments");
 
   const brandsWithoutSuccessor = brands.filter(
     (brand) => !brandAssignments?.[String(brand.id)]
   );
-  const projectsFollowingBrand = projects.filter(
-    (project) => !projectAssignments?.[String(project.id)]
-  ).length;
 
   const handleSubmit = form.handleSubmit(async (values) => {
     if (!values.client_id) {
@@ -187,14 +175,7 @@ export function TransferManagerDialog({
       return;
     }
 
-    const brand_reassignments = toReassignments(
-      values.brand_reassignments,
-      "brand_id"
-    ) as BrandReassignment[];
-    const project_reassignments = toReassignments(
-      values.project_reassignments,
-      "project_id"
-    ) as ProjectReassignment[];
+    const brand_reassignments = toBrandReassignments(values.brand_reassignments);
 
     const email = values.email.trim();
     const phone = values.phone.trim();
@@ -212,7 +193,6 @@ export function TransferManagerDialog({
           : {}),
         ...(reason ? { reason } : {}),
         brand_reassignments,
-        project_reassignments,
       }
     );
 
@@ -229,7 +209,7 @@ export function TransferManagerDialog({
     const result = res.data as unknown as ManagerTransferResult;
 
     toast.success(
-      `Gerente trasladado. ${result.reassigned_brands} marca(s) y ${result.reassigned_projects} proyecto(s) reasignados; ${result.followed_projects} proyecto(s) siguieron al nuevo gerente de su marca.`
+      `Gerente trasladado. ${result.reassigned_brands} marca(s) reasignada(s); ${result.followed_projects} proyecto(s) siguieron al nuevo gerente de su marca.`
     );
 
     queryClient.invalidateQueries({ queryKey: ["manager-transfer-preview"] });
@@ -249,8 +229,8 @@ export function TransferManagerDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       {/*
         Sin overflow-y-auto en el propio DialogContent a propósito: este
-        diálogo renderiza un ManagerSelect por CADA marca/proyecto del
-        gerente (cantidad dinámica, puede ser larga), así que a diferencia
+        diálogo renderiza un ManagerSelect por CADA marca del gerente y la
+        lista de sus proyectos (cantidad dinámica, puede ser larga), así que a diferencia
         de CreateBrandModal/CreateClientModal (contenido corto, se les quitó
         el recorte) aquí SÍ hace falta limitar la altura — pero el scroll
         vive en un div interno (`flex-1 overflow-y-auto`), no en
@@ -267,8 +247,8 @@ export function TransferManagerDialog({
           <DialogDescription>
             El gerente conserva su historial. Sus marcas y proyectos se quedan en{" "}
             {preview?.current_client?.name ?? "el cliente actual"}: cada marca
-            necesita un nuevo gerente y sus proyectos lo siguen salvo que elijas
-            otro.
+            necesita un nuevo gerente y sus proyectos pasan al nuevo gerente de
+            su marca.
           </DialogDescription>
         </DialogHeader>
 
@@ -397,22 +377,23 @@ export function TransferManagerDialog({
                 )}
 
                 {projects.length > 0 && (
-                  <section className="space-y-3">
+                  <section className="space-y-2">
                     <h3 className="text-sm font-semibold">Proyectos activos</h3>
-                    {projects.map((project) => (
-                      <ManagerSelect
-                        key={project.id}
-                        form={form}
-                        control={form.control}
-                        name={
-                          `project_reassignments.${project.id}` as FieldPath<TransferFormValues>
-                        }
-                        label={project.title}
-                        placeholder="Sin elección — sigue al nuevo gerente de su marca"
-                        clientId={currentClientId}
-                        isClearable
-                      />
-                    ))}
+                    <ul className="space-y-1 text-sm">
+                      {projects.map((project) => (
+                        <li key={project.id} className="flex justify-between gap-2">
+                          <span>{project.title}</span>
+                          {project.brand_name && (
+                            <span className="text-xs text-muted-foreground">
+                              {`Marca: ${project.brand_name}`}
+                            </span>
+                          )}
+                        </li>
+                      ))}
+                    </ul>
+                    <p className="text-xs text-muted-foreground" role="note">
+                      {`Los proyectos pasan al nuevo gerente de su marca principal (${projects.length} proyecto(s)).`}
+                    </p>
                   </section>
                 )}
 
@@ -428,12 +409,6 @@ export function TransferManagerDialog({
                   </p>
                 )}
 
-                {projectsFollowingBrand > 0 && (
-                  <p className="text-xs text-muted-foreground" role="note">
-                    Los proyectos sin elección pasan al nuevo gerente de su marca
-                    ({projectsFollowingBrand} proyecto(s)).
-                  </p>
-                )}
               </form>
             </Form>
           )}

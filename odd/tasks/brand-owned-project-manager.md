@@ -12,10 +12,13 @@ S6. Existing data: projects whose manager differs from their principal brand's m
 
 ## Tasks
 T1 | — | allow editing associated brands on completed projects (previous request) | inline | done 4ee4ea7 (full Jest 1513 passed; tsc 0; eslint 0)
-T2 | S1,S2,S3,S4,S5,S6 | brand change cascade + Drive sync, remove manual project manager change (API, query, card), transfer without per-project choice, creation check, migration 024; tests; README | gentle-ai-worker | pending
+T2 | S1,S2,S3,S4,S5,S6 | brand change cascade + Drive sync, remove manual project manager change (API, query, card), transfer without per-project choice, creation check, migration 024; tests; README | gentle-ai-worker | done (full Jest 181/1525; tsc 0; eslint 0; independent verify S1-S6 PASS)
 
 ## Log
 L1. "una cosa, cuando ya esta creado un proyecto puedo agregarle mas marcas?" → "no veo donde se agregan mas" (screenshot: project 80 completed, card read-only) → choice "Permitir editarlas también en completados" → T1.
 L2. "ven ya que estoy viendo como es que a un proyecto puedo cambiarle el gerente si los proyectos estan linkeados es a una marca, la forma de cambiar un proyecto de gerente es asignarle la marca a otro gerente"
 L3. Answers: cascade → "(custom) algo importante es que cada vez que se cambia el gerente de una marca queda en el historial, esto servira para luego saber por ejemplo quienen fueron los gerentes que empezaron un proyecto, lo hariamos viendo la fecha de creacion de un proyecto y quien era el gerente en ese tiempo"; manual change → "Sí, quitarlo (Recomendado)"; confirmation → "Sí, todos los proyectos de la marca".
 L4. Engram mirror unavailable in this session (no memory tools).
+L5. Read-only production check: 1 of 87 projects misaligned — #9 "FLIPBOOK INTERACTIVO" (Izinova, Abbott Co): project manager Camilo Talero, brand manager Alexander Alvis since 2026-09-14 (brand_manager_history by Admin Sistema); project history empty.
+L6. Worker T2 done (RED 27 -> GREEN; full Jest 181/1525; tsc 0; eslint 0). Parent decisions on open questions: drop unused updateProject 3rd param and ProjectManagerCard canEdit; transfer brand reassignments use cascadeBrandManagerToProjects (all projects of the brand); migration 024 does not touch updated_at. Follow-up worker: RED 5 -> GREEN; full Jest 181/1525; tsc 0; eslint 0.
+L7. Independent verify: S1-S6 PASS, no defects. Advisories: create-time race reading brand manager outside tx; transfer does not re-sync Drive (baseline); followed_projects vs preview count may differ; sequential Drive sync; updateBrand reads current brand outside tx (baseline).

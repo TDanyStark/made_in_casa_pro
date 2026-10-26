@@ -1,4 +1,5 @@
-// Associated brands stay editable on completed projects; the manager card does not.
+// Associated brands stay editable on completed projects; the manager card is
+// always read-only (brand-owned-project-manager S3) and takes no canEdit prop.
 import React from "react";
 import { render, screen } from "@testing-library/react";
 import { ProjectDetailClient } from "@/components/projects/ProjectDetailClient";
@@ -27,7 +28,9 @@ jest.mock("@/components/projects/ProjectInfoTab", () => ({ ProjectInfoTab: () =>
 jest.mock("@/components/projects/ProjectAdjustmentsTab", () => ({ ProjectAdjustmentsTab: () => null }));
 jest.mock("@/components/notifications/EmailHistoryTable", () => ({ EmailHistoryTable: () => null }));
 jest.mock("@/components/projects/ProjectManagerCard", () => ({
-  ProjectManagerCard: ({ canEdit }: { canEdit: boolean }) => <div data-testid="manager-card">{String(canEdit)}</div>,
+  ProjectManagerCard: (props: Record<string, unknown>) => (
+    <div data-testid="manager-card">{Object.keys(props).sort().join(",")}</div>
+  ),
 }));
 jest.mock("@/components/projects/ProjectBrandsCard", () => ({
   ProjectBrandsCard: ({ canEdit }: { canEdit: boolean }) => <div data-testid="brands-card">{String(canEdit)}</div>,
@@ -37,7 +40,7 @@ describe("ProjectDetailClient on a completed project", () => {
   it("keeps associated brands editable for editors while the manager stays read-only", () => {
     render(<ProjectDetailClient projectId={10} userRole={UserRole.ADMIN} currentUserId={1} />);
     expect(screen.getByTestId("brands-card")).toHaveTextContent("true");
-    expect(screen.getByTestId("manager-card")).toHaveTextContent("false");
+    expect(screen.getByTestId("manager-card")).toHaveTextContent(/^project$/);
   });
 
 });

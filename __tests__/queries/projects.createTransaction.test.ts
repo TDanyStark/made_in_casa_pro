@@ -26,7 +26,7 @@ beforeEach(() => {
   mockTransaction.commit.mockReset().mockResolvedValue(undefined);
   mockTransaction.rollback.mockReset().mockResolvedValue(undefined);
   mockExecute
-    .mockResolvedValueOnce({ rows: [{ client_id: 7 }] }) // brand client
+    .mockResolvedValueOnce({ rows: [{ client_id: 7, manager_id: 3 }] }) // brand client + manager
     .mockResolvedValueOnce({ rows: [{ client_id: 7 }] }) // manager client
     .mockResolvedValue({ rows: [{ id: 15, title: "Proyecto" }] }); // getProjectById
 });

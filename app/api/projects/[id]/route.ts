@@ -18,7 +18,6 @@ import {
   normalizeProjectDateTime,
 } from "@/lib/utils/project-date-time";
 import { parseDriveFolderId } from "@/lib/utils/drive-url";
-import { syncProjectDriveAccess } from "@/lib/services/projectDriveAccess";
 
 const projectDateTimeSchema = z
   .string()
@@ -53,12 +52,6 @@ const driveFolderUrlSchema = z
 
 const patchSchema = z.object({
   title: z.string().min(1).max(300).optional(),
-  /**
-   * Reasignación de responsable. El nuevo gerente debe pertenecer al mismo
-   * cliente del proyecto; si no, la capa de queries lanza MANAGER_CLIENT_MISMATCH
-   * y aquí se devuelve 400.
-   */
-  manager_id: z.coerce.number().int().positive().optional(),
   /** Marcas adicionales del mismo cliente; en PATCH reemplaza el conjunto completo */
   additional_brand_ids: z.array(z.coerce.number().int().positive()).max(50).optional(),
   campaign_id: z.coerce.number().int().positive().nullable().optional(),
@@ -111,6 +104,14 @@ export async function PATCH(request: NextRequest, { params }: Params) {
   try {
     const { id } = await params;
     const body = await request.json();
+    // El gerente del proyecto es siempre el de su marca principal: se cambia
+    // reasignando la marca (PATCH /api/brands/[id]), nunca aquí.
+    if (body && typeof body === "object" && "manager_id" in body) {
+      return NextResponse.json(
+        { error: "El gerente del proyecto se cambia reasignando su marca" },
+        { status: 400 }
+      );
+    }
     const validation = patchSchema.safeParse(body);
     if (!validation.success) {
       return NextResponse.json(
@@ -118,10 +119,6 @@ export async function PATCH(request: NextRequest, { params }: Params) {
         { status: 400 }
       );
     }
-    // El actor queda registrado en project_manager_history si cambia el gerente
-    const cookie = (await cookies()).get("session")?.value;
-    const session = cookie ? await decrypt(cookie) : null;
-
     const data = { ...validation.data };
     if (typeof data.drive_folder_url === "string") {
       if (data.drive_folder_url === "") {
@@ -140,16 +137,9 @@ export async function PATCH(request: NextRequest, { params }: Params) {
       }
     }
 
-    const updated = await updateProject(
-      parseInt(id),
-      data,
-      session?.id ?? null
-    );
+    const updated = await updateProject(parseInt(id), data);
     if (!updated) return NextResponse.json({ error: "Proyecto no encontrado" }, { status: 404 });
-    const driveWarning = data.manager_id !== undefined
-      ? await syncProjectDriveAccess(parseInt(id))
-      : null;
-    return NextResponse.json({ ...updated, ...(driveWarning ? { driveWarning } : {}) });
+    return NextResponse.json(updated);
   } catch (error) {
     const domain = domainErrorResponse(error);
     if (domain) return domain;

@@ -148,7 +148,7 @@ export type TransferPreviewBrand = {
   name: string;
 };
 
-/** Proyecto activo (no archivado) que quedaría huérfano tras el traslado. */
+/** Proyecto activo (no archivado) del gerente: pasará al nuevo gerente de su marca. */
 export type TransferPreviewProject = {
   id: number;
   title: string;
@@ -169,17 +169,12 @@ export type ManagerTransferPreview = {
   current_client: ClientType | null;
   brands: TransferPreviewBrand[];
   projects: TransferPreviewProject[];
-  /** Otros gerentes del cliente actual, candidatos a heredar marcas / proyectos */
+  /** Otros gerentes del cliente actual, candidatos a heredar sus marcas */
   available_managers: TransferPreviewSuccessor[];
 };
 
 export type BrandReassignment = {
   brand_id: number;
-  new_manager_id: number;
-};
-
-export type ProjectReassignment = {
-  project_id: number;
   new_manager_id: number;
 };
 
@@ -189,9 +184,7 @@ export type ManagerTransferResult = {
   new_client_id: number;
   /** Marcas entregadas a un sucesor; se quedan en el cliente que el gerente deja. */
   reassigned_brands: number;
-  /** Proyectos entregados a un sucesor; se quedan en el cliente que el gerente deja. */
-  reassigned_projects: number;
-  /** Proyectos sin reasignación explícita: pasan al nuevo gerente de su marca principal. */
+  /** Proyectos del gerente: pasan siempre al nuevo gerente de su marca principal. */
   followed_projects: number;
 };
 

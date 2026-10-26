@@ -12,11 +12,6 @@ const reassignmentSchema = z.object({
   new_manager_id: z.coerce.number().int().positive(),
 });
 
-const projectReassignmentSchema = z.object({
-  project_id: z.coerce.number().int().positive(),
-  new_manager_id: z.coerce.number().int().positive(),
-});
-
 const transferSchema = z.object({
   target_client_id: z.coerce.number().int().positive(),
   email: z.string().email().optional().nullable(),
@@ -25,10 +20,16 @@ const transferSchema = z.object({
   started_at: z.string().datetime({ offset: true }).optional().nullable(),
   reason: z.string().max(1000).optional().nullable(),
   brand_reassignments: z.array(reassignmentSchema).optional().default([]),
+  /**
+   * Ya no se acepta: el gerente de un proyecto es siempre el de su marca
+   * principal, así que los proyectos siguen al nuevo gerente de su marca.
+   */
   project_reassignments: z
-    .array(projectReassignmentSchema)
-    .optional()
-    .default([]),
+    .never({
+      message:
+        "Los proyectos siguen al nuevo gerente de su marca; no se reasignan por separado",
+    })
+    .optional(),
 });
 
 type Params = { params: Promise<{ id: string }> };
@@ -68,7 +69,6 @@ export async function POST(request: NextRequest, { params }: Params) {
       reason: validation.data.reason,
       changedBy: session?.id ?? null,
       brandReassignments: validation.data.brand_reassignments,
-      projectReassignments: validation.data.project_reassignments,
     });
 
     return NextResponse.json(result);
