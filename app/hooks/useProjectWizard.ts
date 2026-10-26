@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useCallback } from "react";
-import { ProductType } from "@/lib/definitions";
+import { ProductType, ProjectBrandRef } from "@/lib/definitions";
 
 export interface WizardManager {
   id: number;
@@ -35,6 +35,8 @@ export interface WizardState {
   title: string;
   brand_id: number | null;
   brand_name: string;
+  /** Marcas asociadas (mismo cliente que la principal) */
+  additional_brands: ProjectBrandRef[];
   ideal_delivery_at: string;
   oc: string;
   billing_closed_at: string;
@@ -75,6 +77,7 @@ const INITIAL_STATE: WizardState = {
   title: "",
   brand_id: null,
   brand_name: "",
+  additional_brands: [],
   ideal_delivery_at: "",
   oc: "",
   billing_closed_at: "",

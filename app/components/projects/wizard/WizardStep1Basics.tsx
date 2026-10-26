@@ -7,6 +7,8 @@ import { z } from "zod";
 import { useQuery } from "@tanstack/react-query";
 import { get } from "@/lib/services/apiService";
 import { BrandSelect } from "@/components/brands/BrandSelect";
+import { AdditionalBrandsSelect } from "@/components/brands/AdditionalBrandsSelect";
+import { ProjectBrandRef } from "@/lib/definitions";
 import {
   Form,
   FormControl,
@@ -75,6 +77,10 @@ export function WizardStep1Basics({ state, onNext }: Props) {
   const [selectedBrand, setSelectedBrand] = useState<BrandOption | null>(
     state.brand_id ? { value: state.brand_id, label: state.brand_name } : null
   );
+  // Marcas asociadas: dependen del cliente de la marca principal
+  const [additionalBrands, setAdditionalBrands] = useState<ProjectBrandRef[]>(
+    state.additional_brands ?? []
+  );
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
@@ -109,6 +115,8 @@ export function WizardStep1Basics({ state, onNext }: Props) {
     } else {
       setSelectedBrand({ value, label: "" });
     }
+    // Otra marca principal puede ser de otro cliente: se reinician las asociadas
+    if (value !== selectedBrand?.value) setAdditionalBrands([]);
     form.clearErrors("brand_id");
   };
 
@@ -119,6 +127,7 @@ export function WizardStep1Basics({ state, onNext }: Props) {
       title: values.title,
       brand_id: values.brand_id,
       brand_name: brandDetail.name,
+      additional_brands: additionalBrands,
       client_id: brandDetail.client_id ?? brandDetail.client_info?.id ?? null,
       client_name: brandDetail.client_info?.name ?? "",
       manager_id: brandDetail.manager_id,
@@ -129,6 +138,10 @@ export function WizardStep1Basics({ state, onNext }: Props) {
       billing_closed_at: values.billing_closed_at ?? "",
     });
   };
+
+  const brandClientId = brandDetail
+    ? brandDetail.client_id ?? brandDetail.client_info?.id ?? null
+    : null;
 
   const isLoadingBrandInfo = !!selectedBrand?.value && isLoadingDetail;
   const canProceed = !!brandDetail && !isLoadingDetail;
@@ -246,6 +259,24 @@ export function WizardStep1Basics({ state, onNext }: Props) {
                 Error al cargar la información de la marca
               </Card>
             ) : null}
+          </div>
+        )}
+
+        {brandDetail && brandClientId && (
+          <div className="space-y-2">
+            <label htmlFor="additional-brands" className="text-sm font-medium">
+              Marcas asociadas (opcional)
+            </label>
+            <AdditionalBrandsSelect
+              inputId="additional-brands"
+              clientId={brandClientId}
+              excludeBrandId={brandDetail.id}
+              value={additionalBrands}
+              onChange={setAdditionalBrands}
+            />
+            <p className="text-xs text-muted-foreground">
+              El proyecto queda asignado a la marca principal; las asociadas solo lo vinculan.
+            </p>
           </div>
         )}
 

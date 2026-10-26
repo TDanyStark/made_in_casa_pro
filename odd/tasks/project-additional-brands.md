@@ -15,7 +15,7 @@ S8. Reads: project responses include `additional_brands: {id, name}[]`; the proj
 ## Tasks
 T1 | S2,S3,S6,S8 | migration 023 `project_brands`; queries: select `additional_brands`, validate + insert on create, replace on update, brand filters match links; query tests | inline | done (RED 10 failed -> GREEN; queries 428 passed; tsc 0) | commit pending
 T2 | S3,S6,S7 | API: POST/PATCH zod `additional_brand_ids`, domain error codes/status; route tests | inline | done (RED 4 failed -> GREEN; api/projects 285 passed; tsc 0)
-T3 | S6,S7,S8 | UI: AdditionalBrandsSelect (react-select multi, client-filtered), wizard step 1 + confirm, ProjectHeader display, ProjectBrandsCard edit in detail; component tests; README | inline | pending
+T3 | S6,S7,S8 | UI: AdditionalBrandsSelect (react-select multi, client-filtered), wizard step 1 + confirm, ProjectHeader display, ProjectBrandsCard edit in detail; component tests; README | inline | done (RED -> GREEN; full Jest 176 suites / 1502 tests; tsc 0; eslint 0)
 
 ## Log
 L1. User request: "es posible Crear la forma de que un proyecto pueda estar asignado a muchas marcas?"
@@ -24,3 +24,5 @@ L3. Decisions: principal + additional brands (S2); Drive under principal (S4); t
 L4. Exploration: 21 app files use `projects.brand_id`; keeping it as principal leaves them untouched. `ClientComponent.tsx` is pre-existing dead code (not in scope). Engram mirror unavailable in this session (no memory tools).
 L5. User confirmation: "Ven recuerda que se colocara una marca principal y las demas seran asociadas, para no cambiar toda la estructura actual" — matches S2; no structure change to projects.brand_id.
 L6. T1: my-tasks brandId test updated on purpose (S8 changes the filter to principal-or-additional).
+L7. Slice boundary: slice 1 = T1 (aa152a1, 391 lines); slice 2 = T2 (5bda677) + T3 UI.
+L8. Final checks: full Jest 176 suites / 1502 passed; tsc --noEmit 0; eslint on edited files 0. Not run: migration 023 against a real PostgreSQL, browser check of the wizard/card.

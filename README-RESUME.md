@@ -55,6 +55,7 @@ clients (laboratorios)
   └── managers          gerente de contacto del cliente
 brands                  marca comercial       → client_id, manager_id
 projects                proyecto sobre marca  → client_id, brand_id, manager_id
+  └── project_brands    marcas asociadas      → brand_id (mismo cliente)
   └── project_tasks     tareas ejecutables    → task_quotes, task_transitions
 ```
 
@@ -149,6 +150,26 @@ del cliente que se está dejando, o cuando el sucesor es el propio gerente.
 
 El resultado devuelve `reassigned_brands` / `reassigned_projects` (lo heredado por
 sucesores) y `moved_brands` / `moved_projects` (lo que viajó con el gerente).
+
+### Marcas asociadas de un proyecto
+
+`projects.brand_id` es la **marca principal**: define cliente, gerente, carpeta de
+Drive y la línea "Marca" de los correos, igual que antes. Un proyecto puede además
+vincularse a **marcas asociadas** en `project_brands` (migración
+`023_project_brands.sql`).
+
+- `POST /api/projects` y `PATCH /api/projects/[id]` aceptan
+  `additional_brand_ids: number[]`; en PATCH reemplaza el conjunto completo
+  (`[]` quita todas).
+- Reglas (`app/lib/queries/projectBrands.ts`): marcas existentes
+  (`BRAND_NOT_FOUND` → 404), del mismo `projects.client_id`
+  (`BRAND_CLIENT_MISMATCH` → 400) y distintas de la principal
+  (`ADDITIONAL_BRAND_IS_PRINCIPAL` → 400). Si falla, no se escribe nada.
+- Las respuestas de proyecto incluyen `additional_brands: {id, name}[]`; filtrar
+  proyectos o "Mis tareas" por `brand_id` incluye los proyectos asociados a esa marca.
+- El traslado de gerentes no modifica `project_brands`.
+- UI: paso 1 del wizard ("Marcas asociadas") y tarjeta "Marcas" en la pestaña de
+  información del proyecto.
 
 ### Reasignación de gerente en un proyecto
 

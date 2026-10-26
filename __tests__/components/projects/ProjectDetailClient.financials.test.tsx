@@ -22,6 +22,7 @@ jest.mock("@/components/projects/ProjectNotesEditor", () => ({ ProjectNotesEdito
 jest.mock("@/components/projects/ProjectCoManagersTab", () => ({ ProjectCoManagersTab: () => <div>co</div> }));
 jest.mock("@/components/projects/ProjectInfoTab", () => ({ ProjectInfoTab: () => <div>info</div> }));
 jest.mock("@/components/projects/ProjectManagerCard", () => ({ ProjectManagerCard: () => <div>manager</div> }));
+jest.mock("@/components/projects/ProjectBrandsCard", () => ({ ProjectBrandsCard: () => <div>brands</div> }));
 jest.mock("@/components/projects/ProjectAdjustmentsTab", () => ({ ProjectAdjustmentsTab: () => <div>tasks</div> }));
 jest.mock("@/components/notifications/EmailHistoryTable", () => ({ EmailHistoryTable: () => <div>emails</div> }));
 

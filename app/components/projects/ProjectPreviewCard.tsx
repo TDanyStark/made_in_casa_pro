@@ -35,6 +35,11 @@ export function ProjectPreviewCard({ state }: ProjectPreviewCardProps) {
               )}
             </div>
           )}
+          {state.additional_brands?.length > 0 && (
+            <p className="text-xs text-muted-foreground">
+              {`Marcas asociadas: ${state.additional_brands.map((b) => b.name).join(", ")}`}
+            </p>
+          )}
         </div>
 
         {/* Manager */}
