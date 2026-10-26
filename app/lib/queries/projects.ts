@@ -497,7 +497,12 @@ export async function updateProject(
   try {
     const currentProject = await getProjectById(id);
     if (!currentProject) return null;
-    if (currentProject.status === 'completed' && data.status !== 'in_adjustments' && data.status !== 'archived' && data.status !== 'active') {
+    // Las marcas asociadas son un vínculo informativo: se pueden editar aun
+    // con el proyecto completado, siempre que sea lo único que cambia.
+    const onlyAdditionalBrands = Object.entries(data).every(
+      ([key, value]) => key === "additional_brand_ids" || value === undefined
+    );
+    if (!onlyAdditionalBrands && currentProject.status === 'completed' && data.status !== 'in_adjustments' && data.status !== 'archived' && data.status !== 'active') {
        throw new Error("No se pueden editar proyectos completados");
     }
 

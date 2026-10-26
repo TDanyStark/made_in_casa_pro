@@ -136,10 +136,8 @@ export function ProjectDetailClient({ projectId, userRole, currentUserId }: Prop
             project={project}
             canEdit={canEdit && project.status !== 'completed'}
           />
-          <ProjectBrandsCard
-            project={project}
-            canEdit={canEdit && project.status !== 'completed'}
-          />
+          {/* Las marcas asociadas se pueden editar incluso con el proyecto completado */}
+          <ProjectBrandsCard project={project} canEdit={canEdit} />
           <ProjectInfoTab project={project} canEdit={canEdit && project.status !== 'completed'} />
         </TabsContent>
 
