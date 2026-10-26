@@ -70,6 +70,8 @@ const project: ProjectDetailType = {
   brand_name: "Marca",
   manager_id: 2,
   manager_name: "Ana",
+  created_manager_id: 2,
+  created_manager_name: "Ana",
   client_id: 3,
   client_name: "Cliente",
   campaign_id: null,

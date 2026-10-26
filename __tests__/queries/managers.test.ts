@@ -640,6 +640,34 @@ describe('transferManager()', () => {
     expectNoClientMoves();
   });
 
+  it('S7: el traslado mueve el gerente actual de los proyectos pero nunca escribe created_manager_id', async () => {
+    queueBaseReads();
+    mockExecute.mockResolvedValueOnce(makeResult([{ id: 4, client_id: 5, manager_id: 2 }])); // marca
+    mockExecute.mockResolvedValueOnce(makeResult([{ client_id: 5 }]));                       // sucesor
+    queueManagedBrands([{ id: 4, name: 'Nulytelly' }]);
+    mockExecute.mockResolvedValueOnce(makeResult([]));
+    mockTransaction.execute.mockImplementation(async (stmt: { sql: string }) => {
+      if (/FROM projects/.test(stmt.sql) && /FOR UPDATE/.test(stmt.sql)) {
+        return makeResult([{ id: 30, manager_id: 2 }]);
+      }
+      if (stmt.sql.includes('LEFT JOIN brands b ON b.id = p.brand_id')) {
+        return makeResult([{ id: 20, title: 'Otra marca', brand_manager_id: 13 }]);
+      }
+      return makeResult([]);
+    });
+
+    await transferManager({
+      managerId: 2,
+      targetClientId: 9,
+      brandReassignments: [{ brand_id: 4, new_manager_id: 11 }],
+    });
+
+    const sql = transactionSql();
+    expect(sql.filter((s) => s.includes('UPDATE projects SET manager_id'))).toHaveLength(2);
+    expect(sql.some((s) => s.includes('created_manager_id'))).toBe(false);
+    expect(mockExecute.mock.calls.some((c) => (c[0] as { sql: string }).sql.includes('created_manager_id'))).toBe(false);
+  });
+
   it('S10: falla cerrado si la marca principal de un proyecto no tiene un nuevo gerente', async () => {
     queueBaseReads();
     queueManagedBrands([]);

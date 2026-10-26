@@ -17,6 +17,7 @@ jest.mock('next/cache', () => ({
 
 import { db } from '@/lib/db';
 import {
+  cascadeBrandManagerToProjects,
   createProject,
   clearProjectDriveAccessFailure,
   getProjectDriveAccessFailures,
@@ -171,6 +172,7 @@ describe('project queries metadata fields', () => {
           'Proyecto',
           2,
           3,
+          3, // created_manager_id: gerente al crearse = manager_id (S7)
           7, // client_id heredado de la marca, no del gerente
           null,
           null,
@@ -412,5 +414,87 @@ describe('getProjectManagerHistory()', () => {
   it('returns an empty array when db throws', async () => {
     mockExecute.mockRejectedValueOnce(new Error('error'));
     expect(await getProjectManagerHistory(11)).toEqual([]);
+  });
+});
+
+describe('gerente al crearse (created_manager_id)', () => {
+  // Spec: odd/tasks/brand-owned-project-manager.md — S7, S8
+
+  it('S7: createProject guarda created_manager_id igual a manager_id', async () => {
+    mockTransaction.execute.mockResolvedValueOnce(makeResult([{ id: 15 }]));
+    mockExecute
+      .mockResolvedValueOnce(makeResult([{ client_id: 7, manager_id: 3 }]))
+      .mockResolvedValueOnce(makeResult([{ client_id: 7 }]))
+      .mockResolvedValueOnce(makeResult([{ id: 15 }]));
+
+    await createProject({ title: 'Proyecto', brand_id: 2, manager_id: 3 });
+
+    const insert = mockTransaction.execute.mock.calls[0][0] as { sql: string; args: unknown[] };
+    expect(insert.sql.replace(/\s+/g, ' ')).toContain(
+      'INSERT INTO projects (title, brand_id, manager_id, created_manager_id, client_id,'
+    );
+    expect(insert.sql).toContain('$15');
+    expect(insert.args).toHaveLength(15);
+    expect(insert.args.slice(0, 5)).toEqual(['Proyecto', 2, 3, 3, 7]);
+  });
+
+  it('S8: getProjectById devuelve created_manager_id y created_manager_name', async () => {
+    mockExecute.mockResolvedValueOnce(makeResult([{ id: 1 }]));
+
+    await getProjectById(1);
+
+    const sql = (mockExecute.mock.calls[0]?.[0] as { sql: string }).sql;
+    expect(sql).toContain('p.created_manager_id');
+    expect(sql).toContain('cm.name          AS created_manager_name');
+    expect(sql).toContain('LEFT JOIN managers         cm  ON p.created_manager_id = cm.id');
+    // El gerente actual sigue saliendo de manager_id
+    expect(sql).toContain('LEFT JOIN managers         m   ON p.manager_id  = m.id');
+  });
+
+  it('S8: el listado paginado también incluye el gerente al crearse', async () => {
+    mockExecute
+      .mockResolvedValueOnce(makeResult([{ count: 0 }]))
+      .mockResolvedValueOnce(makeResult([]));
+
+    await getProjectsWithPagination({});
+
+    const listSql = (mockExecute.mock.calls[1]?.[0] as { sql: string }).sql;
+    expect(listSql).toContain('AS created_manager_name');
+    expect(listSql).toContain('ON p.created_manager_id = cm.id');
+  });
+
+  it('S7: la cascada de marca mueve manager_id pero nunca escribe created_manager_id', async () => {
+    mockTransaction.execute.mockResolvedValueOnce(
+      makeResult([{ id: 30, manager_id: 7 }])
+    );
+
+    const moved = await cascadeBrandManagerToProjects(
+      mockTransaction as never,
+      4,
+      11,
+      77,
+      'Traslado'
+    );
+
+    expect(moved).toEqual([30]);
+    const calls = mockTransaction.execute.mock.calls.map((c) => c[0] as { sql: string; args: unknown[] });
+    expect(calls.find((c) => c.sql.includes('UPDATE projects'))?.sql).toBe(
+      'UPDATE projects SET manager_id = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2'
+    );
+    expect(calls.some((c) => c.sql.includes('created_manager_id'))).toBe(false);
+  });
+
+  it('S7: updateProject ignora created_manager_id aunque llegue en el payload', async () => {
+    const current = { id: 9, status: 'active', manager_id: 3, client_id: 7 };
+    mockExecute
+      .mockResolvedValueOnce(makeResult([current]))
+      .mockResolvedValueOnce(makeResult([]))
+      .mockResolvedValueOnce(makeResult([current]));
+
+    await updateProject(9, { title: 'Nuevo', created_manager_id: 12 } as never);
+
+    const update = mockExecute.mock.calls[1][0] as { sql: string; args: unknown[] };
+    expect(update.sql).toBe('UPDATE projects SET title = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2');
+    expect(update.args).toEqual(['Nuevo', 9]);
   });
 });

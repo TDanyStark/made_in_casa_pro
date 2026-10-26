@@ -30,6 +30,8 @@ const PROJECT_SELECT = `
   b.name           AS brand_name,
   p.manager_id,
   m.name           AS manager_name,
+  p.created_manager_id,
+  cm.name          AS created_manager_name,
   cl.id            AS client_id,
   cl.name          AS client_name,
   p.campaign_id,
@@ -54,11 +56,13 @@ const PROJECT_SELECT = `
 `;
 
 // El cliente sale de `projects.client_id` (migración 012), NO del gerente.
-// `managers` se mantiene solo para resolver `manager_name`.
+// `managers` se mantiene solo para resolver `manager_name` (gerente actual) y
+// `created_manager_name` (gerente con el que se creó, migración 025).
 const PROJECT_JOINS = `
   FROM projects p
   LEFT JOIN brands           b   ON p.brand_id    = b.id
   LEFT JOIN managers         m   ON p.manager_id  = m.id
+  LEFT JOIN managers         cm  ON p.created_manager_id = cm.id
   LEFT JOIN clients          cl  ON p.client_id   = cl.id
   LEFT JOIN campaigns        cam ON p.campaign_id = cam.id
   LEFT JOIN products         pr  ON p.product_id  = pr.id
@@ -430,13 +434,15 @@ export async function createProject(data: {
       const result = await transaction.execute({
         sql: `
           INSERT INTO projects
-            (title, brand_id, manager_id, client_id, product_id, campaign_id, drive_folder_id, drive_folder_url, notes, ideal_delivery_at, oc, billing_closed_at, status, created_by)
-          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+            (title, brand_id, manager_id, created_manager_id, client_id, product_id, campaign_id, drive_folder_id, drive_folder_url, notes, ideal_delivery_at, oc, billing_closed_at, status, created_by)
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
           RETURNING id
         `,
         args: [
           data.title,
           data.brand_id,
+          data.manager_id,
+          // Gerente al crearse (S7): fijo, nada más lo escribe.
           data.manager_id,
           clientId,
           data.product_id ?? null,

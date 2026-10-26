@@ -80,4 +80,33 @@ describe('ProjectManagerCard', () => {
       expect(mockPatch).not.toHaveBeenCalled();
     }
   );
+
+  it('S8: muestra el gerente y el cliente con los que se cre\u00f3 el proyecto', async () => {
+    renderWithQueryClient(
+      <ProjectManagerCard
+        project={{
+          ...project,
+          created_manager_id: 2,
+          created_manager_name: 'Monica Robles',
+        } as ProjectDetailType}
+      />
+    );
+
+    expect(screen.getByText('Al crearse: Monica Robles (Adium Co)')).toBeInTheDocument();
+    // El encabezado sigue mostrando el gerente actual
+    expect(screen.getByText('Gerente principal')).toBeInTheDocument();
+    expect(screen.getByText('Luis Sandoval', { selector: 'p' })).toBeInTheDocument();
+    await screen.findByText('Motivo: Traslado');
+  });
+
+  it('S8: oculta la l\u00ednea si no hay gerente al crearse', async () => {
+    renderWithQueryClient(
+      <ProjectManagerCard
+        project={{ ...project, created_manager_name: null } as unknown as ProjectDetailType}
+      />
+    );
+
+    expect(screen.queryByText(/Al crearse:/)).not.toBeInTheDocument();
+    await screen.findByText('Motivo: Traslado');
+  });
 });
