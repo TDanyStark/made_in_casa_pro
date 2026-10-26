@@ -1,6 +1,7 @@
 "use client";
 
 import { useLayoutEffect, useRef, useState } from "react";
+import { INVALID_COP_AMOUNT_MESSAGE, parseCopAmount } from "@/lib/utils/cop-amount";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -86,7 +87,7 @@ function TaskCostSection({
   const detail = data ? describeTaskCost(data) : null;
   const correction = data ? describeCorrection(data) : null;
   const canEdit = canEditCost && Boolean(data?.editable);
-  const cleanDraft = draft.replace(/[^0-9.]/g, "");
+  const isDraftEmpty = draft.trim() === "";
 
   const startEditing = () => {
     setDraft(data ? String(data.cost) : "");
@@ -94,11 +95,16 @@ function TaskCostSection({
   };
 
   const saveCost = async () => {
-    if (cleanDraft === "") return;
+    const amount = parseCopAmount(draft);
+    if (amount === null) return;
+    if (amount === undefined) {
+      toast.error(INVALID_COP_AMOUNT_MESSAGE);
+      return;
+    }
     setIsSaving(true);
     try {
       const res = await patch<TaskCost>(`projects/${projectId}/tasks/${taskId}/cost`, {
-        completion_cost: Number(cleanDraft),
+        completion_cost: amount,
       });
       if (!res.ok || !res.data) throw new Error(res.error || "Error al corregir el costo de la tarea");
       queryClient.setQueryData(queryKey, res.data);
@@ -149,7 +155,7 @@ function TaskCostSection({
               disabled={isSaving}
               autoFocus
             />
-            <Button type="submit" size="xs" disabled={isSaving || cleanDraft === ""}>
+            <Button type="submit" size="xs" disabled={isSaving || isDraftEmpty}>
               Guardar
             </Button>
             <Button type="button" size="xs" variant="ghost" onClick={() => setIsEditing(false)} disabled={isSaving}>

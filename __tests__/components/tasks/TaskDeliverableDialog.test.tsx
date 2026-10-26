@@ -352,6 +352,26 @@ describe("TaskDeliverableDialog — cost correction (S15, S16)", () => {
     expect(screen.queryByLabelText("Nuevo costo de la tarea")).not.toBeInTheDocument();
   });
 
+  it("parses Colombian thousands separators in the corrected cost", async () => {
+    renderEditable(external, true);
+    fireEvent.click(await screen.findByRole("button", { name: "Corregir costo de la tarea" }));
+    fireEvent.change(screen.getByLabelText("Nuevo costo de la tarea"), { target: { value: "1.500.000" } });
+    mockPatch.mockResolvedValue({ ok: true, data: { ...external, cost: 1500000 } });
+    fireEvent.click(screen.getByRole("button", { name: "Guardar" }));
+
+    await waitFor(() => expect(mockPatch).toHaveBeenCalledWith("projects/10/tasks/1/cost", { completion_cost: 1500000 }));
+  });
+
+  it("does not send a non-numeric cost and shows an error", async () => {
+    renderEditable(external, true);
+    fireEvent.click(await screen.findByRole("button", { name: "Corregir costo de la tarea" }));
+    fireEvent.change(screen.getByLabelText("Nuevo costo de la tarea"), { target: { value: "abc" } });
+    fireEvent.click(screen.getByRole("button", { name: "Guardar" }));
+
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith("Ingresa un precio válido en pesos (solo números)"));
+    expect(mockPatch).not.toHaveBeenCalled();
+  });
+
   it("sends 0 as a valid cost", async () => {
     renderEditable(external, true);
     fireEvent.click(await screen.findByRole("button", { name: "Corregir costo de la tarea" }));
