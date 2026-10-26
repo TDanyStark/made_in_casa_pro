@@ -304,11 +304,16 @@ export type CampaignType = {
 
 export type ProjectStatus = 'active' | 'paused' | 'completed' | 'archived' | 'in_adjustments';
 
+export type ProjectBrandRef = { id: number; name: string };
+
 export type ProjectType = {
   id: number;
   title: string;
+  /** Marca principal: define cliente, gerente, carpeta de Drive y correos */
   brand_id: number;
   brand_name: string;
+  /** Marcas adicionales vinculadas (mismo cliente), ordenadas por nombre */
+  additional_brands?: ProjectBrandRef[];
   manager_id: number;
   manager_name: string;
   client_id: number;

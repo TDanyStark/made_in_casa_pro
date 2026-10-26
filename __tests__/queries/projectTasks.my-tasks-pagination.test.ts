@@ -62,7 +62,8 @@ describe("getMyTasksWithPagination", () => {
     await getMyTasksWithPagination({ userId: 8, brandId: 5, page: 1, limit: 10 });
 
     const countCall = mockExecute.mock.calls[0][0] as { sql: string; args: unknown[] };
-    expect(countCall.sql).toContain("p.brand_id = $");
+    // S8: principal brand or additional brand (project_brands)
+    expect(countCall.sql).toContain("= ANY(ARRAY[p.brand_id] || ARRAY(SELECT pb.brand_id FROM project_brands pb WHERE pb.project_id = p.id))");
     expect(countCall.args).toContain(5);
   });
 

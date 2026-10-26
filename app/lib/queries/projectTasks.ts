@@ -19,6 +19,7 @@ import { CREATOR_FILTER_ROLES } from "@/lib/role-groups";
 import type { DbTransaction } from "../db/types";
 import { completionFreeze, type CompletionFreeze } from "../internal-rate";
 import { WEEKLY_WORK_HOURS_SQL } from "./settings";
+import { PROJECT_BRAND_FILTER_SQL } from "./projectBrands";
 
 /**
  * A business rule rejected the operation. `status` is the HTTP status the API
@@ -1661,7 +1662,8 @@ export async function getMyTasksWithPagination(
     const conditions: Array<{ sql: string; value: unknown }> = [
       { sql: "pt.assigned_user_id = $", value: userId },
       { sql: "pt.status = ANY($)", value: resolvedStatuses },
-      { sql: "p.brand_id = $", value: brandId },
+      // Marca principal o adicional del proyecto
+      { sql: PROJECT_BRAND_FILTER_SQL, value: brandId },
       { sql: "p.created_by = $", value: creatorUserId },
       { sql: "pt.assigned_at >= $", value: assignedFrom },
       { sql: "pt.assigned_at <= $", value: assignedTo },
