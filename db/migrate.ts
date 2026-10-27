@@ -14,16 +14,10 @@ import { readdir, readFile } from "fs/promises";
 import { join, dirname } from "path";
 import { fileURLToPath } from "url";
 import { Pool } from "pg";
+import { loadEnvFiles } from "./load-env";
 
-// ── Cargar variables de entorno ──────────────────────────────────────────────
-for (const envFile of [".env.local", ".env"]) {
-  try {
-    process.loadEnvFile(envFile);
-    break;
-  } catch {
-    // Archivo no encontrado — continúa con el siguiente
-  }
-}
+// ── Cargar variables de entorno (.env.local primero; .env completa) ─────────
+loadEnvFiles();
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
