@@ -9,7 +9,6 @@ import {
 } from "../definitions";
 import { DomainError } from "../errors";
 import { ITEMS_PER_PAGE } from "@/config/constants";
-import { cascadeBrandManagerToProjects, reassignProjectManager } from "./projects";
 
 export async function getManagerByEmail(email: string) {
   try {
@@ -259,10 +258,12 @@ export interface TransferManagerInput {
  * `UPDATE managers SET client_id` más una fila de historial, nunca una fila
  * duplicada. Las marcas nunca cambian de cliente (`brands.client_id` y
  * `projects.client_id` no se tocan): cada marca del gerente necesita un
- * sucesor de ESE cliente o el traslado se rechaza. Cada marca reasignada mueve
- * todos sus proyectos a su sucesor (`cascadeBrandManagerToProjects`), y el resto
- * de proyectos del gerente pasa al gerente de su marca principal (no hay
- * elección por proyecto: su gerente es el de su marca).
+ * sucesor de ESE cliente o el traslado se rechaza. El gerente actual de un
+ * proyecto se lee siempre de su marca principal, así que los proyectos siguen
+ * a su marca sin escrituras por proyecto (ni `projects` ni
+ * `project_manager_history`); `followed_projects` es el número de proyectos de
+ * las marcas reasignadas. Como toda marca del gerente necesita sucesor, ningún
+ * proyecto puede quedarse con el gerente que se va.
  *
  * Todo ocurre en una única transacción: o se traslada con sus reasignaciones y
  * su auditoría completas, o no se traslada.
@@ -353,64 +354,20 @@ export async function transferManager({
           reason ?? null,
         ],
       });
-      // Reasignar una marca es un cambio de gerente de marca: TODOS sus
-      // proyectos (cualquier estado y gerente actual) pasan a su sucesor.
-      const moved = await cascadeBrandManagerToProjects(
-        transaction,
-        brand.brandId,
-        brand.newManagerId,
-        changedBy,
-        reason
-      );
-      followedProjectsCount += moved.length;
     }
 
-    // El resto de proyectos del gerente (de marcas no reasignadas en este
-    // traslado) sigue al gerente de su marca principal. Los de las marcas
-    // reasignadas ya no apuntan a él, así que no se auditan dos veces.
-    const followers = await transaction.execute({
-      sql: `SELECT p.id, p.title, b.manager_id AS brand_manager_id
-              FROM projects p
-              LEFT JOIN brands b ON b.id = p.brand_id
-             WHERE p.manager_id = $1
-             ORDER BY p.id`,
-      args: [managerId],
-    });
-    const followerRows = followers.rows as unknown as Array<{
-      id: number;
-      title: string;
-      brand_manager_id: number | null;
-    }>;
-
-    // Falla cerrado: un proyecto no puede quedarse con el gerente que se va ni
-    // sin gerente porque su marca no lo tenga.
-    const orphaned = followerRows.filter(
-      (row) =>
-        row.brand_manager_id === null ||
-        Number(row.brand_manager_id) === Number(managerId)
-    );
-    if (orphaned.length > 0) {
-      throw new DomainError(
-        "BRANDS_WITHOUT_SUCCESSOR",
-        `Asigna un nuevo gerente a la marca principal de estos proyectos antes del traslado: ${orphaned
-          .map((row) => row.title)
-          .join(", ")}`
+    // Los proyectos de las marcas reasignadas siguen a su nuevo gerente sin
+    // escribirse: solo se cuentan para el resultado.
+    if (brandRows.length > 0) {
+      const placeholders = brandRows.map((_, index) => `$${index + 1}`);
+      const followed = await transaction.execute({
+        sql: `SELECT COUNT(*) AS count FROM projects WHERE brand_id IN (${placeholders.join(", ")})`,
+        args: brandRows.map((brand) => brand.brandId),
+      });
+      followedProjectsCount = Number(
+        (followed.rows[0] as { count?: number | string } | undefined)?.count ?? 0
       );
     }
-
-    for (const row of followerRows) {
-      await reassignProjectManager(
-        transaction,
-        {
-          projectId: Number(row.id),
-          previousManagerId: Number(managerId),
-          newManagerId: Number(row.brand_manager_id),
-        },
-        changedBy,
-        reason
-      );
-    }
-    followedProjectsCount += followerRows.length;
 
     const managerUpdates = [`client_id = $1`];
     const managerArgs: unknown[] = [targetClientId];
@@ -619,7 +576,7 @@ export async function getManagerTransferPreview(
         FROM projects p
         JOIN brands b ON p.brand_id = b.id
         WHERE b.manager_id = $1
-          AND p.client_id = $2
+          AND b.client_id = $2
           AND p.status <> 'archived'
         ORDER BY p.updated_at DESC
       `,

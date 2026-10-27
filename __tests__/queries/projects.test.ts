@@ -16,8 +16,8 @@ jest.mock('next/cache', () => ({
 }));
 
 import { db } from '@/lib/db';
+import * as projectQueries from '@/lib/queries/projects';
 import {
-  cascadeBrandManagerToProjects,
   createProject,
   clearProjectDriveAccessFailure,
   getProjectDriveAccessFailures,
@@ -172,8 +172,7 @@ describe('project queries metadata fields', () => {
         args: [
           'Proyecto',
           2,
-          3,
-          3, // created_manager_id: gerente al crearse = manager_id (S7)
+          3, // created_manager_id: gerente al crearse = gerente de la marca (S7)
           7, // client_id heredado de la marca, no del gerente
           null,
           null,
@@ -442,7 +441,7 @@ describe('gerente y cliente actuales: se leen de la marca principal', () => {
 describe('gerente al crearse (created_manager_id)', () => {
   // Spec: odd/tasks/brand-owned-project-manager.md — S7, S8
 
-  it('S7: createProject guarda created_manager_id igual a manager_id', async () => {
+  it('S4: createProject guarda created_manager_id y ya no escribe projects.manager_id', async () => {
     mockTransaction.execute.mockResolvedValueOnce(makeResult([{ id: 15 }]));
     mockExecute
       .mockResolvedValueOnce(makeResult([{ client_id: 7, manager_id: 3 }]))
@@ -452,12 +451,22 @@ describe('gerente al crearse (created_manager_id)', () => {
     await createProject({ title: 'Proyecto', brand_id: 2, manager_id: 3 });
 
     const insert = mockTransaction.execute.mock.calls[0][0] as { sql: string; args: unknown[] };
-    expect(insert.sql.replace(/\s+/g, ' ')).toContain(
-      'INSERT INTO projects (title, brand_id, manager_id, created_manager_id, client_id,'
+    const sql = insert.sql.replace(/\s+/g, ' ');
+    expect(sql).toContain(
+      'INSERT INTO projects (title, brand_id, created_manager_id, client_id, product_id,'
     );
-    expect(insert.sql).toContain('$15');
-    expect(insert.args).toHaveLength(15);
-    expect(insert.args.slice(0, 5)).toEqual(['Proyecto', 2, 3, 3, 7]);
+    expect(sql).not.toMatch(/[(,] manager_id[,)]/);
+    expect(insert.sql).toContain('$14');
+    expect(insert.sql).not.toContain('$15');
+    expect(insert.args).toHaveLength(14);
+    expect(insert.args.slice(0, 4)).toEqual(['Proyecto', 2, 3, 7]);
+    // Ninguna sentencia del alta escribe project_manager_history
+    const all = [
+      ...mockTransaction.execute.mock.calls.map((c) => (c[0] as { sql: string }).sql),
+      ...mockExecute.mock.calls.map((c) => (c[0] as { sql: string }).sql),
+    ];
+    expect(all.some((s) => s.includes('project_manager_history'))).toBe(false);
+    expect(mockTransaction.commit).toHaveBeenCalledTimes(1);
   });
 
   it('S8: getProjectById devuelve created_manager_id y created_manager_name', async () => {
@@ -483,25 +492,9 @@ describe('gerente al crearse (created_manager_id)', () => {
     expect(listSql).toContain('ON p.created_manager_id = cm.id');
   });
 
-  it('S7: la cascada de marca mueve manager_id pero nunca escribe created_manager_id', async () => {
-    mockTransaction.execute.mockResolvedValueOnce(
-      makeResult([{ id: 30, manager_id: 7 }])
-    );
-
-    const moved = await cascadeBrandManagerToProjects(
-      mockTransaction as never,
-      4,
-      11,
-      77,
-      'Traslado'
-    );
-
-    expect(moved).toEqual([30]);
-    const calls = mockTransaction.execute.mock.calls.map((c) => c[0] as { sql: string; args: unknown[] });
-    expect(calls.find((c) => c.sql.includes('UPDATE projects'))?.sql).toBe(
-      'UPDATE projects SET manager_id = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2'
-    );
-    expect(calls.some((c) => c.sql.includes('created_manager_id'))).toBe(false);
+  it('S4: ya no existen helpers que escriban el gerente de un proyecto', () => {
+    expect(projectQueries).not.toHaveProperty('cascadeBrandManagerToProjects');
+    expect(projectQueries).not.toHaveProperty('reassignProjectManager');
   });
 
   it('S7: updateProject ignora created_manager_id aunque llegue en el payload', async () => {

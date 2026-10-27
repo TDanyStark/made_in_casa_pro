@@ -9,7 +9,6 @@ import {
   UserRole,
 } from "../definitions";
 import { DomainError } from "../errors";
-import type { DbTransaction } from "../db/types";
 import { buildWhereClause, buildPaginationArgs, parseTotal } from "../db/query-helpers";
 import { ITEMS_PER_PAGE } from "@/config/constants";
 import {
@@ -411,7 +410,9 @@ export async function createProject(data: {
 }): Promise<ProjectType> {
   try {
     // La marca principal es la fuente de verdad del cliente (migración 012) y
-    // del gerente: el proyecto nace con el gerente actual de su marca.
+    // del gerente: el proyecto nace con el gerente actual de su marca. El
+    // gerente actual no se guarda en el proyecto (se lee de `brands.manager_id`);
+    // solo se fija el gerente al crearse (`created_manager_id`).
     const brand = await getPrincipalBrand(data.brand_id);
     const clientId = brand.clientId;
     if (brand.managerId === null || Number(data.manager_id) !== brand.managerId) {
@@ -434,15 +435,14 @@ export async function createProject(data: {
       const result = await transaction.execute({
         sql: `
           INSERT INTO projects
-            (title, brand_id, manager_id, created_manager_id, client_id, product_id, campaign_id, drive_folder_id, drive_folder_url, notes, ideal_delivery_at, oc, billing_closed_at, status, created_by)
-          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+            (title, brand_id, created_manager_id, client_id, product_id, campaign_id, drive_folder_id, drive_folder_url, notes, ideal_delivery_at, oc, billing_closed_at, status, created_by)
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
           RETURNING id
         `,
         args: [
           data.title,
           data.brand_id,
-          data.manager_id,
-          // Gerente al crearse (S7): fijo, nada más lo escribe.
+          // Gerente al crearse: fijo, nada más lo escribe.
           data.manager_id,
           clientId,
           data.product_id ?? null,
@@ -488,9 +488,9 @@ export async function createProject(data: {
 /**
  * Actualiza un proyecto.
  *
- * `manager_id` NO es actualizable aquí: el gerente de un proyecto es siempre el
- * de su marca principal y cambia solo al reasignar la marca (`updateBrand`, que
- * llama a `cascadeBrandManagerToProjects`).
+ * El gerente NO es actualizable aquí: el gerente actual de un proyecto se lee
+ * siempre de su marca principal (`brands.manager_id`) y cambia solo al
+ * reasignar la marca (`updateBrand`), sin escribir nada en el proyecto.
  */
 export async function updateProject(
   id: number,
@@ -588,71 +588,6 @@ export async function updateProject(
     console.error("Error updating project:", error);
     throw error;
   }
-}
-
-/** Cambia el gerente de un proyecto y lo audita en `project_manager_history`. */
-export async function reassignProjectManager(
-  transaction: DbTransaction,
-  project: {
-    projectId: number;
-    previousManagerId: number | null;
-    newManagerId: number;
-  },
-  changedBy: number | null | undefined,
-  reason: string | null | undefined
-): Promise<void> {
-  await transaction.execute({
-    sql: `UPDATE projects SET manager_id = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2`,
-    args: [project.newManagerId, project.projectId],
-  });
-  await transaction.execute({
-    sql: `INSERT INTO project_manager_history
-            (project_id, previous_manager_id, new_manager_id, changed_by, reason)
-          VALUES ($1, $2, $3, $4, $5)`,
-    args: [
-      project.projectId,
-      project.previousManagerId,
-      project.newManagerId,
-      changedBy ?? null,
-      reason ?? null,
-    ],
-  });
-}
-
-/**
- * El gerente de un proyecto es el de su marca principal: al cambiar el gerente
- * de una marca, TODOS sus proyectos (cualquier estado) pasan al nuevo gerente,
- * cada uno con su fila en `project_manager_history`. Corre dentro de la
- * transacción del cambio de marca. Devuelve los ids de los proyectos movidos.
- */
-export async function cascadeBrandManagerToProjects(
-  transaction: DbTransaction,
-  brandId: number | string,
-  newManagerId: number,
-  changedBy: number | null | undefined,
-  reason: string | null | undefined
-): Promise<number[]> {
-  const result = await transaction.execute({
-    sql: `SELECT id, manager_id FROM projects
-           WHERE brand_id = $1 AND manager_id IS DISTINCT FROM $2
-           ORDER BY id
-           FOR UPDATE`,
-    args: [brandId, newManagerId],
-  });
-  const rows = result.rows as unknown as Array<{ id: number; manager_id: number | null }>;
-  for (const row of rows) {
-    await reassignProjectManager(
-      transaction,
-      {
-        projectId: Number(row.id),
-        previousManagerId: row.manager_id === null ? null : Number(row.manager_id),
-        newManagerId: Number(newManagerId),
-      },
-      changedBy,
-      reason
-    );
-  }
-  return rows.map((row) => Number(row.id));
 }
 
 export async function deleteProject(id: number): Promise<void> {

@@ -4,7 +4,6 @@ import { BrandManagerHistoryEntry, BrandType } from "../definitions";
 import { getManagerById } from "./managers";
 import { DomainError } from "../errors";
 import { ITEMS_PER_PAGE } from "@/config/constants";
-import { cascadeBrandManagerToProjects } from "./projects";
 
 export async function getBrandsByManagerId(managerId: string) {
   try {
@@ -159,9 +158,11 @@ export async function createBrand(brandData: Omit<BrandType, "id">) {
  * movía la marca de cliente en silencio.
  *
  * Cambiar el gerente es la ÚNICA forma de cambiar el gerente de sus proyectos:
- * en la misma transacción que el UPDATE y `brand_manager_history`, todos los
- * proyectos cuya marca principal es esta pasan al nuevo gerente (con su fila en
- * `project_manager_history`). Devuelve sus ids para re-sincronizar Drive.
+ * el gerente actual de un proyecto se lee siempre de su marca principal, así
+ * que no se escribe nada en `projects` ni en `project_manager_history`. En la
+ * misma transacción que el UPDATE y `brand_manager_history` se leen los ids de
+ * los proyectos cuya marca principal es esta (los que ahora tienen el nuevo
+ * gerente) y se devuelven.
  *
  * @param changedBy id del usuario que ejecuta el cambio (auditoría)
  */
@@ -233,8 +234,8 @@ export async function updateBrand(
           args,
         });
 
-        // Si hay cambio de manager, registrar en la tabla de historial y pasar
-        // los proyectos de la marca al nuevo gerente
+        // Si hay cambio de manager, registrar en la tabla de historial y leer
+        // los proyectos de la marca, que ahora tienen al nuevo gerente
         let reassignedProjectIds: number[] = [];
         if (managerChanged && currentBrand) {
           await transaction.execute({
@@ -249,13 +250,13 @@ export async function updateBrand(
               reason ?? null,
             ],
           });
-          reassignedProjectIds = await cascadeBrandManagerToProjects(
-            transaction,
-            id,
-            Number(manager_id),
-            changedBy,
-            reason
-          );
+          const projects = await transaction.execute({
+            sql: `SELECT id FROM projects WHERE brand_id = $1 ORDER BY id`,
+            args: [id],
+          });
+          reassignedProjectIds = (
+            projects.rows as unknown as Array<{ id: number }>
+          ).map((row) => Number(row.id));
         }
 
         // Confirmar transacción

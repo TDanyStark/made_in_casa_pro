@@ -171,7 +171,7 @@ export type ManagerTransferResult = {
   new_client_id: number;
   /** Marcas entregadas a un sucesor; se quedan en el cliente que el gerente deja. */
   reassigned_brands: number;
-  /** Proyectos del gerente: pasan siempre al nuevo gerente de su marca principal. */
+  /** Proyectos de las marcas reasignadas: siguen al nuevo gerente de su marca sin escribirse. */
   followed_projects: number;
 };
 

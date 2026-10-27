@@ -94,8 +94,8 @@ export async function PATCH(
       return NextResponse.json(existingBrand);
     }
 
-    // El actor queda registrado en brand_manager_history y en el historial de
-    // cada proyecto que pasa al nuevo gerente
+    // El actor queda registrado en brand_manager_history; los proyectos de la
+    // marca siguen al nuevo gerente sin escribirse (reassigned_projects)
     const cookie = (await cookies()).get("session")?.value;
     const session = cookie ? await decrypt(cookie) : null;
 
