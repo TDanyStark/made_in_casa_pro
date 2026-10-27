@@ -12,7 +12,9 @@
 --
 -- Orden de despliegue: 026 → desplegar el código que ya no usa la columna →
 -- 027. Si el código anterior a 026 sigue desplegado, NO ejecutar esta
--- migración: ese código escribe y lee `projects.manager_id`.
+-- migración: ese código escribe y lee `projects.manager_id`. Ojo: `db:migrate`
+-- aplica todas las pendientes juntas; no lo ejecutes con 026 y 027 pendientes
+-- mientras siga desplegado el código anterior.
 --
 -- Rollback: el valor se puede reconstruir desde la marca (y los valores
 -- anteriores a la alineación de 024 siguen en `project_manager_history`):

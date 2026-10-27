@@ -577,6 +577,13 @@ desalineados):
    (`manager_id` sigue siendo NOT NULL).
 3. Ejecutar `027` solo cuando ese código esté en producción.
 
+`npm run db:migrate` aplica **todas** las migraciones pendientes de una vez:
+si 026 y 027 están pendientes a la vez con el código anterior desplegado, 027
+eliminaría la columna que ese código todavía usa. Para el paso 1, aplica solo la
+026 (por ejemplo, con `psql -1 -f db/migrations/026_brand_sourced_project_manager.sql`
+y registrándola en `_migrations`, o migrando desde una rama sin la 027) o ejecuta
+`db:migrate` justo después de desplegar el código nuevo.
+
 ### Variables de entorno
 
 Requeridas:
