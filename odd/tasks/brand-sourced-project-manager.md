@@ -1,6 +1,6 @@
 # Brand-sourced project manager
 The current project manager is always read from `brands.manager_id` via `projects.brand_id`; `projects.manager_id` stops being written and is dropped. Managers get no Drive access by default.
-Branch: feat/brand-sourced-project-manager (from main 857d814); delivery: chained PR slices, one per task (T1 d160cc4 | T2 4ab03d1 | T3 b304c6a | T4). No push, no production DB writes or migrations without the user.
+Branch: feat/brand-sourced-project-manager (from main 857d814); delivery: chained PR slices, one per task (T1 d160cc4 | T2 4ab03d1 | T3 b304c6a | T4 32ed45a). No push, no production DB writes or migrations without the user.
 
 ## Specs
 S1. "normalmente ellos no tienen acceso a ese drive porque no tienen cuenta de google, entonces que por defecto ninguno tenga acceso al drive" + choice "Sí, tampoco co-responsables": project Drive recipients no longer include the principal manager nor co-managers (`manager` / `co_manager` sources); the wizard no longer shares the new folder with manager/co-manager emails; changing a brand's manager and adding/removing co-managers no longer re-sync Drive.
@@ -16,7 +16,7 @@ S8. Manager transfer keeps requiring a successor for every brand; projects follo
 T1 | S1,S2,S7 | Drive without managers/co-managers; drop Drive re-sync on brand change and co-manager add/remove; wizard stops sharing manager emails; tests | inline | done d160cc4 (RED 5 -> GREEN; full Jest 183/1538; tsc 0; eslint 0 on changed files)
 T2 | S3,S4,S6 | read current manager from the brand everywhere (select/joins, filter, projectTasks commercial mode, transfer preview); remove history UI + endpoint; tests | gentle-ai-worker (context backstop) | done 4ab03d1 (RED 7 -> GREEN; full Jest 184/1541; tsc 0; eslint 0 on changed files)
 T3 | S4,S5,S8 | stop writing projects.manager_id and project_manager_history (cascade, reassign, transfer followers, createProject); migration 026 (DROP NOT NULL, brands.manager_id NOT NULL RESTRICT, bmh RESTRICT); tests | gentle-ai-worker | done b304c6a (RED 17 -> GREEN; full Jest 185/1548; tsc 0; eslint 0; 026 applied on scratch PG16)
-T4 | S4 | migration 027 drop projects.manager_id + index; types; README; tests | inline | done COMMIT (RED 3 -> GREEN; full Jest 186/1551; tsc 0; eslint 0; 001→027 + query probe on scratch PG16)
+T4 | S4 | migration 027 drop projects.manager_id + index; types; README; tests | inline | done 32ed45a (RED 3 -> GREEN; full Jest 186/1551; tsc 0; eslint 0; 001→027 + query probe on scratch PG16)
 
 ## Log
 L1. User request (read-only analysis): "Análisis (solo lectura): que `brands.manager_id` sea la única fuente de verdad del gerente de un proyecto … Objetivo a analizar: Eliminar `projects.manager_id` (o dejar de usarlo) para que el gerente actual se lea SIEMPRE de `brands.manager_id` vía `projects.brand_id`. Conservar `created_manager_id`, `client_id`, `project_manager_history` y `brand_manager_history`."
