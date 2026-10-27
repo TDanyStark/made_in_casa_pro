@@ -14,7 +14,7 @@ S8. Manager transfer keeps requiring a successor for every brand; projects follo
 
 ## Tasks
 T1 | S1,S2,S7 | Drive without managers/co-managers; drop Drive re-sync on brand change and co-manager add/remove; wizard stops sharing manager emails; tests | inline | done d160cc4 (RED 5 -> GREEN; full Jest 183/1538; tsc 0; eslint 0 on changed files)
-T2 | S3,S4,S6 | read current manager from the brand everywhere (select/joins, filter, projectTasks commercial mode, transfer preview); remove history UI + endpoint; tests | gentle-ai-worker (context backstop) | done COMMIT (RED 7 -> GREEN; full Jest 184/1541; tsc 0; eslint 0 on changed files)
+T2 | S3,S4,S6 | read current manager from the brand everywhere (select/joins, filter, projectTasks commercial mode, transfer preview); remove history UI + endpoint; tests | gentle-ai-worker (context backstop) | done 4ab03d1 (RED 7 -> GREEN; full Jest 184/1541; tsc 0; eslint 0 on changed files)
 T3 | S4,S5,S8 | stop writing projects.manager_id and project_manager_history (cascade, reassign, transfer followers, createProject); migration 026 (DROP NOT NULL, brands.manager_id NOT NULL RESTRICT, bmh RESTRICT); tests | inline | pending
 T4 | S4 | migration 027 drop projects.manager_id + index; types; README; tests | inline | pending
 
