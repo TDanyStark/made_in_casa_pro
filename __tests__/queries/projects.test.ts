@@ -23,7 +23,6 @@ import {
   getProjectDriveAccessFailures,
   getProjectExpectedDriveRecipients,
   getProjectById,
-  getProjectManagerHistory,
   getProjectStakeholderEmails,
   getProjectsWithPagination,
   recalculateProjectProgress,
@@ -394,28 +393,49 @@ describe('getProjectsWithPagination()', () => {
   });
 });
 
-describe('getProjectManagerHistory()', () => {
-  it('resuelve nombres del gerente previo, el nuevo y el actor', async () => {
-    mockExecute.mockResolvedValueOnce(makeResult([{
-      id: 1, project_id: 11,
-      previous_manager_id: 2, previous_manager_name: 'Monica Robles',
-      new_manager_id: 11, new_manager_name: 'Luis Sandoval',
-      changed_by: 77, changed_by_name: 'Admin',
-      reason: 'Reasignación', changed_at: '2026-01-01T00:00:00.000Z',
-    }]));
+describe('gerente y cliente actuales: se leen de la marca principal', () => {
+  // Spec: odd/tasks/brand-sourced-project-manager.md — S3, S4, S6
 
-    const result = await getProjectManagerHistory(11);
+  it('S4/S6: getProjectById lee el gerente actual de brands.manager_id y conserva las claves', async () => {
+    mockExecute.mockResolvedValueOnce(makeResult([{ id: 1 }]));
 
-    expect(result[0]).toEqual(expect.objectContaining({
-      previousManagerName: 'Monica Robles',
-      newManagerName: 'Luis Sandoval',
-      changedByName: 'Admin',
-    }));
+    await getProjectById(1);
+
+    const sql = (mockExecute.mock.calls[0]?.[0] as { sql: string }).sql;
+    expect(sql).toContain('b.manager_id     AS manager_id');
+    expect(sql).toContain('m.name           AS manager_name');
+    expect(sql).toContain('LEFT JOIN managers         m   ON m.id = b.manager_id');
+    expect(sql).not.toContain('p.manager_id');
   });
 
-  it('returns an empty array when db throws', async () => {
-    mockExecute.mockRejectedValueOnce(new Error('error'));
-    expect(await getProjectManagerHistory(11)).toEqual([]);
+  it('S3: getProjectById expone el cliente actual (de la marca) junto al de la creación', async () => {
+    mockExecute.mockResolvedValueOnce(makeResult([{ id: 1 }]));
+
+    await getProjectById(1);
+
+    const sql = (mockExecute.mock.calls[0]?.[0] as { sql: string }).sql;
+    expect(sql).toContain('b.client_id      AS current_client_id');
+    expect(sql).toContain('bcl.name         AS current_client_name');
+    expect(sql).toContain('LEFT JOIN clients          bcl ON bcl.id = b.client_id');
+    // El cliente de la creación sigue saliendo de projects.client_id
+    expect(sql).toContain('cl.name          AS client_name');
+    expect(sql).toContain('LEFT JOIN clients          cl  ON p.client_id   = cl.id');
+  });
+
+  it('S4: el filtro por gerente del listado usa el gerente de la marca', async () => {
+    mockExecute
+      .mockResolvedValueOnce(makeResult([{ count: 0 }]))
+      .mockResolvedValueOnce(makeResult([]));
+
+    await getProjectsWithPagination({ managerId: 9 });
+
+    const countCall = mockExecute.mock.calls[0]?.[0] as { sql: string; args: unknown[] };
+    const listCall = mockExecute.mock.calls[1]?.[0] as { sql: string; args: unknown[] };
+    expect(countCall.sql).toContain('b.manager_id = $1');
+    expect(countCall.args).toEqual([9]);
+    expect(countCall.sql).not.toContain('p.manager_id');
+    expect(listCall.sql).not.toContain('p.manager_id');
+    expect(listCall.sql).toContain('AS current_client_name');
   });
 });
 
@@ -449,8 +469,6 @@ describe('gerente al crearse (created_manager_id)', () => {
     expect(sql).toContain('p.created_manager_id');
     expect(sql).toContain('cm.name          AS created_manager_name');
     expect(sql).toContain('LEFT JOIN managers         cm  ON p.created_manager_id = cm.id');
-    // El gerente actual sigue saliendo de manager_id
-    expect(sql).toContain('LEFT JOIN managers         m   ON p.manager_id  = m.id');
   });
 
   it('S8: el listado paginado también incluye el gerente al crearse', async () => {

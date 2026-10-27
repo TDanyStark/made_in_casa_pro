@@ -3,7 +3,6 @@ import { revalidatePath } from "next/cache";
 import {
   ProjectType,
   ProjectDetailType,
-  ProjectManagerHistoryEntry,
   ProjectDriveFailureCode,
   ProjectDriveRecipientSource,
   ProjectStatus,
@@ -28,12 +27,14 @@ const PROJECT_SELECT = `
   p.title,
   p.brand_id,
   b.name           AS brand_name,
-  p.manager_id,
+  b.manager_id     AS manager_id,
   m.name           AS manager_name,
   p.created_manager_id,
   cm.name          AS created_manager_name,
   cl.id            AS client_id,
   cl.name          AS client_name,
+  b.client_id      AS current_client_id,
+  bcl.name         AS current_client_name,
   p.campaign_id,
   cam.name         AS campaign_name,
   p.product_id,
@@ -55,15 +56,17 @@ const PROJECT_SELECT = `
   ${ADDITIONAL_BRANDS_SELECT}
 `;
 
-// El cliente sale de `projects.client_id` (migración 012), NO del gerente.
-// `managers` se mantiene solo para resolver `manager_name` (gerente actual) y
-// `created_manager_name` (gerente con el que se creó, migración 025).
+// El cliente de la creación sale de `projects.client_id` (migración 012) y el
+// gerente de la creación de `projects.created_manager_id` (migración 025).
+// El gerente y el cliente ACTUALES salen siempre de la marca principal
+// (`brands.manager_id` / `brands.client_id`), no de `projects.manager_id`.
 const PROJECT_JOINS = `
   FROM projects p
   LEFT JOIN brands           b   ON p.brand_id    = b.id
-  LEFT JOIN managers         m   ON p.manager_id  = m.id
+  LEFT JOIN managers         m   ON m.id = b.manager_id
   LEFT JOIN managers         cm  ON p.created_manager_id = cm.id
   LEFT JOIN clients          cl  ON p.client_id   = cl.id
+  LEFT JOIN clients          bcl ON bcl.id = b.client_id
   LEFT JOIN campaigns        cam ON p.campaign_id = cam.id
   LEFT JOIN products         pr  ON p.product_id  = pr.id
   LEFT JOIN product_categories pc ON pr.category_id = pc.id
@@ -295,7 +298,8 @@ export async function getProjectsWithPagination({
       { sql: "p.status = $", value: status },
       // Marca principal o adicional
       { sql: PROJECT_BRAND_FILTER_SQL, value: brandId },
-      { sql: "p.manager_id = $", value: managerId },
+      // Gerente actual = el de la marca principal
+      { sql: "b.manager_id = $", value: managerId },
       { sql: "p.client_id = $", value: clientId },
       { sql: "p.campaign_id = $", value: campaignId },
       {
@@ -649,56 +653,6 @@ export async function cascadeBrandManagerToProjects(
     );
   }
   return rows.map((row) => Number(row.id));
-}
-
-/**
- * Historial de reasignaciones de gerente de un proyecto, con nombres resueltos
- * del gerente anterior, el nuevo y el usuario que ejecutó el cambio.
- * Espeja `getBrandManagerHistory` en brands.ts.
- */
-export async function getProjectManagerHistory(
-  projectId: number
-): Promise<ProjectManagerHistoryEntry[]> {
-  try {
-    const result = await db.execute({
-      sql: `
-        SELECT
-          pmh.id,
-          pmh.project_id,
-          pmh.previous_manager_id,
-          prev_m.name AS previous_manager_name,
-          pmh.new_manager_id,
-          new_m.name  AS new_manager_name,
-          pmh.changed_by,
-          u.name      AS changed_by_name,
-          pmh.reason,
-          pmh.changed_at
-        FROM project_manager_history pmh
-        LEFT JOIN managers prev_m ON pmh.previous_manager_id = prev_m.id
-        LEFT JOIN managers new_m  ON pmh.new_manager_id      = new_m.id
-        LEFT JOIN users    u      ON pmh.changed_by          = u.id
-        WHERE pmh.project_id = $1
-        ORDER BY pmh.changed_at DESC
-      `,
-      args: [projectId],
-    });
-
-    return result.rows.map((row) => ({
-      id: row.id,
-      projectId: row.project_id,
-      previousManagerId: row.previous_manager_id,
-      previousManagerName: row.previous_manager_name,
-      newManagerId: row.new_manager_id,
-      newManagerName: row.new_manager_name,
-      changedBy: row.changed_by,
-      changedByName: row.changed_by_name,
-      reason: row.reason,
-      changedAt: row.changed_at,
-    })) as unknown as ProjectManagerHistoryEntry[];
-  } catch (error) {
-    console.error("Error fetching project manager history:", error);
-    return [];
-  }
 }
 
 export async function deleteProject(id: number): Promise<void> {

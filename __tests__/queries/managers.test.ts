@@ -811,6 +811,9 @@ describe('getManagerTransferPreview()', () => {
 
     const projectsSql = (mockExecute.mock.calls[2][0] as { sql: string }).sql;
     expect(projectsSql).toContain("p.status <> 'archived'");
+    // S4 (brand-sourced-project-manager): el gerente del proyecto es el de su marca
+    expect(projectsSql).toContain('b.manager_id = $1');
+    expect(projectsSql).not.toContain('p.manager_id');
     // El sucesor nunca puede ser el propio gerente
     expect((mockExecute.mock.calls[3][0] as { sql: string }).sql).toContain('id <> $2');
   });

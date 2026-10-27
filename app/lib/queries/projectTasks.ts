@@ -1302,7 +1302,8 @@ export async function resolveProjectTaskAssignment(
         sql: `
           SELECT p.created_by, m.email AS manager_email
           FROM projects p
-          LEFT JOIN managers m ON p.manager_id = m.id
+          LEFT JOIN brands b ON b.id = p.brand_id
+          LEFT JOIN managers m ON m.id = b.manager_id
           WHERE p.id = $1
         `,
         args: [projectId],

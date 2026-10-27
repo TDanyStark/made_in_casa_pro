@@ -617,8 +617,8 @@ export async function getManagerTransferPreview(
       sql: `
         SELECT p.id, p.title, p.status, p.brand_id, b.name AS brand_name
         FROM projects p
-        LEFT JOIN brands b ON p.brand_id = b.id
-        WHERE p.manager_id = $1
+        JOIN brands b ON p.brand_id = b.id
+        WHERE b.manager_id = $1
           AND p.client_id = $2
           AND p.status <> 'archived'
         ORDER BY p.updated_at DESC

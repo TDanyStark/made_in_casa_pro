@@ -203,21 +203,27 @@ El gerente de un proyecto es **siempre el gerente actual de su marca principal**
   principal; si no, `MANAGER_NOT_BRAND_MANAGER` → 400 ("El gerente del proyecto
   debe ser el gerente de su marca principal") sin escribir nada.
 
-El `client_id` del proyecto nunca se toca. El historial se consulta en
-`GET /api/projects/[id]/manager-history`.
+El `client_id` del proyecto nunca se toca. El historial de gerentes del proyecto
+ya no se muestra ni se expone (se eliminó `GET /api/projects/[id]/manager-history`);
+la tabla `project_manager_history` se conserva.
 
 #### Datos actuales vs. datos de la creación
 
 | Columna | Qué es | ¿Cambia? |
 |---------|--------|-----------|
-| `manager_id` | Gerente **actual** = gerente de la marca principal | Sí, por cascada al reasignar la marca o en un traslado |
+| `manager_id` (respuesta) | Gerente **actual**: se lee de `brands.manager_id` vía `projects.brand_id`, no de `projects.manager_id` | Sí, al reasignar la marca o en un traslado |
+| `current_client_id` / `current_client_name` (respuesta) | Cliente **actual**: el de la marca principal (`brands.client_id`) | Sí, si la marca cambia de cliente |
 | `created_manager_id` | Gerente con el que se **creó** el proyecto (migración 025) | No: lo fija `createProject` (igual a `manager_id`) y nada más lo escribe |
 | `client_id` | Cliente con el que se **creó** el proyecto | No |
 
-El gerente y el cliente actuales se leen desde la marca (la marca pertenece a un
-gerente, y el gerente a un cliente). Las respuestas de proyecto incluyen
-`created_manager_id` y `created_manager_name`; la tarjeta "Gerente principal"
-muestra además la línea "Al crearse: {gerente} ({cliente})".
+El gerente y el cliente actuales se leen siempre desde la marca principal: en el
+detalle y el listado de proyectos, en el filtro `manager_id` del listado, en la
+asignación de tareas en modo comercial y en la vista previa del traslado de
+gerente. Las respuestas mantienen las claves `manager_id`/`manager_name` e
+incluyen `current_client_id`/`current_client_name`, `created_manager_id` y
+`created_manager_name`. La tarjeta "Gerente principal" muestra
+"{gerente actual} ({cliente actual})" y la línea "Al crearse: {gerente}
+({cliente})"; ya no muestra historial.
 
 ## Carpetas de Drive de proyectos
 

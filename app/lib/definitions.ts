@@ -114,19 +114,6 @@ export type BrandManagerHistoryEntry = {
   changedAt: string;
 };
 
-export type ProjectManagerHistoryEntry = {
-  id: number;
-  projectId: number;
-  previousManagerId: number | null;
-  previousManagerName: string | null;
-  newManagerId: number;
-  newManagerName: string | null;
-  changedBy: number | null;
-  changedByName: string | null;
-  reason: string | null;
-  changedAt: string;
-};
-
 export type ManagerClientHistoryEntry = {
   id: number;
   managerId: number;
@@ -305,7 +292,7 @@ export type ProjectType = {
   brand_name: string;
   /** Marcas adicionales vinculadas (mismo cliente), ordenadas por nombre */
   additional_brands?: ProjectBrandRef[];
-  /** Gerente actual: siempre el de la marca principal (cambia por cascada) */
+  /** Gerente actual: se lee siempre de la marca principal (`brands.manager_id`) */
   manager_id: number;
   manager_name: string;
   /** Gerente con el que se creó el proyecto: fijo (migración 025) */
@@ -314,6 +301,9 @@ export type ProjectType = {
   /** Cliente de la creación: fijo */
   client_id: number;
   client_name: string;
+  /** Cliente actual: el de la marca principal (`brands.client_id`) */
+  current_client_id: number | null;
+  current_client_name: string | null;
   campaign_id: number | null;
   campaign_name: string | null;
   product_id: number | null;

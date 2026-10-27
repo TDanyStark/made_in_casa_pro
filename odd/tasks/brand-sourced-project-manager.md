@@ -13,8 +13,8 @@ S7. "no" (co-managers are not auto-removed): `project_managers` behavior unchang
 S8. Manager transfer keeps requiring a successor for every brand; projects follow their brand without per-project writes; `followed_projects` stays in the response as the count of projects of the reassigned brands.
 
 ## Tasks
-T1 | S1,S2,S7 | Drive without managers/co-managers; drop Drive re-sync on brand change and co-manager add/remove; wizard stops sharing manager emails; tests | inline | pending
-T2 | S3,S4,S6 | read current manager from the brand everywhere (select/joins, filter, projectTasks commercial mode, transfer preview); remove history UI + endpoint; tests | inline | pending
+T1 | S1,S2,S7 | Drive without managers/co-managers; drop Drive re-sync on brand change and co-manager add/remove; wizard stops sharing manager emails; tests | inline | done d160cc4 (RED 5 -> GREEN; full Jest 183/1538; tsc 0; eslint 0 on changed files)
+T2 | S3,S4,S6 | read current manager from the brand everywhere (select/joins, filter, projectTasks commercial mode, transfer preview); remove history UI + endpoint; tests | gentle-ai-worker (context backstop) | done COMMIT (RED 7 -> GREEN; full Jest 184/1541; tsc 0; eslint 0 on changed files)
 T3 | S4,S5,S8 | stop writing projects.manager_id and project_manager_history (cascade, reassign, transfer followers, createProject); migration 026 (DROP NOT NULL, brands.manager_id NOT NULL RESTRICT, bmh RESTRICT); tests | inline | pending
 T4 | S4 | migration 027 drop projects.manager_id + index; types; README; tests | inline | pending
 
@@ -23,3 +23,4 @@ L1. User request (read-only analysis): "Análisis (solo lectura): que `brands.ma
 L2. Answers to open questions: "1. en vercel 2. si 3. normalmente ellos no tienen acceso a ese drive porque no tienen cuenta de google, entonces que por defecto ninguno tenga acceso al drive 4. solo con gerente al crearse y cliente al crearse y el gerente y cliente actual 5. si dale 6. no, solo lo que ves en el codigo 7. no"
 L3. Choices: "Sí, implementa los 4 cortes"; existing access "Dejarlos como están"; co-managers "Sí, tampoco co-responsables".
 L4. Engram mirror unavailable in this session (no memory tools).
+L5. T2 worker: current manager and current client read from the brand (PROJECT_SELECT/JOINS, list filter, projectTasks commercial mode, transfer preview); history UI, endpoint and getProjectManagerHistory removed. Parent removed the route file (worker cannot delete). Open question answered by parent: transfer preview switches `p.client_id` to `b.client_id` in T3 (brands never change client, so it is equivalent and consistent with "current from the brand").
