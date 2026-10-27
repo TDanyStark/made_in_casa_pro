@@ -8,22 +8,18 @@
  * Reads all .sql files from db/seeds/ sorted by filename, tracks applied
  * seeds in a _seeds table, and skips already-applied ones.
  * All seed files use ON CONFLICT DO NOTHING so they are safe to re-run.
+ * With NODE_ENV=production it refuses to run unless CONFIRM_PRODUCTION=1.
  */
 
 import { readdir, readFile } from "fs/promises";
 import { join, dirname } from "path";
 import { fileURLToPath } from "url";
 import { Pool } from "pg";
+import { loadEnvFiles } from "./load-env";
+import { assertProductionConfirmed } from "./production-guard";
 
-// Load .env.local / .env for local development
-for (const envFile of [".env.local", ".env"]) {
-  try {
-    process.loadEnvFile(envFile);
-    break;
-  } catch {
-    // File not found — try next
-  }
-}
+// Load .env.local, then .env for whatever it does not define
+loadEnvFiles();
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const RESET = process.argv.includes("--reset");
@@ -47,6 +43,8 @@ const SEED_TABLES = [
 ].join(", ");
 
 async function seed() {
+  assertProductionConfirmed(RESET ? "db:seed:reset" : "db:seed");
+
   const url =
     process.env.NODE_ENV === "production"
       ? process.env.DATABASE_URL

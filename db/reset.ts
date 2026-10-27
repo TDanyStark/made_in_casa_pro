@@ -6,20 +6,16 @@
  * Drops the entire public schema (all tables, indexes, sequences, extensions),
  * recreates it, then runs migrations and seeds from scratch.
  *
- * ⚠️  ALL DATA WILL BE LOST. Local development only.
+ * ⚠️  ALL DATA WILL BE LOST. Local development only: with NODE_ENV=production
+ * it refuses to run unless CONFIRM_PRODUCTION=1.
  */
 
 import { execSync } from "child_process";
 import { Pool } from "pg";
+import { loadEnvFiles } from "./load-env";
+import { assertProductionConfirmed } from "./production-guard";
 
-for (const envFile of [".env.local", ".env"]) {
-  try {
-    process.loadEnvFile(envFile);
-    break;
-  } catch {
-    // File not found — try next
-  }
-}
+loadEnvFiles();
 
 const red    = (s: string) => `\x1b[31m${s}\x1b[0m`;
 const green  = (s: string) => `\x1b[32m${s}\x1b[0m`;
@@ -27,6 +23,8 @@ const yellow = (s: string) => `\x1b[33m${s}\x1b[0m`;
 const bold   = (s: string) => `\x1b[1m${s}\x1b[0m`;
 
 async function reset() {
+  assertProductionConfirmed("db:reset");
+
   const url =
     process.env.NODE_ENV === "production"
       ? process.env.DATABASE_URL

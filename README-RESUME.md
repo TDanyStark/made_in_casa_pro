@@ -522,10 +522,17 @@ npm run dev            # http://localhost:3000
 | `npm run db:seed` / `db:seed:reset` | Semillas |
 | `npm run db:reset` | Borra el esquema `public` y vuelve a migrar y sembrar (solo local: **pierde todos los datos**) |
 
+Los scripts `db:*` cargan `.env.local` y después `.env`: la primera definición
+gana (y el entorno de la terminal gana sobre ambos), y `.env` completa lo que
+falte, como `DATABASE_URL`. Con `NODE_ENV=production`, `db:migrate` usa
+`DATABASE_URL`; `db:reset`, `db:seed` y `db:seed:reset` **se niegan a correr**
+(salen con código 1 antes de conectar) salvo que se agregue
+`CONFIRM_PRODUCTION=1`.
+
 ### Migraciones
 
-`npm run db:migrate` ejecuta `db/migrate.ts`. Carga `.env.local` y si no existe
-`.env`, crea la tabla de control `_migrations`, lee `db/migrations/*.sql` en
+`npm run db:migrate` ejecuta `db/migrate.ts`. Carga `.env.local` y `.env`
+(ver arriba), crea la tabla de control `_migrations`, lee `db/migrations/*.sql` en
 orden alfabético (el prefijo `NNN_` fija el orden), salta las ya aplicadas y
 corre **cada migración en su propia transacción**: si una falla hace `rollback`,
 informa qué archivo fue y detiene el proceso.
