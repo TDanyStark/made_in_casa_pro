@@ -18,7 +18,7 @@ import {
 import { Loader2 } from "lucide-react";
 import CreatableSelect from "react-select/creatable";
 import CreateManagerModal from "@/components/managers/CreateManagerModal";
-import { BrandType, DriveSyncWarning, ManagerType } from "@/lib/definitions";
+import { BrandType, ManagerType } from "@/lib/definitions";
 import {
   ManagerOption,
   createManagerOptionFormatter,
@@ -93,7 +93,7 @@ export function ChangeManager({ brandId, managerId, clientId, onSuccess }: Props
     try {
       // Usar el servicio de API centralizado para actualizar el gerente de la marca
       const response = await patch<
-        BrandType & { reassigned_projects?: number; driveWarning?: DriveSyncWarning }
+        BrandType & { reassigned_projects?: number }
       >(`brands/${brandId}`, {
         manager_id: data.manager_id
       });
@@ -109,11 +109,6 @@ export function ChangeManager({ brandId, managerId, clientId, onSuccess }: Props
           ? `Gerente asignado correctamente. ${movedProjects} proyecto(s) pasaron al nuevo gerente.`
           : "Gerente asignado correctamente"
       );
-      if (response.data?.driveWarning) {
-        toast.warning(
-          `Drive no pudo sincronizar todos los accesos: ${response.data.driveWarning.message}`
-        );
-      }
       if (movedProjects > 0) {
         queryClient.invalidateQueries({ queryKey: ["projects"] });
         queryClient.invalidateQueries({ queryKey: ["project"] });

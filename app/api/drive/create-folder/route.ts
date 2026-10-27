@@ -11,8 +11,6 @@ const schema = z.object({
   clientName: z.string().min(1),
   brandName: z.string().min(1),
   projectTitle: z.string().min(1),
-  /** Emails adicionales a compartir (manager, co-managers). */
-  shareEmails: z.array(z.string().email()).default([]),
 });
 
 export async function POST(request: NextRequest) {
@@ -32,7 +30,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { shareEmails, ...folderData } = validation.data;
+    const folderData = validation.data;
 
     // Get the email of the user creating the project
     const cookie = (await cookies()).get("session")?.value;
@@ -42,12 +40,8 @@ export async function POST(request: NextRequest) {
     // Collect leadership emails from DB
     const adminEmails = await getAdminAndLeadershipEmails();
 
-    // Merge all emails: admins + creator + manager + co-managers
-    const allEmails = [
-      ...adminEmails,
-      ...(creatorEmail ? [creatorEmail] : []),
-      ...shareEmails,
-    ];
+    // Admins + creator. Managers and co-managers never get Drive access.
+    const allEmails = [...adminEmails, ...(creatorEmail ? [creatorEmail] : [])];
 
     const result = await createProjectFolders({
       ...folderData,

@@ -103,12 +103,12 @@ describe('WizardStep6Confirm', () => {
       }));
     });
 
-    // Byte-for-byte identical: create-folder is called with the exact same args as before.
+    // Managers never get Drive access: no manager emails are sent
+    // (odd/tasks/brand-sourced-project-manager.md S1).
     expect(mockPost).toHaveBeenNthCalledWith(1, 'drive/create-folder', {
       clientName: 'Cliente Uno',
       brandName: 'Marca Uno',
       projectTitle: 'Proyecto metadata',
-      shareEmails: ['carlos@test.com'],
     });
 
     // No automatic lookup is ever performed anymore.

@@ -193,8 +193,7 @@ El gerente de un proyecto es **siempre el gerente actual de su marca principal**
   proyectos de la marca, en cualquier estado, al nuevo gerente con una fila en
   `project_manager_history` cada uno (`cascadeBrandManagerToProjects`). Si algo
   falla, `rollback` completo.
-- Tras confirmar, la ruta re-sincroniza el acceso a Drive de esos proyectos
-  (best effort: un fallo se devuelve como `driveWarning`, nunca bloquea). La
+- Los gerentes no reciben acceso a Drive, así que el cambio no toca Drive. La
   respuesta incluye `reassigned_projects` (cuántos proyectos cambiaron).
 - `PATCH /api/projects/[id]` con `manager_id` → 400
   `{ error: "El gerente del proyecto se cambia reasignando su marca" }`, sin
@@ -276,8 +275,9 @@ permisos heredados ni a la cuenta OAuth conectada.
 
 Solo `PROJECT_EDIT_ROLES` con acceso al proyecto recibe además el estado de los
 destinatarios esperados: liderazgo activo (admin, directivo y financiero),
-creador activo, asignados activos y los gerente/co-gerentes vinculados al
-proyecto. Un permiso efectivo directo, heredado, de dominio o público evita un
+creador activo y asignados activos. Los gerentes y co-responsables (contactos
+del cliente) **nunca** reciben acceso por defecto: normalmente no tienen cuenta
+de Google. Los permisos que ya tuvieran no se revocan. Un permiso efectivo directo, heredado, de dominio o público evita un
 falso "sin acceso"; un rol inferior a editor se muestra como insuficiente. Drive
 no permite comprobar la membresía individual de grupos, por lo que la interfaz
 lo comunica como una limitación y no afirma acceso o ausencia con certeza.
@@ -293,8 +293,8 @@ aditiva el conjunto actual de interesados como `writer`. Nunca revoca
 automáticamente a antiguos asignados. Si Drive falla, la mutación de negocio se
 mantiene exitosa y la respuesta incluye `driveWarning`; el reintento no vuelve a
 crear la tarea o asignación. La creación y la recreación comparten con
-administradores, directivos, financieros, creador, gerente principal, co-gerentes
-y asignados actuales.
+administradores, directivos, financieros, creador y asignados actuales; agregar
+o quitar co-responsables no sincroniza Drive.
 
 ## Una sola tarea en progreso por colaborador
 

@@ -1,4 +1,5 @@
 /** @jest-environment node */
+// Spec: odd/tasks/brand-sourced-project-manager.md — S1
 
 jest.mock("@/lib/services/api-auth", () => ({
   validateHttpMethod: jest.fn(() => ({ isValidMethod: true })),
@@ -50,7 +51,7 @@ describe("POST /api/drive/create-folder", () => {
     shareEmails: ["manager@test.com"],
   };
 
-  it("happy path: returns 201 with the created folder data", async () => {
+  it("happy path: returns 201 and shares only with leadership and the creator, never with manager emails (S1)", async () => {
     mockCreateProjectFolders.mockResolvedValue({
       projectFolderId: "folder-1",
       projectFolderUrl: "https://drive.google.com/drive/folders/folder-1",
@@ -68,7 +69,7 @@ describe("POST /api/drive/create-folder", () => {
       clientName: "Cliente Uno",
       brandName: "Marca Uno",
       projectTitle: "Proyecto X",
-      shareEmails: ["admin@test.com", "creator@test.com", "manager@test.com"],
+      shareEmails: ["admin@test.com", "creator@test.com"],
     });
   });
 

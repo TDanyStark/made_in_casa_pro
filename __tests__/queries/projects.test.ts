@@ -63,20 +63,22 @@ describe('project queries metadata fields', () => {
     mockExecute.mockResolvedValueOnce(makeResult([
       { email: ' Admin@Test.com ', name: 'Admin', source: 'leadership' },
       { email: 'admin@test.com', name: 'Admin', source: 'creator' },
-      { email: 'manager@test.com', name: 'Manager', source: 'manager' },
-      { email: 'manager@test.com', name: 'Manager', source: 'co_manager' },
+      { email: 'worker@test.com', name: 'Worker', source: 'task_assignee' },
       { email: 'invalid', name: 'Invalid', source: 'task_assignee' },
     ]));
 
     await expect(getProjectExpectedDriveRecipients(15)).resolves.toEqual([
       { email: 'admin@test.com', name: 'Admin', sources: ['leadership', 'creator'] },
-      { email: 'manager@test.com', name: 'Manager', sources: ['manager', 'co_manager'] },
+      { email: 'worker@test.com', name: 'Worker', sources: ['task_assignee'] },
     ]);
     const call = mockExecute.mock.calls[0]?.[0] as { sql: string; args: unknown[] };
     expect(call.args[0]).toBe(15);
     expect(call.args).toEqual([15, 1, 2, 5]);
     expect(call.sql).toContain("'task_assignee' AS source");
-    expect(call.sql).toContain("'co_manager' AS source");
+    // S1 (brand-sourced-project-manager): ningún gerente ni co-responsable recibe acceso
+    expect(call.sql).not.toContain("'manager' AS source");
+    expect(call.sql).not.toContain("'co_manager' AS source");
+    expect(call.sql).not.toContain('managers');
     expect(call.sql).not.toContain('m.client_id');
   });
 

@@ -79,7 +79,7 @@ describe("ProjectDriveAccessManager", () => {
       canShare: true,
       permissions: [{ id: "group", type: "group", role: "writer", emailAddress: "team@abbott.com", displayName: null, domain: null, inherited: false, isConnectedAccount: false, canDelete: true }],
       expectedRecipients: [
-        { email: "daniel.test@abbott.com", name: "Daniel", sources: ["manager"], expectedRole: "writer", status: "missing", actualRole: null, accessVia: null, failureCode: "NO_GOOGLE_ACCOUNT", lastAttemptAt: "now", hasUnverifiableGroupAccess: true },
+        { email: "daniel.test@abbott.com", name: "Daniel", sources: ["task_assignee"], expectedRole: "writer", status: "missing", actualRole: null, accessVia: null, failureCode: "NO_GOOGLE_ACCOUNT", lastAttemptAt: "now", hasUnverifiableGroupAccess: true },
         { email: "policy@test.com", name: null, sources: ["leadership"], expectedRole: "writer", status: "missing", actualRole: null, accessVia: null, failureCode: "POLICY_OR_RESTRICTION", lastAttemptAt: "now", hasUnverifiableGroupAccess: true },
         { email: "unknown@test.com", name: null, sources: ["task_assignee"], expectedRole: "writer", status: "missing", actualRole: null, accessVia: null, failureCode: "TRANSIENT_OR_UNKNOWN", lastAttemptAt: "now", hasUnverifiableGroupAccess: true },
       ],

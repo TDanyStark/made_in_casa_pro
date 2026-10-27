@@ -364,9 +364,7 @@ export type ProjectDriveFailureCode =
 export type ProjectDriveRecipientSource =
   | "leadership"
   | "creator"
-  | "task_assignee"
-  | "manager"
-  | "co_manager";
+  | "task_assignee";
 
 export type ProjectDriveExpectedRecipient = {
   email: string;

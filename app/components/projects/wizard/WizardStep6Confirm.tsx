@@ -77,16 +77,10 @@ export function WizardStep6Confirm({ state, onBack }: Props) {
         // 1. Create Drive folder (mandatory) — unchanged from original flow.
         setCurrentAction("Creando carpeta en Drive...");
 
-        const shareEmails = [
-          state.manager_email,
-          ...state.co_manager_emails,
-        ].filter(Boolean);
-
         const driveRes = await post<DriveResult>("drive/create-folder", {
           clientName: state.client_name,
           brandName: state.brand_name,
           projectTitle: state.title,
-          shareEmails,
         });
 
         if (!driveRes.ok || !driveRes.data) {

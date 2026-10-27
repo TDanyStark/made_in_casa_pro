@@ -170,7 +170,11 @@ export type ProjectDriveRecipient = {
   sources: ProjectDriveRecipientSource[];
 };
 
-/** Current people who should receive additive access to the project folder. */
+/**
+ * Current people who should receive additive access to the project folder.
+ * Managers and co-managers (client contacts) never get access: they usually
+ * have no Google account.
+ */
 export async function getProjectExpectedDriveRecipients(
   projectId: number
 ): Promise<ProjectDriveRecipient[]> {
@@ -186,14 +190,6 @@ export async function getProjectExpectedDriveRecipients(
       SELECT u.email, u.name, 'task_assignee' AS source
       FROM project_tasks pt JOIN users u ON u.id = pt.assigned_user_id
       WHERE pt.project_id = $1 AND u.is_active = 1 AND u.email IS NOT NULL
-      UNION ALL
-      SELECT m.email, m.name, 'manager' AS source
-      FROM projects p JOIN managers m ON m.id = p.manager_id
-      WHERE p.id = $1 AND m.email IS NOT NULL
-      UNION ALL
-      SELECT m.email, m.name, 'co_manager' AS source
-      FROM project_managers pm JOIN managers m ON m.id = pm.manager_id
-      WHERE pm.project_id = $1 AND m.email IS NOT NULL
     `,
     args: [projectId, UserRole.ADMIN, UserRole.DIRECTIVO, UserRole.FINANCIERO],
   });
