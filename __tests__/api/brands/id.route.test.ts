@@ -2,6 +2,7 @@
  * @jest-environment node
  */
 // Spec: odd/tasks/brand-owned-project-manager.md — S1
+// Spec: odd/tasks/brand-sourced-project-manager.md — S1
 
 jest.mock("@/lib/services/api-auth", () => ({
   validateHttpMethod: jest.fn(() => ({ isValidMethod: true })),
@@ -36,10 +37,6 @@ const mockUpdate = updateBrand as jest.Mock;
 const mockSync = syncProjectDriveAccess as jest.Mock;
 
 const BRAND = { id: 5, name: "Nulytelly", manager_id: 10, client_id: 2 };
-const WARNING = {
-  code: "DRIVE_ACCESS_SYNC_FAILED",
-  message: "No se pudieron sincronizar todos los accesos de Google Drive.",
-};
 
 async function patch(body: unknown) {
   const req = new NextRequest("http://localhost/api/brands/5", {
@@ -60,12 +57,11 @@ describe("PATCH /api/brands/[id]", () => {
     mockGetBrand.mockResolvedValue(BRAND);
   });
 
-  it("S1: informa los proyectos que pasaron al nuevo gerente y re-sincroniza su Drive", async () => {
+  it("S1: informa los proyectos que pasaron al nuevo gerente sin sincronizar Drive", async () => {
     mockUpdate.mockResolvedValue({
       brand: { ...BRAND, manager_id: 20 },
       reassignedProjectIds: [20, 21],
     });
-    mockSync.mockResolvedValue(null);
 
     const res = await patch({ manager_id: 20 });
 
@@ -80,30 +76,8 @@ describe("PATCH /api/brands/[id]", () => {
       { name: undefined, manager_id: 20, business_unit_id: undefined },
       77
     );
-    expect(mockSync.mock.calls).toEqual([[20], [21]]);
-  });
-
-  it("S1: un fallo de Drive no bloquea el cambio: responde 200 con driveWarning", async () => {
-    mockUpdate.mockResolvedValue({
-      brand: { ...BRAND, manager_id: 20 },
-      reassignedProjectIds: [20, 21, 22],
-    });
-    mockSync
-      .mockResolvedValueOnce(WARNING)
-      .mockRejectedValueOnce(new Error("drive down"))
-      .mockResolvedValueOnce(null);
-
-    const res = await patch({ manager_id: 20 });
-
-    expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({
-      ...BRAND,
-      manager_id: 20,
-      reassigned_projects: 3,
-      driveWarning: WARNING,
-    });
-    // Sigue sincronizando el resto de proyectos tras un fallo
-    expect(mockSync).toHaveBeenCalledTimes(3);
+    // Los gerentes no reciben acceso a Drive (odd/tasks/brand-sourced-project-manager.md S1)
+    expect(mockSync).not.toHaveBeenCalled();
   });
 
   it("no sincroniza Drive cuando ningún proyecto cambió de gerente", async () => {

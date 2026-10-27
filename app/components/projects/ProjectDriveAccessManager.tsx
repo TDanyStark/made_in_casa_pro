@@ -28,8 +28,6 @@ const SOURCE_LABELS = {
   leadership: "Liderazgo",
   creator: "Creador",
   task_assignee: "Responsable de tarea",
-  manager: "Contacto cliente",
-  co_manager: "Contacto cliente",
 } as const;
 
 function missingReason(failureCode: string | null) {

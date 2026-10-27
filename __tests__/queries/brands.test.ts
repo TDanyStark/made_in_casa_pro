@@ -290,15 +290,13 @@ describe('updateBrand()', () => {
     expect(db.transaction).not.toHaveBeenCalled();
   });
 
-  // ── S1 / S2: el gerente de los proyectos sigue al de su marca principal ────
-  // Spec: odd/tasks/brand-owned-project-manager.md — S1, S2
+  // ── Los proyectos siguen a su marca sin escrituras por proyecto ───────────
+  // Spec: odd/tasks/brand-sourced-project-manager.md — S4
 
-  /** Proyectos de la marca cuyo gerente difiere del nuevo (cualquier estado). */
-  function brandProjects(rows: Array<{ id: number; manager_id: number | null }>) {
+  /** Ids de los proyectos cuya marca principal es esta (lectura en la transacción). */
+  function brandProjects(rows: Array<{ id: number }>) {
     mockTransaction.execute.mockImplementation(async (stmt: { sql: string }) =>
-      /FROM projects/.test(stmt.sql) && /FOR UPDATE/.test(stmt.sql)
-        ? makeResult(rows)
-        : makeResult([])
+      /FROM projects/.test(stmt.sql) ? makeResult(rows) : makeResult([])
     );
   }
 
@@ -308,70 +306,72 @@ describe('updateBrand()', () => {
     );
   }
 
-  it('S1: pasa todos los proyectos de la marca al nuevo gerente con historial, en la misma transacción', async () => {
+  it('S4: cambia el gerente de la marca con historial y solo LEE sus proyectos, sin escribirlos', async () => {
     mockExecute.mockResolvedValueOnce(currentBrandRow());
     mockGetManagerById.mockResolvedValueOnce(sameClientManager());
-    brandProjects([
-      { id: 20, manager_id: 10 },
-      { id: 21, manager_id: null },
-    ]);
+    brandProjects([{ id: 20 }, { id: 21 }]);
     mockTransaction.commit.mockResolvedValue(undefined);
     mockExecute.mockResolvedValueOnce(currentBrandRow({ manager_id: 20 }));
 
     const result = await updateBrand('5', { manager_id: 20 }, 77, 'Traslado');
 
     const calls = txCalls();
-    const lookup = calls.find((c) => /FROM projects/.test(c.sql) && /FOR UPDATE/.test(c.sql))!;
-    expect(lookup.sql).toContain('brand_id = $1');
-    expect(lookup.sql).toContain('manager_id IS DISTINCT FROM $2');
-    // Todos los estados: sin filtro por status
-    expect(lookup.sql).not.toMatch(/status/);
-    expect(lookup.args).toEqual(['5', 20]);
+    expect(calls).toHaveLength(3);
+    expect(calls[0].sql).toBe('UPDATE brands SET manager_id = $1 WHERE id = $2');
+    expect(calls[0].args).toEqual([20, '5']);
+    expect(calls[1].sql).toContain('INSERT INTO brand_manager_history');
+    expect(calls[1].args).toEqual(['5', 10, 20, 77, 'Traslado']);
+    expect(calls[2].sql).toBe('SELECT id FROM projects WHERE brand_id = $1 ORDER BY id');
+    expect(calls[2].args).toEqual(['5']);
 
-    const updates = calls.filter((c) => c.sql.includes('UPDATE projects SET manager_id'));
-    expect(updates.map((c) => c.args)).toEqual([[20, 20], [20, 21]]);
-    expect(updates[0].sql).toContain('updated_at = CURRENT_TIMESTAMP');
-
-    const history = calls.filter((c) => c.sql.includes('INSERT INTO project_manager_history'));
-    expect(history.map((c) => c.args)).toEqual([
-      [20, 10, 20, 77, 'Traslado'],
-      [21, null, 20, 77, 'Traslado'],
-    ]);
-
-    // S2: el historial de la marca se sigue escribiendo, antes de los proyectos
-    const brandHistory = calls.findIndex((c) => c.sql.includes('INSERT INTO brand_manager_history'));
-    expect(brandHistory).toBeGreaterThan(-1);
-    expect(calls[brandHistory].args).toEqual(['5', 10, 20, 77, 'Traslado']);
-    expect(brandHistory).toBeLessThan(calls.indexOf(lookup));
-
-    expect(db.transaction).toHaveBeenCalledTimes(1);
-    expect(mockTransaction.commit).toHaveBeenCalledTimes(1);
+    // Ninguna escritura sobre projects ni project_manager_history, ni dentro ni fuera
+    const all = [...calls.map((c) => c.sql), ...mockExecute.mock.calls.map((c) => (c[0] as { sql: string }).sql)];
+    expect(all.some((s) => /UPDATE\s+projects/.test(s))).toBe(false);
+    expect(all.some((s) => s.includes('project_manager_history'))).toBe(false);
     const outside = mockExecute.mock.calls.map((call) => (call[0] as { sql: string }).sql);
     expect(outside.some((s) => /UPDATE|INSERT|DELETE/.test(s))).toBe(false);
 
+    expect(db.transaction).toHaveBeenCalledTimes(1);
+    expect(mockTransaction.commit).toHaveBeenCalledTimes(1);
+    expect(mockTransaction.rollback).not.toHaveBeenCalled();
     expect(result.reassignedProjectIds).toEqual([20, 21]);
     expect(result.brand?.manager_id).toBe(20);
+    expect(revalidatePath).toHaveBeenCalledWith('/projects');
+    expect(revalidatePath).toHaveBeenCalledWith('/brands/5');
+    expect(revalidatePath).toHaveBeenCalledWith('/clients/2');
   });
 
-  it('S1: hace rollback de marca y proyectos si falla el historial de un proyecto', async () => {
+  it('S4: una marca sin proyectos devuelve [] y no revalida /projects', async () => {
+    mockExecute.mockResolvedValueOnce(currentBrandRow());
+    mockGetManagerById.mockResolvedValueOnce(sameClientManager());
+    brandProjects([]);
+    mockTransaction.commit.mockResolvedValue(undefined);
+    mockExecute.mockResolvedValueOnce(currentBrandRow({ manager_id: 20 }));
+
+    const result = await updateBrand('5', { manager_id: 20 });
+
+    expect(result.reassignedProjectIds).toEqual([]);
+    expect(revalidatePath).not.toHaveBeenCalledWith('/projects');
+  });
+
+  it('S4: hace rollback del cambio de marca si falla la lectura de sus proyectos', async () => {
     mockExecute.mockResolvedValueOnce(currentBrandRow());
     mockGetManagerById.mockResolvedValueOnce(sameClientManager());
     mockTransaction.execute.mockImplementation(async (stmt: { sql: string }) => {
-      if (stmt.sql.includes('INSERT INTO project_manager_history')) throw new Error('history failed');
-      return /FROM projects/.test(stmt.sql) && /FOR UPDATE/.test(stmt.sql)
-        ? makeResult([{ id: 20, manager_id: 10 }])
-        : makeResult([]);
+      if (/FROM projects/.test(stmt.sql)) throw new Error('projects failed');
+      return makeResult([]);
     });
     mockTransaction.rollback.mockResolvedValue(undefined);
 
-    await expect(updateBrand('5', { manager_id: 20 })).rejects.toThrow('history failed');
+    await expect(updateBrand('5', { manager_id: 20 })).rejects.toThrow('projects failed');
     expect(mockTransaction.rollback).toHaveBeenCalledTimes(1);
     expect(mockTransaction.commit).not.toHaveBeenCalled();
+    expect(revalidatePath).not.toHaveBeenCalled();
   });
 
-  it('S1: no toca proyectos cuando el gerente no cambia', async () => {
+  it('no toca proyectos cuando el gerente no cambia', async () => {
     mockExecute.mockResolvedValueOnce(currentBrandRow());
-    brandProjects([{ id: 20, manager_id: 3 }]);
+    brandProjects([{ id: 20 }]);
     mockTransaction.commit.mockResolvedValue(undefined);
     mockExecute.mockResolvedValueOnce(currentBrandRow());
 
@@ -381,8 +381,8 @@ describe('updateBrand()', () => {
     expect(result.reassignedProjectIds).toEqual([]);
   });
 
-  it('S1: un cambio solo de nombre no toca proyectos ni historial', async () => {
-    brandProjects([{ id: 20, manager_id: 3 }]);
+  it('un cambio solo de nombre no toca proyectos ni historial', async () => {
+    brandProjects([{ id: 20 }]);
     mockTransaction.commit.mockResolvedValue(undefined);
     mockExecute.mockResolvedValueOnce(currentBrandRow());
 

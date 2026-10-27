@@ -54,7 +54,8 @@ middleware.ts
 clients (laboratorios)
   └── managers          gerente de contacto del cliente
 brands                  marca comercial       → client_id, manager_id
-projects                proyecto sobre marca  → client_id, brand_id, manager_id
+projects                proyecto sobre marca  → client_id, brand_id, created_manager_id
+                        (gerente actual = brands.manager_id de su marca principal)
   └── project_brands    marcas asociadas      → brand_id (mismo cliente)
   └── project_tasks     tareas ejecutables    → task_quotes, task_transitions
 ```
@@ -126,21 +127,18 @@ Reglas al trasladar (las marcas **nunca** cambian de cliente; solo cambia su ger
 
 | Caso | Resultado |
 |------|-----------|
-| Marca del gerente **con sucesor** | Se queda en su cliente y cambia de gerente (+ `brand_manager_history`); **todos** sus proyectos (cualquier estado y gerente actual) pasan al sucesor (+ `project_manager_history`) |
+| Marca del gerente **con sucesor** | Se queda en su cliente y cambia de gerente (+ `brand_manager_history`); sus proyectos (cualquier estado) tienen desde ese momento al sucesor, sin escribir nada en `projects` |
 | Marca del gerente **sin sucesor** | El traslado se **rechaza** (`BRANDS_WITHOUT_SUCCESSOR`, 400) nombrando las marcas; no se escribe nada |
-| Otro proyecto del gerente (marca no reasignada en el traslado) | Pasa al gerente actual de **su marca principal** (+ `project_manager_history`), en cualquier estado. No hay elección por proyecto |
+| Proyecto del gerente | Su gerente es siempre el de **su marca principal**: sigue a la marca, sin escrituras por proyecto ni elección por proyecto |
 
-`brands.client_id` y `projects.client_id` nunca se modifican en un traslado. Si
-la marca principal de un proyecto quedara sin gerente o con el gerente que se va,
-la transacción falla cerrada (`BRANDS_WITHOUT_SUCCESSOR`) y hace `rollback`.
+`brands.client_id` y `projects.client_id` nunca se modifican en un traslado.
+Como toda marca del gerente necesita sucesor, ningún proyecto puede quedarse con
+el gerente que se va.
 
 Orden obligatorio dentro de la única transacción:
 
-1. Reasignar las marcas a sus sucesores (+ `brand_manager_history`) y, por cada
-   una, pasar todos sus proyectos al sucesor (`cascadeBrandManagerToProjects`,
-   + `project_manager_history`).
-2. Pasar los proyectos restantes del gerente al gerente de su marca principal
-   (+ `project_manager_history`). Los ya movidos en el paso 1 no se repiten.
+1. Reasignar las marcas a sus sucesores (+ `brand_manager_history`).
+2. Contar los proyectos de las marcas reasignadas (`followed_projects`).
 3. `UPDATE managers SET client_id` (y email / teléfono si cambian).
 4. Insertar en `manager_client_history`.
 
@@ -157,8 +155,8 @@ del cliente que se está dejando, o cuando el sucesor es el propio gerente, y
 
 El endpoint ya no acepta `project_reassignments` (400 "Datos inválidos" si se
 envía). El resultado devuelve `reassigned_brands` (marcas heredadas por sus
-sucesores) y `followed_projects` (**todos** los proyectos que cambiaron de
-gerente en el traslado: los de las marcas reasignadas más los demás del gerente). El diálogo de traslado exige un nuevo gerente por marca antes de enviar y
+sucesores) y `followed_projects` (número de proyectos cuya marca principal es
+una de las marcas reasignadas: los que ahora tienen al sucesor). El diálogo de traslado exige un nuevo gerente por marca antes de enviar y
 lista los proyectos del gerente solo como información.
 
 ### Marcas asociadas de un proyecto
@@ -189,36 +187,44 @@ El gerente de un proyecto es **siempre el gerente actual de su marca principal**
 - `updateBrand` (`PATCH /api/brands/[id]`, botón "Asignar Nuevo Gerente" de la
   marca), en **una sola transacción**: actualiza la marca, escribe
   `brand_manager_history` (con `changed_at`; sirve para saber quién era el
-  gerente de la marca cuando se creó cada proyecto) y pasa **todos** los
-  proyectos de la marca, en cualquier estado, al nuevo gerente con una fila en
-  `project_manager_history` cada uno (`cascadeBrandManagerToProjects`). Si algo
-  falla, `rollback` completo.
-- Tras confirmar, la ruta re-sincroniza el acceso a Drive de esos proyectos
-  (best effort: un fallo se devuelve como `driveWarning`, nunca bloquea). La
-  respuesta incluye `reassigned_projects` (cuántos proyectos cambiaron).
+  gerente de la marca cuando se creó cada proyecto) y lee los proyectos cuya
+  marca principal es esta. No escribe nada en `projects` ni en
+  `project_manager_history`: sus proyectos, en cualquier estado, tienen al nuevo
+  gerente porque lo leen de la marca. Si algo falla, `rollback` completo.
+- Los gerentes no reciben acceso a Drive, así que el cambio no toca Drive. La
+  respuesta incluye `reassigned_projects` (cuántos proyectos de la marca tienen
+  ahora al nuevo gerente).
 - `PATCH /api/projects/[id]` con `manager_id` → 400
   `{ error: "El gerente del proyecto se cambia reasignando su marca" }`, sin
   escribir nada. La tarjeta "Gerente principal" del proyecto es de solo lectura
   y remite a la marca.
 - `POST /api/projects` exige que `manager_id` sea el gerente de la marca
   principal; si no, `MANAGER_NOT_BRAND_MANAGER` → 400 ("El gerente del proyecto
-  debe ser el gerente de su marca principal") sin escribir nada.
+  debe ser el gerente de su marca principal") sin escribir nada. Ese gerente
+  solo se guarda como `created_manager_id`; la columna `projects.manager_id`
+  ya no existe (migración 027).
 
-El `client_id` del proyecto nunca se toca. El historial se consulta en
-`GET /api/projects/[id]/manager-history`.
+El `client_id` del proyecto nunca se toca. El historial de gerentes del proyecto
+ya no se muestra ni se expone (se eliminó `GET /api/projects/[id]/manager-history`);
+la tabla `project_manager_history` se conserva con sus datos, pero ya no se escribe.
 
 #### Datos actuales vs. datos de la creación
 
 | Columna | Qué es | ¿Cambia? |
 |---------|--------|-----------|
-| `manager_id` | Gerente **actual** = gerente de la marca principal | Sí, por cascada al reasignar la marca o en un traslado |
-| `created_manager_id` | Gerente con el que se **creó** el proyecto (migración 025) | No: lo fija `createProject` (igual a `manager_id`) y nada más lo escribe |
+| `manager_id` (respuesta) | Gerente **actual**: se lee de `brands.manager_id` vía `projects.brand_id` (no hay columna en `projects`) | Sí, al reasignar la marca o en un traslado |
+| `current_client_id` / `current_client_name` (respuesta) | Cliente **actual**: el de la marca principal (`brands.client_id`) | No en la práctica: las marcas no cambian de cliente |
+| `created_manager_id` | Gerente con el que se **creó** el proyecto (migración 025) | No: lo fija `createProject` (el gerente de la marca al crear) y nada más lo escribe |
 | `client_id` | Cliente con el que se **creó** el proyecto | No |
 
-El gerente y el cliente actuales se leen desde la marca (la marca pertenece a un
-gerente, y el gerente a un cliente). Las respuestas de proyecto incluyen
-`created_manager_id` y `created_manager_name`; la tarjeta "Gerente principal"
-muestra además la línea "Al crearse: {gerente} ({cliente})".
+El gerente y el cliente actuales se leen siempre desde la marca principal: en el
+detalle y el listado de proyectos, en el filtro `manager_id` del listado, en la
+asignación de tareas en modo comercial y en la vista previa del traslado de
+gerente. Las respuestas mantienen las claves `manager_id`/`manager_name` e
+incluyen `current_client_id`/`current_client_name`, `created_manager_id` y
+`created_manager_name`. La tarjeta "Gerente principal" muestra
+"{gerente actual} ({cliente actual})" y la línea "Al crearse: {gerente}
+({cliente})"; ya no muestra historial.
 
 ## Carpetas de Drive de proyectos
 
@@ -276,8 +282,9 @@ permisos heredados ni a la cuenta OAuth conectada.
 
 Solo `PROJECT_EDIT_ROLES` con acceso al proyecto recibe además el estado de los
 destinatarios esperados: liderazgo activo (admin, directivo y financiero),
-creador activo, asignados activos y los gerente/co-gerentes vinculados al
-proyecto. Un permiso efectivo directo, heredado, de dominio o público evita un
+creador activo y asignados activos. Los gerentes y co-responsables (contactos
+del cliente) **nunca** reciben acceso por defecto: normalmente no tienen cuenta
+de Google. Los permisos que ya tuvieran no se revocan. Un permiso efectivo directo, heredado, de dominio o público evita un
 falso "sin acceso"; un rol inferior a editor se muestra como insuficiente. Drive
 no permite comprobar la membresía individual de grupos, por lo que la interfaz
 lo comunica como una limitación y no afirma acceso o ausencia con certeza.
@@ -293,8 +300,8 @@ aditiva el conjunto actual de interesados como `writer`. Nunca revoca
 automáticamente a antiguos asignados. Si Drive falla, la mutación de negocio se
 mantiene exitosa y la respuesta incluye `driveWarning`; el reintento no vuelve a
 crear la tarea o asignación. La creación y la recreación comparten con
-administradores, directivos, financieros, creador, gerente principal, co-gerentes
-y asignados actuales.
+administradores, directivos, financieros, creador y asignados actuales; agregar
+o quitar co-responsables no sincroniza Drive.
 
 ## Una sola tarea en progreso por colaborador
 
@@ -484,7 +491,7 @@ proyecto queda creado y el wizard solo muestra un aviso.
 | Tabla | Registra |
 |-------|----------|
 | `manager_client_history` | Traslados de un gerente entre clientes |
-| `project_manager_history` | Cambios de gerente responsable de un proyecto |
+| `project_manager_history` | Cambios de gerente de un proyecto **hasta la migración 026** (se conserva, ya no se escribe: el gerente actual es el de la marca) |
 | `brand_manager_history` | Cambios de gerente responsable de una marca |
 | `task_transitions` | Cambios de estado de las tareas de proyecto |
 | `notification_events` | Eventos de notificación emitidos (con reintentos en `notification_deliveries`) |
@@ -544,6 +551,38 @@ antigua de `project_manager_history` (por `changed_at`, desempate por `id`) o,
 si no hay historial o ese valor es NULL, con el `manager_id` actual. Debe
 correr **después** de la 024, para que los proyectos alineados ahí conserven
 su gerente original. No toca `updated_at`. Es idempotente.
+
+`026_brand_sourced_project_manager.sql` acompaña el cambio por el que el gerente
+de un proyecto se lee solo de su marca: `projects.manager_id` admite NULL (ya no
+se escribe; se elimina en la 027), `brands.manager_id` pasa a NOT NULL (la
+migración aborta indicando cuántas marcas no tienen gerente) y las FKs de
+`brands.manager_id` y de `brand_manager_history` hacia `managers` pasan a
+`ON DELETE RESTRICT` (borrar un gerente con marcas o historial de marca se
+rechaza). Es idempotente. Rollback: revertir el código y volver a ejecutar las
+dos sentencias de la 024 para realinear `projects.manager_id`.
+
+`027_drop_project_manager_id.sql` elimina `projects.manager_id` y su índice
+`idx_projects_manager_id` (la FK se va con la columna). Se conservan
+`created_manager_id`, `client_id`, `project_manager_history` y
+`brand_manager_history`. Es idempotente (`IF EXISTS`). Rollback: volver a crear
+la columna y rellenarla desde la marca (`brands.manager_id`); el SQL está en el
+encabezado de la migración.
+
+**Orden de despliegue de 026/027** (el código y el esquema nunca deben quedar
+desalineados):
+
+1. Ejecutar `026` con el código anterior aún desplegado (es compatible).
+2. Desplegar el código que lee el gerente desde la marca y ya no escribe
+   `projects.manager_id`. Si se despliega antes de la 026, crear proyectos falla
+   (`manager_id` sigue siendo NOT NULL).
+3. Ejecutar `027` solo cuando ese código esté en producción.
+
+`npm run db:migrate` aplica **todas** las migraciones pendientes de una vez:
+si 026 y 027 están pendientes a la vez con el código anterior desplegado, 027
+eliminaría la columna que ese código todavía usa. Para el paso 1, aplica solo la
+026 (por ejemplo, con `psql -1 -f db/migrations/026_brand_sourced_project_manager.sql`
+y registrándola en `_migrations`, o migrando desde una rama sin la 027) o ejecuta
+`db:migrate` justo después de desplegar el código nuevo.
 
 ### Variables de entorno
 

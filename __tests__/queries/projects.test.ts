@@ -16,14 +16,13 @@ jest.mock('next/cache', () => ({
 }));
 
 import { db } from '@/lib/db';
+import * as projectQueries from '@/lib/queries/projects';
 import {
-  cascadeBrandManagerToProjects,
   createProject,
   clearProjectDriveAccessFailure,
   getProjectDriveAccessFailures,
   getProjectExpectedDriveRecipients,
   getProjectById,
-  getProjectManagerHistory,
   getProjectStakeholderEmails,
   getProjectsWithPagination,
   recalculateProjectProgress,
@@ -63,20 +62,22 @@ describe('project queries metadata fields', () => {
     mockExecute.mockResolvedValueOnce(makeResult([
       { email: ' Admin@Test.com ', name: 'Admin', source: 'leadership' },
       { email: 'admin@test.com', name: 'Admin', source: 'creator' },
-      { email: 'manager@test.com', name: 'Manager', source: 'manager' },
-      { email: 'manager@test.com', name: 'Manager', source: 'co_manager' },
+      { email: 'worker@test.com', name: 'Worker', source: 'task_assignee' },
       { email: 'invalid', name: 'Invalid', source: 'task_assignee' },
     ]));
 
     await expect(getProjectExpectedDriveRecipients(15)).resolves.toEqual([
       { email: 'admin@test.com', name: 'Admin', sources: ['leadership', 'creator'] },
-      { email: 'manager@test.com', name: 'Manager', sources: ['manager', 'co_manager'] },
+      { email: 'worker@test.com', name: 'Worker', sources: ['task_assignee'] },
     ]);
     const call = mockExecute.mock.calls[0]?.[0] as { sql: string; args: unknown[] };
     expect(call.args[0]).toBe(15);
     expect(call.args).toEqual([15, 1, 2, 5]);
     expect(call.sql).toContain("'task_assignee' AS source");
-    expect(call.sql).toContain("'co_manager' AS source");
+    // S1 (brand-sourced-project-manager): ningún gerente ni co-responsable recibe acceso
+    expect(call.sql).not.toContain("'manager' AS source");
+    expect(call.sql).not.toContain("'co_manager' AS source");
+    expect(call.sql).not.toContain('managers');
     expect(call.sql).not.toContain('m.client_id');
   });
 
@@ -171,8 +172,7 @@ describe('project queries metadata fields', () => {
         args: [
           'Proyecto',
           2,
-          3,
-          3, // created_manager_id: gerente al crearse = manager_id (S7)
+          3, // created_manager_id: gerente al crearse = gerente de la marca (S7)
           7, // client_id heredado de la marca, no del gerente
           null,
           null,
@@ -392,35 +392,56 @@ describe('getProjectsWithPagination()', () => {
   });
 });
 
-describe('getProjectManagerHistory()', () => {
-  it('resuelve nombres del gerente previo, el nuevo y el actor', async () => {
-    mockExecute.mockResolvedValueOnce(makeResult([{
-      id: 1, project_id: 11,
-      previous_manager_id: 2, previous_manager_name: 'Monica Robles',
-      new_manager_id: 11, new_manager_name: 'Luis Sandoval',
-      changed_by: 77, changed_by_name: 'Admin',
-      reason: 'Reasignación', changed_at: '2026-01-01T00:00:00.000Z',
-    }]));
+describe('gerente y cliente actuales: se leen de la marca principal', () => {
+  // Spec: odd/tasks/brand-sourced-project-manager.md — S3, S4, S6
 
-    const result = await getProjectManagerHistory(11);
+  it('S4/S6: getProjectById lee el gerente actual de brands.manager_id y conserva las claves', async () => {
+    mockExecute.mockResolvedValueOnce(makeResult([{ id: 1 }]));
 
-    expect(result[0]).toEqual(expect.objectContaining({
-      previousManagerName: 'Monica Robles',
-      newManagerName: 'Luis Sandoval',
-      changedByName: 'Admin',
-    }));
+    await getProjectById(1);
+
+    const sql = (mockExecute.mock.calls[0]?.[0] as { sql: string }).sql;
+    expect(sql).toContain('b.manager_id     AS manager_id');
+    expect(sql).toContain('m.name           AS manager_name');
+    expect(sql).toContain('LEFT JOIN managers         m   ON m.id = b.manager_id');
+    expect(sql).not.toContain('p.manager_id');
   });
 
-  it('returns an empty array when db throws', async () => {
-    mockExecute.mockRejectedValueOnce(new Error('error'));
-    expect(await getProjectManagerHistory(11)).toEqual([]);
+  it('S3: getProjectById expone el cliente actual (de la marca) junto al de la creación', async () => {
+    mockExecute.mockResolvedValueOnce(makeResult([{ id: 1 }]));
+
+    await getProjectById(1);
+
+    const sql = (mockExecute.mock.calls[0]?.[0] as { sql: string }).sql;
+    expect(sql).toContain('b.client_id      AS current_client_id');
+    expect(sql).toContain('bcl.name         AS current_client_name');
+    expect(sql).toContain('LEFT JOIN clients          bcl ON bcl.id = b.client_id');
+    // El cliente de la creación sigue saliendo de projects.client_id
+    expect(sql).toContain('cl.name          AS client_name');
+    expect(sql).toContain('LEFT JOIN clients          cl  ON p.client_id   = cl.id');
+  });
+
+  it('S4: el filtro por gerente del listado usa el gerente de la marca', async () => {
+    mockExecute
+      .mockResolvedValueOnce(makeResult([{ count: 0 }]))
+      .mockResolvedValueOnce(makeResult([]));
+
+    await getProjectsWithPagination({ managerId: 9 });
+
+    const countCall = mockExecute.mock.calls[0]?.[0] as { sql: string; args: unknown[] };
+    const listCall = mockExecute.mock.calls[1]?.[0] as { sql: string; args: unknown[] };
+    expect(countCall.sql).toContain('b.manager_id = $1');
+    expect(countCall.args).toEqual([9]);
+    expect(countCall.sql).not.toContain('p.manager_id');
+    expect(listCall.sql).not.toContain('p.manager_id');
+    expect(listCall.sql).toContain('AS current_client_name');
   });
 });
 
 describe('gerente al crearse (created_manager_id)', () => {
   // Spec: odd/tasks/brand-owned-project-manager.md — S7, S8
 
-  it('S7: createProject guarda created_manager_id igual a manager_id', async () => {
+  it('S4: createProject guarda created_manager_id y ya no escribe projects.manager_id', async () => {
     mockTransaction.execute.mockResolvedValueOnce(makeResult([{ id: 15 }]));
     mockExecute
       .mockResolvedValueOnce(makeResult([{ client_id: 7, manager_id: 3 }]))
@@ -430,12 +451,22 @@ describe('gerente al crearse (created_manager_id)', () => {
     await createProject({ title: 'Proyecto', brand_id: 2, manager_id: 3 });
 
     const insert = mockTransaction.execute.mock.calls[0][0] as { sql: string; args: unknown[] };
-    expect(insert.sql.replace(/\s+/g, ' ')).toContain(
-      'INSERT INTO projects (title, brand_id, manager_id, created_manager_id, client_id,'
+    const sql = insert.sql.replace(/\s+/g, ' ');
+    expect(sql).toContain(
+      'INSERT INTO projects (title, brand_id, created_manager_id, client_id, product_id,'
     );
-    expect(insert.sql).toContain('$15');
-    expect(insert.args).toHaveLength(15);
-    expect(insert.args.slice(0, 5)).toEqual(['Proyecto', 2, 3, 3, 7]);
+    expect(sql).not.toMatch(/[(,] manager_id[,)]/);
+    expect(insert.sql).toContain('$14');
+    expect(insert.sql).not.toContain('$15');
+    expect(insert.args).toHaveLength(14);
+    expect(insert.args.slice(0, 4)).toEqual(['Proyecto', 2, 3, 7]);
+    // Ninguna sentencia del alta escribe project_manager_history
+    const all = [
+      ...mockTransaction.execute.mock.calls.map((c) => (c[0] as { sql: string }).sql),
+      ...mockExecute.mock.calls.map((c) => (c[0] as { sql: string }).sql),
+    ];
+    expect(all.some((s) => s.includes('project_manager_history'))).toBe(false);
+    expect(mockTransaction.commit).toHaveBeenCalledTimes(1);
   });
 
   it('S8: getProjectById devuelve created_manager_id y created_manager_name', async () => {
@@ -447,8 +478,6 @@ describe('gerente al crearse (created_manager_id)', () => {
     expect(sql).toContain('p.created_manager_id');
     expect(sql).toContain('cm.name          AS created_manager_name');
     expect(sql).toContain('LEFT JOIN managers         cm  ON p.created_manager_id = cm.id');
-    // El gerente actual sigue saliendo de manager_id
-    expect(sql).toContain('LEFT JOIN managers         m   ON p.manager_id  = m.id');
   });
 
   it('S8: el listado paginado también incluye el gerente al crearse', async () => {
@@ -463,25 +492,9 @@ describe('gerente al crearse (created_manager_id)', () => {
     expect(listSql).toContain('ON p.created_manager_id = cm.id');
   });
 
-  it('S7: la cascada de marca mueve manager_id pero nunca escribe created_manager_id', async () => {
-    mockTransaction.execute.mockResolvedValueOnce(
-      makeResult([{ id: 30, manager_id: 7 }])
-    );
-
-    const moved = await cascadeBrandManagerToProjects(
-      mockTransaction as never,
-      4,
-      11,
-      77,
-      'Traslado'
-    );
-
-    expect(moved).toEqual([30]);
-    const calls = mockTransaction.execute.mock.calls.map((c) => c[0] as { sql: string; args: unknown[] });
-    expect(calls.find((c) => c.sql.includes('UPDATE projects'))?.sql).toBe(
-      'UPDATE projects SET manager_id = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2'
-    );
-    expect(calls.some((c) => c.sql.includes('created_manager_id'))).toBe(false);
+  it('S4: ya no existen helpers que escriban el gerente de un proyecto', () => {
+    expect(projectQueries).not.toHaveProperty('cascadeBrandManagerToProjects');
+    expect(projectQueries).not.toHaveProperty('reassignProjectManager');
   });
 
   it('S7: updateProject ignora created_manager_id aunque llegue en el payload', async () => {

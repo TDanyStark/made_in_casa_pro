@@ -29,7 +29,7 @@ describe("syncProjectDriveAccess", () => {
     (getProjectById as jest.Mock).mockResolvedValue({ id: 8, drive_folder_id: "folder-8" });
     (getProjectExpectedDriveRecipients as jest.Mock).mockResolvedValue([
       { email: "a@test.com", name: "A", sources: ["leadership"] },
-      { email: "b@test.com", name: "B", sources: ["manager"] },
+      { email: "b@test.com", name: "B", sources: ["task_assignee"] },
     ]);
     (syncDriveFolderAccessDetailed as jest.Mock).mockResolvedValue({
       warning: null,
@@ -55,7 +55,7 @@ describe("syncProjectDriveAccess", () => {
 });
 
 describe("buildExpectedDriveRecipientStatuses", () => {
-  const recipient = { email: "person@abbott.com", name: "Person", sources: ["manager" as const] };
+  const recipient = { email: "person@abbott.com", name: "Person", sources: ["task_assignee" as const] };
   const permission = (overrides: Record<string, unknown>) => ({
     id: "p", type: "user", role: "writer", emailAddress: null, displayName: null,
     domain: null, inherited: false, isConnectedAccount: false, canDelete: true, ...overrides,
