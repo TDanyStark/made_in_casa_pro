@@ -58,7 +58,7 @@ const PROJECT_SELECT = `
 // El cliente de la creación sale de `projects.client_id` (migración 012) y el
 // gerente de la creación de `projects.created_manager_id` (migración 025).
 // El gerente y el cliente ACTUALES salen siempre de la marca principal
-// (`brands.manager_id` / `brands.client_id`), no de `projects.manager_id`.
+// (`brands.manager_id` / `brands.client_id`); `projects` no tiene columna de gerente actual (migración 027).
 const PROJECT_JOINS = `
   FROM projects p
   LEFT JOIN brands           b   ON p.brand_id    = b.id

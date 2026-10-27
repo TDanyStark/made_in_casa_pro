@@ -54,7 +54,8 @@ middleware.ts
 clients (laboratorios)
   └── managers          gerente de contacto del cliente
 brands                  marca comercial       → client_id, manager_id
-projects                proyecto sobre marca  → client_id, brand_id, manager_id
+projects                proyecto sobre marca  → client_id, brand_id, created_manager_id
+                        (gerente actual = brands.manager_id de su marca principal)
   └── project_brands    marcas asociadas      → brand_id (mismo cliente)
   └── project_tasks     tareas ejecutables    → task_quotes, task_transitions
 ```
@@ -200,8 +201,8 @@ El gerente de un proyecto es **siempre el gerente actual de su marca principal**
 - `POST /api/projects` exige que `manager_id` sea el gerente de la marca
   principal; si no, `MANAGER_NOT_BRAND_MANAGER` → 400 ("El gerente del proyecto
   debe ser el gerente de su marca principal") sin escribir nada. Ese gerente
-  solo se guarda como `created_manager_id`; `projects.manager_id` ya no se
-  escribe (migración 026: admite NULL; se elimina en la 027).
+  solo se guarda como `created_manager_id`; la columna `projects.manager_id`
+  ya no existe (migración 027).
 
 El `client_id` del proyecto nunca se toca. El historial de gerentes del proyecto
 ya no se muestra ni se expone (se eliminó `GET /api/projects/[id]/manager-history`);
@@ -211,9 +212,9 @@ la tabla `project_manager_history` se conserva con sus datos, pero ya no se escr
 
 | Columna | Qué es | ¿Cambia? |
 |---------|--------|-----------|
-| `manager_id` (respuesta) | Gerente **actual**: se lee de `brands.manager_id` vía `projects.brand_id`, no de `projects.manager_id` | Sí, al reasignar la marca o en un traslado |
-| `current_client_id` / `current_client_name` (respuesta) | Cliente **actual**: el de la marca principal (`brands.client_id`) | Sí, si la marca cambia de cliente |
-| `created_manager_id` | Gerente con el que se **creó** el proyecto (migración 025) | No: lo fija `createProject` (igual a `manager_id`) y nada más lo escribe |
+| `manager_id` (respuesta) | Gerente **actual**: se lee de `brands.manager_id` vía `projects.brand_id` (no hay columna en `projects`) | Sí, al reasignar la marca o en un traslado |
+| `current_client_id` / `current_client_name` (respuesta) | Cliente **actual**: el de la marca principal (`brands.client_id`) | No en la práctica: las marcas no cambian de cliente |
+| `created_manager_id` | Gerente con el que se **creó** el proyecto (migración 025) | No: lo fija `createProject` (el gerente de la marca al crear) y nada más lo escribe |
 | `client_id` | Cliente con el que se **creó** el proyecto | No |
 
 El gerente y el cliente actuales se leen siempre desde la marca principal: en el
@@ -559,6 +560,22 @@ migración aborta indicando cuántas marcas no tienen gerente) y las FKs de
 `ON DELETE RESTRICT` (borrar un gerente con marcas o historial de marca se
 rechaza). Es idempotente. Rollback: revertir el código y volver a ejecutar las
 dos sentencias de la 024 para realinear `projects.manager_id`.
+
+`027_drop_project_manager_id.sql` elimina `projects.manager_id` y su índice
+`idx_projects_manager_id` (la FK se va con la columna). Se conservan
+`created_manager_id`, `client_id`, `project_manager_history` y
+`brand_manager_history`. Es idempotente (`IF EXISTS`). Rollback: volver a crear
+la columna y rellenarla desde la marca (`brands.manager_id`); el SQL está en el
+encabezado de la migración.
+
+**Orden de despliegue de 026/027** (el código y el esquema nunca deben quedar
+desalineados):
+
+1. Ejecutar `026` con el código anterior aún desplegado (es compatible).
+2. Desplegar el código que lee el gerente desde la marca y ya no escribe
+   `projects.manager_id`. Si se despliega antes de la 026, crear proyectos falla
+   (`manager_id` sigue siendo NOT NULL).
+3. Ejecutar `027` solo cuando ese código esté en producción.
 
 ### Variables de entorno
 
