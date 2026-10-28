@@ -230,7 +230,7 @@ describe("POST /api/projects/[id]/adjustments eligibility from real latest-versi
         { id: 1, version_number: 1, status: "active", task_count: "3", completed_task_count: "3" },
       ] as never);
 
-      const res = await callPost({});
+      const res = await callPost({ tasks: [{ title: "Primera", assigned_user_id: 7 }] });
 
       expect(res.status).toBe(201);
       expect(createSubFolder).toHaveBeenCalledWith(expect.objectContaining({ folderName: "v2" }));
@@ -265,10 +265,44 @@ describe("POST /api/projects/[id]/adjustments eligibility from real latest-versi
       { id: 2, version_number: 2, status: "completed", task_count: 1, completed_task_count: 1 },
     ] as never);
 
-    const res = await callPost({});
+    const res = await callPost({ tasks: [{ title: "Primera", assigned_user_id: 7 }] });
 
     expect(res.status).toBe(201);
     expect(createSubFolder).toHaveBeenCalledWith(expect.objectContaining({ folderName: "v3" }));
+  });
+
+  it.each([
+    ["no tasks field and no product templates", {}],
+    ["an empty task list and no product templates", { tasks: [] }],
+  ])("rejects %s with 400 before any write or Drive call", async (_label, body) => {
+    mockGetAdjustments.mockResolvedValue([
+      { id: 1, version_number: 1, status: "completed", task_count: 1, completed_task_count: 1 },
+    ] as never);
+
+    const res = await callPost(body);
+
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: "No se puede crear una versión sin tareas. Agrega al menos una tarea." });
+    expectNoSideEffects();
+  });
+
+  it("rejects an empty task list when the product has no templates, after reading them", async () => {
+    mockGetProjectById.mockResolvedValueOnce({
+      id: 15, status: "completed", drive_folder_id: "drive-root", product_id: 9, created_by: 3,
+    } as never);
+    mockGetAdjustments.mockResolvedValue([
+      { id: 1, version_number: 1, status: "completed", task_count: 1, completed_task_count: 1 },
+    ] as never);
+    (db.execute as jest.Mock).mockResolvedValueOnce({ rows: [] });
+
+    const res = await callPost({ tasks: [] });
+
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: "No se puede crear una versión sin tareas. Agrega al menos una tarea." });
+    expect(db.execute).toHaveBeenCalledTimes(1);
+    expect(createSubFolder).not.toHaveBeenCalled();
+    expect(mockCreateAdjustment).not.toHaveBeenCalled();
+    expect(mockDbTransaction).not.toHaveBeenCalled();
   });
 
   it("keeps the operations role check before anything else", async () => {

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { SortableList } from "@/components/ui/sortable-list";
-import { TaskAssignmentSelector, AssignMode } from "@/components/tasks/TaskAssignmentSelector";
+import { TaskAssignmentSelector, AssignMode, getAssignmentErrors } from "@/components/tasks/TaskAssignmentSelector";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -108,7 +108,15 @@ export function TaskSettingsDialog({ open, onOpenChange, task, projectId, onSave
 
   if (!draft) return null;
 
+  const assignmentErrors = getAssignmentErrors({
+    assignMode: draft.assign_mode,
+    areaId: draft.area_id,
+    assignedUserId: draft.assigned_user_id,
+    requiresQuote: draft.requires_quote,
+  });
+
   const handleDone = () => {
+    if (assignmentErrors.length > 0) return;
     onSave(draft.id, draft);
     onOpenChange(false);
   };
@@ -200,11 +208,16 @@ export function TaskSettingsDialog({ open, onOpenChange, task, projectId, onSave
               requiresQuote={draft.requires_quote}
               projectId={projectId}
             />
+            {assignmentErrors.map(({ field, message }) => (
+              <p key={field} className="text-xs text-destructive font-medium px-1">
+                {message}
+              </p>
+            ))}
           </div>
         </div>
 
         <DialogFooter className="mt-6">
-          <Button onClick={handleDone}>Listo</Button>
+          <Button onClick={handleDone} disabled={assignmentErrors.length > 0}>Listo</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

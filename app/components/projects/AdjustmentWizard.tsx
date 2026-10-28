@@ -177,7 +177,7 @@ export function AdjustmentWizard({
       id: lid, template_id: null, isExtra: true, title: "Nueva tarea",
       description: "",
       area_id: null, area_name: null, assigned_user_id: null, assigned_user_name: null,
-      assign_to_commercial: 0, assign_mode: "auto",
+      assign_to_commercial: 0, assign_mode: "specific",
       requires_quote: false, quoter_ids: [],
       order_index: localTasks.length, task_type: "execution",
     };
@@ -311,10 +311,20 @@ export function AdjustmentWizard({
               <ChevronRight className="h-4 w-4 ml-1" />
             </Button>
           ) : (
-            <Button type="button" onClick={handleSubmit} disabled={isSubmitting || loadError} className="min-w-[140px]">
-              {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-              {isSubmitting ? "Creando ajuste..." : "Crear Ajuste"}
-            </Button>
+            <div className="flex items-center gap-3">
+              {!loadError && !loadingTemplates && localTasks.length === 0 && (
+                <p className="text-xs text-destructive">La versión debe tener al menos una tarea.</p>
+              )}
+              <Button
+                type="button"
+                onClick={handleSubmit}
+                disabled={isSubmitting || loadError || loadingTemplates || localTasks.length === 0}
+                className="min-w-[140px]"
+              >
+                {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                {isSubmitting ? "Creando ajuste..." : "Crear Ajuste"}
+              </Button>
+            </div>
           )}
         </div>
       </DialogContent>

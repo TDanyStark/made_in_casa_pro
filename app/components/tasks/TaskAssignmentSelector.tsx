@@ -47,6 +47,33 @@ import { Users, Zap, UserCheck, X, Search, Check, ChevronsUpDown } from "lucide-
 
 export type AssignMode = "auto" | "commercial" | "specific";
 
+export const SPECIFIC_USER_REQUIRED_MESSAGE =
+  "Debes seleccionar una persona cuando el modo es 'Persona específica'";
+export const AUTO_AREA_REQUIRED_MESSAGE =
+  "Selecciona un área para la auto-asignación, o cambia a otro modo";
+
+/**
+ * Assignment rules shared by every task form, so no task is saved without
+ * someone (or some area) responsible for it:
+ *   - "specific" requires a person.
+ *   - "auto" requires an area (unless the task requires an external quote).
+ */
+export function getAssignmentErrors(values: {
+  assignMode: AssignMode;
+  areaId: number | null | undefined;
+  assignedUserId: number | null | undefined;
+  requiresQuote?: boolean;
+}): { field: "assigned_user_id" | "area_id"; message: string }[] {
+  const errors: { field: "assigned_user_id" | "area_id"; message: string }[] = [];
+  if (values.assignMode === "specific" && !values.assignedUserId) {
+    errors.push({ field: "assigned_user_id", message: SPECIFIC_USER_REQUIRED_MESSAGE });
+  }
+  if (values.assignMode === "auto" && !values.areaId && !values.requiresQuote) {
+    errors.push({ field: "area_id", message: AUTO_AREA_REQUIRED_MESSAGE });
+  }
+  return errors;
+}
+
 const ROL_LABELS: Record<number, string> = {
   [UserRole.ADMIN]: "Admin",
   [UserRole.DIRECTIVO]: "Directivo",
@@ -213,39 +240,25 @@ export function TaskAssignmentSelector({
           <div>
             <label className="text-sm font-medium block mb-1.5">Asignación</label>
             <div className="grid grid-cols-1 gap-2">
-              {/* Auto */}
+              {/* Specific */}
               <button
                 type="button"
                 disabled={disabled}
-                onClick={() => onAssignModeChange("auto")}
+                onClick={() => onAssignModeChange("specific")}
                 className={`flex items-start gap-3 rounded-md border p-3 text-left transition-colors ${
-                  assignMode === "auto"
+                  assignMode === "specific"
                     ? "border-primary bg-primary/5"
                     : "border-input hover:bg-muted/50"
                 } ${disabled ? "opacity-50 cursor-not-allowed" : ""}`}
               >
-                <Zap className={`h-4 w-4 mt-0.5 flex-shrink-0 ${assignMode === "auto" ? "text-primary" : "text-muted-foreground"}`} />
+                <Users className={`h-4 w-4 mt-0.5 flex-shrink-0 ${assignMode === "specific" ? "text-primary" : "text-muted-foreground"}`} />
                 <div>
-                  <p className="text-sm font-medium leading-none">Auto-asignación por área</p>
+                  <p className="text-sm font-medium leading-none">Persona específica</p>
                   <p className="text-xs text-muted-foreground mt-0.5">
-                    El sistema escoge el colaborador interno con menos carga del área seleccionada
+                    Selecciona cualquier usuario de la organización
                   </p>
-                  {assignMode === "auto" && areaId && (
-                    <div className="mt-2 flex items-center gap-1.5 text-xs text-primary font-medium bg-primary/10 px-2 py-1 rounded">
-                      {isLoadingPreview ? (
-                        <span className="flex items-center gap-1"><Zap className="h-3 w-3 animate-pulse" /> Resolviendo...</span>
-                      ) : isPreviewError ? (
-                        <span className="flex items-center gap-1 text-destructive"><X className="h-3 w-3" /> Error al resolver la asignación</span>
-                      ) : previewUser ? (
-                        <span className="flex items-center gap-1"><UserCheck className="h-3 w-3" /> Se asignará a: {previewUser.name}</span>
-                      ) : (
-                        <span className="flex items-center gap-1 text-destructive"><X className="h-3 w-3" /> Sin colaborador disponible</span>
-                      )}
-                    </div>
-                  )}
                 </div>
               </button>
-
               {/* Commercial */}
               <button
                 type="button"
@@ -279,25 +292,39 @@ export function TaskAssignmentSelector({
                 </div>
               </button>
 
-              {/* Specific */}
+              {/* Auto */}
               <button
                 type="button"
                 disabled={disabled}
-                onClick={() => onAssignModeChange("specific")}
+                onClick={() => onAssignModeChange("auto")}
                 className={`flex items-start gap-3 rounded-md border p-3 text-left transition-colors ${
-                  assignMode === "specific"
+                  assignMode === "auto"
                     ? "border-primary bg-primary/5"
                     : "border-input hover:bg-muted/50"
                 } ${disabled ? "opacity-50 cursor-not-allowed" : ""}`}
               >
-                <Users className={`h-4 w-4 mt-0.5 flex-shrink-0 ${assignMode === "specific" ? "text-primary" : "text-muted-foreground"}`} />
+                <Zap className={`h-4 w-4 mt-0.5 flex-shrink-0 ${assignMode === "auto" ? "text-primary" : "text-muted-foreground"}`} />
                 <div>
-                  <p className="text-sm font-medium leading-none">Persona específica</p>
+                  <p className="text-sm font-medium leading-none">Auto-asignación por área</p>
                   <p className="text-xs text-muted-foreground mt-0.5">
-                    Selecciona cualquier usuario de la organización
+                    El sistema escoge el colaborador interno con menos carga del área seleccionada
                   </p>
+                  {assignMode === "auto" && areaId && (
+                    <div className="mt-2 flex items-center gap-1.5 text-xs text-primary font-medium bg-primary/10 px-2 py-1 rounded">
+                      {isLoadingPreview ? (
+                        <span className="flex items-center gap-1"><Zap className="h-3 w-3 animate-pulse" /> Resolviendo...</span>
+                      ) : isPreviewError ? (
+                        <span className="flex items-center gap-1 text-destructive"><X className="h-3 w-3" /> Error al resolver la asignación</span>
+                      ) : previewUser ? (
+                        <span className="flex items-center gap-1"><UserCheck className="h-3 w-3" /> Se asignará a: {previewUser.name}</span>
+                      ) : (
+                        <span className="flex items-center gap-1 text-destructive"><X className="h-3 w-3" /> Sin colaborador disponible</span>
+                      )}
+                    </div>
+                  )}
                 </div>
               </button>
+
             </div>
           </div>
 
@@ -309,9 +336,9 @@ export function TaskAssignmentSelector({
                 <span className="text-destructive ml-1">*</span>
               </label>
               <Select
-                value={areaId?.toString() ?? "none"}
+                value={areaId?.toString() ?? ""}
                 onValueChange={(v) => {
-                  onAreaIdChange(v === "none" ? null : Number(v));
+                  onAreaIdChange(v ? Number(v) : null);
                   onAssignedUserIdChange(null);
                 }}
                 disabled={disabled}
@@ -320,7 +347,6 @@ export function TaskAssignmentSelector({
                   <SelectValue placeholder="Seleccionar área" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="none">Sin área específica</SelectItem>
                   {areas.map((area) => (
                     <SelectItem key={area.id!} value={area.id!.toString()}>
                       {area.name}
@@ -331,11 +357,6 @@ export function TaskAssignmentSelector({
               {areasError && (
                 <p className="text-xs text-destructive mt-1">Error al cargar las áreas</p>
               )}
-              {!areaId && (
-                <p className="text-xs text-muted-foreground mt-1">
-                  Si no seleccionas área, la auto-asignación no podrá ejecutarse.
-                </p>
-              )}
             </div>
           )}
         </>
@@ -345,7 +366,7 @@ export function TaskAssignmentSelector({
       {assignMode === "specific" && !requiresQuote && (
         <div>
           <label className="text-sm font-medium block mb-1.5">Persona asignada</label>
-          <Popover open={userPickerOpen} onOpenChange={setUserPickerOpen}>
+          <Popover open={userPickerOpen} onOpenChange={setUserPickerOpen} modal>
             <PopoverTrigger asChild>
               <Button
                 type="button"
@@ -382,23 +403,6 @@ export function TaskAssignmentSelector({
                 <CommandInput placeholder="Buscar por nombre, área, interno/externo..." />
                 <CommandList>
                   <CommandEmpty>No se encontraron personas.</CommandEmpty>
-                  <CommandGroup>
-                    <CommandItem
-                      value="sin asignar dejar vacío"
-                      onSelect={() => {
-                        onAssignedUserIdChange(null);
-                        setUserPickerOpen(false);
-                      }}
-                    >
-                      <Check
-                        className={cn(
-                          "mr-2 h-4 w-4",
-                          assignedUserId === null ? "opacity-100" : "opacity-0"
-                        )}
-                      />
-                      <span className="text-muted-foreground">Sin asignar (dejar vacío)</span>
-                    </CommandItem>
-                  </CommandGroup>
                   {usersByArea.map(({ area, users }) => (
                     <CommandGroup key={area} heading={area}>
                       {users.map((u) => {

@@ -30,7 +30,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { get, post, patch, del } from "@/lib/services/apiService";
 import { ProductTaskTemplateType, TaskType } from "@/lib/definitions";
-import { TaskAssignmentSelector, AssignMode } from "@/components/tasks/TaskAssignmentSelector";
+import { TaskAssignmentSelector, AssignMode, getAssignmentErrors } from "@/components/tasks/TaskAssignmentSelector";
 
 // ─── Form schema ──────────────────────────────────────────────────────────────
 
@@ -39,10 +39,19 @@ const taskSchema = z.object({
   description: z.string().optional().nullable(),
   task_type: z.enum(["execution", "validation"]).default("execution"),
   requires_quote: z.boolean().default(false),
-  assign_mode: z.enum(["auto", "commercial", "specific"]).default("auto"),
+  assign_mode: z.enum(["auto", "commercial", "specific"]).default("specific"),
   area_id: z.coerce.number().positive().optional().nullable(),
   assigned_user_id: z.coerce.number().positive().optional().nullable(),
   quoter_ids: z.array(z.number()).default([]),
+}).superRefine((data, ctx) => {
+  for (const { field, message } of getAssignmentErrors({
+    assignMode: data.assign_mode,
+    areaId: data.area_id,
+    assignedUserId: data.assigned_user_id,
+    requiresQuote: data.requires_quote,
+  })) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message, path: [field] });
+  }
 });
 
 type TaskFormValues = z.infer<typeof taskSchema>;
@@ -98,7 +107,7 @@ export default function ProductTasksManager({ productId, initialTasks = [] }: Pr
     resolver: zodResolver(taskSchema),
     defaultValues: {
       title: "", description: "", task_type: "execution", requires_quote: false,
-      assign_mode: "auto", area_id: null, assigned_user_id: null,
+      assign_mode: "specific", area_id: null, assigned_user_id: null,
     },
   });
 
@@ -118,7 +127,7 @@ export default function ProductTasksManager({ productId, initialTasks = [] }: Pr
 
   function openCreate() {
     setEditingTask(null);
-    form.reset({ title: "", description: "", task_type: "execution", requires_quote: false, assign_mode: "auto", area_id: null, assigned_user_id: null, quoter_ids: [] });
+    form.reset({ title: "", description: "", task_type: "execution", requires_quote: false, assign_mode: "specific", area_id: null, assigned_user_id: null, quoter_ids: [] });
     setDialogOpen(true);
   }
 
@@ -377,17 +386,38 @@ export default function ProductTasksManager({ productId, initialTasks = [] }: Pr
 
               {/* Unified assignment widget */}
               <Controller control={form.control} name="assign_mode" render={() => (
-                <TaskAssignmentSelector
-                  assignMode={assignMode}
-                  onAssignModeChange={(mode) => form.setValue("assign_mode", mode)}
-                  areaId={areaId ?? null}
-                  onAreaIdChange={(id) => form.setValue("area_id", id)}
-                  assignedUserId={form.watch("assigned_user_id") ?? null}
-                  onAssignedUserIdChange={(id) => form.setValue("assigned_user_id", id)}
-                  quoterIds={quoterIds}
-                  onQuoterIdsChange={(ids) => form.setValue("quoter_ids", ids)}
-                  requiresQuote={requiresQuote}
-                />
+                <div className="space-y-1">
+                  <TaskAssignmentSelector
+                    assignMode={assignMode}
+                    onAssignModeChange={(mode) => {
+                      form.setValue("assign_mode", mode);
+                      form.clearErrors(["assigned_user_id", "area_id"]);
+                    }}
+                    areaId={areaId ?? null}
+                    onAreaIdChange={(id) => {
+                      form.setValue("area_id", id);
+                      form.clearErrors("area_id");
+                    }}
+                    assignedUserId={form.watch("assigned_user_id") ?? null}
+                    onAssignedUserIdChange={(id) => {
+                      form.setValue("assigned_user_id", id);
+                      if (id) form.clearErrors("assigned_user_id");
+                    }}
+                    quoterIds={quoterIds}
+                    onQuoterIdsChange={(ids) => form.setValue("quoter_ids", ids)}
+                    requiresQuote={requiresQuote}
+                  />
+                  {form.formState.errors.assigned_user_id && (
+                    <p className="text-xs text-destructive font-medium px-1">
+                      {form.formState.errors.assigned_user_id.message}
+                    </p>
+                  )}
+                  {form.formState.errors.area_id && (
+                    <p className="text-xs text-destructive font-medium px-1">
+                      {form.formState.errors.area_id.message}
+                    </p>
+                  )}
+                </div>
               )} />
 
               <DialogFooter>

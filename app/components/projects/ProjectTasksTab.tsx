@@ -16,7 +16,7 @@ import {
   TaskType,
   TaskFlag,
 } from "@/lib/definitions";
-import { TaskAssignmentSelector, AssignMode } from "@/components/tasks/TaskAssignmentSelector";
+import { TaskAssignmentSelector, AssignMode, getAssignmentErrors } from "@/components/tasks/TaskAssignmentSelector";
 import { SortableList } from "@/components/ui/sortable-list";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -138,24 +138,18 @@ const taskSchema = z
     task_type: z.enum(["execution", "validation"]).default("execution"),
     requires_quote: z.boolean().default(false),
     quoter_ids: z.array(z.number()).default([]),
-    assign_mode: z.enum(["auto", "commercial", "specific"]).default("auto"),
+    assign_mode: z.enum(["auto", "commercial", "specific"]).default("specific"),
     area_id: z.coerce.number().positive().optional().nullable(),
     assigned_user_id: z.coerce.number().positive().optional().nullable(),
   })
   .superRefine((data, ctx) => {
-    if (data.assign_mode === "specific" && !data.assigned_user_id) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: "Debes seleccionar una persona cuando el modo es 'Persona específica'",
-        path: ["assigned_user_id"],
-      });
-    }
-    if (data.assign_mode === "auto" && !data.area_id && !data.requires_quote) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: "Selecciona un área para la auto-asignación, o cambia a otro modo",
-        path: ["area_id"],
-      });
+    for (const { field, message } of getAssignmentErrors({
+      assignMode: data.assign_mode,
+      areaId: data.area_id,
+      assignedUserId: data.assigned_user_id,
+      requiresQuote: data.requires_quote,
+    })) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message, path: [field] });
     }
   });
 
@@ -414,7 +408,7 @@ export function ProjectTasksTab({
       task_type: "execution",
       requires_quote: false,
       quoter_ids: [],
-      assign_mode: "auto",
+      assign_mode: "specific",
       area_id: null,
       assigned_user_id: null,
     });

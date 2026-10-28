@@ -134,6 +134,42 @@ export async function POST(
     const session = cookie ? await decrypt(cookie) : null;
     const currentUserId = session?.id ? Number(session.id) : null;
 
+    // ── Resolve the task list before any write ────────────────────────────────
+    // If wizard sent an explicit task list, use it. Otherwise fall back to templates.
+    let taskList: TaskTemplateRow[] = tasks as TaskTemplateRow[];
+
+    if (taskList.length === 0 && project.product_id) {
+      // No wizard tasks sent — load from templates as-is
+      const tplResult = await db.execute({
+        sql: `SELECT id AS template_id, title, area_id, assigned_user_id, assign_to_commercial, task_type, requires_quote
+              FROM product_task_templates WHERE product_id = $1 ORDER BY order_index ASC, id ASC`,
+        args: [project.product_id],
+      });
+      
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const tplTasks = tplResult.rows as any[];
+      for (const t of tplTasks) {
+        if (Number(t.requires_quote) === 1) {
+          const quotersResult = await db.execute({
+            sql: `SELECT user_id FROM product_task_template_quoters WHERE template_id = $1`,
+            args: [t.template_id],
+          });
+          t.quoter_ids = quotersResult.rows.map(r => (r as { user_id: number }).user_id);
+        } else {
+          t.quoter_ids = [];
+        }
+      }
+      taskList = tplTasks;
+    }
+
+    // A version must never exist without tasks: reject before Drive or DB writes.
+    if (taskList.length === 0) {
+      return NextResponse.json(
+        { error: "No se puede crear una versión sin tareas. Agrega al menos una tarea." },
+        { status: 400 }
+      );
+    }
+
     const nextVersion = lastAdjustment ? lastAdjustment.version_number + 1 : 2;
 
     // Create Drive subfolder
@@ -163,34 +199,6 @@ export async function POST(
       notes: notes ?? null,
     });
 
-    // ── Build and insert tasks ────────────────────────────────────────────────
-    // If wizard sent an explicit task list, use it. Otherwise fall back to templates.
-    let taskList: TaskTemplateRow[] = tasks as TaskTemplateRow[];
-
-    if (taskList.length === 0 && project.product_id) {
-      // No wizard tasks sent — load from templates as-is
-      const tplResult = await db.execute({
-        sql: `SELECT id AS template_id, title, area_id, assigned_user_id, assign_to_commercial, task_type, requires_quote
-              FROM product_task_templates WHERE product_id = $1 ORDER BY order_index ASC, id ASC`,
-        args: [project.product_id],
-      });
-      
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const tplTasks = tplResult.rows as any[];
-      for (const t of tplTasks) {
-        if (Number(t.requires_quote) === 1) {
-          const quotersResult = await db.execute({
-            sql: `SELECT user_id FROM product_task_template_quoters WHERE template_id = $1`,
-            args: [t.template_id],
-          });
-          t.quoter_ids = quotersResult.rows.map(r => (r as { user_id: number }).user_id);
-        } else {
-          t.quoter_ids = [];
-        }
-      }
-      taskList = tplTasks;
-    }
-
     const createdNotifications: Array<{
       taskId: number;
       assignedTo: number | null;
@@ -198,7 +206,7 @@ export async function POST(
       quoterIds: number[];
     }> = [];
 
-    if (taskList.length > 0) {
+    {
       const transaction = await db.transaction("write");
       try {
         // Same invariant as every other task insert: the version must belong to this project

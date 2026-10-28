@@ -202,7 +202,7 @@ export function WizardStep4Tasks({ state, onNext, onBack, update }: Props) {
       assigned_user_id: null,
       assigned_user_name: null,
       assign_to_commercial: 0,
-      assign_mode: "auto",
+      assign_mode: "specific",
       requires_quote: false,
       quoter_ids: [],
       order_index: localTasks.length,
@@ -292,8 +292,13 @@ export function WizardStep4Tasks({ state, onNext, onBack, update }: Props) {
 
       <div className="flex justify-between pt-2">
         <Button type="button" variant="outline" onClick={onBack}>Atrás</Button>
-        <Button type="button" onClick={() => onNext({})} disabled={loadError}>Siguiente</Button>
+        <Button type="button" onClick={() => onNext({})} disabled={loadError || localTasks.length === 0}>Siguiente</Button>
       </div>
+      {!loadError && localTasks.length === 0 && (
+        <p className="text-xs text-destructive text-right">
+          El proyecto debe tener al menos una tarea para continuar.
+        </p>
+      )}
 
       <TaskSettingsDialog
         open={!!taskToEdit}
