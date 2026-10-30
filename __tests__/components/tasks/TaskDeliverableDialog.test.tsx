@@ -14,7 +14,9 @@ jest.mock("sonner", () => ({ toast: { success: jest.fn(), error: jest.fn() } }))
 jest.mock("@/components/ui/dialog", () => ({
   Dialog: ({ children, open }: { children: React.ReactNode; open: boolean }) =>
     open ? <div data-testid="dialog">{children}</div> : null,
-  DialogContent: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  DialogContent: ({ children, className }: { children: React.ReactNode; className?: string }) => (
+    <div data-testid="dialog-content" className={className}>{children}</div>
+  ),
   DialogHeader: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
   DialogTitle: ({ children }: { children: React.ReactNode }) => <h2>{children}</h2>,
   DialogDescription: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
@@ -198,6 +200,42 @@ describe("TaskDeliverableDialog", () => {
     expect(screen.getByText("entrega")).toBeInTheDocument();
     expect(container.querySelector("img")).toBeNull();
     expect(container.querySelector("script")).toBeNull();
+  });
+
+  // The dialog grid must use a shrinkable column so a long link truncates
+  // instead of producing horizontal scroll.
+  it("lays out the dialog in a shrinkable single column and truncates the link", () => {
+    renderDialog({ delivery_url: "https://drive.google.com/drive/u/3/folders/12UQ8gbVm9bHkgW2ZhshnsAXZ7xxxxxxxxxx" });
+
+    expect(screen.getByTestId("dialog-content")).toHaveClass("grid-cols-1");
+    expect(screen.getByText(/drive.google.com/)).toHaveClass("truncate");
+  });
+
+  it("copies the delivery link to the clipboard and confirms it", async () => {
+    const writeText = jest.fn().mockResolvedValue(undefined);
+    Object.assign(navigator, { clipboard: { writeText } });
+    renderDialog({ delivery_url: "https://example.com/deliverable" });
+
+    fireEvent.click(screen.getByRole("button", { name: "Copiar link" }));
+
+    expect(writeText).toHaveBeenCalledWith("https://example.com/deliverable");
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith("Link copiado"));
+  });
+
+  it("toasts an error when the clipboard rejects the copy", async () => {
+    const writeText = jest.fn().mockRejectedValue(new Error("denied"));
+    Object.assign(navigator, { clipboard: { writeText } });
+    renderDialog({ delivery_url: "https://example.com/deliverable" });
+
+    fireEvent.click(screen.getByRole("button", { name: "Copiar link" }));
+
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith("No se pudo copiar el link"));
+  });
+
+  it("offers no copy button when no link was reported", () => {
+    renderDialog({ delivery_url: null });
+
+    expect(screen.queryByRole("button", { name: "Copiar link" })).not.toBeInTheDocument();
   });
 
   it("renders a non-http delivery value as plain text", () => {

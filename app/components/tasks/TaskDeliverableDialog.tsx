@@ -13,7 +13,7 @@ import { formatProgressMinutes } from "@/lib/task-progress";
 import { get, patch } from "@/lib/services/apiService";
 import type { TaskCost } from "@/lib/queries/taskCost";
 import { TaskStatusBadge } from "./TaskStatusBadge";
-import { Clock, Eye, ExternalLink, FileText, Link as LinkIcon, Pencil, User, Wallet } from "lucide-react";
+import { Check, Clock, Copy, Eye, ExternalLink, FileText, Link as LinkIcon, Pencil, User, Wallet } from "lucide-react";
 
 interface TaskDeliverableDialogProps {
   open: boolean;
@@ -180,6 +180,35 @@ function TaskCostSection({
   );
 }
 
+function CopyLinkButton({ url }: { url: string }) {
+  const [copied, setCopied] = useState(false);
+
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopied(true);
+      toast.success("Link copiado");
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      toast.error("No se pudo copiar el link");
+    }
+  };
+
+  return (
+    <Button
+      type="button"
+      variant="ghost"
+      size="icon-xs"
+      className="size-6 shrink-0"
+      aria-label="Copiar link"
+      title="Copiar link"
+      onClick={copy}
+    >
+      {copied ? <Check /> : <Copy />}
+    </Button>
+  );
+}
+
 // Fallback used when the paragraph has no layout (hidden / not measured yet).
 const DESCRIPTION_FALLBACK_MAX_CHARS = 160;
 
@@ -261,7 +290,7 @@ export function TaskDeliverableDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[560px] max-h-[85vh] overflow-y-auto">
+      <DialogContent className="grid-cols-1 sm:max-w-[560px] max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-start gap-2 pr-6 text-base leading-snug">
             <Eye className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
@@ -312,10 +341,11 @@ export function TaskDeliverableDialog({
                   <ExternalLink className="h-3.5 w-3.5 shrink-0" />
                 </a>
               ) : deliveryUrl ? (
-                <span className="truncate">{deliveryUrl}</span>
+                <span className="min-w-0 truncate">{deliveryUrl}</span>
               ) : (
                 <span className="text-muted-foreground">Sin link reportado</span>
               )}
+              {deliveryUrl && <CopyLinkButton url={deliveryUrl} />}
             </div>
 
             <div className="flex flex-col gap-2">
@@ -325,7 +355,7 @@ export function TaskDeliverableDialog({
               </p>
               {hasDeliveryNotes ? (
                 <SafeHtml
-                  className="prose prose-sm dark:prose-invert max-w-none max-h-64 overflow-y-auto rounded-md border bg-muted/20 p-4 text-sm"
+                  className="prose prose-sm dark:prose-invert max-w-none max-h-64 overflow-y-auto break-words rounded-md border bg-muted/20 p-4 text-sm"
                   html={task.delivery_notes}
                 />
               ) : (
