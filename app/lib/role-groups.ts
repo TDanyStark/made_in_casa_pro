@@ -28,6 +28,14 @@ export const OPERATIONS_ROLES: readonly UserRole[] = [
 
 export const PROJECT_EDIT_ROLES: readonly UserRole[] = OPERATIONS_ROLES;
 
+// Roles que crean proyectos (financiero no). El orden es el del filtro
+// "Creado por" de /projects: comerciales, directivos, admins.
+export const PROJECT_CREATOR_ROLES: readonly UserRole[] = [
+  UserRole.COMERCIAL,
+  UserRole.DIRECTIVO,
+  UserRole.ADMIN,
+];
+
 export const PROJECT_VIEW_ROLES: readonly UserRole[] = [
   ...PROJECT_EDIT_ROLES,
   UserRole.COLABORADOR,
@@ -50,6 +58,7 @@ export const TASK_COST_EDIT_ROLES: readonly UserRole[] = [
 ];
 
 export const CREATOR_FILTER_ROLES: readonly UserRole[] = OPERATIONS_ROLES;
+
 
 // Roles que pueden ver quién creó cada proyecto en la lista de proyectos.
 export const PROJECT_CREATOR_VIEW_ROLES: readonly UserRole[] = [

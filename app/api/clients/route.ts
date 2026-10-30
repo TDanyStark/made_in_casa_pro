@@ -6,6 +6,8 @@ import { validateApiRole, validateHttpMethod } from '@/lib/services/api-auth';
 import { AUTHENTICATED_ROLES, OPERATIONS_ROLES } from '@/lib/role-groups';
 import { z } from 'zod';
 
+const MAX_CLIENTS_LIMIT = 500;
+
 // Schema para validar los datos del cliente
 const clientSchema = z.object({
   name: z.string().min(1, "El nombre es obligatorio"),
@@ -28,7 +30,13 @@ export async function GET(request: NextRequest) {
   try {
     const url = new URL(request.url);
     const page = parseInt(url.searchParams.get("page") || "1");
-    const limit = ITEMS_PER_PAGE;
+    // `limit` opcional para selects que necesitan la lista completa
+    // (p. ej. el filtro de cliente en /projects); por defecto se pagina igual.
+    const requestedLimit = parseInt(url.searchParams.get("limit") || "");
+    const limit =
+      Number.isFinite(requestedLimit) && requestedLimit > 0
+        ? Math.min(requestedLimit, MAX_CLIENTS_LIMIT)
+        : ITEMS_PER_PAGE;
     const search = url.searchParams.get("search");
     
     // Get paginated results

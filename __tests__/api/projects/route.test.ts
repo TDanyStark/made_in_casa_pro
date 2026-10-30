@@ -215,4 +215,66 @@ describe('GET /api/projects', () => {
     await callGet(new NextRequest('http://localhost/api/projects'));
     expect(mockGetProjects).toHaveBeenCalledWith(expect.objectContaining({ assignedUserId: 77 }));
   });
+
+  function asRole(role: UserRole) {
+    mockValidateApiRole.mockResolvedValue({
+      isAuthorized: true,
+      userRole: role,
+      response: undefined,
+    } as never);
+  }
+
+  it.each([UserRole.ADMIN, UserRole.DIRECTIVO, UserRole.FINANCIERO])(
+    'filters by the requested creator for role %s',
+    async (role) => {
+      asRole(role);
+      const res = await callGet(new NextRequest('http://localhost/api/projects?created_by=5'));
+      expect(res.status).toBe(200);
+      expect(mockGetProjects).toHaveBeenCalledWith(
+        expect.objectContaining({ createdById: 5, assignedUserId: undefined })
+      );
+    }
+  );
+
+  it('keeps the colaborador scope and adds the requested creator', async () => {
+    asRole(UserRole.COLABORADOR);
+    await callGet(new NextRequest('http://localhost/api/projects?created_by=5'));
+    expect(mockGetProjects).toHaveBeenCalledWith(
+      expect.objectContaining({ createdById: 5, assignedUserId: 77 })
+    );
+  });
+
+  it('never lets a comercial see projects created by someone else', async () => {
+    asRole(UserRole.COMERCIAL);
+    await callGet(new NextRequest('http://localhost/api/projects?created_by=5'));
+    expect(mockGetProjects).toHaveBeenCalledWith(
+      expect.objectContaining({ createdById: 77, assignedUserId: undefined })
+    );
+  });
+
+  it.each(['created_by=abc', 'created_by=0', 'created_by=-3', 'created_by=1.5'])(
+    'rejects invalid %s with 400 and does not query',
+    async (qs) => {
+      const res = await callGet(new NextRequest(`http://localhost/api/projects?${qs}`));
+      expect(res.status).toBe(400);
+      expect(await res.json()).toEqual({ error: 'Parámetro created_by inválido' });
+      expect(mockGetProjects).not.toHaveBeenCalled();
+    }
+  );
+
+  it('keeps passing brand, client and manager filters through', async () => {
+    await callGet(
+      new NextRequest('http://localhost/api/projects?brand_id=3&client_id=4&manager_id=6&search=abc&status=active')
+    );
+    expect(mockGetProjects).toHaveBeenCalledWith(
+      expect.objectContaining({
+        brandId: 3,
+        clientId: 4,
+        managerId: 6,
+        search: 'abc',
+        status: 'active',
+        createdById: undefined,
+      })
+    );
+  });
 });

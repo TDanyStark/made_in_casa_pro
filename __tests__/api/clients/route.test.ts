@@ -83,3 +83,50 @@ describe("POST /api/clients", () => {
     expect(mockCreateClient).not.toHaveBeenCalled();
   });
 });
+
+describe("GET /api/clients limit", () => {
+  const { GET } = jest.requireActual("@/api/clients/route") as typeof import("@/api/clients/route");
+  const { getClientsWithPagination } = jest.requireMock("@/lib/queries/clients") as {
+    getClientsWithPagination: jest.Mock;
+  };
+  const { ITEMS_PER_PAGE } = jest.requireActual("@/config/constants") as typeof import("@/config/constants");
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockValidateHttpMethod.mockReturnValue({ isValidMethod: true, response: undefined });
+    mockValidateApiRole.mockResolvedValue({
+      isAuthorized: true,
+      userRole: 4 as never,
+      response: undefined,
+    } as never);
+    getClientsWithPagination.mockResolvedValue({ clients: [{ id: 1, name: "A" }], total: 1 });
+  });
+
+  async function callGet(qs: string) {
+    const response = await GET(new NextRequest(`http://localhost/api/clients${qs}`));
+    if (!response) throw new Error("GET handler returned undefined");
+    return response;
+  }
+
+  it("keeps ITEMS_PER_PAGE when no limit is given", async () => {
+    const res = await callGet("?page=2&search=ab");
+    expect(res.status).toBe(200);
+    expect(getClientsWithPagination).toHaveBeenCalledWith({ page: 2, limit: ITEMS_PER_PAGE, search: "ab" });
+    expect(await res.json()).toEqual({ data: [{ id: 1, name: "A" }], pageCount: 1, currentPage: 2, total: 1 });
+  });
+
+  it("honors a requested limit", async () => {
+    await callGet("?limit=300");
+    expect(getClientsWithPagination).toHaveBeenCalledWith({ page: 1, limit: 300, search: undefined });
+  });
+
+  it("caps the limit at 500", async () => {
+    await callGet("?limit=5000");
+    expect(getClientsWithPagination).toHaveBeenCalledWith({ page: 1, limit: 500, search: undefined });
+  });
+
+  it.each(["?limit=abc", "?limit=0", "?limit=-1"])("falls back to ITEMS_PER_PAGE for %s", async (qs) => {
+    await callGet(qs);
+    expect(getClientsWithPagination).toHaveBeenCalledWith({ page: 1, limit: ITEMS_PER_PAGE, search: undefined });
+  });
+});

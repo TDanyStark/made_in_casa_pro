@@ -19,6 +19,18 @@ export interface SearchableSelectOption {
   label: string;
   /** Optional numeric badge shown to the right of the label (e.g. pending task count). */
   badge?: number | null;
+  /** Optional group heading; consecutive options with the same group render together. */
+  group?: string;
+}
+
+function groupOptions(options: SearchableSelectOption[]) {
+  const groups: { heading?: string; options: SearchableSelectOption[] }[] = [];
+  for (const opt of options) {
+    const last = groups[groups.length - 1];
+    if (last && last.heading === opt.group) last.options.push(opt);
+    else groups.push({ heading: opt.group, options: [opt] });
+  }
+  return groups;
 }
 
 interface SearchableSelectProps {
@@ -86,27 +98,29 @@ export function SearchableSelect({
           <CommandInput placeholder={searchPlaceholder} />
           <CommandList>
             <CommandEmpty>{emptyMessage}</CommandEmpty>
-            <CommandGroup>
-              {options.map((opt) => (
-                <CommandItem
-                  key={opt.value}
-                  value={opt.label}
-                  onSelect={() => {
-                    onValueChange(opt.value);
-                    setOpen(false);
-                  }}
-                >
-                  <CheckIcon
-                    className={cn(
-                      "size-4 shrink-0",
-                      value === opt.value ? "opacity-100" : "opacity-0"
-                    )}
-                  />
-                  <span className="flex-1 truncate">{opt.label}</span>
-                  {opt.badge != null && <BadgeCount count={opt.badge} />}
-                </CommandItem>
-              ))}
-            </CommandGroup>
+            {groupOptions(options).map((group, index) => (
+              <CommandGroup key={`${group.heading ?? ""}-${index}`} heading={group.heading}>
+                {group.options.map((opt) => (
+                  <CommandItem
+                    key={opt.value}
+                    value={opt.label}
+                    onSelect={() => {
+                      onValueChange(opt.value);
+                      setOpen(false);
+                    }}
+                  >
+                    <CheckIcon
+                      className={cn(
+                        "size-4 shrink-0",
+                        value === opt.value ? "opacity-100" : "opacity-0"
+                      )}
+                    />
+                    <span className="flex-1 truncate">{opt.label}</span>
+                    {opt.badge != null && <BadgeCount count={opt.badge} />}
+                  </CommandItem>
+                ))}
+              </CommandGroup>
+            ))}
           </CommandList>
         </Command>
       </PopoverContent>

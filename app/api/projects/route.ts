@@ -44,6 +44,8 @@ const projectSchema = z.object({
   status: z.enum(["active", "paused", "completed", "archived"]).optional(),
 });
 
+const createdByIdSchema = z.coerce.number().int().positive().optional();
+
 export async function GET(request: NextRequest) {
   const methodValidation = validateHttpMethod(request, ["GET"]);
   if (!methodValidation.isValidMethod) return methodValidation.response;
@@ -63,14 +65,22 @@ export async function GET(request: NextRequest) {
     const clientId = url.searchParams.get("client_id") ? parseInt(url.searchParams.get("client_id")!) : undefined;
     const campaignId = url.searchParams.get("campaign_id") ? parseInt(url.searchParams.get("campaign_id")!) : undefined;
 
+    const createdByParam = url.searchParams.get("created_by") || undefined;
+    const createdBy = createdByIdSchema.safeParse(createdByParam);
+    if (!createdBy.success) {
+      return NextResponse.json({ error: "Parámetro created_by inválido" }, { status: 400 });
+    }
+    const requestedCreatedById = createdBy.data;
+
     // Restringir visibilidad según el rol del usuario:
     //   - Colaborador: solo proyectos con al menos una tarea asignada a él
-    //   - Comercial: solo proyectos que él creó
+    //   - Comercial: solo proyectos que él creó (ignora el filtro created_by)
     //   - Admin / Directivo / Financiero: ven todo
     const sessionCookie = (await cookies()).get("session")?.value;
     const session = sessionCookie ? await decrypt(sessionCookie) : null;
     let assignedUserId: number | undefined;
-    let createdById: number | undefined;
+    let createdById: number | undefined =
+      roleValidation.userRole === UserRole.COMERCIAL ? undefined : requestedCreatedById;
     if (session?.id) {
       // Rol vigente en BD (validateApiRole), no el del JWT
       if (roleValidation.userRole === UserRole.COLABORADOR) {
