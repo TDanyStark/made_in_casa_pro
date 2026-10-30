@@ -31,6 +31,7 @@ import { quoteReceived } from "@/lib/email/templates/quoteReceived";
 import { quoteAccepted } from "@/lib/email/templates/quoteAccepted";
 import { projectAdjustmentCreated } from "@/lib/email/templates/projectAdjustmentCreated";
 import { projectReadyToClose } from "@/lib/email/templates/projectReadyToClose";
+import { taskQueueStalled } from "@/lib/email/templates/taskQueueStalled";
 import type { NotificationEventType } from "@/lib/services/notificationEngine";
 
 export async function POST(
@@ -411,6 +412,44 @@ async function buildRetryMessage(
           text: projectReadyToClose.text(ctx),
         },
         opts: { projectId: event.project_id, adjustmentId: null, threadKey },
+      };
+    }
+
+    // ── task.queue_stalled ───────────────────────────────────────────────
+    case "task.queue_stalled": {
+      if (!event.task_id || !event.project_id) return null;
+      // Rebuild from the waiting tasks stored at dispatch time (the queue may have moved since).
+      const stored = Array.isArray(meta.waiting_tasks) ? meta.waiting_tasks : [];
+      const waitingTasks = stored
+        .map((t) => t as { id?: unknown; title?: unknown })
+        .filter((t) => t && t.title != null)
+        .map((t) => ({ id: Number(t.id), title: String(t.title) }));
+      if (waitingTasks.length === 0) return null;
+      const [task, project, commercial] = await Promise.all([
+        getProjectTaskById(event.task_id),
+        getProjectById(event.project_id),
+        recipientUserId ? getUserNotificationRecipient(recipientUserId) : getProjectCommercial(event.project_id),
+      ]);
+      if (!task || !project || !commercial) return null;
+      const completedByName = await getActorName(actorUserId);
+      const adjustmentId = task.adjustment_id ?? null;
+      const threadKey = await resolveProjectVersionThreadKey(event.project_id, adjustmentId);
+      const ctx = {
+        recipientName: commercial.name,
+        completedByName,
+        completedTaskTitle: task.title,
+        projectTitle: project.title,
+        projectId: project.id,
+        waitingTasks,
+      };
+      return {
+        message: {
+          to: { email: recipientEmail, name: commercial.name },
+          subject: taskQueueStalled.subject(ctx),
+          html: taskQueueStalled.html(ctx),
+          text: taskQueueStalled.text(ctx),
+        },
+        opts: { projectId: event.project_id, adjustmentId, threadKey },
       };
     }
 

@@ -32,6 +32,7 @@ jest.mock("@/lib/queries/projects", () => ({
 jest.mock("@/lib/queries/projectTasks", () => ({
   getProjectTaskById: jest.fn(),
   getTaskDriveFolderUrl: jest.fn(),
+  getTasksByProject: jest.fn(),
 }));
 
 jest.mock("@/lib/services/email/emailService", () => ({
@@ -55,7 +56,7 @@ import {
   getProjectCommercial,
 } from "@/lib/queries/notificationRecipients";
 import { getProjectById, recalculateProjectProgressWithTransition } from "@/lib/queries/projects";
-import { getProjectTaskById, getTaskDriveFolderUrl } from "@/lib/queries/projectTasks";
+import { getProjectTaskById, getTaskDriveFolderUrl, getTasksByProject } from "@/lib/queries/projectTasks";
 import { sendEmail } from "@/lib/services/email/emailService";
 
 const mockCreateEvent = createNotificationEvent as jest.Mock;
@@ -71,6 +72,7 @@ const mockGetProjectTaskById = getProjectTaskById as jest.Mock;
 const mockGetTaskDriveFolderUrl = getTaskDriveFolderUrl as jest.Mock;
 const mockSendEmail = sendEmail as jest.Mock;
 const mockGetProjectCommercial = getProjectCommercial as jest.Mock;
+const mockGetTasksByProject = getTasksByProject as jest.Mock;
 const mockRecalcWithTransition = recalculateProjectProgressWithTransition as jest.Mock;
 
 const project = { id: 1, title: "Campaña Q2", brand_name: "Acme", client_name: "Acme Corp", notes: null, ideal_delivery_at: null, completed_at: null };
@@ -490,6 +492,91 @@ describe("dispatchNotification()", () => {
     });
 
     expect(mockSendEmail).not.toHaveBeenCalled();
+  });
+
+  // ── task.queue_stalled (S3) ──────────────────────────────────────────────
+
+  describe("task.queue_stalled", () => {
+    const completed = { ...task, id: 13, title: "Tarea 3", adjustment_id: 20 };
+    const versionTasks = [
+      { id: 11, title: "Tarea 1", status: "completed" },
+      { id: 12, title: "Tarea 2", status: "completed" },
+      { id: 13, title: "Tarea 3", status: "completed" },
+      { id: 14, title: "Tarea 4", status: "completed" },
+      { id: 15, title: "Tarea 5", status: "waiting" },
+    ];
+
+    beforeEach(() => {
+      mockGetProjectTaskById.mockResolvedValue(completed);
+      mockGetTasksByProject.mockResolvedValue(versionTasks);
+      mockGetProjectCommercial.mockResolvedValue(creator);
+    });
+
+    it("sends one email to the commercial from the actor listing the waiting tasks of the version", async () => {
+      await dispatchNotification({
+        eventType: NOTIFICATION_EVENTS.TASK_QUEUE_STALLED,
+        actorUserId: 5,
+        projectId: 1,
+        taskId: 13,
+      });
+
+      expect(mockGetTasksByProject).toHaveBeenCalledWith(1, 20);
+      expect(mockGetProjectCommercial).toHaveBeenCalledWith(1);
+      expect(mockCreateEvent).toHaveBeenCalledWith(
+        expect.objectContaining({
+          event_type: "task.queue_stalled",
+          project_id: 1,
+          task_id: 13,
+          actor_user_id: 5,
+          metadata: { waiting_tasks: [{ id: 15, title: "Tarea 5" }] },
+        })
+      );
+      expect(mockSendEmail).toHaveBeenCalledTimes(1);
+      const call = mockSendEmail.mock.calls[0][0];
+      expect(call).toEqual(
+        expect.objectContaining({
+          senderUserId: 5,
+          eventId: 99,
+          recipientUserId: 3,
+          projectId: 1,
+          adjustmentId: 20,
+          thread: { threadKey: "project:1:version:v2" },
+        })
+      );
+      expect(call.message.to).toEqual({ email: "daniel@test.com", name: "Daniel Amado" });
+      expect(call.message.subject).toBe("[Campaña Q2] Hay tareas en espera por activar");
+      expect(call.message.html).toContain("Tarea 5");
+      expect(call.message.html).not.toContain("Tarea 4");
+      expect(call.message.html).toContain("https://app.madeincasa.com/projects/1");
+      expect(call.message.text).toContain("- Tarea 5");
+    });
+
+    it("sends nothing and records no event when no task of the version is waiting", async () => {
+      mockGetTasksByProject.mockResolvedValue(versionTasks.map((t) => ({ ...t, status: "completed" })));
+
+      await dispatchNotification({
+        eventType: NOTIFICATION_EVENTS.TASK_QUEUE_STALLED,
+        actorUserId: 5,
+        projectId: 1,
+        taskId: 13,
+      });
+
+      expect(mockCreateEvent).not.toHaveBeenCalled();
+      expect(mockSendEmail).not.toHaveBeenCalled();
+    });
+
+    it("sends nothing when the project has no commercial", async () => {
+      mockGetProjectCommercial.mockResolvedValue(null);
+
+      await dispatchNotification({
+        eventType: NOTIFICATION_EVENTS.TASK_QUEUE_STALLED,
+        actorUserId: 5,
+        projectId: 1,
+        taskId: 13,
+      });
+
+      expect(mockSendEmail).not.toHaveBeenCalled();
+    });
   });
 
   // ── recalculateProgressAndNotify ─────────────────────────────────────────

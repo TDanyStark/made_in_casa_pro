@@ -31,6 +31,7 @@ const EVENT_TYPE_LABELS: Record<string, string> = {
   "project.adjustment.created": "Ajuste creado",
   "project.completed": "Proyecto completado",
   "project.ready_to_close": "Proyecto completado (aviso comercial)",
+  "task.queue_stalled": "Cola detenida (aviso comercial)",
 };
 
 function StatusBadge({ status }: { status: DeliveryStatus }) {

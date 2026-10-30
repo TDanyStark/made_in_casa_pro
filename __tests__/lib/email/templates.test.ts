@@ -11,6 +11,7 @@ import { quoteReceived } from "@/lib/email/templates/quoteReceived";
 import { quoteAccepted } from "@/lib/email/templates/quoteAccepted";
 import { projectAdjustmentCreated } from "@/lib/email/templates/projectAdjustmentCreated";
 import { projectReadyToClose } from "@/lib/email/templates/projectReadyToClose";
+import { taskQueueStalled } from "@/lib/email/templates/taskQueueStalled";
 
 beforeAll(() => {
   process.env.NEXT_PUBLIC_APP_URL = "https://app.madeincasa.com";
@@ -427,5 +428,59 @@ describe("projectReadyToClose template", () => {
     expect(text).toContain("Cliente: Acme Corp");
     expect(text).toContain("Ver proyecto: https://app.madeincasa.com/projects/15");
     expect(text).toContain("se marcó automáticamente como completado");
+  });
+});
+
+// ── taskQueueStalled ──────────────────────────────────────────────────────
+
+describe("taskQueueStalled template", () => {
+  const ctx = {
+    recipientName: "Daniel Amado",
+    completedByName: "Ana García",
+    completedTaskTitle: "Tarea 3",
+    projectTitle: "Campaña Q2",
+    projectId: 15,
+    waitingTasks: [{ id: 5, title: "Tarea 5" }],
+  };
+
+  it("subject tells the commercial there are waiting tasks to activate", () => {
+    expect(taskQueueStalled.subject(ctx)).toBe("[Campaña Q2] Hay tareas en espera por activar");
+  });
+
+  it("html explains why nothing was activated, lists the waiting tasks and links to the project", () => {
+    const html = taskQueueStalled.html(ctx);
+    assertValidHtml(html);
+    assertNoUndefined(html);
+    expect(html).toContain("Hola, Daniel Amado");
+    expect(html).toContain("Ana García");
+    expect(html).toContain("Tarea 3");
+    expect(html).toContain("no se activó la siguiente porque ya estaba completada");
+    expect(html).toContain("<li");
+    expect(html).toContain("Tarea 5");
+    expect(html).toContain("debes activarla");
+    expect(html).toContain("Ver proyecto");
+    expect(html).toContain('href="https://app.madeincasa.com/projects/15"');
+  });
+
+  it("html uses plural wording for several waiting tasks and escapes titles", () => {
+    const html = taskQueueStalled.html({
+      ...ctx,
+      waitingTasks: [{ id: 5, title: "<b>T5</b>" }, { id: 6, title: "Tarea 6" }],
+    });
+    expect(html).toContain("debes activarlas");
+    expect(html).not.toContain("<b>T5</b>");
+    expect(html).toContain("&lt;b&gt;T5&lt;/b&gt;");
+    expect(html).toContain("Tarea 6");
+  });
+
+  it("text includes the explanation, each waiting task and the project link", () => {
+    const text = taskQueueStalled.text({ ...ctx, waitingTasks: [{ id: 5, title: "Tarea 5" }, { id: 6, title: "Tarea 6" }] });
+    assertNoUndefined(text);
+    expect(text).toContain("Hola, Daniel Amado");
+    expect(text).toContain("Ana García terminó la tarea \"Tarea 3\"");
+    expect(text).toContain("- Tarea 5");
+    expect(text).toContain("- Tarea 6");
+    expect(text).toContain("debes activarlas");
+    expect(text).toContain("Ver proyecto: https://app.madeincasa.com/projects/15");
   });
 });

@@ -180,7 +180,7 @@ describe('completeTask()', () => {
       .mockResolvedValueOnce(makeResult([])) // INSERT transition (completed)
       .mockResolvedValueOnce(
         makeResult([
-          { id: 2, assigned_user_id: null, requires_quote: 0, task_flag: 'new', status: 'not_started' },
+          { id: 2, assigned_user_id: null, requires_quote: 0, task_flag: 'new', status: 'waiting' },
         ])
       ) // SELECT next
       .mockResolvedValueOnce(makeResult([])) // UPDATE next -> blocked
@@ -233,6 +233,8 @@ describe('completeTask()', () => {
     );
     expect(result.blockedReason).toBeUndefined();
     expect(result.nextTask?.status).toBe('not_started');
+    expect(result.nextActivated).toBe(true);
+    expect(result.nextCompleted).toBe(false);
   });
 
   it('scopes the next-task lookup to the same adjustment_id', async () => {
@@ -350,5 +352,76 @@ describe('completeTask() freezes the monthly-salary rate', () => {
   it('stores nothing for an external collaborator', async () => {
     const args = await completeWith([{ is_internal: 0, monthly_salary: '5040000', weekly_work_hours: null }]);
     expect(args).toEqual([1, 90, null, null, null, null, null]);
+  });
+});
+
+// S1-S3 (odd/tasks/task-queue-activation.md): automation activates at most the
+// immediate next task, only when every earlier task is completed.
+describe('completeTask() with manually activated parallel tasks', () => {
+  function completeWithNext(next: Record<string, unknown>, nextRow: Record<string, unknown>) {
+    mockExecute.mockResolvedValueOnce(
+      makeResult([makeTaskRow({ id: 1, status: 'in_progress', project_id: 1, adjustment_id: 3 })])
+    );
+    mockTransaction.execute
+      .mockResolvedValueOnce(makeResult([{ status: 'in_progress' }])) // lock
+      .mockResolvedValueOnce(makeResult([])) // read assignee
+      .mockResolvedValueOnce(makeResult([])) // UPDATE completed
+      .mockResolvedValueOnce(makeResult([])) // INSERT transition
+      .mockResolvedValueOnce(makeResult([next])) // SELECT next
+      .mockResolvedValue(makeResult([])); // any further write
+    mockExecute.mockResolvedValueOnce(makeResult([makeTaskRow({ id: 1, status: 'completed' })]));
+    mockExecute.mockResolvedValueOnce(makeResult([makeTaskRow(nextRow)]));
+    return completeTask(1, 5, null, { progress_minutes: 10 });
+  }
+
+  it('counts the open tasks before the next one in the same version', async () => {
+    await completeWithNext(
+      { id: 2, assigned_user_id: 9, requires_quote: 0, task_flag: 'new', status: 'waiting', open_before: 0 },
+      { id: 2, status: 'not_started' }
+    );
+    const select = mockTransaction.execute.mock.calls[4][0] as { sql: string };
+    expect(select.sql).toMatch(/AS open_before/);
+    expect(select.sql).toMatch(/status <> 'completed'/);
+  });
+
+  it('S2: leaves an already active (not_started) next task untouched', async () => {
+    const result = await completeWithNext(
+      { id: 2, assigned_user_id: 9, requires_quote: 0, task_flag: 'new', status: 'not_started', open_before: 0 },
+      { id: 2, status: 'not_started', assigned_user_id: 9 }
+    );
+    expect(mockTransaction.execute).toHaveBeenCalledTimes(5);
+    expect(result.nextActivated).toBe(false);
+    expect(result.nextCompleted).toBe(false);
+    expect(result.blockedReason).toBeUndefined();
+    expect(mockTransaction.commit).toHaveBeenCalled();
+  });
+
+  it('S1: does not activate the waiting next task while an earlier task is still open', async () => {
+    const result = await completeWithNext(
+      { id: 3, assigned_user_id: 9, requires_quote: 0, task_flag: 'new', status: 'waiting', open_before: 1 },
+      { id: 3, status: 'waiting', assigned_user_id: 9 }
+    );
+    expect(mockTransaction.execute).toHaveBeenCalledTimes(5);
+    expect(result.nextActivated).toBe(false);
+    expect(result.blockedReason).toBeUndefined();
+  });
+
+  it('S1: does not block an unassigned waiting next task while an earlier task is still open', async () => {
+    const result = await completeWithNext(
+      { id: 3, assigned_user_id: null, requires_quote: 1, task_flag: 'new', status: 'waiting', open_before: 2 },
+      { id: 3, status: 'waiting', assigned_user_id: null }
+    );
+    expect(mockTransaction.execute).toHaveBeenCalledTimes(5);
+    expect(result.blockedReason).toBeUndefined();
+  });
+
+  it('S3: reports that the next task was already completed and activates nothing', async () => {
+    const result = await completeWithNext(
+      { id: 4, assigned_user_id: 9, requires_quote: 0, task_flag: 'new', status: 'completed', open_before: 0 },
+      { id: 4, status: 'completed' }
+    );
+    expect(mockTransaction.execute).toHaveBeenCalledTimes(5);
+    expect(result.nextActivated).toBe(false);
+    expect(result.nextCompleted).toBe(true);
   });
 });

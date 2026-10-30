@@ -90,13 +90,25 @@ export async function POST(request: NextRequest, { params }: Params) {
 
     // approve: targetTask is the next task completeTask activated (or blocked).
     // reject: targetTask is the first correction task, created 'not_started'.
+    // Only when this validation activated it (an already active task was notified before).
     const activated = result.targetTask;
-    if (activated && activated.status === "not_started" && activated.assigned_user_id) {
+    if (result.targetActivated && activated && activated.status === "not_started" && activated.assigned_user_id) {
       await dispatchNotification({
         eventType: NOTIFICATION_EVENTS.TASK_READY,
         actorUserId: userId,
         projectId,
         taskId: activated.id,
+      });
+    }
+
+    // S3 (approve): the next task was already completed, so nothing was activated;
+    // tell the commercial which tasks of the version are still waiting.
+    if (action === "approve" && result.nextCompleted) {
+      await dispatchNotification({
+        eventType: NOTIFICATION_EVENTS.TASK_QUEUE_STALLED,
+        actorUserId: userId,
+        projectId,
+        taskId,
       });
     }
 

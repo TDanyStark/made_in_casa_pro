@@ -281,7 +281,7 @@ describe("no interpolated values in SQL (S21)", () => {
 
     await completeTask(1, 5, null, { progress_minutes: 10 });
 
-    const next = txCall(/SELECT id, assigned_user_id, requires_quote, task_flag, status/)!;
+    const next = txCall(/SELECT nt.id, nt.assigned_user_id, nt.requires_quote, nt.task_flag, nt.status/)!;
     expect(sqlOf(next)).toContain("adjustment_id = $3");
     expect(sqlOf(next)).not.toMatch(/adjustment_id = 7/);
     expect(argsOf(next)).toEqual([1, 1, 7]);

@@ -44,7 +44,7 @@ beforeEach(() => {
 });
 
 describe('reorderProjectTasks() activated ids', () => {
-  it('returns the id of the waiting task promoted to not_started and not the demoted one', async () => {
+  it('S4: promotes the waiting task moved first and keeps the other not_started task active', async () => {
     // getTasksByProject: current tasks (none completed)
     mockExecute.mockResolvedValueOnce(
       makeResult([
@@ -62,10 +62,11 @@ describe('reorderProjectTasks() activated ids', () => {
           { id: 1, status: 'not_started', assigned_user_id: 5 },
         ])
       ) // SELECT ordered tasks
-      .mockResolvedValueOnce(makeResult([])) // UPDATE promote id=2
-      .mockResolvedValueOnce(makeResult([])); // UPDATE demote id=1
+      .mockResolvedValueOnce(makeResult([])); // UPDATE promote id=2
 
     await expect(reorderProjectTasks(1, [2, 1], 9)).resolves.toEqual([2]);
+    const demotions = mockTransaction.execute.mock.calls.filter(([q]) => /status = 'waiting'/.test(q.sql));
+    expect(demotions).toHaveLength(0);
     expect(mockTransaction.commit).toHaveBeenCalled();
   });
 
@@ -113,5 +114,41 @@ describe('reorderProjectTasks() list completeness', () => {
     });
     expect(db.transaction).not.toHaveBeenCalled();
     expect(mockTransaction.execute).not.toHaveBeenCalled();
+  });
+});
+
+// Completed tasks can be reordered like any other task; the pending-task
+// promotion still skips them.
+describe('reorderProjectTasks() completed tasks', () => {
+  it('moves a completed task to a new position and saves the order', async () => {
+    mockExecute.mockResolvedValueOnce(
+      makeResult([
+        { id: 1, status: 'not_started', order_index: 0 },
+        { id: 2, status: 'completed', order_index: 1 },
+        { id: 3, status: 'completed', order_index: 2 },
+        { id: 4, status: 'waiting', order_index: 3 },
+      ])
+    );
+
+    mockTransaction.execute
+      .mockResolvedValueOnce(makeResult([]))
+      .mockResolvedValueOnce(makeResult([]))
+      .mockResolvedValueOnce(makeResult([]))
+      .mockResolvedValueOnce(makeResult([]))
+      .mockResolvedValueOnce(
+        makeResult([
+          { id: 2, status: 'completed', assigned_user_id: 5 },
+          { id: 3, status: 'completed', assigned_user_id: 5 },
+          { id: 1, status: 'not_started', assigned_user_id: 5 },
+          { id: 4, status: 'waiting', assigned_user_id: 8 },
+        ])
+      );
+
+    await expect(reorderProjectTasks(1, [2, 3, 1, 4], 9)).resolves.toEqual([]);
+    const orderUpdates = mockTransaction.execute.mock.calls
+      .filter(([q]) => /SET order_index/.test(q.sql))
+      .map(([q]) => [q.args[0], q.args[1]]);
+    expect(orderUpdates).toEqual([[0, 2], [1, 3], [2, 1], [3, 4]]);
+    expect(mockTransaction.commit).toHaveBeenCalled();
   });
 });

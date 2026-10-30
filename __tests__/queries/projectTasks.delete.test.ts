@@ -186,7 +186,7 @@ describe('deleteProjectTask()', () => {
     expect(mockTransaction.commit).toHaveBeenCalled();
   });
 
-  it('demotes a duplicate not_started task that is not the first pending one', async () => {
+  it('S4: keeps a manually activated second not_started task active', async () => {
     mockExecute.mockResolvedValueOnce(
       makeResult([makeTaskRow({ id: 1, status: 'not_started', project_id: 1, adjustment_id: null })])
     );
@@ -195,22 +195,15 @@ describe('deleteProjectTask()', () => {
       .mockResolvedValueOnce(makeResult([])) // DELETE
       .mockResolvedValueOnce(
         makeResult([
-          { id: 2, status: 'not_started', assigned_user_id: 5 }, // first non-completed — stays active
-          { id: 4, status: 'not_started', assigned_user_id: null }, // stray duplicate — must demote
+          { id: 2, status: 'not_started', assigned_user_id: 5 }, // first non-completed
+          { id: 4, status: 'not_started', assigned_user_id: null }, // activated by hand
         ])
-      )
-      .mockResolvedValueOnce(makeResult([])); // UPDATE demote id=4
+      );
 
-    // Demoted tasks are never reported as activated
     await expect(deleteProjectTask(1)).resolves.toEqual([]);
 
-    expect(mockTransaction.execute).toHaveBeenNthCalledWith(
-      3,
-      expect.objectContaining({
-        sql: expect.stringContaining("status = 'waiting'"),
-        args: expect.arrayContaining([4]),
-      })
-    );
+    // DELETE + SELECT only: nothing is demoted back to waiting.
+    expect(mockTransaction.execute).toHaveBeenCalledTimes(2);
     expect(mockTransaction.commit).toHaveBeenCalled();
   });
 

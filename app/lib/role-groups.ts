@@ -57,6 +57,13 @@ export const PROJECT_CREATOR_VIEW_ROLES: readonly UserRole[] = [
   UserRole.DIRECTIVO,
 ];
 
+// Activan a mano una tarea en espera (botón "Activar").
+export const TASK_ACTIVATE_ROLES: readonly UserRole[] = [
+  UserRole.ADMIN,
+  UserRole.DIRECTIVO,
+  UserRole.COMERCIAL,
+];
+
 export const TASK_OVERRIDE_ROLES: readonly UserRole[] = [
   ...LEADERSHIP_ROLES,
   UserRole.COMERCIAL,

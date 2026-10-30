@@ -329,6 +329,53 @@ describe("POST /api/notification-deliveries/[id]/retry", () => {
     expect(mockResendExistingDelivery).toHaveBeenCalledTimes(1);
   });
 
+  it("rebuilds and resends a failed task.queue_stalled delivery from the stored waiting tasks", async () => {
+    mockGetDeliveryById.mockResolvedValue({
+      ...failedDelivery,
+      event_type: "task.queue_stalled",
+    } as unknown as never);
+    mockGetNotificationEventById.mockResolvedValue({
+      ...baseEvent,
+      event_type: "task.queue_stalled",
+      metadata: { waiting_tasks: [{ id: 12, title: "Tarea en espera" }] },
+    } as unknown as never);
+    mockGetProjectTaskById.mockResolvedValue({ ...task, adjustment_id: 30 } as unknown as never);
+    mockGetProjectById.mockResolvedValue(project as unknown as never);
+    mockGetUserNotificationRecipient.mockResolvedValue({ userId: 5, name: "Comercial", email: "to@example.com" } as never);
+    mockGetActorName.mockResolvedValue("Alice");
+    mockResolveThreadKey.mockResolvedValue("project:7:version:v2");
+
+    const res = await callPost("42");
+
+    expect(res!.status).toBe(200);
+    expect(mockGetUserNotificationRecipient).toHaveBeenCalledWith(5);
+    expect(mockResolveThreadKey).toHaveBeenCalledWith(7, 30);
+    expect(mockResendExistingDelivery).toHaveBeenCalledWith(
+      42,
+      expect.objectContaining({
+        to: { email: "to@example.com", name: "Comercial" },
+        subject: "[Project X] Hay tareas en espera por activar",
+        html: expect.stringContaining("Tarea en espera"),
+        text: expect.stringContaining("Alice terminó la tarea \"Task Y\""),
+      }),
+      { projectId: 7, adjustmentId: 30, threadKey: "project:7:version:v2" }
+    );
+  });
+
+  it("returns 422 for a task.queue_stalled event without stored waiting tasks", async () => {
+    mockGetDeliveryById.mockResolvedValue({ ...failedDelivery, event_type: "task.queue_stalled" } as unknown as never);
+    mockGetNotificationEventById.mockResolvedValue({
+      ...baseEvent,
+      event_type: "task.queue_stalled",
+      metadata: {},
+    } as unknown as never);
+
+    const res = await callPost("42");
+
+    expect(res!.status).toBe(422);
+    expect(mockResendExistingDelivery).not.toHaveBeenCalled();
+  });
+
   it("returns 500 on unexpected error", async () => {
     mockGetDeliveryById.mockRejectedValue(new Error("DB error"));
     const res = await callPost("42");

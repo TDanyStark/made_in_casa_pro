@@ -42,7 +42,7 @@ jest.mock('@/lib/queries/projects', () => ({
 jest.mock('@/lib/services/notificationEngine', () => ({
   dispatchNotification: jest.fn().mockResolvedValue(undefined),
   recalculateProgressAndNotify: jest.fn().mockResolvedValue(0),
-  NOTIFICATION_EVENTS: { TASK_READY: 'task.ready' },
+  NOTIFICATION_EVENTS: { TASK_READY: 'task.ready', TASK_QUEUE_STALLED: 'task.queue_stalled' },
 }));
 
 // ── Imports (after mocks) ───────────────────────────────────────────────────
@@ -146,6 +146,8 @@ describe('POST /validate — reject action', () => {
     setupAuthMocks();
     mockGetProjectTaskById.mockResolvedValue(makeValidationTask() as never);
     mockValidateTask.mockResolvedValue({
+      targetActivated: false,
+      nextCompleted: false,
       task: makeValidationTask({ status: 'completed' }) as never,
       targetTask: makeCorrectionTask(101, 4) as never,
       blockedReason: undefined,
@@ -166,7 +168,8 @@ describe('POST /validate — reject action', () => {
     mockValidateTask.mockResolvedValue({
       task: makeValidationTask({ status: 'completed' }) as never,
       targetTask: makeCorrectionTask(101, 4) as never,
-    });
+      targetActivated: true,
+    } as never);
 
     const req = makeRequest({ action: 'reject', targetTaskId: 7 });
     await callPost(req, makeParams());
@@ -233,6 +236,8 @@ describe('POST /validate — approve action', () => {
     mockRecalculate.mockResolvedValue(undefined as never);
     mockGetProjectTaskById.mockResolvedValue(makeValidationTask({ assigned_user_id: 5 }) as never);
     mockValidateTask.mockResolvedValue({
+      targetActivated: false,
+      nextCompleted: false,
       task: makeValidationTask({ status: 'completed' }) as never,
       targetTask: null,
     });
@@ -247,6 +252,8 @@ describe('POST /validate — approve action', () => {
     setupAuthMocks();
     mockGetProjectTaskById.mockResolvedValue(makeValidationTask() as never);
     mockValidateTask.mockResolvedValue({
+      targetActivated: false,
+      nextCompleted: false,
       task: makeValidationTask({ status: 'completed' }) as never,
       targetTask: makeValidationTask({ id: 11, order_index: 4, status: 'not_started' }) as never,
       blockedReason: undefined,
@@ -267,6 +274,8 @@ describe('POST /validate — approve action', () => {
     setupAuthMocks();
     mockGetProjectTaskById.mockResolvedValue(makeValidationTask() as never);
     mockValidateTask.mockResolvedValue({
+      targetActivated: false,
+      nextCompleted: false,
       task: makeValidationTask({ status: 'completed' }) as never,
       targetTask: null,
     });
@@ -282,6 +291,8 @@ describe('POST /validate — approve action', () => {
     setupAuthMocks();
     mockGetProjectTaskById.mockResolvedValue(makeValidationTask() as never);
     mockValidateTask.mockResolvedValue({
+      targetActivated: false,
+      nextCompleted: false,
       task: makeValidationTask({ status: 'completed' }) as never,
       targetTask: null,
     });
@@ -326,7 +337,8 @@ describe('POST /validate — task.ready notification', () => {
     mockValidateTask.mockResolvedValue({
       task: makeValidationTask({ status: 'completed' }) as never,
       targetTask: makeValidationTask({ id: 11, task_type: 'execution', status: 'not_started', assigned_user_id: 8 }) as never,
-    });
+      targetActivated: true,
+    } as never);
 
     const res = await callPost(makeRequest({ action: 'approve' }), makeParams());
 
@@ -346,7 +358,8 @@ describe('POST /validate — task.ready notification', () => {
     mockValidateTask.mockResolvedValue({
       task: makeValidationTask({ status: 'completed' }) as never,
       targetTask: makeCorrectionTask(101, 4) as never,
-    });
+      targetActivated: true,
+    } as never);
 
     await callPost(makeRequest({ action: 'reject', targetTaskId: 7 }), makeParams());
 
@@ -362,6 +375,8 @@ describe('POST /validate — task.ready notification', () => {
     setupAuthMocks();
     mockGetProjectTaskById.mockResolvedValue(makeValidationTask() as never);
     mockValidateTask.mockResolvedValueOnce({
+      targetActivated: false,
+      nextCompleted: false,
       task: makeValidationTask({ status: 'completed' }) as never,
       targetTask: makeValidationTask({ id: 11, status: 'blocked', assigned_user_id: null }) as never,
       blockedReason: 'La siguiente tarea no tiene colaborador asignado.',
@@ -369,17 +384,92 @@ describe('POST /validate — task.ready notification', () => {
     await callPost(makeRequest({ action: 'approve' }), makeParams());
 
     mockValidateTask.mockResolvedValueOnce({
+      targetActivated: false,
+      nextCompleted: false,
       task: makeValidationTask({ status: 'completed' }) as never,
       targetTask: makeValidationTask({ id: 11, status: 'not_started', assigned_user_id: null }) as never,
     });
     await callPost(makeRequest({ action: 'approve' }), makeParams());
 
     mockValidateTask.mockResolvedValueOnce({
+      targetActivated: false,
+      nextCompleted: false,
       task: makeValidationTask({ status: 'completed' }) as never,
       targetTask: null,
     });
     await callPost(makeRequest({ action: 'approve' }), makeParams());
 
     expect(mockDispatch).not.toHaveBeenCalled();
+  });
+
+  it('S2 approve: does not dispatch task.ready again when the next task was already active', async () => {
+    setupAuthMocks();
+    mockGetProjectTaskById.mockResolvedValue(makeValidationTask() as never);
+    mockValidateTask.mockResolvedValue({
+      task: makeValidationTask({ status: 'completed' }) as never,
+      targetTask: makeValidationTask({ id: 11, task_type: 'execution', status: 'not_started', assigned_user_id: 8 }) as never,
+      targetActivated: false,
+    } as never);
+
+    const res = await callPost(makeRequest({ action: 'approve' }), makeParams());
+
+    expect(res.status).toBe(200);
+    expect(mockDispatch).not.toHaveBeenCalled();
+  });
+});
+
+// ── S3: queue stalled notice to the commercial ───────────────────────────────
+
+describe('POST /validate — S3 queue stalled notice', () => {
+  it('approve: dispatches task.queue_stalled for the validation task when the next task was already completed', async () => {
+    setupAuthMocks();
+    mockGetProjectTaskById.mockResolvedValue(makeValidationTask() as never);
+    mockValidateTask.mockResolvedValue({
+      task: makeValidationTask({ status: 'completed' }) as never,
+      targetTask: makeValidationTask({ id: 11, task_type: 'execution', status: 'completed', assigned_user_id: 8 }) as never,
+      targetActivated: false,
+      nextCompleted: true,
+    } as never);
+
+    const res = await callPost(makeRequest({ action: 'approve' }), makeParams());
+
+    expect(res.status).toBe(200);
+    expect(mockDispatch).toHaveBeenCalledTimes(1);
+    expect(mockDispatch).toHaveBeenCalledWith({
+      eventType: 'task.queue_stalled',
+      actorUserId: 5,
+      projectId: 1,
+      taskId: 10,
+    });
+  });
+
+  it('approve: does not dispatch task.queue_stalled when the next task was not completed', async () => {
+    setupAuthMocks();
+    mockGetProjectTaskById.mockResolvedValue(makeValidationTask() as never);
+    mockValidateTask.mockResolvedValue({
+      task: makeValidationTask({ status: 'completed' }) as never,
+      targetTask: makeValidationTask({ id: 11, task_type: 'execution', status: 'in_progress', assigned_user_id: 8 }) as never,
+      targetActivated: false,
+      nextCompleted: false,
+    } as never);
+
+    await callPost(makeRequest({ action: 'approve' }), makeParams());
+
+    expect(mockDispatch).not.toHaveBeenCalled();
+  });
+
+  it('reject: never dispatches task.queue_stalled', async () => {
+    setupAuthMocks();
+    mockGetProjectTaskById.mockResolvedValue(makeValidationTask() as never);
+    mockValidateTask.mockResolvedValue({
+      task: makeValidationTask({ status: 'completed' }) as never,
+      targetTask: makeCorrectionTask(101, 4) as never,
+      targetActivated: true,
+      nextCompleted: false,
+    } as never);
+
+    await callPost(makeRequest({ action: 'reject', targetTaskId: 7 }), makeParams());
+
+    expect(mockDispatch.mock.calls.map(([i]) => i.eventType)).toEqual(['task.ready']);
   });
 });

@@ -33,7 +33,7 @@ import {
   type NotificationRecipient,
 } from "@/lib/queries/notificationRecipients";
 import { getProjectById, recalculateProjectProgressWithTransition } from "@/lib/queries/projects";
-import { getProjectTaskById, getTaskDriveFolderUrl } from "@/lib/queries/projectTasks";
+import { getProjectTaskById, getTaskDriveFolderUrl, getTasksByProject } from "@/lib/queries/projectTasks";
 import { sendEmail } from "@/lib/services/email/emailService";
 
 import { taskAssigned } from "@/lib/email/templates/taskAssigned";
@@ -45,6 +45,7 @@ import { quoteReceived } from "@/lib/email/templates/quoteReceived";
 import { quoteAccepted } from "@/lib/email/templates/quoteAccepted";
 import { projectAdjustmentCreated } from "@/lib/email/templates/projectAdjustmentCreated";
 import { projectReadyToClose } from "@/lib/email/templates/projectReadyToClose";
+import { taskQueueStalled } from "@/lib/email/templates/taskQueueStalled";
 
 // ── Supported event types ──────────────────────────────────────────────────
 
@@ -59,6 +60,7 @@ export const NOTIFICATION_EVENTS = {
   PROJECT_ADJUSTMENT_CREATED: "project.adjustment.created",
   PROJECT_COMPLETED: "project.completed",
   PROJECT_READY_TO_CLOSE: "project.ready_to_close",
+  TASK_QUEUE_STALLED: "task.queue_stalled",
 } as const;
 
 export type NotificationEventType =
@@ -143,6 +145,17 @@ export interface ProjectReadyToCloseInput extends BaseInput {
   projectId: number;
 }
 
+/**
+ * Completing (or approving) `taskId` activated nothing because the next task
+ * was already completed: tell the commercial which tasks of that version are
+ * still 'waiting' and need a manual activation.
+ */
+export interface TaskQueueStalledInput extends BaseInput {
+  eventType: "task.queue_stalled";
+  projectId: number;
+  taskId: number;
+}
+
 export type DispatchInput =
   | TaskAssignedInput
   | TaskReadyInput
@@ -153,7 +166,8 @@ export type DispatchInput =
   | QuoteAcceptedInput
   | ProjectAdjustmentCreatedInput
   | ProjectCompletedInput
-  | ProjectReadyToCloseInput;
+  | ProjectReadyToCloseInput
+  | TaskQueueStalledInput;
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -230,8 +244,25 @@ export async function dispatchNotification(input: DispatchInput): Promise<void> 
   // Retired event: tolerate legacy callers without creating events or deliveries.
   if (input.eventType === NOTIFICATION_EVENTS.PROJECT_COMPLETED) return;
   try {
+    // task.queue_stalled: resolve the waiting tasks of the completed task's version
+    // first; with none waiting there is nothing to tell, so no event is recorded.
+    let stalled: { adjustmentId: number | null; waitingTasks: { id: number; title: string }[] } | null = null;
+    if (input.eventType === "task.queue_stalled") {
+      const completedTask = await getProjectTaskById(input.taskId);
+      if (!completedTask) return;
+      const adjustmentId = completedTask.adjustment_id ?? null;
+      const versionTasks = await getTasksByProject(input.projectId, adjustmentId);
+      const waitingTasks = versionTasks
+        .filter((t) => t.status === "waiting")
+        .map((t) => ({ id: t.id, title: t.title }));
+      if (waitingTasks.length === 0) return;
+      stalled = { adjustmentId, waitingTasks };
+    }
+
     // Build metadata: merge event-specific fields so retries can reconstruct the message
-    const eventMetadata = buildEventMetadata(input);
+    const eventMetadata = stalled
+      ? { ...buildEventMetadata(input), waiting_tasks: stalled.waitingTasks }
+      : buildEventMetadata(input);
 
     const event = await createNotificationEvent({
       event_type: input.eventType,
@@ -605,6 +636,45 @@ export async function dispatchNotification(input: DispatchInput): Promise<void> 
             };
           },
           { projectId: input.projectId, adjustmentId: null, threadKey }
+        );
+        break;
+      }
+
+      // ── task.queue_stalled ────────────────────────────────────────────────
+      case "task.queue_stalled": {
+        if (!stalled) break;
+        const [task, project, commercial] = await Promise.all([
+          getProjectTaskById(input.taskId),
+          getProjectById(input.projectId),
+          getProjectCommercial(input.projectId),
+        ]);
+        if (!task || !project || !commercial) break;
+
+        const completedByName = await getActorName(input.actorUserId);
+        const threadKey = await resolveProjectVersionThreadKey(input.projectId, stalled.adjustmentId);
+        const waitingTasks = stalled.waitingTasks;
+
+        // Sender = the actor whose completion left the queue stalled.
+        await sendToRecipients(
+          [commercial],
+          input.actorUserId,
+          eventId,
+          (r) => {
+            const ctx = {
+              recipientName: r.name,
+              completedByName,
+              completedTaskTitle: task.title,
+              projectTitle: project.title,
+              projectId: project.id,
+              waitingTasks,
+            };
+            return {
+              subject: taskQueueStalled.subject(ctx),
+              html: taskQueueStalled.html(ctx),
+              text: taskQueueStalled.text(ctx),
+            };
+          },
+          { projectId: input.projectId, adjustmentId: stalled.adjustmentId, threadKey }
         );
         break;
       }

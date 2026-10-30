@@ -115,15 +115,27 @@ export async function POST(request: NextRequest, { params }: Params) {
       taskId,
     });
 
-    // completeTask re-reads the next task after commit: 'not_started' means it was
-    // activated (never when it was set to 'blocked'). Tell its assignee it's their turn.
+    // Tell the assignee it's their turn only when this completion activated the
+    // next task (an already active one was notified before; a blocked one waits).
     const nextTask = result.nextTask;
-    if (nextTask && nextTask.status === "not_started" && nextTask.assigned_user_id) {
+    if (result.nextActivated && nextTask && nextTask.status === "not_started" && nextTask.assigned_user_id) {
       await dispatchNotification({
         eventType: NOTIFICATION_EVENTS.TASK_READY,
         actorUserId: userId,
         projectId,
         taskId: nextTask.id,
+      });
+    }
+
+    // S3: the next task was already completed, so nothing was activated; tell the
+    // commercial which tasks of the version are still waiting (the engine skips
+    // the email when none are).
+    if (result.nextCompleted) {
+      await dispatchNotification({
+        eventType: NOTIFICATION_EVENTS.TASK_QUEUE_STALLED,
+        actorUserId: userId,
+        projectId,
+        taskId,
       });
     }
 

@@ -542,15 +542,15 @@ export async function deleteProjectTask(id: number): Promise<number[]> {
  * always has an active next task, never all-waiting" holds:
  *   - The first non-completed task (lowest order_index) is promoted from
  *     'waiting' to 'not_started' if needed.
- *   - Any other 'not_started' task that isn't the first non-completed one is
- *     demoted back to 'waiting' (keeps a single pending task active at a time).
+ *   - Other 'not_started' tasks are kept: they were activated by hand to run
+ *     in parallel, so automation never sends them back to 'waiting'.
  *   - Tasks already 'in_progress', 'paused' or 'blocked' are left untouched — those are
  *     healthy active states, not something to "fix".
  *   - Completed tasks are skipped entirely and never touched.
  *
  * Must run inside an existing write transaction (delete/reorder are atomic).
- * Returns the ids of the tasks it promoted 'waiting' -> 'not_started' (never the
- * ones it demotes), so the API layer can dispatch task.ready after commit.
+ * Returns the ids of the tasks it promoted 'waiting' -> 'not_started', so the
+ * API layer can dispatch task.ready after commit.
  * Extracted from reorderProjectTasks() so deleteProjectTask() (and any future
  * caller) can reuse the exact same promotion semantics instead of duplicating it.
  */
@@ -579,27 +579,13 @@ async function ensureNextPendingTaskActive(
     assigned_user_id: number | null;
   }[];
 
-  let firstNonCompletedFound = false;
-  for (const task of tasks) {
-    if (task.status === "completed") continue;
-
-    if (!firstNonCompletedFound) {
-      firstNonCompletedFound = true;
-      if (task.status === "waiting") {
-        await transaction.execute({
-          sql: `UPDATE project_tasks SET status = 'not_started', assigned_at = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $1`,
-          args: [task.id, task.assigned_user_id ? new Date() : null],
-        });
-        activatedIds.push(Number(task.id));
-      }
-    } else {
-      if (task.status === "not_started") {
-        await transaction.execute({
-          sql: `UPDATE project_tasks SET status = 'waiting', updated_at = CURRENT_TIMESTAMP WHERE id = $1`,
-          args: [task.id],
-        });
-      }
-    }
+  const firstPending = tasks.find((task) => task.status !== "completed");
+  if (firstPending?.status === "waiting") {
+    await transaction.execute({
+      sql: `UPDATE project_tasks SET status = 'not_started', assigned_at = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $1`,
+      args: [firstPending.id, firstPending.assigned_user_id ? new Date() : null],
+    });
+    activatedIds.push(Number(firstPending.id));
   }
   return activatedIds;
 }
@@ -625,21 +611,8 @@ export async function reorderProjectTasks(
     throw new TaskRuleError("La lista debe incluir todas las tareas de la versión, una sola vez", 400);
   }
 
-  const completedTaskIds = currentTasks.filter(t => t.status === "completed").map(t => t.id);
-
-  // Business Rule: Completed tasks must not change their position relative to others
-  // In practice, this means they stay at their fixed order_index (assuming they were at the top)
-  for (const tid of completedTaskIds) {
-    const task = currentTasks.find(t => t.id === tid)!;
-    const currentIdx = task.order_index;
-    const newIdx = orderedIds.indexOf(tid);
-    
-    // If the completed task is in the list being reordered, its index must match its current order_index
-    if (newIdx !== -1 && newIdx !== currentIdx) {
-      throw new Error("Las tareas completadas no pueden ser reordenadas.");
-    }
-  }
-
+  // Completed tasks can be reordered freely: the pending-task promotion below
+  // skips them, so their position never changes which task is active.
   const adjustmentFilter =
     adjustmentId === undefined ? "" : adjustmentId === null ? "AND adjustment_id IS NULL" : "AND adjustment_id = $4";
   const adjustmentArgs = adjustmentId === undefined || adjustmentId === null ? [] : [adjustmentId];
@@ -654,8 +627,8 @@ export async function reorderProjectTasks(
     }
 
     // Status logic:
-    // 1. The first task that is NOT completed must be set to 'not_started' if it was 'waiting'
-    // 2. All subsequent tasks that are 'not_started' must be set to 'waiting'
+    // The first task that is NOT completed is set to 'not_started' if it was
+    // 'waiting'; tasks activated by hand later in the list stay active.
     const activatedIds = await ensureNextPendingTaskActive(transaction, projectId, adjustmentId);
 
     await transaction.commit();
@@ -666,6 +639,53 @@ export async function reorderProjectTasks(
     console.error("Error reordering project tasks:", error);
     throw error;
   }
+}
+
+// ─── Manual activation ────────────────────────────────────────────────────────
+
+/**
+ * Quick manual activation of a 'waiting' task ('Activar' button): moves it to
+ * 'not_started' so its assignee can take it, in parallel with any other active
+ * task. Rejects (writing nothing) a task that is no longer waiting (409) or has
+ * no assignee (400). The API layer sends task.ready after commit.
+ */
+export async function activateWaitingTask(taskId: number, userId: number): Promise<ProjectTaskType | null> {
+  const transaction = await db.transaction("write");
+  let projectId: number;
+  try {
+    const locked = await transaction.execute({
+      sql: `SELECT status, assigned_user_id, project_id, task_flag FROM project_tasks
+            WHERE id = $1
+            FOR UPDATE`,
+      args: [taskId],
+    });
+    const row = locked.rows[0] as
+      | { status: string; assigned_user_id: number | null; project_id: number; task_flag: string }
+      | undefined;
+    if (!row) throw new TaskRuleError("Tarea no encontrada", 404);
+    if (row.status !== "waiting") throw new TaskRuleError("Solo se pueden activar tareas en espera", 409);
+    if (!row.assigned_user_id) throw new TaskRuleError("Asigna un colaborador antes de activar la tarea", 400);
+    projectId = Number(row.project_id);
+
+    await transaction.execute({
+      sql: `UPDATE project_tasks SET status = 'not_started', assigned_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id = $1`,
+      args: [taskId],
+    });
+    await transaction.execute({
+      sql: `
+        INSERT INTO task_transitions (task_id, project_id, from_status, to_status, from_flag, to_flag, moved_by, notes)
+        VALUES ($1, $2, $3, 'not_started', $4, $4, $5, $6)
+      `,
+      args: [taskId, projectId, row.status, row.task_flag, userId, "Activada manualmente"],
+    });
+    await transaction.commit();
+  } catch (error) {
+    await transaction.rollback();
+    throw error;
+  }
+
+  revalidatePath(`/projects/${projectId}`);
+  return getProjectTaskById(taskId);
 }
 
 // ─── Transition logger ────────────────────────────────────────────────────────
@@ -871,7 +891,14 @@ async function readCompletionFreeze(transaction: DbTransaction, taskId: number):
 // ─── Complete task (execution flow) ──────────────────────────────────────────
 
 /**
- * Marks an execution task as completed and auto-activates the next task in order.
+ * Marks an execution task as completed and, when it is its turn, activates the
+ * task immediately after it. Automation activates at most that one task, and
+ * only while it is 'waiting' and every earlier task of the version is completed
+ * (tasks activated by hand run in parallel; the queue moves on once they all
+ * finish). An already active next task is left untouched.
+ * `nextActivated` tells callers whether the next task was just activated (so
+ * task.ready is sent once); `nextCompleted` that it was already completed, so
+ * the queue cannot advance on its own.
  * Only the assigned user can complete (enforced at API layer).
  */
 export async function completeTask(
@@ -883,7 +910,13 @@ export async function completeTask(
     delivery_url?: string | null;
     completion_cost?: number | null;
   }
-): Promise<{ task: ProjectTaskType; nextTask: ProjectTaskType | null; blockedReason?: string }> {
+): Promise<{
+  task: ProjectTaskType;
+  nextTask: ProjectTaskType | null;
+  blockedReason?: string;
+  nextActivated: boolean;
+  nextCompleted: boolean;
+}> {
   const task = await getProjectTaskById(taskId);
   if (!task) throw new Error("Tarea no encontrada");
   if (task.status === "completed") throw new Error("Esta tarea ya está completada y no puede modificarse");
@@ -898,6 +931,8 @@ export async function completeTask(
   const transaction = await db.transaction("write");
   let nextId: number | null = null;
   let blockedReason: string | undefined;
+  let nextActivated = false;
+  let nextCompleted = false;
   try {
     // 0. Lock the task and re-check: a concurrent completion may have won the race.
     const locked = await transaction.execute({
@@ -955,16 +990,25 @@ export async function completeTask(
     // skip over an immediate-next task that is already 'blocked' (e.g. an
     // unresolved quote) and incorrectly jump ahead to evaluate/activate a
     // later task, letting work after the blocked one cut the queue.
+    // open_before counts the tasks before it that are not completed yet (tasks
+    // activated by hand in parallel): while any is open the next one must wait.
     const adjFilter = task.adjustment_id !== null ? `AND adjustment_id = $3` : `AND adjustment_id IS NULL`;
+    const prevAdjFilter =
+      task.adjustment_id !== null ? `AND prev.adjustment_id = $3` : `AND prev.adjustment_id IS NULL`;
 
     const nextResult = await transaction.execute({
       sql: `
-        SELECT id, assigned_user_id, requires_quote, task_flag, status
-        FROM project_tasks
-        WHERE project_id = $1
-          AND order_index > (SELECT order_index FROM project_tasks WHERE id = $2)
-          ${adjFilter}
-        ORDER BY order_index ASC
+        SELECT nt.id, nt.assigned_user_id, nt.requires_quote, nt.task_flag, nt.status,
+               (SELECT COUNT(*) FROM project_tasks prev
+                 WHERE prev.project_id = $1
+                   AND prev.order_index < nt.order_index
+                   AND prev.status <> 'completed'
+                   ${prevAdjFilter}) AS open_before
+        FROM project_tasks nt
+        WHERE nt.project_id = $1
+          AND nt.order_index > (SELECT order_index FROM project_tasks WHERE id = $2)
+          ${adjFilter.replace("adjustment_id", "nt.adjustment_id")}
+        ORDER BY nt.order_index ASC
         LIMIT 1
       `,
       args: task.adjustment_id !== null ? [task.project_id, taskId, task.adjustment_id] : [task.project_id, taskId],
@@ -977,13 +1021,18 @@ export async function completeTask(
         requires_quote: number;
         task_flag: string;
         status: string;
+        open_before?: number | string | null;
       };
+      const openBefore = Number(next.open_before ?? 0);
 
-      // Only 'waiting' or 'not_started' immediate-next tasks are eligible to be
-      // evaluated/activated here. Any other status (most notably 'blocked', but
-      // also 'in_progress'/'completed' should they ever appear) already occupies
-      // the queue's turn and must be left untouched — never promoted past.
-      if (next.status === "waiting" || next.status === "not_started") {
+      // Only a 'waiting' immediate-next task whose earlier tasks are all
+      // completed is evaluated/activated here. 'not_started', 'in_progress',
+      // 'paused' and 'blocked' are already active and are left untouched; a
+      // 'completed' one means the queue cannot advance on its own. Never
+      // promote past the immediate next task.
+      if (next.status === "completed") {
+        nextCompleted = true;
+      } else if (next.status === "waiting" && openBefore === 0) {
         if (Number(next.requires_quote) === 1 && !next.assigned_user_id) {
           // Block: requires external quote, no one assigned yet
           await transaction.execute({
@@ -1025,6 +1074,7 @@ export async function completeTask(
             `,
             args: [next.id, task.project_id, next.status, next.task_flag, userId, "Activada automáticamente al completar tarea anterior"],
           });
+          nextActivated = true;
         }
       } else if (next.status === "blocked") {
         blockedReason = "La siguiente tarea ya está bloqueada en espera de resolución (cotización o asignación pendiente).";
@@ -1046,7 +1096,7 @@ export async function completeTask(
   const nextTask = nextId !== null ? await getProjectTaskById(nextId) : null;
 
   revalidatePath(`/projects/${task.project_id}`);
-  return { task: updatedTask!, nextTask, blockedReason };
+  return { task: updatedTask!, nextTask, blockedReason, nextActivated, nextCompleted };
 }
 
 // ─── Rejection loop — append-only new tasks ──────────────────────────────────
@@ -1249,7 +1299,15 @@ export async function validateTask(
   action: "approve" | "reject",
   targetTaskId?: number,
   notes?: string | null
-): Promise<{ task: ProjectTaskType; targetTask: ProjectTaskType | null; blockedReason?: string }> {
+): Promise<{
+  task: ProjectTaskType;
+  targetTask: ProjectTaskType | null;
+  blockedReason?: string;
+  /** True when targetTask was just activated (next task, or the first correction task). */
+  targetActivated: boolean;
+  /** Approve only: the next task was already completed, so nothing was activated. */
+  nextCompleted: boolean;
+}> {
   const task = await getProjectTaskById(taskId);
   if (!task) throw new Error("Tarea no encontrada");
   if (task.status === "completed") throw new Error("Esta tarea ya está completada y no puede modificarse");
@@ -1260,7 +1318,13 @@ export async function validateTask(
 
   if (action === "approve") {
     const result = await completeTask(taskId, userId, notes);
-    return { task: result.task, targetTask: result.nextTask, blockedReason: result.blockedReason };
+    return {
+      task: result.task,
+      targetTask: result.nextTask,
+      blockedReason: result.blockedReason,
+      targetActivated: result.nextActivated,
+      nextCompleted: result.nextCompleted,
+    };
   }
 
   // Reject: create two new tasks (correction + re-validation) instead of mutating existing tasks
@@ -1270,7 +1334,7 @@ export async function validateTask(
 
   const updatedTask = await getProjectTaskById(taskId);
   revalidatePath(`/projects/${task.project_id}`);
-  return { task: updatedTask!, targetTask: loopResult.firstCorrectionTask };
+  return { task: updatedTask!, targetTask: loopResult.firstCorrectionTask, targetActivated: true, nextCompleted: false };
 }
 
 // ─── Auto-assignment helpers ──────────────────────────────────────────────────
