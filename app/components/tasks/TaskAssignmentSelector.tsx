@@ -21,7 +21,7 @@
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { get } from "@/lib/services/apiService";
-import { AreaType, UserRole } from "@/lib/definitions";
+import { AreaType } from "@/lib/definitions";
 import {
   Select,
   SelectContent,
@@ -29,21 +29,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from "@/components/ui/command";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
-import { cn } from "@/lib/utils";
-import { Users, Zap, UserCheck, X, Search, Check, ChevronsUpDown } from "lucide-react";
+import { Users, Zap, UserCheck, X, Search } from "lucide-react";
+import { AssignableUserOption, UserPickerCombobox, useAssignableCollaborators } from "./UserPickerCombobox";
 
 export type AssignMode = "auto" | "commercial" | "specific";
 
@@ -74,22 +64,7 @@ export function getAssignmentErrors(values: {
   return errors;
 }
 
-const ROL_LABELS: Record<number, string> = {
-  [UserRole.ADMIN]: "Admin",
-  [UserRole.DIRECTIVO]: "Directivo",
-  [UserRole.FINANCIERO]: "Financiero",
-  [UserRole.COMERCIAL]: "Comercial",
-  [UserRole.COLABORADOR]: "Colaborador",
-};
-
-interface UserOption {
-  id: number;
-  name: string;
-  rol_id: number;
-  is_internal: number;
-  area_name: string | null;
-  active_task_count: number;
-}
+type UserOption = AssignableUserOption;
 
 interface Props {
   assignMode: AssignMode;
@@ -149,16 +124,7 @@ export function TaskAssignmentSelector({
   });
 
   // All active users (for "specific" mode)
-  const { data: allUsers = [], isError: allUsersError } = useQuery<UserOption[]>({
-    queryKey: ["all-users-for-assignment"],
-    queryFn: async () => {
-      const res = await get<UserOption[]>(`collaborators?all_users=1`);
-      if (!res.ok) throw new Error(res.error);
-      return res.data ?? [];
-    },
-    enabled: assignMode === "specific",
-    staleTime: 1000 * 60 * 2,
-  });
+  const { data: allUsers = [], isError: allUsersError } = useAssignableCollaborators(assignMode === "specific");
 
   const { data: previewUser, isLoading: isLoadingPreview, isError: isPreviewError } = useQuery<{ id: number; name: string } | null>({
     queryKey: ["least-loaded-preview", assignMode, areaId, projectId],
@@ -195,42 +161,6 @@ export function TaskAssignmentSelector({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [assignMode]);
 
-  // Popover open state for the searchable person combobox
-  const [userPickerOpen, setUserPickerOpen] = useState(false);
-
-  const NO_AREA_LABEL = "Sin área";
-
-  // Group users by area; within each area, internals first then externals, then by name.
-  const usersByArea = (() => {
-    const groups = new Map<string, UserOption[]>();
-    for (const u of allUsers) {
-      const key = u.area_name ?? NO_AREA_LABEL;
-      const list = groups.get(key) ?? [];
-      list.push(u);
-      groups.set(key, list);
-    }
-    const sortedKeys = Array.from(groups.keys()).sort((a, b) => {
-      // "Sin área" goes last
-      if (a === NO_AREA_LABEL) return 1;
-      if (b === NO_AREA_LABEL) return -1;
-      return a.localeCompare(b);
-    });
-    return sortedKeys.map((area) => ({
-      area,
-      users: groups
-        .get(area)!
-        .slice()
-        .sort((a, b) => {
-          // internal (1) before external (0)
-          if (a.is_internal !== b.is_internal) return b.is_internal - a.is_internal;
-          return a.name.localeCompare(b.name);
-        }),
-    }));
-  })();
-
-  const selectedUser = allUsers.find((u) => u.id === assignedUserId) ?? null;
-
-  const isCollaborator = (u: UserOption) => u.rol_id === UserRole.COLABORADOR;
 
   return (
     <div className="space-y-3">
@@ -366,104 +296,12 @@ export function TaskAssignmentSelector({
       {assignMode === "specific" && !requiresQuote && (
         <div>
           <label className="text-sm font-medium block mb-1.5">Persona asignada</label>
-          <Popover open={userPickerOpen} onOpenChange={setUserPickerOpen} modal>
-            <PopoverTrigger asChild>
-              <Button
-                type="button"
-                variant="outline"
-                role="combobox"
-                aria-expanded={userPickerOpen}
-                disabled={disabled}
-                className="w-full justify-between font-normal"
-              >
-                {selectedUser ? (
-                  <span className="flex items-center gap-2 truncate">
-                    <span className="truncate">{selectedUser.name}</span>
-                    {selectedUser.area_name && (
-                      <span className="text-xs text-muted-foreground">· {selectedUser.area_name}</span>
-                    )}
-                    {isCollaborator(selectedUser) && (
-                      <Badge variant="outline" className="text-[10px] px-1 py-0">
-                        {selectedUser.is_internal === 1 ? "Interno" : "Externo"}
-                      </Badge>
-                    )}
-                  </span>
-                ) : (
-                  <span className="text-muted-foreground">Seleccionar persona...</span>
-                )}
-                <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
-              <Command
-                filter={(value, search) =>
-                  value.toLowerCase().includes(search.toLowerCase()) ? 1 : 0
-                }
-              >
-                <CommandInput placeholder="Buscar por nombre, área, interno/externo..." />
-                <CommandList>
-                  <CommandEmpty>No se encontraron personas.</CommandEmpty>
-                  {usersByArea.map(({ area, users }) => (
-                    <CommandGroup key={area} heading={area}>
-                      {users.map((u) => {
-                        const internalLabel = isCollaborator(u)
-                          ? u.is_internal === 1
-                            ? "interno"
-                            : "externo"
-                          : "";
-                        const searchValue = `${u.name} ${area} ${internalLabel}`;
-                        return (
-                          <CommandItem
-                            key={u.id}
-                            value={searchValue}
-                            onSelect={() => {
-                              onAssignedUserIdChange(u.id);
-                              setUserPickerOpen(false);
-                            }}
-                          >
-                            <Check
-                              className={cn(
-                                "mr-2 h-4 w-4",
-                                assignedUserId === u.id ? "opacity-100" : "opacity-0"
-                              )}
-                            />
-                            <div className="flex items-center justify-between gap-2 w-full min-w-0">
-                              <span className="truncate">{u.name}</span>
-                              <div className="flex items-center gap-1.5 shrink-0">
-                                {isCollaborator(u) && (
-                                  <span className="text-xs text-muted-foreground">
-                                    {u.active_task_count} tarea(s)
-                                  </span>
-                                )}
-                                {isCollaborator(u) && (
-                                  <Badge
-                                    variant="outline"
-                                    className={cn(
-                                      "text-[10px] px-1 py-0",
-                                      u.is_internal === 1
-                                        ? "text-green-700 border-green-300 bg-green-50 dark:bg-green-900/20 dark:text-green-400"
-                                        : "text-amber-700 border-amber-300 bg-amber-50 dark:bg-amber-900/20 dark:text-amber-400"
-                                    )}
-                                  >
-                                    {u.is_internal === 1 ? "Interno" : "Externo"}
-                                  </Badge>
-                                )}
-                                {!isCollaborator(u) && (
-                                  <Badge variant="outline" className="text-[10px] px-1 py-0">
-                                    {ROL_LABELS[u.rol_id] ?? "—"}
-                                  </Badge>
-                                )}
-                              </div>
-                            </div>
-                          </CommandItem>
-                        );
-                      })}
-                    </CommandGroup>
-                  ))}
-                </CommandList>
-              </Command>
-            </PopoverContent>
-          </Popover>
+          <UserPickerCombobox
+            users={allUsers}
+            value={assignedUserId}
+            onChange={onAssignedUserIdChange}
+            disabled={disabled}
+          />
           {allUsersError && (
             <p className="text-xs text-destructive mt-1">Error al cargar las personas</p>
           )}
