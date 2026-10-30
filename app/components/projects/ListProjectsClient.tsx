@@ -9,8 +9,6 @@ import {
   ProjectType,
   ApiResponseWithPagination,
   BrandType,
-  ClientType,
-  ManagerType,
   UserType,
 } from "@/lib/definitions";
 import { ITEMS_PER_PAGE } from "@/config/constants";
@@ -24,6 +22,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { SearchableSelect } from "@/components/ui/searchable-select";
+import { AsyncSearchableSelect } from "@/components/ui/async-searchable-select";
 import SearchBar from "@/components/search/search";
 import Pagination from "@/components/pagination/Pagination";
 import { buildCreatorFilterOptions } from "@/lib/utils/project-filters";
@@ -52,6 +51,21 @@ async function fetchList<T>(endpoint: string): Promise<T[]> {
   const res = await get<{ data: T[] }>(endpoint);
   if (!res.ok) throw new Error(res.error);
   return res.data?.data || [];
+}
+
+/** Filas de `GET /api/clients` y `GET /api/managers`. */
+type NamedRow = { id: number; name: string };
+/** Filas de `GET /api/brands` (lista paginada): el nombre viene como `brand_name`. */
+type BrandRow = { id: number; brand_name: string };
+
+const getName = (row: NamedRow) => row.name;
+const getBrandName = (row: BrandRow) => row.brand_name;
+
+/** `GET /api/brands?id=X` devuelve la marca con `name`; sirve para un id que llega por URL. */
+async function fetchBrandLabel(id: string): Promise<string | undefined> {
+  const res = await get<BrandType>(`brands?id=${id}`);
+  if (!res.ok) throw new Error(res.error);
+  return res.data?.name;
 }
 
 export function ListProjectsClient({ canCreate, canSeeCreator = false, canFilterByCreator = false }: Props) {
@@ -105,23 +119,8 @@ export function ListProjectsClient({ canCreate, canSeeCreator = false, canFilter
     staleTime: 1000 * 60 * 2,
   });
 
-  // Opciones de los filtros. Marca y gerente se acotan al cliente elegido.
-  const clientScope = clientId ? `&client_id=${clientId}` : "";
-
-  const { data: clients = [], isError: clientsError } = useQuery({
-    queryKey: ["project-filter-clients"],
-    queryFn: () => fetchList<ClientType>("clients?limit=500"),
-  });
-
-  const { data: brands = [], isError: brandsError } = useQuery({
-    queryKey: ["project-filter-brands", clientId],
-    queryFn: () => fetchList<BrandType>(`brands?limit=500${clientScope}`),
-  });
-
-  const { data: managers = [], isError: managersError } = useQuery({
-    queryKey: ["project-filter-managers", clientId],
-    queryFn: () => fetchList<ManagerType>(`managers?limit=200${clientScope}`),
-  });
+  // Marca y gerente se buscan dentro del cliente elegido.
+  const clientScope = { client_id: clientId || undefined };
 
   const { data: creators = [], isError: creatorsError } = useQuery({
     queryKey: ["project-filter-creators"],
@@ -131,13 +130,16 @@ export function ListProjectsClient({ canCreate, canSeeCreator = false, canFilter
 
   const creatorOptions = useMemo(() => buildCreatorFilterOptions(creators), [creators]);
 
-  const toOptions = (items: { id?: number; name: string }[]) =>
-    items.map((item) => ({ value: String(item.id), label: item.name }));
-
   const projects = (data as unknown as { data: ProjectType[] })?.data ?? [];
   const pageCount = (data as unknown as { pageCount: number })?.pageCount ?? 1;
   const currentPage = (data as unknown as { currentPage: number })?.currentPage ?? 1;
   const total = (data as unknown as { total: number })?.total ?? 0;
+
+  // Etiqueta de respaldo para un cliente/gerente que llega por URL: al filtrar por
+  // él, todas las filas comparten ese cliente (projects.client_id) y ese gerente
+  // (gerente de la marca principal).
+  const clientLabel = clientId ? projects[0]?.client_name || "Cliente seleccionado" : undefined;
+  const managerLabel = managerId ? projects[0]?.manager_name || "Gerente seleccionado" : undefined;
 
   return (
     <div className="space-y-4">
@@ -177,32 +179,46 @@ export function ListProjectsClient({ canCreate, canSeeCreator = false, canFilter
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
-        <SearchableSelect
+        <AsyncSearchableSelect<NamedRow>
+          endpoint="clients"
+          getLabel={getName}
           value={clientId || "all"}
           onValueChange={(v) =>
             // Al cambiar de cliente, la marca y el gerente elegidos pueden no pertenecerle
             setFilter({ client_id: v === "all" ? null : v, brand_id: null, manager_id: null })
           }
-          options={[{ value: "all", label: "Cliente: todos" }, ...toOptions(clients)]}
+          allOption={{ value: "all", label: "Cliente: todos" }}
+          selectedLabel={clientLabel}
           placeholder="Cliente"
           searchPlaceholder="Buscar cliente..."
-          emptyMessage={clientsError ? "Error al cargar los clientes." : "Sin clientes."}
+          emptyMessage="Sin clientes."
+          errorMessage="Error al cargar los clientes."
         />
-        <SearchableSelect
+        <AsyncSearchableSelect<BrandRow>
+          endpoint="brands"
+          params={clientScope}
+          getLabel={getBrandName}
           value={brandId || "all"}
           onValueChange={(v) => setFilter({ brand_id: v === "all" ? null : v })}
-          options={[{ value: "all", label: "Marca: todas" }, ...toOptions(brands)]}
+          allOption={{ value: "all", label: "Marca: todas" }}
+          fetchSelectedLabel={fetchBrandLabel}
           placeholder="Marca"
           searchPlaceholder="Buscar marca..."
-          emptyMessage={brandsError ? "Error al cargar las marcas." : "Sin marcas."}
+          emptyMessage="Sin marcas."
+          errorMessage="Error al cargar las marcas."
         />
-        <SearchableSelect
+        <AsyncSearchableSelect<NamedRow>
+          endpoint="managers"
+          params={clientScope}
+          getLabel={getName}
           value={managerId || "all"}
           onValueChange={(v) => setFilter({ manager_id: v === "all" ? null : v })}
-          options={[{ value: "all", label: "Gerente: todos" }, ...toOptions(managers)]}
+          allOption={{ value: "all", label: "Gerente: todos" }}
+          selectedLabel={managerLabel}
           placeholder="Gerente"
           searchPlaceholder="Buscar gerente..."
-          emptyMessage={managersError ? "Error al cargar los gerentes." : "Sin gerentes."}
+          emptyMessage="Sin gerentes."
+          errorMessage="Error al cargar los gerentes."
         />
         {canFilterByCreator && (
           <SearchableSelect

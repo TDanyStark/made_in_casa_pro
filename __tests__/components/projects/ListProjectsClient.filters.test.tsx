@@ -7,6 +7,20 @@ const mockReplace = jest.fn();
 const mockGet = jest.fn();
 const mockQueryFns: Record<string, () => Promise<unknown>> = {};
 let mockSearch = "page=1";
+let mockProjects: Array<Record<string, unknown>> = [];
+
+type AsyncSelectProps = {
+  endpoint: string;
+  params?: Record<string, string | undefined>;
+  getLabel: (row: never) => string;
+  value: string;
+  onValueChange: (value: string) => void;
+  allOption: { value: string; label: string };
+  selectedLabel?: string;
+  fetchSelectedLabel?: (value: string) => Promise<string | undefined>;
+  placeholder?: string;
+};
+const mockAsyncSelects: Record<string, AsyncSelectProps> = {};
 
 jest.mock("lucide-react", () => new Proxy({}, {
   get: (_, iconName: string) => {
@@ -73,10 +87,20 @@ jest.mock("@/components/ui/searchable-select", () => ({
   ),
 }));
 
+jest.mock("@/components/ui/async-searchable-select", () => ({
+  AsyncSearchableSelect: (props: AsyncSelectProps) => {
+    mockAsyncSelects[props.placeholder ?? ""] = props;
+    const { placeholder, value, allOption, selectedLabel, onValueChange } = props;
+    return (
+      <select aria-label={placeholder} value={value} onChange={(e) => onValueChange(e.target.value)}>
+        <option value={allOption.value}>{allOption.label}</option>
+        {value !== allOption.value && <option value={value}>{selectedLabel ?? ""}</option>}
+      </select>
+    );
+  },
+}));
+
 const LISTS: Record<string, unknown> = {
-  "project-filter-clients": [{ id: 4, name: "Cliente A" }],
-  "project-filter-brands": [{ id: 3, name: "Marca A" }],
-  "project-filter-managers": [{ id: 6, name: "Gerente A" }],
   "project-filter-creators": [
     { id: 1, name: "Admin Uno", rol_id: UserRole.ADMIN },
     { id: 5, name: "Fina", rol_id: UserRole.FINANCIERO },
@@ -90,7 +114,7 @@ jest.mock("@tanstack/react-query", () => ({
     mockQueryFns[key] = queryFn;
     if (key === "projects") {
       return {
-        data: { data: [{ id: 1, title: "Proyecto demo" }], pageCount: 1, currentPage: 1, total: 1 },
+        data: { data: mockProjects, pageCount: 1, currentPage: 1, total: mockProjects.length },
         isLoading: false,
         isError: false,
       };
@@ -104,6 +128,8 @@ describe("ListProjectsClient filters", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockSearch = "page=1";
+    mockProjects = [{ id: 1, title: "Proyecto demo", client_name: "Cliente A", manager_name: "Gerente A" }];
+    Object.keys(mockAsyncSelects).forEach((key) => delete mockAsyncSelects[key]);
     mockGet.mockResolvedValue({ ok: true, data: { data: [] } });
   });
 
@@ -138,16 +164,73 @@ describe("ListProjectsClient filters", () => {
     );
   });
 
-  it("scopes brand and manager options to the selected client", async () => {
+  it("searches clients, brands and managers server-side, scoping brand and manager to the client", () => {
     mockSearch = "client_id=4";
     render(<ListProjectsClient canCreate={false} canFilterByCreator />);
 
-    await mockQueryFns["project-filter-brands"]();
-    await mockQueryFns["project-filter-managers"]();
-    await mockQueryFns["project-filter-clients"]();
-    expect(mockGet).toHaveBeenCalledWith("brands?limit=500&client_id=4");
-    expect(mockGet).toHaveBeenCalledWith("managers?limit=200&client_id=4");
-    expect(mockGet).toHaveBeenCalledWith("clients?limit=500");
+    const { Cliente: client, Marca: brand, Gerente: manager } = mockAsyncSelects;
+    expect(client.endpoint).toBe("clients");
+    expect(client.params).toBeUndefined();
+    expect(brand.endpoint).toBe("brands");
+    expect(brand.params).toEqual({ client_id: "4" });
+    expect(manager.endpoint).toBe("managers");
+    expect(manager.params).toEqual({ client_id: "4" });
+    expect(mockQueryFns["project-filter-clients"]).toBeUndefined();
+    expect(mockQueryFns["project-filter-brands"]).toBeUndefined();
+    expect(mockQueryFns["project-filter-managers"]).toBeUndefined();
+  });
+
+  it("does not scope brand and manager when no client is selected", () => {
+    render(<ListProjectsClient canCreate={false} canFilterByCreator />);
+
+    expect(mockAsyncSelects.Marca.params).toEqual({ client_id: undefined });
+    expect(mockAsyncSelects.Gerente.params).toEqual({ client_id: undefined });
+  });
+
+  it("labels options with the real API shapes (brand rows use brand_name)", () => {
+    render(<ListProjectsClient canCreate={false} canFilterByCreator />);
+
+    const label = (name: string, row: Record<string, unknown>) =>
+      (mockAsyncSelects[name].getLabel as (r: Record<string, unknown>) => string)(row);
+    expect(label("Marca", { id: 3, brand_name: "Marca A", manager_name: "Gerente A" })).toBe("Marca A");
+    expect(label("Cliente", { id: 4, name: "Cliente A" })).toBe("Cliente A");
+    expect(label("Gerente", { id: 6, name: "Gerente A" })).toBe("Gerente A");
+    expect(mockAsyncSelects.Marca.allOption).toEqual({ value: "all", label: "Marca: todas" });
+  });
+
+  it("resolves a brand id from the URL with GET brands?id=", async () => {
+    mockSearch = "brand_id=3";
+    mockGet.mockResolvedValue({ ok: true, data: { id: 3, name: "Marca A" } });
+    render(<ListProjectsClient canCreate={false} canFilterByCreator />);
+
+    expect(mockAsyncSelects.Marca.value).toBe("3");
+    await expect(mockAsyncSelects.Marca.fetchSelectedLabel!("3")).resolves.toBe("Marca A");
+    expect(mockGet).toHaveBeenCalledWith("brands?id=3");
+  });
+
+  it("derives client and manager labels from the filtered project rows", () => {
+    mockSearch = "client_id=4&manager_id=6";
+    render(<ListProjectsClient canCreate={false} canFilterByCreator />);
+
+    expect(mockAsyncSelects.Cliente.selectedLabel).toBe("Cliente A");
+    expect(mockAsyncSelects.Gerente.selectedLabel).toBe("Gerente A");
+  });
+
+  it("uses a neutral label for client and manager when there are no rows", () => {
+    mockSearch = "client_id=4&manager_id=6";
+    mockProjects = [];
+    render(<ListProjectsClient canCreate={false} canFilterByCreator />);
+
+    expect(mockAsyncSelects.Cliente.selectedLabel).toBe("Cliente seleccionado");
+    expect(mockAsyncSelects.Gerente.selectedLabel).toBe("Gerente seleccionado");
+  });
+
+  it("sets the brand filter and goes back to page 1", () => {
+    mockSearch = "page=3";
+    render(<ListProjectsClient canCreate={false} canFilterByCreator />);
+
+    mockAsyncSelects.Marca.onValueChange("3");
+    expect(mockReplace).toHaveBeenCalledWith("/projects?page=1&brand_id=3");
   });
 
   it("clears brand and manager when the client changes and resets to page 1", () => {
