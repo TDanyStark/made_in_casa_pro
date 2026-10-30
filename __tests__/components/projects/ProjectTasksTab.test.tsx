@@ -4,6 +4,7 @@ import userEvent from "@testing-library/user-event";
 
 const mockQueryFns: Record<string, () => Promise<unknown>> = {};
 let mockTasksError = false;
+let mockTasksOverride: unknown[] | null = null;
 
 jest.mock("@tanstack/react-query", () => ({
   useQueryClient: () => ({
@@ -26,6 +27,15 @@ jest.mock("@tanstack/react-query", () => ({
         data: { cost: 15000, internal: true, minutes: 30, hourly_rate: 30000, source: "frozen_rate" },
         isLoading: false,
         isError: false,
+      };
+    }
+    if (String(queryKey[0]) === "project-tasks" && mockTasksOverride) {
+      return {
+        data: mockTasksOverride,
+        isLoading: false,
+        isFetching: false,
+        refetch: jest.fn(),
+        dataUpdatedAt: Date.now(),
       };
     }
     if (String(queryKey[0]) === "project-tasks") {
@@ -169,8 +179,12 @@ jest.mock("@/components/ui/card", () => ({
 jest.mock("@/components/ui/badge", () => ({ Badge: ({ children }: { children: React.ReactNode }) => <span>{children}</span> }));
 
 jest.mock("@/components/ui/sortable-list", () => ({
-  SortableList: ({ items, renderItem }: { items: { id: number }[]; renderItem: (item: { id: number }) => React.ReactNode }) => (
-    <div>{items.map((item) => <div key={item.id}>{renderItem(item)}</div>)}</div>
+  SortableList: ({ items, renderItem }: { items: { id: number }[]; renderItem: (item: { id: number }, dragHandle: React.ReactNode) => React.ReactNode }) => (
+    <div>
+      {items.map((item) => (
+        <div key={item.id}>{renderItem(item, <button type="button" aria-label="Arrastrar para reordenar" />)}</div>
+      ))}
+    </div>
   ),
 }));
 
@@ -210,6 +224,121 @@ describe("ProjectTasksTab", () => {
       "https://example.com/final"
     );
     expect(screen.getByText(/entrega publicada/i)).toBeInTheDocument();
+  });
+});
+
+const buildTask = (id: number, status: string) => ({
+    id,
+    project_id: 7,
+    template_id: null,
+    title: `Tarea ${id}`,
+    description: null,
+    area_id: null,
+    area_name: null,
+    assigned_user_id: 4,
+    assigned_user_name: "Vale",
+    assigned_user_rol_id: 4,
+    assigned_user_is_internal: 1,
+    status,
+    task_type: "execution",
+    task_flag: "new",
+    adjustment_id: null,
+    requires_quote: 0,
+    assign_to_commercial: 0,
+    order_index: id,
+    created_at: "2026-04-07T00:00:00.000Z",
+    updated_at: "2026-04-07T00:00:00.000Z",
+    delivery_url: null,
+    delivery_notes: null,
+    completion_cost: null,
+    progress_percent: 0,
+    progress_minutes: 0,
+    quoter_ids: [],
+    quote_count: 0,
+    pending_quote_count: 0,
+  });
+
+describe("ProjectTasksTab long lists", () => {
+
+  afterEach(() => {
+    mockTasksOverride = null;
+  });
+
+  it("stacks completed tasks with a count and loads pending tasks 4 at a time", async () => {
+    const user = userEvent.setup();
+    mockTasksOverride = [
+      ...Array.from({ length: 12 }, (_, i) => buildTask(i + 1, "completed")),
+      buildTask(13, "in_progress"),
+      ...Array.from({ length: 7 }, (_, i) => buildTask(i + 14, "not_started")),
+    ];
+
+    render(
+      <ProjectTasksTab projectId={7} productName="Producto" canEdit={false} currentUserId={4} currentUserRole={4} />
+    );
+
+    expect(screen.getByText("12 tareas completadas")).toBeInTheDocument();
+    expect(screen.queryByText("Tarea 1")).not.toBeInTheDocument();
+    for (const id of [13, 14, 15, 16, 17]) expect(screen.getByText(`Tarea ${id}`)).toBeInTheDocument();
+    expect(screen.queryByText("Tarea 18")).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /mostrar 3 m\u00e1s \(quedan 3\)/i }));
+    for (const id of [18, 19, 20]) expect(screen.getByText(`Tarea ${id}`)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /ver menos/i })).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /12 tareas completadas/i }));
+    expect(screen.getByText("Tarea 1")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /apilar completadas/i })).toBeInTheDocument();
+  });
+
+  it("keeps showing every task when there are 8 or fewer", () => {
+    mockTasksOverride = Array.from({ length: 8 }, (_, i) => buildTask(i + 1, i < 5 ? "completed" : "not_started"));
+
+    render(
+      <ProjectTasksTab projectId={7} productName="Producto" canEdit={false} currentUserId={4} currentUserRole={4} />
+    );
+
+    for (let id = 1; id <= 8; id++) expect(screen.getByText(`Tarea ${id}`)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /tareas completadas/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /mostrar .* m\u00e1s/i })).not.toBeInTheDocument();
+  });
+});
+
+// S5: quick "Activar" button on waiting tasks for comercial, admin and directivo.
+describe("ProjectTasksTab — activate a waiting task (S5)", () => {
+  afterEach(() => {
+    mockTasksOverride = null;
+  });
+
+  it.each([1, 2, 3])("role %i activates a waiting task with one click", async (role) => {
+    const user = userEvent.setup();
+    const { post } = jest.requireMock("@/lib/services/apiService") as { post: jest.Mock };
+    post.mockResolvedValue({ ok: true, data: { task: {} } });
+    mockTasksOverride = [buildTask(1, "in_progress"), buildTask(2, "waiting")];
+
+    render(<ProjectTasksTab projectId={7} productName="Producto" canEdit currentUserId={1} currentUserRole={role} />);
+
+    await user.click(screen.getByRole("button", { name: /activar tarea 2/i }));
+    expect(post).toHaveBeenCalledWith("projects/7/tasks/2/activate", {});
+  });
+
+  it.each([4, 5])("role %i does not see the activate button", (role) => {
+    mockTasksOverride = [buildTask(1, "in_progress"), buildTask(2, "waiting")];
+
+    render(<ProjectTasksTab projectId={7} productName="Producto" canEdit={false} currentUserId={1} currentUserRole={role} />);
+
+    expect(screen.getByText("Tarea 2")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /activar tarea/i })).not.toBeInTheDocument();
+  });
+});
+
+describe("ProjectTasksTab — reorder completed tasks", () => {
+  it("shows the drag handle on completed tasks when the user can edit", () => {
+    render(
+      <ProjectTasksTab projectId={7} productName="Producto" canEdit currentUserId={1} currentUserRole={1} />
+    );
+
+    expect(screen.getByText("Subir artes finales")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /arrastrar para reordenar/i })).toBeInTheDocument();
   });
 });
 

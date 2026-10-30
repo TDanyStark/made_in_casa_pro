@@ -18,6 +18,7 @@ import {
 } from "@/lib/definitions";
 import { TaskAssignmentSelector, AssignMode, getAssignmentErrors } from "@/components/tasks/TaskAssignmentSelector";
 import { SortableList } from "@/components/ui/sortable-list";
+import { getTaskListWindow, TASK_PAGE_SIZE } from "@/lib/task-list-window";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -25,7 +26,7 @@ import { TaskValidationDialog } from "@/components/tasks/TaskValidationDialog";
 import { TaskCompleteDialog } from "@/components/tasks/TaskCompleteDialog";
 import { TaskHistoryDialog } from "@/components/tasks/TaskHistoryDialog";
 import { TaskDeliverableDialog } from "@/components/tasks/TaskDeliverableDialog";
-import { LEADERSHIP_ROLES, TASK_COST_EDIT_ROLES } from "@/lib/role-groups";
+import { LEADERSHIP_ROLES, TASK_ACTIVATE_ROLES, TASK_COST_EDIT_ROLES } from "@/lib/role-groups";
 import type { UserRole } from "@/lib/definitions";
 import {
   Dialog,
@@ -72,6 +73,7 @@ import {
   Package,
   CheckCircle,
   ChevronDown,
+  ChevronUp,
   AlertTriangle,
   Clock,
   ShieldCheck,
@@ -304,8 +306,12 @@ export function ProjectTasksTab({
   const [editingAssigneeOnly, setEditingAssigneeOnly] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [reordering, setReordering] = useState(false);
+  const [showCompleted, setShowCompleted] = useState(false);
+  const [extraPages, setExtraPages] = useState(0);
+  const [showAll, setShowAll] = useState(false);
   const [completingTaskId] = useState<number | null>(null);
   const [startingTaskId, setStartingTaskId] = useState<number | null>(null);
+  const [activatingTaskId, setActivatingTaskId] = useState<number | null>(null);
   const [completeDialogOpen, setCompleteDialogOpen] = useState(false);
   const [taskToComplete, setTaskToComplete] = useState<ProjectTaskType | null>(null);
   const [historyDialogOpen, setHistoryDialogOpen] = useState(false);
@@ -383,6 +389,10 @@ export function ProjectTasksTab({
   // pueden tomar, completar y validar cualquier tarea aunque no sean el
   // colaborador asignado.
   const canCompleteOverride = isAdmin || currentUserRole === 3;
+
+  // Botón "Activar" en tareas en espera: comercial, admin y directivo.
+  const canActivateWaiting =
+    currentUserRole !== undefined && TASK_ACTIVATE_ROLES.includes(currentUserRole as UserRole);
 
   // Costo de cada tarea en el ojito: solo admin, directivo y financiero.
   const canSeeTaskCost =
@@ -502,6 +512,20 @@ export function ProjectTasksTab({
     }
   };
 
+  const handleActivateTask = async (task: ProjectTaskType) => {
+    setActivatingTaskId(task.id);
+    try {
+      const res = await post(`projects/${projectId}/tasks/${task.id}/activate`, {});
+      if (!res.ok) throw new Error(res.error || "Error al activar la tarea");
+      toast.success("Tarea activada");
+      invalidateAll();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Error al activar la tarea");
+    } finally {
+      setActivatingTaskId(null);
+    }
+  };
+
   const handleStartTask = async (task: ProjectTaskType) => {
     setStartingTaskId(task.id);
     try {
@@ -518,17 +542,6 @@ export function ProjectTasksTab({
   };
 
   const handleReorder = async (reordered: ProjectTaskType[]) => {
-    // Business Rule: Completed tasks cannot be reordered
-    // Check if any task that was completed moved or if a new task took its place
-    for (let i = 0; i < tasks.length; i++) {
-      if (tasks[i].status === "completed") {
-        if (reordered[i].id !== tasks[i].id) {
-          toast.error("No puedes reordenar las tareas completadas ni mover tareas antes de ellas.");
-          return;
-        }
-      }
-    }
-
     setReordering(true);
 
     // Actualizamos localmente el order_index de cada tarea para que el
@@ -566,6 +579,9 @@ export function ProjectTasksTab({
   }
 
   const completed = sortedTasks.filter((t) => t.status === "completed").length;
+  const taskWindow = getTaskListWindow(sortedTasks, { showCompleted, extraPages, showAll });
+  const stackableCount = getTaskListWindow(sortedTasks, { showCompleted: false, extraPages, showAll }).stacked.length;
+  const nextPageCount = Math.min(TASK_PAGE_SIZE, taskWindow.hidden.length);
 
   return (
     <TooltipProvider>
@@ -612,9 +628,41 @@ export function ProjectTasksTab({
             </p>
           </div>
         ) : (
+          <>
+          {taskWindow.stacked.length > 0 && (
+            <button
+              type="button"
+              onClick={() => setShowCompleted(true)}
+              aria-expanded={false}
+              className="group relative mb-5 w-full text-left"
+            >
+              <span aria-hidden className="absolute inset-x-4 -bottom-3 h-full rounded-lg border bg-card/40" />
+              <span aria-hidden className="absolute inset-x-2 -bottom-1.5 h-full rounded-lg border bg-card/70" />
+              <span className="relative flex items-center justify-between rounded-lg border bg-card px-4 py-3 transition-colors group-hover:bg-muted/50">
+                <span className="flex items-center gap-2 text-sm font-medium">
+                  <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-400" />
+                  {taskWindow.stacked.length} {taskWindow.stacked.length === 1 ? "tarea completada" : "tareas completadas"}
+                </span>
+                <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                  Ver
+                  <ChevronDown className="h-3.5 w-3.5" />
+                </span>
+              </span>
+            </button>
+          )}
+          {showCompleted && stackableCount > 0 && (
+            <div className="mb-2 flex justify-end">
+              <Button variant="ghost" size="sm" className="h-7 text-xs text-muted-foreground" onClick={() => setShowCompleted(false)}>
+                <ChevronUp className="h-3.5 w-3.5 mr-1" />
+                Apilar completadas
+              </Button>
+            </div>
+          )}
           <SortableList
-            items={sortedTasks}
-            onReorder={handleReorder}
+            items={taskWindow.visible}
+            onReorder={(reorderedVisible) =>
+              handleReorder([...taskWindow.stacked, ...reorderedVisible, ...taskWindow.hidden])
+            }
             renderItem={(task, dragHandle) => {
               const taskType = task.task_type ?? "execution";
               const taskFlag = task.task_flag ?? "new";
@@ -642,15 +690,7 @@ export function ProjectTasksTab({
                           } ${isBlocked ? "border-destructive/50 bg-destructive/5" : ""} ${isCompleted ? "border-green-100 dark:border-green-900/30" : ""}`}
                         >
                           {canEdit && (
-                            <div className="flex-shrink-0 pt-0.5">
-                              {isCompleted ? (
-                                <div className="p-1.5 opacity-20 grayscale cursor-not-allowed">
-                                  <ChevronDown className="h-4 w-4" />
-                                </div>
-                              ) : (
-                                dragHandle
-                              )}
-                            </div>
+                            <div className="flex-shrink-0 pt-0.5">{dragHandle}</div>
                           )}
                           {(isWaiting || isBlocked) && (
                             <div className="flex-shrink-0 pt-1 pl-1">
@@ -813,6 +853,24 @@ export function ProjectTasksTab({
                                <HistoryIcon className="h-3.5 w-3.5" />
                             </Button>
 
+                            {isWaiting && canActivateWaiting && (
+                              <Button
+                                size="sm"
+                                variant="secondary"
+                                className="h-7 text-xs gap-1"
+                                onClick={() => handleActivateTask(task)}
+                                disabled={activatingTaskId === task.id}
+                                aria-label={`Activar ${task.title}`}
+                              >
+                                {activatingTaskId === task.id ? (
+                                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                ) : (
+                                  <PlayCircle className="h-3.5 w-3.5" />
+                                )}
+                                Activar
+                              </Button>
+                            )}
+
                             {canStart && (
                               <Button
                                 size="sm"
@@ -908,6 +966,32 @@ export function ProjectTasksTab({
                       );
                     }}
                   />
+          {taskWindow.hidden.length > 0 ? (
+            <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
+              <Button variant="outline" size="sm" onClick={() => setExtraPages((p) => p + 1)}>
+                <ChevronDown className="h-3.5 w-3.5 mr-1" />
+                Mostrar {nextPageCount} más (quedan {taskWindow.hidden.length})
+              </Button>
+              <Button variant="ghost" size="sm" onClick={() => setShowAll(true)}>
+                Ver todas
+              </Button>
+            </div>
+          ) : (extraPages > 0 || showAll) && (
+            <div className="mt-3 flex justify-center">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setExtraPages(0);
+                  setShowAll(false);
+                }}
+              >
+                <ChevronUp className="h-3.5 w-3.5 mr-1" />
+                Ver menos
+              </Button>
+            </div>
+          )}
+          </>
                 )}
 
 

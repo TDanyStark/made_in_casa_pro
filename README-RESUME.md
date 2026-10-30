@@ -303,6 +303,22 @@ crear la tarea o asignación. La creación y la recreación comparten con
 administradores, directivos, financieros, creador y asignados actuales; agregar
 o quitar co-responsables no sincroniza Drive.
 
+## Cola de tareas y activación manual
+
+Las tareas de una versión se hacen en orden y, por defecto, solo una está activa.
+Las tareas activas son las que están en `not_started`, `in_progress`, `paused` o
+`blocked`. Comercial, administrador y directivo pueden activar a mano otras
+tareas para que avancen en paralelo.
+
+| Acción | Endpoint | Efecto |
+|--------|----------|--------|
+| Activar tarea en espera (botón **Activar**) | `POST /api/projects/[id]/tasks/[tid]/activate` | `waiting` → `not_started` y envía `task.ready` al asignado. Solo admin, directivo y comercial (`TASK_ACTIVATE_ROLES`). Si la tarea ya no está en espera responde 409 y si no tiene colaborador responde 400; en ambos casos no cambia nada |
+| Completar o aprobar validación | `.../tasks/[tid]/complete`, `.../tasks/[tid]/validate` | Solo se mira la tarea que sigue justo después. Se activa únicamente si está en `waiting` **y todas las anteriores están completadas**: la automatización activa como máximo una tarea. Si la siguiente ya está activa no se toca (no se envía `task.ready` otra vez). Si ya está completada no se activa nada y se avisa al comercial (`task.queue_stalled`) cuando quedan tareas en espera |
+| Reordenar o eliminar | `POST .../tasks/reorder`, `DELETE .../tasks/[tid]` | La primera tarea pendiente pasa de `waiting` a `not_started`; las tareas activadas a mano siguen activas. Las tareas completadas también se pueden reordenar |
+
+Ejemplo: con A y B activas a la vez, completar A no activa nada porque B sigue
+abierta; al completar B se activa C.
+
 ## Una sola tarea en progreso por colaborador
 
 Cada colaborador puede tener **una sola** tarea en `in_progress`. Así los
@@ -414,7 +430,8 @@ asignación. Se envía cada vez que una tarea **con responsable** queda en
 | Origen | Cuándo |
 |--------|--------|
 | Crear tarea (`POST /api/projects/[id]/tasks`) o ajuste (`POST /api/projects/[id]/adjustments`) | La tarea se crea ya activa; llega después de `task.assigned`, así que el primer colaborador recibe los dos correos |
-| Completar (`.../tasks/[tid]/complete`) o validar (`.../tasks/[tid]/validate`) | Se activa la siguiente tarea (o la primera de corrección al rechazar). Si queda `blocked` no se envía |
+| Completar (`.../tasks/[tid]/complete`) o validar (`.../tasks/[tid]/validate`) | Se activa la siguiente tarea (o la primera de corrección al rechazar). Si queda `blocked`, o si ya estaba activa, no se envía |
+| Activar (`POST .../tasks/[tid]/activate`) | Comercial, admin o directivo activan a mano una tarea en espera |
 | Editar (`PATCH .../tasks/[tid]`) | El estado cambia a `not_started` desde otro estado |
 | Eliminar o reordenar (`DELETE .../tasks/[tid]`, `POST .../tasks/reorder`) | La siguiente tarea pendiente pasa de `waiting` a `not_started` |
 | Aceptar cotización (`PATCH .../tasks/[tid]/quotes/[qid]`) | La tarea queda `not_started` con el colaborador aceptado; llega después de `quote.accepted` |
@@ -444,6 +461,16 @@ Solo la última versión admite tareas nuevas desde `POST /api/projects/[id]/tas
 El selector muestra el estado completado, pero el cierre ya no requiere un botón manual.
 Los estados se sincronizan dentro de una transacción, bloqueando el proyecto antes
  de contar las tareas. No se aplica ninguna migración retroactiva.
+
+### Aviso de cola detenida al comercial (`task.queue_stalled`)
+
+Se envía al **comercial del proyecto** (`projects.created_by`) cuando se completa
+una tarea, o se aprueba una validación, y no se activa la siguiente porque ya
+estaba completada. Solo se envía si en esa versión quedan tareas en `waiting`:
+el correo las lista y le pide que las active con el botón **Activar**. Si no
+queda ninguna en espera, o el proyecto no tiene comercial, no se registra ni se
+envía nada. El reintento reconstruye el correo con la lista guardada en el
+evento (`metadata.waiting_tasks`).
 
 ### Aviso de cierre al comercial (`project.ready_to_close`)
 
