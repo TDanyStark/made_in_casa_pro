@@ -30,6 +30,16 @@ describe("buildCreatorFilterOptions()", () => {
     expect(options).toEqual([{ value: "3", label: "Cami", group: "Comerciales" }]);
   });
 
+  it("leaves out inactive users", () => {
+    const options = buildCreatorFilterOptions([
+      { id: 1, name: "Activo", rol_id: UserRole.COMERCIAL, is_active: true },
+      { id: 2, name: "Inactivo", rol_id: UserRole.COMERCIAL, is_active: false },
+      { id: 3, name: "Directivo inactivo", rol_id: UserRole.DIRECTIVO, is_active: false },
+    ]);
+
+    expect(options).toEqual([{ value: "1", label: "Activo", group: "Comerciales" }]);
+  });
+
   it("returns an empty list when there are no users", () => {
     expect(buildCreatorFilterOptions([])).toEqual([]);
   });
