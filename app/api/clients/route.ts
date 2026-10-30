@@ -1,4 +1,4 @@
-import { createClient, getClientsWithPagination } from '@/lib/queries/clients';
+import { createClient, getClientById, getClientsWithPagination } from '@/lib/queries/clients';
 import { revalidatePath } from 'next/cache';
 import { NextRequest, NextResponse } from 'next/server';
 import { ITEMS_PER_PAGE } from '@/config/constants';
@@ -80,13 +80,16 @@ export async function POST(request: NextRequest) {
     
     const { name, country_id } = validationResult.data;
     
-    await createClient(name, country_id);
-    
+    const result = await createClient(name, country_id);
+    const newId = Number(result.rows[0]?.id);
+
     revalidatePath('/clients');
-    
-    return NextResponse.json({
-      message: 'Cliente creado exitosamente',
-    }, { status: 201 });
+
+    // Devolvemos el cliente creado (con id y país) para que los flujos de
+    // creación inline (ClientSelect) puedan autoseleccionarlo.
+    const newClient = await getClientById(String(newId));
+
+    return NextResponse.json(newClient ?? { id: newId, name, country_id }, { status: 201 });
   } catch (error) {
     console.error("Error creating client:", error);
     return NextResponse.json({
