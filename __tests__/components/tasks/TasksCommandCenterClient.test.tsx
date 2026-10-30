@@ -5,7 +5,25 @@ import { UserRole } from "@/lib/definitions";
 
 const mockReplace = jest.fn();
 const mockGet = jest.fn();
+const mockPatch = jest.fn();
 const mockQueryFns: Record<string, () => Promise<unknown>> = {};
+const baseRow = {
+  id: 1,
+  title: "Tarea demo",
+  project_id: 10,
+  project_title: "Proyecto demo",
+  product_name: "Producto demo",
+  assigned_user_id: null,
+  assigned_user_name: null,
+  assigned_user_is_internal: null,
+  task_flag: "new",
+  task_type: "execution",
+  status: "not_started",
+  requires_quote: 0,
+  assigned_at: null,
+  completed_at: null,
+};
+let mockRows: Array<Record<string, unknown>> = [baseRow];
 
 jest.mock("lucide-react", () => new Proxy({}, {
   get: (_, iconName: string) => {
@@ -23,31 +41,26 @@ jest.mock("next/navigation", () => ({
 
 jest.mock("@tanstack/react-query", () => ({
   useQueryClient: () => ({ invalidateQueries: jest.fn() }),
-  useMutation: () => ({ mutate: jest.fn(), isPending: false }),
+  useMutation: ({
+    mutationFn,
+    onSuccess,
+    onError,
+  }: {
+    mutationFn: (vars: unknown) => Promise<unknown>;
+    onSuccess?: () => void;
+    onError?: (err: Error) => void;
+  }) => ({
+    mutate: (vars: unknown) =>
+      mutationFn(vars).then(() => onSuccess?.(), (err: Error) => onError?.(err)),
+    isPending: false,
+  }),
   useQuery: ({ queryKey, queryFn }: { queryKey: unknown[]; queryFn: () => Promise<unknown> }) => {
     const key = String(queryKey[0]);
     mockQueryFns[key] = queryFn;
     if (key === "tasks-command-center") {
       return {
         data: {
-          data: [
-            {
-              id: 1,
-              title: "Tarea demo",
-              project_id: 10,
-              project_title: "Proyecto demo",
-              product_name: "Producto demo",
-              assigned_user_id: null,
-              assigned_user_name: null,
-              assigned_user_is_internal: null,
-              task_flag: "new",
-              task_type: "execution",
-              status: "not_started",
-              requires_quote: 0,
-              assigned_at: null,
-              completed_at: null,
-            },
-          ],
+          data: mockRows,
           pageCount: 1,
           currentPage: 1,
           total: 1,
@@ -78,8 +91,38 @@ jest.mock("@tanstack/react-query", () => ({
 
 jest.mock("@/lib/services/apiService", () => ({
   get: (...args: unknown[]) => mockGet(...args),
-  patch: jest.fn(),
+  patch: (...args: unknown[]) => mockPatch(...args),
 }));
+
+jest.mock("@/components/ui/dropdown-menu", () => {
+  const Pass = ({ children }: { children?: React.ReactNode }) => <div>{children}</div>;
+  return {
+    DropdownMenu: Pass,
+    DropdownMenuTrigger: Pass,
+    DropdownMenuContent: Pass,
+    DropdownMenuLabel: Pass,
+    DropdownMenuSeparator: () => <hr />,
+    DropdownMenuSub: Pass,
+    DropdownMenuSubTrigger: ({ children }: { children?: React.ReactNode }) => <div>{children}</div>,
+    DropdownMenuSubContent: Pass,
+    DropdownMenuItem: ({
+      children,
+      onSelect,
+      asChild,
+    }: {
+      children?: React.ReactNode;
+      onSelect?: () => void;
+      asChild?: boolean;
+    }) =>
+      asChild ? (
+        <div role="menuitem">{children}</div>
+      ) : (
+        <div role="menuitem" onClick={() => onSelect?.()}>
+          {children}
+        </div>
+      ),
+  };
+});
 
 jest.mock("@/components/ui/popover", () => ({
   Popover: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
@@ -130,8 +173,18 @@ jest.mock("@/components/ui/label", () => ({
 }));
 
 jest.mock("@/components/ui/button", () => ({
-  Button: ({ children, onClick }: { children: React.ReactNode; onClick?: () => void }) => (
-    <button onClick={onClick}>{children}</button>
+  Button: ({
+    children,
+    onClick,
+    "aria-label": ariaLabel,
+  }: {
+    children: React.ReactNode;
+    onClick?: () => void;
+    "aria-label"?: string;
+  }) => (
+    <button onClick={onClick} aria-label={ariaLabel}>
+      {children}
+    </button>
   ),
 }));
 
@@ -140,7 +193,7 @@ jest.mock("@/components/ui/table", () => ({
   TableHeader: ({ children }: { children: React.ReactNode }) => <thead>{children}</thead>,
   TableBody: ({ children }: { children: React.ReactNode }) => <tbody>{children}</tbody>,
   TableRow: ({ children }: { children: React.ReactNode }) => <tr>{children}</tr>,
-  TableHead: ({ children }: { children: React.ReactNode }) => <th>{children}</th>,
+  TableHead: ({ children }: { children?: React.ReactNode }) => <th>{children}</th>,
   TableCell: ({ children, colSpan }: { children: React.ReactNode; colSpan?: number }) => (
     <td colSpan={colSpan}>{children}</td>
   ),
@@ -186,6 +239,7 @@ jest.mock("@/components/tasks/TaskDeliverableDialog", () => ({
 describe("TasksCommandCenterClient", () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockRows = [baseRow];
   });
 
   it("renders main columns and one row", () => {
@@ -262,6 +316,103 @@ describe("TasksCommandCenterClient", () => {
     render(<TasksCommandCenterClient userRole={role} />);
 
     expect(screen.getByTestId("deliverable-dialog")).toHaveAttribute("data-can-edit-cost", expected);
+  });
+
+  // Inline status change: a waiting task can go back to "Sin iniciar" from the table.
+  it("changes the status of a waiting task to 'Sin iniciar' with PATCH", async () => {
+    mockRows = [{ ...baseRow, status: "waiting" }];
+    mockPatch.mockResolvedValue({ ok: true, data: {} });
+    const { toast } = jest.requireMock("sonner");
+    render(<TasksCommandCenterClient userRole={UserRole.ADMIN} />);
+
+    const statusMenu = within(screen.getByTestId("status-menu-1"));
+    fireEvent.click(statusMenu.getByRole("menuitem", { name: "Sin iniciar" }));
+
+    expect(mockPatch).toHaveBeenCalledWith("projects/10/tasks/1", { status: "not_started" });
+    await screen.findByText("Tarea demo");
+    expect(toast.success).toHaveBeenCalledWith("Estado actualizado");
+  });
+
+  it("toasts the API error when the status change fails", async () => {
+    mockRows = [{ ...baseRow, status: "waiting" }];
+    mockPatch.mockResolvedValue({ ok: false, error: "Sin permiso" });
+    const { toast } = jest.requireMock("sonner");
+    render(<TasksCommandCenterClient userRole={UserRole.ADMIN} />);
+
+    fireEvent.click(within(screen.getByTestId("status-menu-1")).getByRole("menuitem", { name: "Sin iniciar" }));
+
+    await new Promise((r) => setTimeout(r, 0));
+    expect(toast.error).toHaveBeenCalledWith("Sin permiso");
+  });
+
+  it("offers every status except the current one and 'Completada'; 'Pausada' only from 'En progreso'", () => {
+    mockRows = [
+      { ...baseRow, id: 1, status: "waiting" },
+      { ...baseRow, id: 2, status: "in_progress" },
+    ];
+    render(<TasksCommandCenterClient userRole={UserRole.ADMIN} />);
+
+    const waitingOptions = within(screen.getByTestId("status-menu-1"))
+      .getAllByRole("menuitem")
+      .map((el) => el.textContent);
+    expect(waitingOptions).toEqual(["Sin iniciar", "En progreso", "Bloqueada"]);
+
+    const inProgressOptions = within(screen.getByTestId("status-menu-2"))
+      .getAllByRole("menuitem")
+      .map((el) => el.textContent);
+    expect(inProgressOptions).toEqual(["Sin iniciar", "En espera", "Pausada", "Bloqueada"]);
+  });
+
+  it("does not let a completed task change its status inline", () => {
+    mockRows = [{ ...baseRow, status: "completed" }];
+    render(<TasksCommandCenterClient userRole={UserRole.ADMIN} />);
+
+    expect(screen.queryByTestId("status-menu-1")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Cambiar estado/ })).not.toBeInTheDocument();
+  });
+
+  it("shows a row options menu with status, collaborator, deliverable and project actions", () => {
+    mockRows = [{ ...baseRow, status: "completed" }];
+    render(<TasksCommandCenterClient userRole={UserRole.ADMIN} />);
+
+    expect(screen.getByRole("button", { name: "Opciones de la tarea Tarea demo" })).toBeInTheDocument();
+    const menu = within(screen.getByTestId("row-actions-1"));
+    expect(menu.getByRole("menuitem", { name: "Cambiar colaborador" })).toBeInTheDocument();
+    expect(menu.getByRole("menuitem", { name: "Ver entregable" })).toBeInTheDocument();
+    expect(menu.getByRole("menuitem", { name: "Ir al proyecto" })).toBeInTheDocument();
+    // Completed: no status submenu
+    expect(menu.queryByText("Cambiar estado")).not.toBeInTheDocument();
+  });
+
+  it("the options menu changes the status through its submenu", () => {
+    mockRows = [{ ...baseRow, status: "waiting" }];
+    mockPatch.mockResolvedValue({ ok: true, data: {} });
+    render(<TasksCommandCenterClient userRole={UserRole.ADMIN} />);
+
+    const menu = within(screen.getByTestId("row-actions-1"));
+    expect(menu.getByText("Cambiar estado")).toBeInTheDocument();
+    fireEvent.click(menu.getByRole("menuitem", { name: "Sin iniciar" }));
+
+    expect(mockPatch).toHaveBeenCalledWith("projects/10/tasks/1", { status: "not_started" });
+  });
+
+  it("marks the editable columns for roles that can edit", () => {
+    render(<TasksCommandCenterClient userRole={UserRole.ADMIN} />);
+
+    expect(screen.getAllByTitle("Campo editable: haz clic en el valor para cambiarlo")).toHaveLength(2);
+    expect(screen.getByRole("button", { name: "Cambiar responsable" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Cambiar estado (Sin iniciar)" })).toBeInTheDocument();
+  });
+
+  it("shows no edit indicators nor edit actions for a comercial", () => {
+    render(<TasksCommandCenterClient userRole={UserRole.COMERCIAL} />);
+
+    expect(screen.queryAllByTitle("Campo editable: haz clic en el valor para cambiarlo")).toHaveLength(0);
+    expect(screen.queryByRole("button", { name: "Cambiar responsable" })).not.toBeInTheDocument();
+    expect(screen.queryByTestId("status-menu-1")).not.toBeInTheDocument();
+    const menu = within(screen.getByTestId("row-actions-1"));
+    expect(menu.queryByRole("menuitem", { name: "Cambiar colaborador" })).not.toBeInTheDocument();
+    expect(menu.getByRole("menuitem", { name: "Ir al proyecto" })).toBeInTheDocument();
   });
 
   it.each(["areas-with-internals", "assignable-users"])(

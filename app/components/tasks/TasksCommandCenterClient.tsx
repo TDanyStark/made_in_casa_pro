@@ -6,7 +6,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import { Eye, UserPenIcon } from "lucide-react";
+import { ChevronDown, Eye, FolderOpen, MoreHorizontal, Pencil, RefreshCw, UserPenIcon } from "lucide-react";
 import { get, patch } from "@/lib/services/apiService";
 import {
   ApiResponseWithPagination,
@@ -45,6 +45,17 @@ import {
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import Pagination from "@/components/pagination/Pagination";
 import { toast } from "sonner";
 import {
@@ -89,6 +100,36 @@ const STATUS_OPTIONS: ProjectTaskStatus[] = [
   "completed",
   "blocked",
 ];
+
+const EDITABLE_FIELD_HINT = "Campo editable: haz clic en el valor para cambiarlo";
+
+/**
+ * Statuses a task can be moved to from the table. Mirrors the project task
+ * edit form and the PATCH rules: never "completed" (it needs the completion
+ * flow), "paused" only from "in_progress", and a completed task stays put.
+ */
+function statusTargetsFor(current: ProjectTaskStatus): ProjectTaskStatus[] {
+  if (current === "completed") return [];
+  return STATUS_OPTIONS.filter(
+    (target) =>
+      target !== current &&
+      target !== "completed" &&
+      (target !== "paused" || current === "in_progress")
+  );
+}
+
+function EditableHeader({ label, editable }: { label: string; editable: boolean }) {
+  if (!editable) return <>{label}</>;
+  return (
+    <span className="inline-flex items-center gap-1">
+      {label}
+      <span title={EDITABLE_FIELD_HINT} className="inline-flex text-primary">
+        <Pencil className="size-3" aria-hidden="true" />
+        <span className="sr-only">(editable)</span>
+      </span>
+    </span>
+  );
+}
 
 function toStartOfDayIso(value: string) {
   return new Date(`${value}T00:00:00.000Z`).toISOString();
@@ -259,6 +300,32 @@ export function TasksCommandCenterClient({ userRole }: TasksCommandCenterClientP
       toast.error(err.message || "Error al actualizar la tarea");
     },
   });
+
+  const updateStatusMutation = useMutation({
+    mutationFn: async ({ task, status }: { task: TaskCommandCenterRow; status: ProjectTaskStatus }) => {
+      const res = await patch(`projects/${task.project_id}/tasks/${task.id}`, { status });
+      if (!res.ok) throw new Error(res.error || "Error al cambiar el estado");
+      return res.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["tasks-command-center"] });
+      toast.success("Estado actualizado");
+    },
+    onError: (err: Error) => {
+      toast.error(err.message || "Error al cambiar el estado");
+    },
+  });
+
+  const renderStatusItems = (task: TaskCommandCenterRow) =>
+    statusTargetsFor(task.status).map((target) => (
+      <DropdownMenuItem
+        key={target}
+        disabled={updateStatusMutation.isPending}
+        onSelect={() => updateStatusMutation.mutate({ task, status: target })}
+      >
+        <TaskStatusBadge status={target} />
+      </DropdownMenuItem>
+    ));
 
   const rows = data?.data || [];
   const currentPage = data?.currentPage || 1;
@@ -498,14 +565,21 @@ export function TasksCommandCenterClient({ userRole }: TasksCommandCenterClientP
               <TableHead>Tarea</TableHead>
               <TableHead>Proyecto</TableHead>
               <TableHead>Producto</TableHead>
-              <TableHead>Asignado</TableHead>
+              <TableHead>
+                <EditableHeader label="Asignado" editable={canEditAssignee} />
+              </TableHead>
               <TableHead>Bandera</TableHead>
               <TableHead>Tipo</TableHead>
-              <TableHead>Estado</TableHead>
+              <TableHead>
+                <EditableHeader label="Estado" editable={canEditAssignee} />
+              </TableHead>
               <TableHead>Versión</TableHead>
               <TableHead>Asignada</TableHead>
               <TableHead>Completada</TableHead>
               <TableHead className="text-right">Entregable</TableHead>
+              <TableHead className="w-10">
+                <span className="sr-only">Acciones</span>
+              </TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -523,17 +597,18 @@ export function TasksCommandCenterClient({ userRole }: TasksCommandCenterClientP
                   <TableCell><Skeleton className="h-6 w-24" /></TableCell>
                   <TableCell><Skeleton className="h-6 w-24" /></TableCell>
                   <TableCell><Skeleton className="h-6 w-8 ml-auto" /></TableCell>
+                  <TableCell><Skeleton className="h-6 w-6" /></TableCell>
                 </TableRow>
               ))
             ) : isError ? (
               <TableRow>
-                <TableCell colSpan={11} className="text-center text-destructive h-20">
+                <TableCell colSpan={12} className="text-center text-destructive h-20">
                   Error al cargar tareas.
                 </TableCell>
               </TableRow>
             ) : rows.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={11} className="text-center text-muted-foreground h-20">
+                <TableCell colSpan={12} className="text-center text-muted-foreground h-20">
                   No se encontraron tareas con los filtros seleccionados.
                 </TableCell>
               </TableRow>
@@ -558,13 +633,15 @@ export function TasksCommandCenterClient({ userRole }: TasksCommandCenterClientP
                       >
                         <PopoverTrigger asChild>
                           <button
+                            type="button"
                             className="flex items-center gap-1.5 text-left hover:text-primary transition-colors group"
                             aria-label="Cambiar responsable"
+                            title="Cambiar responsable"
                           >
-                            <span className="text-sm">
+                            <span className="text-sm underline decoration-dashed decoration-muted-foreground/50 underline-offset-4 group-hover:decoration-primary">
                               {task.assigned_user_name || "Sin asignar"}
                             </span>
-                            <UserPenIcon className="size-3.5 shrink-0 opacity-0 group-hover:opacity-60 transition-opacity" />
+                            <UserPenIcon className="size-3.5 shrink-0 opacity-50 group-hover:opacity-100 transition-opacity" />
                           </button>
                         </PopoverTrigger>
                         <PopoverContent
@@ -642,7 +719,30 @@ export function TasksCommandCenterClient({ userRole }: TasksCommandCenterClientP
                     </Badge>
                   </TableCell>
                   <TableCell>
-                    <TaskStatusBadge status={task.status} />
+                    {canEditAssignee && statusTargetsFor(task.status).length > 0 ? (
+                      <div data-testid={`status-menu-${task.id}`}>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <button
+                              type="button"
+                              className="group inline-flex items-center gap-1 rounded-full outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                              aria-label={`Cambiar estado (${STATUS_LABELS[task.status]})`}
+                              title="Cambiar estado"
+                              disabled={updateStatusMutation.isPending}
+                            >
+                              <TaskStatusBadge status={task.status} className="cursor-pointer group-hover:brightness-110" />
+                              <ChevronDown className="size-3.5 shrink-0 opacity-50 group-hover:opacity-100 transition-opacity" />
+                            </button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="start">
+                            <DropdownMenuLabel>Cambiar estado</DropdownMenuLabel>
+                            {renderStatusItems(task)}
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
+                    ) : (
+                      <TaskStatusBadge status={task.status} />
+                    )}
                   </TableCell>
                   <TableCell>
                     {task.version_number != null ? (
@@ -677,6 +777,53 @@ export function TasksCommandCenterClient({ userRole }: TasksCommandCenterClientP
                     ) : (
                       <span className="text-muted-foreground text-xs">—</span>
                     )}
+                  </TableCell>
+                  <TableCell>
+                    <div data-testid={`row-actions-${task.id}`}>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-muted-foreground"
+                            aria-label={`Opciones de la tarea ${task.title}`}
+                          >
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        {/* Keep focus where the chosen action puts it (e.g. the assignee popover). */}
+                        <DropdownMenuContent align="end" onCloseAutoFocus={(e) => e.preventDefault()}>
+                          {canEditAssignee && statusTargetsFor(task.status).length > 0 && (
+                            <DropdownMenuSub>
+                              <DropdownMenuSubTrigger>
+                                <RefreshCw className="size-4" />
+                                Cambiar estado
+                              </DropdownMenuSubTrigger>
+                              <DropdownMenuSubContent>{renderStatusItems(task)}</DropdownMenuSubContent>
+                            </DropdownMenuSub>
+                          )}
+                          {canEditAssignee && (
+                            <DropdownMenuItem onSelect={() => openEditPopover(task)}>
+                              <UserPenIcon className="size-4" />
+                              Cambiar colaborador
+                            </DropdownMenuItem>
+                          )}
+                          {task.status === "completed" && (
+                            <DropdownMenuItem onSelect={() => openDeliverableDialog(task)}>
+                              <Eye className="size-4" />
+                              Ver entregable
+                            </DropdownMenuItem>
+                          )}
+                          {(canEditAssignee || task.status === "completed") && <DropdownMenuSeparator />}
+                          <DropdownMenuItem asChild>
+                            <Link href={`/projects/${task.project_id}`}>
+                              <FolderOpen className="size-4" />
+                              Ir al proyecto
+                            </Link>
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
                   </TableCell>
                 </TableRow>
               ))
