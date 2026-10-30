@@ -1,6 +1,6 @@
 import { House, Folder, LayoutList, BookUser, LibraryBig, Users, Settings, CheckSquare, Receipt } from 'lucide-react';
 import { LinksType, UserRole } from './definitions';
-import { ADMIN_ONLY_ROLES, OPERATIONS_ROLES, PROJECT_EDIT_ROLES, PROJECT_VIEW_ROLES } from './role-groups';
+import { ADMIN_ONLY_ROLES, OPERATIONS_ROLES, PROJECT_CREATOR_ROLES, PROJECT_EDIT_ROLES, PROJECT_VIEW_ROLES } from './role-groups';
 
 export type NavSubLink = {
   name: string;
@@ -127,7 +127,7 @@ export const linksNotVisible: LinksType[] = [
   },
   {
     route: '/projects/create',
-    roles: PROJECT_EDIT_ROLES
+    roles: PROJECT_CREATOR_ROLES
   },
   {
     route: '/projects/[id]/edit',

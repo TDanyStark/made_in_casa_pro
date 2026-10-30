@@ -6,7 +6,7 @@ import { createProject, getProjectsWithPagination } from "@/lib/queries/projects
 import { parsePagination } from "@/lib/utils/pagination";
 import { decrypt } from "@/lib/session";
 import { cookies } from "next/headers";
-import { PROJECT_EDIT_ROLES, PROJECT_VIEW_ROLES } from "@/lib/role-groups";
+import { PROJECT_CREATOR_ROLES, PROJECT_VIEW_ROLES } from "@/lib/role-groups";
 import { UserRole } from "@/lib/definitions";
 import {
   isSupportedProjectDateTime,
@@ -107,7 +107,7 @@ export async function POST(request: NextRequest) {
   const methodValidation = validateHttpMethod(request, ["POST"]);
   if (!methodValidation.isValidMethod) return methodValidation.response;
 
-  const roleValidation = await validateApiRole(request, PROJECT_EDIT_ROLES);
+  const roleValidation = await validateApiRole(request, PROJECT_CREATOR_ROLES);
   if (!roleValidation.isAuthorized) return roleValidation.response;
 
   try {

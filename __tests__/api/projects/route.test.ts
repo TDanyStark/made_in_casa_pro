@@ -63,6 +63,36 @@ describe('POST /api/projects', () => {
     mockSyncProjectDriveAccess.mockResolvedValue(null);
   });
 
+  it('only lets comercial, directivo and admin create projects', async () => {
+    mockCreateProject.mockResolvedValue({ id: 1 } as never);
+    const req = new NextRequest('http://localhost/api/projects', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title: 'Proyecto', brand_id: 2, manager_id: 3 }),
+    });
+    await callPost(req);
+    expect(mockValidateApiRole).toHaveBeenCalledWith(req, [
+      UserRole.COMERCIAL,
+      UserRole.DIRECTIVO,
+      UserRole.ADMIN,
+    ]);
+  });
+
+  it('rejects a role without create permission and does not create', async () => {
+    const { NextResponse } = jest.requireActual('next/server');
+    mockValidateApiRole.mockResolvedValue({
+      isAuthorized: false,
+      response: NextResponse.json({ error: 'No autorizado' }, { status: 403 }),
+    } as never);
+    const res = await callPost(new NextRequest('http://localhost/api/projects', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title: 'Proyecto', brand_id: 2, manager_id: 3 }),
+    }));
+    expect(res.status).toBe(403);
+    expect(mockCreateProject).not.toHaveBeenCalled();
+  });
+
   it('accepts the full metadata payload and normalizes datetimes', async () => {
     mockCreateProject.mockResolvedValue({ id: 1 } as never);
 

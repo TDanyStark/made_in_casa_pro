@@ -7,6 +7,7 @@ import {
   PROJECT_EDIT_ROLES,
   PROJECT_VIEW_ROLES,
   PROJECT_CREATOR_VIEW_ROLES,
+  PROJECT_CREATOR_ROLES,
   TASK_OVERRIDE_ROLES,
   TASK_COST_EDIT_ROLES,
   hasAnyRole,
@@ -21,6 +22,10 @@ describe('role-groups', () => {
       UserRole.COMERCIAL,
       UserRole.COLABORADOR,
     ]);
+  });
+
+  it('lets only comercial, directivo and admin create projects', () => {
+    expect(PROJECT_CREATOR_ROLES).toEqual([UserRole.COMERCIAL, UserRole.DIRECTIVO, UserRole.ADMIN]);
   });
 
   it('reuses operations roles for project editing', () => {
