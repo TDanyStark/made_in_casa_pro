@@ -6,7 +6,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import { ChevronDown, Eye, FolderOpen, MoreHorizontal, Pencil, RefreshCw, UserPenIcon } from "lucide-react";
+import { ChevronDown, Eye, FolderOpen, Info, MoreHorizontal, Pencil, RefreshCw, UserPenIcon } from "lucide-react";
 import { get, patch } from "@/lib/services/apiService";
 import {
   ApiResponseWithPagination,
@@ -65,6 +65,7 @@ import {
   TASK_STATUS_DOT,
 } from "./TaskStatusBadge";
 import { TaskDeliverableDialog } from "./TaskDeliverableDialog";
+import { UserPickerCombobox, isCollaborator, useAssignableCollaborators } from "./UserPickerCombobox";
 
 const STATUS_LABELS = TASK_STATUS_LABELS;
 const STATUS_STYLES = TASK_STATUS_STYLES;
@@ -100,6 +101,9 @@ const STATUS_OPTIONS: ProjectTaskStatus[] = [
   "completed",
   "blocked",
 ];
+
+const FLAG_HINT =
+  "Nueva: trabajo original del proyecto. Corrección: se crea al rechazar una validación, para rehacer la tarea. Ajuste: cambio de alcance.";
 
 const EDITABLE_FIELD_HINT = "Campo editable: haz clic en el valor para cambiarlo";
 
@@ -267,6 +271,9 @@ export function TasksCommandCenterClient({ userRole }: TasksCommandCenterClientP
     },
   });
 
+  // Area-grouped list with internal/external, for the assignee editor.
+  const { data: collaborators = [], isError: collaboratorsError } = useAssignableCollaborators(canEditAssignee);
+
   const creatorUsers = useMemo(
     () =>
         assignableUsers.filter((user) => CREATOR_FILTER_ROLES.includes(user.rol_id)),
@@ -340,10 +347,10 @@ export function TasksCommandCenterClient({ userRole }: TasksCommandCenterClientP
 
   const selectedTask = rows.find((r) => r.id === editingTaskId) ?? null;
   const pendingUser = pendingUserId !== "none"
-    ? assignableUsers.find((u) => String(u.id) === pendingUserId)
+    ? collaborators.find((u) => String(u.id) === pendingUserId)
     : undefined;
-  // is_internal puede llegar como boolean, 0/1 o null según la capa de datos
-  const isExternalUser = pendingUser !== undefined && !pendingUser.is_internal;
+  // Only an external collaborator can be asked for a quote.
+  const isExternalUser = pendingUser !== undefined && isCollaborator(pendingUser) && Number(pendingUser.is_internal) !== 1;
 
   return (
     <div className="space-y-4">
@@ -559,25 +566,33 @@ export function TasksCommandCenterClient({ userRole }: TasksCommandCenterClientP
       </div>
 
       <div className="rounded-md border bg-card">
-        <Table>
+        <Table className="[&_td]:px-3 [&_td]:py-3 [&_th]:px-3">
           <TableHeader>
             <TableRow>
-              <TableHead>Tarea</TableHead>
-              <TableHead>Proyecto</TableHead>
-              <TableHead>Producto</TableHead>
-              <TableHead>
+              <TableHead className="min-w-[220px]">Tarea</TableHead>
+              <TableHead className="min-w-[200px]">Proyecto</TableHead>
+              <TableHead className="min-w-[150px]">Producto</TableHead>
+              <TableHead className="min-w-[180px]">
                 <EditableHeader label="Asignado" editable={canEditAssignee} />
               </TableHead>
-              <TableHead>Bandera</TableHead>
-              <TableHead>Tipo</TableHead>
               <TableHead>
+                <span className="inline-flex items-center gap-1">
+                  Bandera
+                  <span title={FLAG_HINT} className="inline-flex cursor-help">
+                    <Info className="size-3.5" aria-hidden="true" />
+                    <span className="sr-only">{FLAG_HINT}</span>
+                  </span>
+                </span>
+              </TableHead>
+              <TableHead>Tipo</TableHead>
+              <TableHead className="min-w-[150px]">
                 <EditableHeader label="Estado" editable={canEditAssignee} />
               </TableHead>
               <TableHead>Versión</TableHead>
-              <TableHead>Asignada</TableHead>
-              <TableHead>Completada</TableHead>
-              <TableHead className="text-right">Entregable</TableHead>
-              <TableHead className="w-10">
+              <TableHead className="whitespace-nowrap">Asignada</TableHead>
+              <TableHead className="whitespace-nowrap">Completada</TableHead>
+              <TableHead className="text-center">Entregable</TableHead>
+              <TableHead className="sticky right-0 z-10 w-12 bg-card shadow-[-8px_0_8px_-8px_rgba(0,0,0,0.35)]">
                 <span className="sr-only">Acciones</span>
               </TableHead>
             </TableRow>
@@ -597,7 +612,7 @@ export function TasksCommandCenterClient({ userRole }: TasksCommandCenterClientP
                   <TableCell><Skeleton className="h-6 w-24" /></TableCell>
                   <TableCell><Skeleton className="h-6 w-24" /></TableCell>
                   <TableCell><Skeleton className="h-6 w-8 ml-auto" /></TableCell>
-                  <TableCell><Skeleton className="h-6 w-6" /></TableCell>
+                  <TableCell className="sticky right-0 z-10 bg-card"><Skeleton className="h-6 w-6" /></TableCell>
                 </TableRow>
               ))
             ) : isError ? (
@@ -638,34 +653,28 @@ export function TasksCommandCenterClient({ userRole }: TasksCommandCenterClientP
                             aria-label="Cambiar responsable"
                             title="Cambiar responsable"
                           >
-                            <span className="text-sm underline decoration-dashed decoration-muted-foreground/50 underline-offset-4 group-hover:decoration-primary">
+                            <span className="whitespace-nowrap text-sm underline decoration-dashed decoration-muted-foreground/50 underline-offset-4 group-hover:decoration-primary">
                               {task.assigned_user_name || "Sin asignar"}
                             </span>
                             <UserPenIcon className="size-3.5 shrink-0 opacity-50 group-hover:opacity-100 transition-opacity" />
                           </button>
                         </PopoverTrigger>
                         <PopoverContent
-                          className="w-72 p-4 space-y-4"
+                          className="w-80 p-4 space-y-4"
                           align="start"
                           onInteractOutside={(e) => e.preventDefault()}
                           onEscapeKeyDown={() => setEditingTaskId(null)}
                         >
                           <p className="text-sm font-medium leading-none">Cambiar responsable</p>
-                          <SearchableSelect
-                            value={editingTaskId === task.id ? pendingUserId : (task.assigned_user_id ? String(task.assigned_user_id) : "none")}
-                            onValueChange={setPendingUserId}
-                            options={[
-                              { value: "none", label: "Sin asignar" },
-                              ...assignableUsers.map((u) => ({
-                                value: String(u.id),
-                                label: u.name,
-                                badge: u.pending_tasks_count ?? null,
-                              })),
-                            ]}
-                            placeholder="Seleccionar usuario"
-                            searchPlaceholder="Buscar usuario..."
-                            emptyMessage={usersError ? "Error al cargar los usuarios." : "Sin usuarios."}
+                          <UserPickerCombobox
+                            users={collaborators}
+                            value={pendingUserId === "none" ? null : Number(pendingUserId)}
+                            onChange={(id) => setPendingUserId(id === null ? "none" : String(id))}
+                            allowUnassigned
                           />
+                          {collaboratorsError && (
+                            <p className="text-xs text-destructive">Error al cargar las personas</p>
+                          )}
                           {isExternalUser && (
                             <div className="flex items-center justify-between gap-2">
                               <Label htmlFor={`requires-quote-${task.id}`} className="text-sm">
@@ -705,7 +714,7 @@ export function TasksCommandCenterClient({ userRole }: TasksCommandCenterClientP
                         </PopoverContent>
                       </Popover>
                     ) : (
-                      <span className="text-sm">{task.assigned_user_name || "Sin asignar"}</span>
+                      <span className="whitespace-nowrap text-sm">{task.assigned_user_name || "Sin asignar"}</span>
                     )}
                   </TableCell>
                   <TableCell>
@@ -753,17 +762,17 @@ export function TasksCommandCenterClient({ userRole }: TasksCommandCenterClientP
                       <span className="text-muted-foreground text-xs">—</span>
                     )}
                   </TableCell>
-                  <TableCell>
+                  <TableCell className="whitespace-nowrap">
                     {task.assigned_at
                       ? format(new Date(task.assigned_at), "d MMM yyyy, HH:mm", { locale: es })
                       : "—"}
                   </TableCell>
-                  <TableCell>
+                  <TableCell className="whitespace-nowrap">
                     {task.completed_at
                       ? format(new Date(task.completed_at), "d MMM yyyy, HH:mm", { locale: es })
                       : "—"}
                   </TableCell>
-                  <TableCell className="text-right">
+                  <TableCell className="text-center">
                     {task.status === "completed" ? (
                       <Button
                         variant="ghost"
@@ -778,7 +787,7 @@ export function TasksCommandCenterClient({ userRole }: TasksCommandCenterClientP
                       <span className="text-muted-foreground text-xs">—</span>
                     )}
                   </TableCell>
-                  <TableCell>
+                  <TableCell className="sticky right-0 z-10 bg-card shadow-[-8px_0_8px_-8px_rgba(0,0,0,0.35)]">
                     <div data-testid={`row-actions-${task.id}`}>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>

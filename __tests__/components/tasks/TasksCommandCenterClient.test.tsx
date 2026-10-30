@@ -24,6 +24,10 @@ const baseRow = {
   completed_at: null,
 };
 let mockRows: Array<Record<string, unknown>> = [baseRow];
+const mockCollaborators = [
+  { id: 20, name: "Interna Diseño", rol_id: 4, is_internal: 1, area_name: "Diseño", active_task_count: 2 },
+  { id: 21, name: "Externa Escritura", rol_id: 4, is_internal: 0, area_name: "Escritura", active_task_count: 0 },
+];
 
 jest.mock("lucide-react", () => new Proxy({}, {
   get: (_, iconName: string) => {
@@ -153,6 +157,28 @@ jest.mock("@/components/ui/searchable-select", () => ({
   ),
 }));
 
+jest.mock("@/components/tasks/UserPickerCombobox", () => ({
+  isCollaborator: (u: { rol_id: number }) => u.rol_id === 4,
+  useAssignableCollaborators: () => ({ data: mockCollaborators, isError: false }),
+  UserPickerCombobox: ({
+    users,
+    value,
+    allowUnassigned,
+    onChange,
+  }: {
+    users: Array<{ id: number; name: string }>;
+    value: number | null;
+    allowUnassigned?: boolean;
+    onChange: (id: number | null) => void;
+  }) => (
+    <div data-testid="user-picker" data-value={String(value)} data-allow-unassigned={String(Boolean(allowUnassigned))}>
+      {users.map((u) => (
+        <button key={u.id} onClick={() => onChange(u.id)}>{`pick ${u.name}`}</button>
+      ))}
+    </div>
+  ),
+}));
+
 jest.mock("sonner", () => ({
   toast: { success: jest.fn(), error: jest.fn() },
 }));
@@ -193,9 +219,11 @@ jest.mock("@/components/ui/table", () => ({
   TableHeader: ({ children }: { children: React.ReactNode }) => <thead>{children}</thead>,
   TableBody: ({ children }: { children: React.ReactNode }) => <tbody>{children}</tbody>,
   TableRow: ({ children }: { children: React.ReactNode }) => <tr>{children}</tr>,
-  TableHead: ({ children }: { children?: React.ReactNode }) => <th>{children}</th>,
-  TableCell: ({ children, colSpan }: { children: React.ReactNode; colSpan?: number }) => (
-    <td colSpan={colSpan}>{children}</td>
+  TableHead: ({ children, className }: { children?: React.ReactNode; className?: string }) => (
+    <th className={className}>{children}</th>
+  ),
+  TableCell: ({ children, colSpan, className }: { children: React.ReactNode; colSpan?: number; className?: string }) => (
+    <td colSpan={colSpan} className={className}>{children}</td>
   ),
 }));
 
@@ -413,6 +441,46 @@ describe("TasksCommandCenterClient", () => {
     const menu = within(screen.getByTestId("row-actions-1"));
     expect(menu.queryByRole("menuitem", { name: "Cambiar colaborador" })).not.toBeInTheDocument();
     expect(menu.getByRole("menuitem", { name: "Ir al proyecto" })).toBeInTheDocument();
+  });
+
+  // The assignee editor reuses the area-grouped picker (internal/external + area).
+  it("edits the assignee with the area-grouped picker and saves the chosen person", async () => {
+    mockPatch.mockResolvedValue({ ok: true, data: {} });
+    render(<TasksCommandCenterClient userRole={UserRole.ADMIN} />);
+    fireEvent.click(within(screen.getByTestId("row-actions-1")).getByRole("menuitem", { name: "Cambiar colaborador" }));
+
+    const picker = screen.getByTestId("user-picker");
+    expect(picker).toHaveAttribute("data-allow-unassigned", "true");
+    fireEvent.click(within(picker).getByRole("button", { name: "pick Interna Diseño" }));
+    fireEvent.click(screen.getByRole("button", { name: "Guardar" }));
+
+    expect(mockPatch).toHaveBeenCalledWith("projects/10/tasks/1", { requires_quote: 0, assigned_user_id: 20 });
+  });
+
+  it("asks for a quote only when the chosen person is an external collaborator", () => {
+    render(<TasksCommandCenterClient userRole={UserRole.ADMIN} />);
+    expect(screen.queryByText("Requiere cotización")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "pick Externa Escritura" }));
+    expect(screen.getByText("Requiere cotización")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "pick Interna Diseño" }));
+    expect(screen.queryByText("Requiere cotización")).not.toBeInTheDocument();
+  });
+
+  it("explains what the flag column means", () => {
+    render(<TasksCommandCenterClient userRole={UserRole.ADMIN} />);
+
+    expect(
+      screen.getByTitle(/Nueva: trabajo original del proyecto\. Corrección: se crea al rechazar una validación/)
+    ).toBeInTheDocument();
+  });
+
+  it("pins the options column to the right while the rest of the table scrolls", () => {
+    render(<TasksCommandCenterClient userRole={UserRole.ADMIN} />);
+
+    expect(screen.getByTestId("row-actions-1").closest("td")).toHaveClass("sticky", "right-0");
+    expect(screen.getByText("Acciones").closest("th")).toHaveClass("sticky", "right-0");
   });
 
   it.each(["areas-with-internals", "assignable-users"])(
