@@ -41,3 +41,11 @@ export function formatDHM(totalMinutes: number | null | undefined): string {
   
   return parts.length > 0 ? parts.join(" ") : "0m";
 }
+
+/** Worked time as hours, never days ("3 h 30 min"). */
+export function formatHours(totalMinutes: number) {
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = Math.round(totalMinutes % 60);
+  if (minutes === 0) return `${hours} h`;
+  return hours === 0 ? `${minutes} min` : `${hours} h ${minutes} min`;
+}

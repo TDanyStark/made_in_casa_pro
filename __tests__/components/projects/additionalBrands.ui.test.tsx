@@ -187,4 +187,55 @@ describe("wizard", () => {
     await waitFor(() => expect(onNext).toHaveBeenCalled());
     expect(onNext.mock.calls[0][0]).toMatchObject({ brand_id: 2, client_id: 3, additional_brands: [{ id: 5, name: "B" }] });
   });
+
+  // Spec: odd/tasks/project-metrics-tab.md — S4: optional sale price at creation.
+  const brandResponse = async (url: string) =>
+    url === "brands/2"
+      ? { ok: true, data: { id: 2, name: "A", manager_id: 7, client_id: 3, client_info: { id: 3, name: "Cliente" }, manager: { id: 7, name: "Ana", email: "a@x.co", client_id: 3 } } }
+      : { ok: true, data: { data: [] } };
+
+  it("WizardStep1Basics marks the empty sale price in red but lets the user continue", async () => {
+    mockGet.mockImplementation(brandResponse);
+    const onNext = jest.fn();
+    const user = userEvent.setup();
+    withClient(<WizardStep1Basics state={{ ...wizardState, sale_price: "" }} onNext={onNext} />);
+
+    const input = screen.getByLabelText("Precio de venta");
+    expect(input).toHaveClass("border-destructive");
+    expect(screen.getByText("Sin precio de venta: anótalo cuando lo tengas.")).toBeInTheDocument();
+    await waitFor(() => expect(mockSelectProps).toBeDefined());
+    await user.click(screen.getByRole("button", { name: "Siguiente" }));
+
+    await waitFor(() => expect(onNext).toHaveBeenCalled());
+    expect(onNext.mock.calls[0][0]).toMatchObject({ sale_price: "" });
+  });
+
+  it("WizardStep1Basics sends the typed sale price", async () => {
+    mockGet.mockImplementation(brandResponse);
+    const onNext = jest.fn();
+    const user = userEvent.setup();
+    withClient(<WizardStep1Basics state={{ ...wizardState, sale_price: "" }} onNext={onNext} />);
+
+    await user.type(screen.getByLabelText("Precio de venta"), "2.500.000");
+    expect(screen.getByLabelText("Precio de venta")).not.toHaveClass("border-destructive");
+    await waitFor(() => expect(mockSelectProps).toBeDefined());
+    await user.click(screen.getByRole("button", { name: "Siguiente" }));
+
+    await waitFor(() => expect(onNext).toHaveBeenCalled());
+    expect(onNext.mock.calls[0][0]).toMatchObject({ sale_price: "2.500.000" });
+  });
+
+  it("WizardStep1Basics rejects a sale price that is not a number", async () => {
+    mockGet.mockImplementation(brandResponse);
+    const onNext = jest.fn();
+    const user = userEvent.setup();
+    withClient(<WizardStep1Basics state={{ ...wizardState, sale_price: "" }} onNext={onNext} />);
+
+    await user.type(screen.getByLabelText("Precio de venta"), "abc");
+    await waitFor(() => expect(mockSelectProps).toBeDefined());
+    await user.click(screen.getByRole("button", { name: "Siguiente" }));
+
+    expect(await screen.findByText("Ingresa un precio válido en pesos (solo números)")).toBeInTheDocument();
+    expect(onNext).not.toHaveBeenCalled();
+  });
 });

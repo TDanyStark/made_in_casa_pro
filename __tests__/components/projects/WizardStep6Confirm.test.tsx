@@ -54,6 +54,7 @@ const baseState = {
   ideal_delivery_at: '2026-04-07T09:30',
   oc: '  OC-123  ',
   billing_closed_at: '2026-04-08T18:45',
+  sale_price: '',
   client_id: 9,
   client_name: 'Cliente Uno',
   created_by: 4,
@@ -352,5 +353,24 @@ describe('WizardStep6Confirm — task notifications', () => {
     });
     // Drive keeps using the principal brand (S4)
     expect(mockPost).toHaveBeenNthCalledWith(1, 'drive/create-folder', expect.objectContaining({ brandName: 'Marca Uno' }));
+  });
+
+  // Spec: odd/tasks/project-metrics-tab.md — S4.
+  it.each([
+    ['2.500.000', 2500000],
+    ['', null],
+  ])('sends the sale price %j as %j', async (typed, expected) => {
+    mockPost
+      .mockResolvedValueOnce({ ok: true, data: { projectFolderId: 'drive-1', projectFolderUrl: 'https://drive.test/folder' } })
+      .mockResolvedValueOnce({ ok: true, data: { id: 44 } })
+      .mockResolvedValueOnce({ ok: true, data: {} });
+    const user = userEvent.setup();
+
+    render(<WizardStep6Confirm state={{ ...baseState, sale_price: typed }} onBack={jest.fn()} />);
+    await user.click(screen.getByRole('button', { name: /crear proyecto/i }));
+
+    await waitFor(() => {
+      expect(mockPost).toHaveBeenCalledWith('projects', expect.objectContaining({ sale_price: expected }));
+    });
   });
 });

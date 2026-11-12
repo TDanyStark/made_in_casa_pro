@@ -40,6 +40,8 @@ export interface WizardState {
   ideal_delivery_at: string;
   oc: string;
   billing_closed_at: string;
+  /** En cuánto se vendió, tal como se escribió (opcional). */
+  sale_price: string;
   client_id: number | null;
   client_name: string;
   created_by: number | null;
@@ -81,6 +83,7 @@ const INITIAL_STATE: WizardState = {
   ideal_delivery_at: "",
   oc: "",
   billing_closed_at: "",
+  sale_price: "",
   client_id: null,
   client_name: "",
   created_by: null,

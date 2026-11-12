@@ -7,6 +7,8 @@ import { toast } from "sonner";
 import { Clock, List, Pencil, TrendingDown, TrendingUp, Wallet } from "lucide-react";
 import { Bar, BarChart, Cell, Pie, PieChart, XAxis, YAxis } from "recharts";
 import { get, patch } from "@/lib/services/apiService";
+import { formatMoney } from "@/lib/utils/format-money";
+import { formatHours } from "@/lib/utils/time";
 import type { ProjectFinancialsView } from "@/lib/queries/projectFinancials";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -32,21 +34,6 @@ interface Props {
 
 const ALL_VERSIONS = "all";
 
-const money = new Intl.NumberFormat("es-CO", {
-  style: "currency",
-  currency: "COP",
-  maximumFractionDigits: 0,
-});
-
-export const formatMoney = (value: number) => money.format(value);
-
-/** Worked time as hours, never days ("3 h 30 min"). */
-export function formatHours(totalMinutes: number) {
-  const hours = Math.floor(totalMinutes / 60);
-  const minutes = Math.round(totalMinutes % 60);
-  if (minutes === 0) return `${hours} h`;
-  return hours === 0 ? `${minutes} min` : `${hours} h ${minutes} min`;
-}
 
 const hoursChartConfig = {
   internal: { label: "Internos", color: "var(--chart-1)" },

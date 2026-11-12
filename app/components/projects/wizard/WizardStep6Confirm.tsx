@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { parseCopAmount } from "@/lib/utils/cop-amount";
 import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import { post, patch, get, del } from "@/lib/services/apiService";
@@ -117,6 +118,8 @@ export function WizardStep6Confirm({ state, onBack }: Props) {
         billing_closed_at: state.billing_closed_at
           ? normalizeProjectDateTime(state.billing_closed_at)
           : null,
+        // Validado en el paso 1; vacío significa "sin registrar".
+        sale_price: parseCopAmount(state.sale_price ?? "") ?? null,
       });
 
       if (!projectRes.ok || !projectRes.data) {
