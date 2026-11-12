@@ -348,6 +348,27 @@ administrativos ven en qué está trabajando en este momento. El resto queda en
   ya estaban en progreso no se modifican; la regla se aplica la próxima vez que el
   colaborador toma o reanuda una tarea.
 
+## Panel de trabajo de la tarea (Mis Tareas)
+
+En **Mis Tareas**, al hacer clic en una tarea o después de **Tomar tarea** se abre
+un panel lateral a la derecha (`TaskWorkSheet`) con todo lo necesario para
+trabajarla sin salir de la página:
+
+- **Izquierda**: la tarea, su descripción, la fecha de asignación y las notas del
+  proyecto y de la versión.
+- **Derecha**: tiempo y avance reportado, Drive, enlace al proyecto (se abre en
+  otra pestaña) y **Antes de ti**: las tareas ya completadas del proyecto. El
+  ojito de cada una muestra sus notas de entrega y el enlace **Abrir entregable**.
+- **Pie**: las acciones de la tarea (tomar, pausar, reportar, completar...).
+- En pantallas pequeñas todo queda en una sola columna.
+
+El título del proyecto en la tarjeta ya no es un enlace: el proyecto solo se abre
+desde el panel.
+
+| Acción | Endpoint | Efecto |
+|--------|----------|--------|
+| Cargar el panel | `GET /api/projects/[id]/tasks/[tid]/context` | Devuelve `drive_folder_url` (prefiere la carpeta de la versión y, si no hay, la del proyecto), `project_notes`, `version_notes`, `version_number` y `previous_tasks`. Misma regla de acceso que el historial de la tarea |
+
 ## Inversión y precio de venta del proyecto
 
 Detalle del proyecto:

@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>01 · Sheet con pestañas</title>
+<style>
+:root{--bg:hsl(0 0% 100%);--fg:hsl(240 10% 3.9%);--primary:hsl(240 5.9% 10%);--pfg:hsl(0 0% 98%);--muted:hsl(240 4.8% 95.9%);--mfg:hsl(240 3.8% 46.1%);--border:hsl(240 5.9% 90%);--ring:hsl(240 10% 3.9%);--purple:#322fbc;--radius:.6rem;--shadow:0 16px 48px rgba(17,24,39,.04),0 12px 24px rgba(17,24,39,.04),0 6px 8px rgba(17,24,39,.02),0 2px 3px rgba(17,24,39,.02)}
+*{box-sizing:border-box}html,body{margin:0;height:100%}
+body{font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;font-size:14px;color:var(--fg);background:var(--bg)}
+button,a{font:inherit;color:inherit}button{cursor:pointer}
+:focus-visible{outline:2px solid var(--ring);outline-offset:2px}
+.app{display:grid;grid-template-columns:240px 1fr;height:100vh}
+.side{border-right:1px solid var(--border);padding:20px 16px;background:var(--muted)}
+.side b{display:block;margin-bottom:20px}.side a{display:block;padding:8px 10px;border-radius:calc(var(--radius) - 2px);text-decoration:none;color:var(--mfg)}.side a[aria-current]{background:var(--bg);color:var(--fg);font-weight:600}
+main{padding:28px 32px;overflow:auto}h1{font-size:24px;margin:0 0 20px}
+.card{border:1px solid var(--border);border-radius:var(--radius);padding:16px 18px;margin-bottom:12px;display:flex;justify-content:space-between;gap:16px;cursor:pointer;background:var(--bg)}
+.card.sel{border-color:var(--primary);box-shadow:0 0 0 1px var(--primary)}
+.card h3{margin:0 0 4px;font-size:15px}.card p{margin:0;color:var(--mfg);font-size:13px}
+.pill{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:500;padding:2px 10px;border-radius:999px;border:1px solid;white-space:nowrap}
+.dot{width:7px;height:7px;border-radius:50%;background:currentColor}
+.s-prog{background:#eff6ff;color:#1d4ed8;border-color:#bfdbfe}.s-new{background:#f1f5f9;color:#334155;border-color:#cbd5e1}.s-done{background:#ecfdf5;color:#047857;border-color:#a7f3d0}.s-adj{background:#fffbeb;color:#b45309;border-color:#fde68a}.s-exec{background:#eff6ff;color:#1d4ed8;border-color:#bfdbfe}
+.btn{border:1px solid var(--border);background:var(--bg);border-radius:calc(var(--radius) - 2px);padding:8px 14px;font-weight:500;display:inline-flex;align-items:center;gap:8px;text-decoration:none}
+.btn.p{background:var(--primary);color:var(--pfg);border-color:var(--primary)}.btn.sm{padding:5px 10px;font-size:13px}
+.ghost{border:0;background:transparent;padding:6px;border-radius:6px;color:var(--mfg)}.ghost:hover{background:var(--muted);color:var(--fg)}
+svg{width:16px;height:16px;flex:none}
+.overlay{position:fixed;inset:0;background:rgba(9,9,11,.35)}
+.sheet{position:fixed;top:0;right:0;bottom:0;width:560px;background:var(--bg);box-shadow:-12px 0 48px rgba(17,24,39,.12);display:flex;flex-direction:column;animation:in .25s cubic-bezier(.46,.03,.52,.96)}
+@keyframes in{from{transform:translateX(24px);opacity:0}}
+@media (prefers-reduced-motion:reduce){.sheet{animation:none}}
+.sh-head{padding:20px 24px 0;border-bottom:1px solid var(--border)}
+.crumb{font-size:12px;color:var(--mfg);display:flex;gap:6px;align-items:center}
+.sh-head h2{font-size:20px;margin:6px 0 10px;line-height:1.3}
+.meta{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);border:1px solid var(--border);border-radius:var(--radius);margin-bottom:16px}
+.stats div{padding:10px 14px}.stats div+div{border-left:1px solid var(--border)}
+.stats small{display:block;color:var(--mfg);font-size:12px}.stats strong{font-size:16px}
+.bar{height:4px;background:var(--muted);border-radius:4px;margin-top:6px}.bar i{display:block;height:100%;width:60%;background:#1d4ed8;border-radius:4px}
+[role=tablist]{display:flex;gap:4px}
+[role=tab]{border:0;background:none;padding:10px 12px;color:var(--mfg);border-bottom:2px solid transparent;font-weight:500;display:flex;gap:6px;align-items:center}
+[role=tab][aria-selected=true]{color:var(--fg);border-color:var(--primary)}
+.count{font-size:11px;background:var(--muted);border-radius:999px;padding:0 7px}
+.sh-body{flex:1;overflow:auto;padding:20px 24px}
+.sec{margin-bottom:22px}.sec h4{font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--mfg);margin:0 0 8px}
+.desc{line-height:1.6;margin:0}
+.links{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.link{border:1px solid var(--border);border-radius:var(--radius);padding:12px;display:flex;gap:10px;align-items:center;text-decoration:none}
+.link:hover{background:var(--muted)}.link small{display:block;color:var(--mfg);font-size:12px}
+.ic{width:34px;height:34px;border-radius:8px;display:grid;place-items:center;background:var(--muted)}
+.note{background:var(--muted);border-radius:var(--radius);padding:14px 16px;line-height:1.6}.note p{margin:0 0 8px}.note ul{margin:0;padding-left:18px}
+.tl{list-style:none;margin:0;padding:0}.tl li{border:1px solid var(--border);border-radius:var(--radius);padding:12px 14px;margin-bottom:10px}
+.tl .row{display:flex;justify-content:space-between;align-items:center;gap:10px}.tl small{color:var(--mfg)}
+.reveal{margin-top:10px;padding-top:10px;border-top:1px dashed var(--border);line-height:1.55}
+.foot{border-top:1px solid var(--border);padding:14px 24px;display:flex;gap:8px;justify-content:space-between;align-items:center;background:var(--bg)}
+.foot .grow{display:flex;gap:8px}
+[hidden]{display:none!important}
+</style></head><body>
+<svg hidden><symbol id="drive" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3h8l6 10-4 7H6l-4-7z"/><path d="M8 3l6 10H2M16 3l-6 10 4 7"/></symbol>
+<symbol id="folder" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></symbol>
+<symbol id="eye" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></symbol>
+<symbol id="x" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></symbol>
+<symbol id="ext" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 3h6v6M10 14 21 3M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></symbol>
+<symbol id="pause" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></symbol>
+<symbol id="check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6 9 17l-5-5"/></symbol></svg>
+
+<div class="app" aria-hidden="true" inert>
+ <nav class="side"><b>Made in Casa</b><a href="#">Dashboard</a><a href="#">Proyectos</a><a href="#" aria-current="page">Mis Tareas</a></nav>
+ <main><h1>Mis Tareas</h1>
+  <article class="card sel"><div><h3>Carrusel Instagram — lanzamiento navideño</h3><p>Campaña Navidad 2026 · Café Altura · Asignada 10 nov, 09:15</p></div><span class="pill s-prog"><span class="dot"></span>En progreso</span></article>
+  <article class="card"><div><h3>Adaptar banners web a formato móvil</h3><p>Rediseño e-commerce · Dulce Hogar · Asignada 11 nov, 14:02</p></div><span class="pill s-new"><span class="dot"></span>Sin iniciar</span></article>
+  <article class="card"><div><h3>Video reel 15 s — receta de temporada</h3><p>Contenido orgánico Q4 · Café Altura · Asignada 6 nov, 10:40</p></div><span class="pill s-done"><span class="dot"></span>Completada</span></article>
+ </main>
+</div>
+
+<div class="overlay"></div>
+<aside class="sheet" role="dialog" aria-modal="true" aria-labelledby="t">
+ <header class="sh-head">
+  <div style="display:flex;justify-content:space-between;align-items:start">
+   <div class="crumb">Campaña Navidad 2026 <span aria-hidden="true">›</span> Café Altura · Café molido 500 g</div>
+   <button class="ghost" aria-label="Cerrar"><svg><use href="#x"/></svg></button>
+  </div>
+  <h2 id="t">Carrusel Instagram — lanzamiento navideño</h2>
+  <div class="meta"><span class="pill s-prog"><span class="dot"></span>En progreso</span><span class="pill s-exec">Ejecución</span><span class="pill s-adj">Ajuste · V2</span><span class="pill s-new">Diseño</span></div>
+  <div class="stats">
+   <div><small>Tiempo trabajado</small><strong>2 h 35 min</strong></div>
+   <div><small>Avance</small><strong>60%</strong><div class="bar"><i></i></div></div>
+   <div><small>Asignada</small><strong>10 nov</strong> <small style="display:inline">09:15</small></div>
+  </div>
+  <div role="tablist" aria-label="Detalle de la tarea">
+   <button role="tab" id="tab-1" aria-controls="p-1" aria-selected="true">Resumen</button>
+   <button role="tab" id="tab-2" aria-controls="p-2" aria-selected="false" tabindex="-1">Notas del proyecto</button>
+   <button role="tab" id="tab-3" aria-controls="p-3" aria-selected="false" tabindex="-1">Historial <span class="count">3</span></button>
+  </div>
+ </header>
+
+ <div class="sh-body">
+  <section role="tabpanel" id="p-1" aria-labelledby="tab-1">
+   <div class="sec"><h4>Qué hay que hacer</h4>
+    <p class="desc">Ajustar el carrusel de 5 piezas (1080×1350) según comentarios del cliente: cambiar el titular de la portada a “Navidad con aroma a origen”, usar la foto del empaque nuevo en la pieza 3 y cerrar con el CTA “Pídelo en cafealtura.co”.</p></div>
+   <div class="sec"><h4>Recursos</h4>
+    <div class="links">
+     <a class="link" href="#"><span class="ic" style="color:#1d4ed8"><svg><use href="#drive"/></svg></span><span><b>Carpeta de Drive</b><small>Versión 2 · fotos, logos y copy</small></span></a>
+     <a class="link" href="#"><span class="ic"><svg><use href="#folder"/></svg></span><span><b>Ver proyecto</b><small>Se abre en otra pestaña</small></span></a>
+    </div></div>
+   <div class="sec"><h4>Asignación</h4>
+    <p class="desc" style="color:var(--mfg)">Proyecto creado por <b style="color:var(--fg)">Laura Gómez</b> · Área Diseño · Asignada el 10 nov 2026 a las 09:15</p></div>
+  </section>
+
+  <section role="tabpanel" id="p-2" aria-labelledby="tab-2" hidden>
+   <div class="note"><p><b>Tono:</b> cálido, familiar, sin tecnicismos.</p><p><b>Paleta:</b> rojo vino, crema y dorado del empaque. Nada de verde navideño.</p><ul><li>Logo siempre en esquina inferior derecha.</li><li>Tipografía de marca: la de la carpeta “Brand kit”.</li><li>El cliente aprueba por WhatsApp, no por correo.</li></ul></div>
+  </section>
+
+  <section role="tabpanel" id="p-3" aria-labelledby="tab-3" hidden>
+   <ol class="tl">
+    <li><div class="row"><div><b>Copy del carrusel</b><br><small>Andrés Pérez · Completada 7 nov</small></div><button class="ghost" aria-expanded="true" aria-controls="r1" aria-label="Ocultar notas y entregable"><svg><use href="#eye"/></svg></button></div>
+     <div class="reveal" id="r1">“Dejo los 5 textos aprobados en el doc. La portada cambió por pedido del cliente.”<br><a class="btn sm" href="#" style="margin-top:8px"><svg><use href="#ext"/></svg>Abrir entregable</a></div></li>
+    <li><div class="row"><div><b>Carrusel Instagram · V1</b><br><small>Tú · Completada 8 nov</small></div><button class="ghost" aria-expanded="false" aria-controls="r2" aria-label="Ver notas y entregable"><svg><use href="#eye"/></svg></button></div>
+     <div class="reveal" id="r2" hidden>“Primera propuesta con fotos de stock mientras llega la sesión.”<br><a class="btn sm" href="#" style="margin-top:8px"><svg><use href="#ext"/></svg>Abrir entregable</a></div></li>
+    <li><div class="row"><div><b>Validación V1</b><br><small>Laura Gómez · Completada 9 nov</small></div><button class="ghost" aria-expanded="false" aria-controls="r3" aria-label="Ver notas y entregable"><svg><use href="#eye"/></svg></button></div>
+     <div class="reveal" id="r3" hidden>“Cliente pide cambiar portada y usar empaque nuevo.”</div></li>
+   </ol>
+  </section>
+ </div>
+
+ <footer class="foot">
+  <button class="btn"><svg><use href="#pause"/></svg>Pausar</button>
+  <div class="grow"><button class="btn">Reportar avance</button><button class="btn p"><svg><use href="#check"/></svg>Completar</button></div>
+ </footer>
+</aside>
+<script>
+const tabs=[...document.querySelectorAll('[role=tab]')];
+function sel(t){tabs.forEach(x=>{const on=x===t;x.setAttribute('aria-selected',on);x.tabIndex=on?0:-1;document.getElementById(x.getAttribute('aria-controls')).hidden=!on});t.focus()}
+tabs.forEach((t,i)=>{t.onclick=()=>sel(t);t.onkeydown=e=>{if(e.key==='ArrowRight')sel(tabs[(i+1)%tabs.length]);if(e.key==='ArrowLeft')sel(tabs[(i+tabs.length-1)%tabs.length])}});
+document.querySelectorAll('[aria-controls^=r]').forEach(b=>b.onclick=()=>{const p=document.getElementById(b.getAttribute('aria-controls'));p.hidden=!p.hidden;b.setAttribute('aria-expanded',!p.hidden)});
+</script>
+</body></html>

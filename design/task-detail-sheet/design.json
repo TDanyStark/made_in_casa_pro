@@ -1,0 +1,9 @@
+{
+  "title": "Detalle de tarea en Mis Tareas (sheet lateral)",
+  "brief": "Right-side sheet for collaborators in Mis Tareas: task + description at assignment, status, time, Drive link, project link (new tab), project notes, previous-task history with eye toggle for notes and deliverable; opens on task click or 'Tomar tarea'.",
+  "artboards": [
+    { "file": "01-tabs-sheet.html", "title": "Sheet con pestañas", "tradeoff": "Very clean and familiar (Resumen / Notas / Historial); notes and history are one click away, not in view", "width": 1440, "height": 900 },
+    { "file": "02-guided-scroll.html", "title": "Guía en 3 pasos (un solo scroll)", "tradeoff": "Reads like a checklist (entiende → recursos → antecedentes) with a prominent timer; more scrolling and a brand-colored header", "width": 1440, "height": 900 },
+    { "file": "03-workspace-split.html", "title": "Panel de trabajo dividido", "tradeoff": "Everything visible at once (brief + notes left, time/links/history right); wide sheet covers most of the list and needs a stacked fallback on small screens", "width": 1440, "height": 900 }
+  ]
+}
