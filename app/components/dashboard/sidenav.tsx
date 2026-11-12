@@ -6,10 +6,13 @@ import { SubmitButtonSignOut } from "./SubmitButtonSignOut";
 import { getCurrentSession } from "@/lib/services/api-session";
 import { getUserEmailConnection } from "@/lib/queries/userEmailConnections";
 import { MailWarning } from "lucide-react";
+import { isInternalCollaborator } from "@/lib/queries/users";
 
 export default async function SideNav() {
   const session = await getCurrentSession();
-  const connection = session?.id ? await getUserEmailConnection(session.id) : null;
+  const [connection, isInternal] = session?.id
+    ? await Promise.all([getUserEmailConnection(session.id), isInternalCollaborator(session.id)])
+    : [null, false];
   // Conectar Gmail es opcional: los correos salen igual por el SMTP del sistema.
   // Mostramos un aviso (no bloqueante) cuando el usuario no tiene Gmail conectado
   // o cuando la conexión quedó inválida, para invitarlo a conectarlo.
@@ -31,7 +34,7 @@ export default async function SideNav() {
         <MICLogo onlyIcon={true} colorWhite={true} />
       </Link>
       <div className="flex grow flex-row justify-between space-x-2 md:flex-col md:space-x-0 md:space-y-2 max-w-full overflow-auto no-scrollbar pb-4 md:pb-0">
-        <NavLinks />
+        <NavLinks isInternalCollaborator={isInternal} />
         <div className="hidden h-auto w-full grow rounded-md bg-muted md:block"></div>
         {showGmailNotice && (
           <Link

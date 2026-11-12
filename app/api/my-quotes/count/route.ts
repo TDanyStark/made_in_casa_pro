@@ -4,6 +4,8 @@ import { AUTHENTICATED_ROLES } from "@/lib/role-groups";
 import { getPendingQuoteInvitationsCount } from "@/lib/queries/taskQuotes";
 import { decrypt } from "@/lib/session";
 import { cookies } from "next/headers";
+import { isInternalCollaborator } from "@/lib/queries/users";
+import { INTERNAL_QUOTES_FORBIDDEN_MESSAGE } from "@/lib/quotes-access";
 
 /**
  * GET /api/my-quotes/count
@@ -22,6 +24,10 @@ export async function GET(request: NextRequest) {
     const session = cookie ? await decrypt(cookie) : null;
     if (!session?.id) {
       return NextResponse.json({ error: "No autenticado" }, { status: 401 });
+    }
+
+    if (await isInternalCollaborator(session.id)) {
+      return NextResponse.json({ error: INTERNAL_QUOTES_FORBIDDEN_MESSAGE }, { status: 403 });
     }
 
     const count = await getPendingQuoteInvitationsCount(session.id);

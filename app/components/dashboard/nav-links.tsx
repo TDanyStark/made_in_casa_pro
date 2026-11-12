@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
@@ -8,17 +8,24 @@ import { ChevronDown } from "lucide-react";
 import { links, navSubLinks } from "@/lib/LinksData";
 import { useRole } from "../context/RoleContext";
 import { get } from "@/lib/services/apiService";
-import { UserRole } from "@/lib/definitions";
 import { cn } from "@/lib/utils";
+import { canAccessMyQuotes } from "@/lib/quotes-access";
 
 const MY_QUOTES_ROUTE = "/my-quotes";
 
-export default function NavLinks() {
+export default function NavLinks({ isInternalCollaborator = false }: { isInternalCollaborator?: boolean }) {
   const pathname = usePathname();
   const role = useRole();
+  const showMyQuotes = canAccessMyQuotes(role, isInternalCollaborator);
+  // "Mis Cotizaciones" is only for external collaborators.
+  const isVisibleLink = useCallback(
+    (link: (typeof links)[number]) =>
+      link.roles.includes(role) && (link.route !== MY_QUOTES_ROUTE || showMyQuotes),
+    [role, showMyQuotes],
+  );
   const [openAccordionRoute, setOpenAccordionRoute] = useState<string | null>(null);
 
-  // Fetch pending quote invitations count — only for COLABORADOR role
+  // Fetch pending quote invitations count — only for external collaborators
   const { data: countData } = useQuery<{ count: number }>({
     queryKey: ["my-quotes-count"],
     queryFn: async () => {
@@ -26,7 +33,7 @@ export default function NavLinks() {
       if (!res.ok) return { count: 0 };
       return res.data!;
     },
-    enabled: role === UserRole.COLABORADOR,
+    enabled: showMyQuotes,
     refetchInterval: 60_000, // refresh every 60s
     staleTime: 30_000,
   });
@@ -35,7 +42,7 @@ export default function NavLinks() {
 
   useEffect(() => {
     const currentGroup = links
-      .filter((link) => link.roles.includes(role))
+      .filter(isVisibleLink)
       .find((link) => {
         const subLinks = navSubLinks[link.route] ?? [];
         return subLinks.some((item) => pathname.startsWith(item.route));
@@ -44,12 +51,12 @@ export default function NavLinks() {
     if (currentGroup) {
       setOpenAccordionRoute(currentGroup.route);
     }
-  }, [pathname, role]);
+  }, [pathname, isVisibleLink]);
 
   return (
     <>
       {links
-        .filter((link) => link.roles.includes(role)) // Filtrar enlaces según el rol
+        .filter(isVisibleLink) // Filtrar enlaces según el rol
         .map((link) => {
           const LinkIcon = link.icon as React.FC<React.SVGProps<SVGSVGElement>>;
           const subLinks = navSubLinks[link.route] ?? [];
@@ -59,7 +66,7 @@ export default function NavLinks() {
           );
           const showBadge =
             link.route === MY_QUOTES_ROUTE &&
-            role === UserRole.COLABORADOR &&
+            showMyQuotes &&
             pendingCount > 0;
 
           if (hasSubLinks) {

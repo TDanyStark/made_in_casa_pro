@@ -5,6 +5,7 @@ import { getUserRole, decrypt } from "@/lib/session";
 import { getProjectDetail } from "@/lib/queries/projects";
 import { getTasksByProject, getTasksForQuoteView, getOpenQuoteTaskIds } from "@/lib/queries/projectTasks";
 import { cookies } from "next/headers";
+import { redirectInternalCollaboratorFromQuotes } from "@/lib/services/quotes-page-guard";
 
 type Props = {
   params: Promise<{ id: string }>;
@@ -15,6 +16,7 @@ export default async function CollaboratorProjectPage({ params }: Props) {
   const projectId = parseInt(id);
 
   if (isNaN(projectId)) notFound();
+  await redirectInternalCollaboratorFromQuotes();
 
   const cookieStore = await cookies();
   const sessionCookie = cookieStore.get("session")?.value;
