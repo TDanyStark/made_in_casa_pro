@@ -328,6 +328,8 @@ export type ProjectType = {
 
 export type ProjectDetailType = ProjectType & {
   co_managers: Array<{ id: number; name: string; email: string }>;
+  /** En cuánto se vendió; ausente cuando el rol no puede verlo. */
+  sale_price?: number | null;
 };
 
 export type DrivePermissionRole = "reader" | "writer" | "owner" | string;

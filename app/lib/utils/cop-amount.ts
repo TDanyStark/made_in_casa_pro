@@ -1,3 +1,5 @@
+export const SALE_PRICE_ERROR = "El precio de venta debe ser un número mayor o igual a 0";
+
 export const INVALID_COP_AMOUNT_MESSAGE = "Ingresa un precio válido en pesos (solo números)";
 
 /**

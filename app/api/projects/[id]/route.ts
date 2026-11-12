@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { cookies } from "next/headers";
 import { decrypt } from "@/lib/session";
+import { UserRole } from "@/lib/definitions";
 import { validateApiRole, validateHttpMethod } from "@/lib/services/api-auth";
 import { domainErrorResponse } from "@/lib/services/api-errors";
 import { getProjectDetail, updateProject, deleteProject, userCanAccessProject } from "@/lib/queries/projects";
@@ -10,6 +11,7 @@ import {
   LEADERSHIP_ROLES,
   OPERATIONS_ROLES,
   PROJECT_EDIT_ROLES,
+  PROJECT_SALE_PRICE_VIEW_ROLES,
   PROJECT_VIEW_ROLES,
 } from "@/lib/role-groups";
 import {
@@ -91,7 +93,21 @@ export async function GET(request: NextRequest, { params }: Params) {
 
   const project = await getProjectDetail(projectId);
   if (!project) return NextResponse.json({ error: "Proyecto no encontrado" }, { status: 404 });
-  return NextResponse.json(project);
+  if (await canViewSalePrice(roleValidation.userRole, project.created_by)) {
+    return NextResponse.json(project);
+  }
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const { sale_price, ...withoutSalePrice } = project;
+  return NextResponse.json(withoutSalePrice);
+}
+
+/** Dirección ve el precio de venta; el comercial, solo en los proyectos que creó. */
+async function canViewSalePrice(userRole: UserRole, createdBy: number | null | undefined) {
+  if (!hasAnyRole(userRole, PROJECT_SALE_PRICE_VIEW_ROLES)) return false;
+  if (userRole !== UserRole.COMERCIAL) return true;
+  const cookie = (await cookies()).get("session")?.value;
+  const session = cookie ? await decrypt(cookie) : null;
+  return session?.id != null && createdBy != null && Number(createdBy) === Number(session.id);
 }
 
 export async function PATCH(request: NextRequest, { params }: Params) {
