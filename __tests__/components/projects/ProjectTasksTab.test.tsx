@@ -442,3 +442,47 @@ describe("buildTaskPayload", () => {
     expect(payload).not.toHaveProperty("status");
   });
 });
+
+describe("ProjectTasksTab — search filter", () => {
+  afterEach(() => {
+    mockTasksOverride = null;
+  });
+
+  it("shows only the tasks matching the title or collaborator, including stacked and paged ones, without drag handles", () => {
+    mockTasksOverride = [
+      ...Array.from({ length: 12 }, (_, i) => buildTask(i + 1, "completed")),
+      ...Array.from({ length: 8 }, (_, i) => buildTask(i + 13, "not_started")),
+      { ...buildTask(21, "not_started"), title: "Edición de video", assigned_user_name: "Andrés Gómez" },
+    ];
+
+    const { rerender } = render(
+      <ProjectTasksTab projectId={7} productName="Producto" canEdit currentUserId={1} currentUserRole={1} searchQuery="tarea 1" />
+    );
+
+    for (const id of [1, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19]) {
+      expect(screen.getByText(`Tarea ${id}`)).toBeInTheDocument();
+    }
+    expect(screen.queryByText("Tarea 2")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /tareas completadas/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /mostrar .* más/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /arrastrar para reordenar/i })).not.toBeInTheDocument();
+    expect(screen.getByText(/11 coincidencias/)).toBeInTheDocument();
+
+    rerender(
+      <ProjectTasksTab projectId={7} productName="Producto" canEdit currentUserId={1} currentUserRole={1} searchQuery="andres" />
+    );
+    expect(screen.getByText("Edición de video")).toBeInTheDocument();
+    expect(screen.queryByText("Tarea 13")).not.toBeInTheDocument();
+  });
+
+  it("shows an empty search message when nothing matches", () => {
+    mockTasksOverride = [buildTask(1, "not_started")];
+
+    render(
+      <ProjectTasksTab projectId={7} productName="Producto" canEdit currentUserId={1} currentUserRole={1} searchQuery="zzz" />
+    );
+
+    expect(screen.getByText("Ninguna tarea coincide con la búsqueda.")).toBeInTheDocument();
+    expect(screen.queryByText("No hay tareas aún.")).not.toBeInTheDocument();
+  });
+});

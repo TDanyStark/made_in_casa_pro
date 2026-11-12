@@ -1,14 +1,16 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { del, get, post } from "@/lib/services/apiService";
-import { canCreateAdjustmentAfter, ProjectAdjustmentType, ProjectDetailType, UserRole } from "@/lib/definitions";
+import { canCreateAdjustmentAfter, ProjectAdjustmentType, ProjectDetailType, ProjectTaskType, UserRole } from "@/lib/definitions";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Input } from "@/components/ui/input";
+import { normalizeSearchText, taskMatchesSearch } from "@/lib/task-search";
 import { SafeHtml } from "@/components/ui/safe-html";
 import { toast } from "sonner";
-import { Plus, ExternalLink, HardDrive, ChevronDown, ChevronUp, Trash2 } from "lucide-react";
+import { Plus, ExternalLink, HardDrive, ChevronDown, ChevronUp, Trash2, Search } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { ProjectTasksTab } from "./ProjectTasksTab";
@@ -48,6 +50,8 @@ export function ProjectAdjustmentsTab({
   const queryClient = useQueryClient();
   const [wizardOpen, setWizardOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const isSearching = normalizeSearchText(searchQuery) !== "";
 
   const { data: adjustments = [], isLoading, isError } = useQuery({
     queryKey: ["project-adjustments", projectId],
@@ -58,6 +62,28 @@ export function ProjectAdjustmentsTab({
     },
     staleTime: 1000 * 60,
   });
+
+  // Collapsed versions don't load their tasks, so the search reads every task of the project once.
+  const { data: projectTasks, isLoading: isLoadingSearch } = useQuery({
+    queryKey: ["project-tasks-search", projectId],
+    queryFn: async () => {
+      const res = await get<ProjectTaskType[]>(`projects/${projectId}/tasks`);
+      if (!res.ok) throw new Error(res.error);
+      return res.data ?? [];
+    },
+    enabled: isSearching,
+    // Refetch every time a search starts so new or reassigned tasks are found.
+    staleTime: 0,
+  });
+
+  const matchingVersionIds = useMemo(() => {
+    const ids = new Set<number>();
+    if (!isSearching) return ids;
+    for (const task of projectTasks ?? []) {
+      if (task.adjustment_id != null && taskMatchesSearch(task, searchQuery)) ids.add(task.adjustment_id);
+    }
+    return ids;
+  }, [isSearching, projectTasks, searchQuery]);
 
   const lastAdjustment = adjustments.length > 0 ? adjustments[adjustments.length - 1] : null;
   const canCreateNew = canCreateAdjustmentAfter(lastAdjustment);
@@ -93,6 +119,10 @@ export function ProjectAdjustmentsTab({
   }
 
   const allVersions = [...adjustments].reverse();
+  const latestVersionId = allVersions[0]?.id;
+  const shownVersions = isSearching
+    ? allVersions.filter((adj) => matchingVersionIds.has(adj.id))
+    : allVersions;
 
   return (
     <>
@@ -111,13 +141,34 @@ export function ProjectAdjustmentsTab({
           )}
         </div>
 
+        {allVersions.length > 0 && (
+          <div className="relative max-w-sm">
+            <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              type="search"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Buscar por tarea o colaborador..."
+              aria-label="Buscar tareas por nombre o colaborador"
+              className="pl-8"
+            />
+          </div>
+        )}
+
         <div className="space-y-4">
-          {allVersions.map((adj, index) => (
+          {isSearching && isLoadingSearch ? (
+            <Skeleton className="h-24 w-full" />
+          ) : isSearching && shownVersions.length === 0 ? (
+            <p className="py-8 text-center text-sm text-muted-foreground">
+              Ninguna tarea coincide con &quot;{searchQuery.trim()}&quot;.
+            </p>
+          ) : shownVersions.map((adj) => (
             <VersionAccordion
               key={adj.id}
               adjustment={adj}
-              isInitiallyExpanded={index === 0}
-              isLatest={index === 0}
+              isInitiallyExpanded={adj.id === latestVersionId}
+              isLatest={adj.id === latestVersionId}
+              searchQuery={isSearching ? searchQuery : ""}
               projectId={projectId}
               projectStatus={projectStatus}
               productName={productName}
@@ -153,7 +204,9 @@ function VersionAccordion({
   canEdit,
   currentUserId,
   currentUserRole,
+  searchQuery,
 }: {
+  searchQuery: string;
   adjustment: ProjectAdjustmentType;
   isInitiallyExpanded: boolean;
   isLatest: boolean;
@@ -166,6 +219,13 @@ function VersionAccordion({
 }) {
   const queryClient = useQueryClient();
   const [expanded, setExpanded] = useState(isInitiallyExpanded);
+  const isSearching = searchQuery !== "";
+
+  // Open every matching version when a search starts and restore the default
+  // when it ends; the user can still toggle versions meanwhile.
+  useEffect(() => {
+    setExpanded(isSearching || isInitiallyExpanded);
+  }, [isSearching, isInitiallyExpanded]);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
 
@@ -268,6 +328,7 @@ function VersionAccordion({
               currentUserId={currentUserId}
               currentUserRole={currentUserRole}
               adjustmentId={adjustment.id}
+              searchQuery={searchQuery}
             />
           </div>
         </div>

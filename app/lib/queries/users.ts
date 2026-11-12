@@ -431,3 +431,13 @@ export async function getAdminAndLeadershipEmails(): Promise<string[]> {
   }
 }
 
+
+/** True when the user is an internal collaborator (rol colaborador + is_internal = 1). */
+export async function isInternalCollaborator(userId: number): Promise<boolean> {
+  const result = await db.execute({
+    sql: `SELECT rol_id, is_internal FROM users WHERE id = $1`,
+    args: [userId],
+  });
+  const row = result.rows[0] as { rol_id?: unknown; is_internal?: unknown } | undefined;
+  return !!row && Number(row.rol_id) === UserRole.COLABORADOR && Number(row.is_internal) === 1;
+}

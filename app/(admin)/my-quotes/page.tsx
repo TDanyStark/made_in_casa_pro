@@ -1,7 +1,9 @@
 import { Breadcrumbs } from "@/components/navigation/Breadcrumbs";
 import { MyQuotesClient } from "@/components/quotes/MyQuotesClient";
+import { redirectInternalCollaboratorFromQuotes } from "@/lib/services/quotes-page-guard";
 
-export default function MyQuotesPage() {
+export default async function MyQuotesPage() {
+  await redirectInternalCollaboratorFromQuotes();
   return (
     <section className="container">
       <Breadcrumbs
