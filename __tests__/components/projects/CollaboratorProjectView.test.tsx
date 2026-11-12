@@ -30,10 +30,6 @@ jest.mock("@/components/projects/ProjectNotesEditor", () => ({
   ProjectNotesEditor: ({ initialContent }: { initialContent: string }) => <div>{initialContent}</div>,
 }));
 
-jest.mock("@/components/projects/ProjectInfoTab", () => ({
-  ProjectInfoTab: () => <div>Información</div>,
-}));
-
 jest.mock("@/components/projects/CollaboratorTasksList", () => ({
   CollaboratorTasksList: ({
     tasks,
@@ -143,6 +139,12 @@ describe("CollaboratorProjectView", () => {
         currentUserId={9}
       />
     );
+
+  // Spec: odd/tasks/project-metrics-tab.md — S6: collaborators see only Tareas and Notas.
+  it("only offers the Tareas and Notas tabs", () => {
+    renderView();
+    expect(screen.getAllByRole("button").map((tab) => tab.textContent)).toEqual(["Tareas (0)", "Notas"]);
+  });
 
   it("query functions throw when the API fails instead of returning empty data", async () => {
     (get as jest.Mock).mockResolvedValue({ ok: false, status: 401, error: "No autorizado" });

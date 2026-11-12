@@ -184,9 +184,24 @@ describe('project queries metadata fields', () => {
           '2026-04-20T17:00:00.000Z',
           'active',
           null,
+          null, // sale_price (project-metrics-tab S4)
         ],
       })
     );
+  });
+
+  it('createProject stores the optional sale price (project-metrics-tab S4)', async () => {
+    mockTransaction.execute.mockResolvedValueOnce(makeResult([{ id: 15 }]));
+    mockExecute
+      .mockResolvedValueOnce(makeResult([{ client_id: 7, manager_id: 3 }]))
+      .mockResolvedValueOnce(makeResult([{ client_id: 7 }]))
+      .mockResolvedValueOnce(makeResult([{ id: 15 }]));
+
+    await createProject({ title: 'Proyecto', brand_id: 2, manager_id: 3, sale_price: 2500000 });
+
+    const insert = mockTransaction.execute.mock.calls[0][0] as { sql: string; args: unknown[] };
+    expect(insert.sql).toContain('sale_price');
+    expect(insert.args[14]).toBe(2500000);
   });
 
   it('createProject rejects a manager from a client other than the brand client', async () => {
@@ -456,9 +471,9 @@ describe('gerente al crearse (created_manager_id)', () => {
       'INSERT INTO projects (title, brand_id, created_manager_id, client_id, product_id,'
     );
     expect(sql).not.toMatch(/[(,] manager_id[,)]/);
-    expect(insert.sql).toContain('$14');
-    expect(insert.sql).not.toContain('$15');
-    expect(insert.args).toHaveLength(14);
+    expect(insert.sql).toContain('$15');
+    expect(insert.sql).not.toContain('$16');
+    expect(insert.args).toHaveLength(15);
     expect(insert.args.slice(0, 4)).toEqual(['Proyecto', 2, 3, 7]);
     // Ninguna sentencia del alta escribe project_manager_history
     const all = [

@@ -20,6 +20,8 @@ jest.mock("@/components/ui/tabs", () => ({
   TabsContent: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
 }));
 jest.mock("@/components/projects/ProjectFinancialCards", () => ({ ProjectFinancialCards: () => null }));
+jest.mock("@/components/projects/ProjectSalePrice", () => ({ ProjectSalePrice: () => null }));
+jest.mock("@/components/projects/ProjectMetricsTab", () => ({ ProjectMetricsTab: () => null }));
 jest.mock("@/components/projects/ProjectHeader", () => ({ ProjectHeader: () => null }));
 jest.mock("@/components/projects/ProjectQuotesTab", () => ({ ProjectQuotesTab: () => null }));
 jest.mock("@/components/projects/ProjectNotesEditor", () => ({ ProjectNotesEditor: () => null }));

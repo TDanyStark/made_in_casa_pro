@@ -350,16 +350,30 @@ administrativos ven en qué está trabajando en este momento. El resto queda en
 
 ## Inversión y precio de venta del proyecto
 
-El detalle de un proyecto muestra arriba un panel compacto con mini gráficos:
-**Horas**, **Invertido** (con el detalle por colaborador), **Venta** y
-**Margen**. Un selector pequeño filtra por versión (por defecto, todas).
+Detalle del proyecto:
+
+- **Pestañas**: Tareas, Notas, Métricas, Cotizaciones, Información y
+  Notificaciones (al final). Los co-responsables viven dentro de Información.
+  Los colaboradores solo ven Tareas y Notas. La pestaña activa se distingue
+  también en modo oscuro.
+- **Precio de venta**: se puede anotar (opcional) al crear el proyecto. En la
+  parte principal del proyecto aparece en rojo mientras está vacío. Lo ven admin,
+  directivo, financiero y el comercial que creó el proyecto; lo editan admin,
+  directivo y ese comercial (`ProjectSalePrice`).
+- **Resumen** (solo admin, directivo y financiero): tarjetas de **Horas**
+  (internas/externas), **Invertido** y **Margen**, con filtro por versión. Sin
+  precio de venta, la tarjeta de margen sale en rojo.
+- **Métricas** (solo admin, directivo y financiero): horas por tipo con su
+  porcentaje, costo frente a venta con el margen, y la tabla "Inversión por
+  colaborador" (tipo, horas, costo y % del costo, de mayor a menor costo, con
+  total). También se filtra por versión. Comercial y colaborador no la ven.
 
 | Qué | Dónde | Quién |
 | --- | --- | --- |
 | Sueldo mensual de un interno | Ficha del colaborador (`PATCH /api/users/[id]` con `monthly_salary`, número >= 0) | Admin |
 | Horas semanales de trabajo (ley) | Configuración → General (`PATCH /api/settings` con `weekly_work_hours`, mayor que 0 y máximo 60; por defecto 42) | Admin |
-| Ver horas, dinero y margen | `GET /api/projects/[id]/financials` (opcional `?adjustment_id=<id>` para una versión) | Admin, directivo, financiero y el comercial que creó el proyecto |
-| Anotar en cuánto se vendió | `PATCH /api/projects/[id]/financials` con `{ "sale_price": number \| null }` | Admin, directivo y el comercial que creó el proyecto |
+| Ver horas, dinero y margen | `GET /api/projects/[id]/financials` (opcional `?adjustment_id=<id>` para una versión) | Admin, directivo y financiero |
+| Anotar en cuánto se vendió | `PATCH /api/projects/[id]/financials` con `{ "sale_price": number \| null }` (responde solo `{ sale_price }`) | Admin, directivo y el comercial que creó el proyecto |
 | Ver cuánto valió una tarea | Ojito de la tarea (`GET /api/projects/[id]/tasks/[tid]/cost`) | Admin, directivo y financiero |
 | Corregir el costo de una tarea externa completada | Lápiz en el ojito de la tarea (`PATCH /api/projects/[id]/tasks/[tid]/cost` con `{ "completion_cost": number }`, >= 0) | Admin y directivo |
 

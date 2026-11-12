@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { SALE_PRICE_ERROR } from "@/lib/utils/cop-amount";
 import { z } from "zod";
 import { validateApiRole, validateHttpMethod } from "@/lib/services/api-auth";
 import { domainErrorResponse } from "@/lib/services/api-errors";
@@ -42,6 +43,12 @@ const projectSchema = z.object({
   oc: nullableTextSchema,
   billing_closed_at: projectDateTimeSchema.optional().nullable(),
   status: z.enum(["active", "paused", "completed", "archived"]).optional(),
+  /** En cuánto se vendió (opcional; se puede anotar después). */
+  sale_price: z
+    .number({ invalid_type_error: SALE_PRICE_ERROR })
+    .nonnegative(SALE_PRICE_ERROR)
+    .nullable()
+    .optional(),
 });
 
 const createdByIdSchema = z.coerce.number().int().positive().optional();
@@ -119,8 +126,12 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const validation = projectSchema.safeParse(body);
     if (!validation.success) {
+      const salePriceInvalid = validation.error.issues.some((issue) => issue.path[0] === "sale_price");
       return NextResponse.json(
-        { error: "Datos de proyecto inválidos", details: validation.error.format() },
+        {
+          error: salePriceInvalid ? SALE_PRICE_ERROR : "Datos de proyecto inválidos",
+          details: validation.error.format(),
+        },
         { status: 400 }
       );
     }

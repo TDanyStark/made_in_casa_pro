@@ -62,14 +62,14 @@ beforeEach(() => {
 });
 
 describe('GET /api/projects/[id]/financials', () => {
-  it('returns the summary for leadership and commercial roles, not collaborators', async () => {
+  // project-metrics-tab S1: metrics are for leadership only.
+  it('returns the summary only to admin, directivo and financiero', async () => {
     as(UserRole.DIRECTIVO);
     const res = await run(GET, req('GET'));
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual(summary);
     const roles = mockRole.mock.calls[0][1];
-    expect(roles).toEqual(expect.arrayContaining([UserRole.ADMIN, UserRole.DIRECTIVO, UserRole.FINANCIERO, UserRole.COMERCIAL]));
-    expect(roles).not.toContain(UserRole.COLABORADOR);
+    expect(roles).toEqual([UserRole.ADMIN, UserRole.DIRECTIVO, UserRole.FINANCIERO]);
     expect(mockGet).toHaveBeenCalledWith(10, null);
   });
 
@@ -147,9 +147,9 @@ describe('PATCH /api/projects/[id]/financials', () => {
     const res = await run(PATCH, req('PATCH', { sale_price: 2500000 }));
     expect(res.status).toBe(200);
     expect(mockUpdate).toHaveBeenCalledWith(10, 2500000);
-    expect(await res.json()).toEqual(summary);
-    expect(mockGet.mock.calls[0][0]).toBe(10);
-    expect(mockGet.mock.calls[0][1] ?? null).toBeNull(); // unfiltered summary
+    // project-metrics-tab S1: a commercial may edit the price but never receives the metrics.
+    expect(await res.json()).toEqual({ sale_price: 2500000 });
+    expect(mockGet).not.toHaveBeenCalled();
     const roles = mockRole.mock.calls[0][1];
     expect(roles).toEqual([UserRole.ADMIN, UserRole.DIRECTIVO, UserRole.COMERCIAL]);
   });

@@ -41,8 +41,11 @@ export const PROJECT_VIEW_ROLES: readonly UserRole[] = [
   UserRole.COLABORADOR,
 ];
 
-// Ven las horas y el dinero invertidos en un proyecto (el comercial, solo si lo creó).
-export const PROJECT_FINANCIALS_VIEW_ROLES: readonly UserRole[] = OPERATIONS_ROLES;
+// Ven las métricas del proyecto (horas y dinero invertidos): solo dirección.
+export const PROJECT_FINANCIALS_VIEW_ROLES: readonly UserRole[] = LEADERSHIP_ROLES;
+
+// Ven el precio de venta del proyecto (el comercial, solo si lo creó).
+export const PROJECT_SALE_PRICE_VIEW_ROLES: readonly UserRole[] = OPERATIONS_ROLES;
 
 // Anotan en cuánto se vendió el proyecto (el comercial, solo si lo creó).
 export const PROJECT_SALE_PRICE_EDIT_ROLES: readonly UserRole[] = [

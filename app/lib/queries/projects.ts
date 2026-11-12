@@ -156,9 +156,17 @@ export async function getProjectDetail(id: number): Promise<ProjectDetailType | 
       args: [id],
     });
 
+    const salePriceResult = await db.execute({
+      sql: `SELECT sale_price FROM projects WHERE id = $1`,
+      args: [id],
+    });
+    const rawSalePrice = (salePriceResult.rows[0] as { sale_price?: number | string | null } | undefined)
+      ?.sale_price;
+
     return {
       ...project,
       co_managers: coMgrResult.rows as unknown as ProjectDetailType["co_managers"],
+      sale_price: rawSalePrice == null ? null : Number(rawSalePrice),
     };
   } catch (error) {
     console.error("Error fetching project detail:", error);
@@ -407,6 +415,7 @@ export async function createProject(data: {
   billing_closed_at?: string | null;
   status?: ProjectStatus;
   created_by?: number | null;
+  sale_price?: number | null;
 }): Promise<ProjectType> {
   try {
     // La marca principal es la fuente de verdad del cliente (migración 012) y
@@ -435,8 +444,8 @@ export async function createProject(data: {
       const result = await transaction.execute({
         sql: `
           INSERT INTO projects
-            (title, brand_id, created_manager_id, client_id, product_id, campaign_id, drive_folder_id, drive_folder_url, notes, ideal_delivery_at, oc, billing_closed_at, status, created_by)
-          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+            (title, brand_id, created_manager_id, client_id, product_id, campaign_id, drive_folder_id, drive_folder_url, notes, ideal_delivery_at, oc, billing_closed_at, status, created_by, sale_price)
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
           RETURNING id
         `,
         args: [
@@ -455,6 +464,7 @@ export async function createProject(data: {
           data.billing_closed_at ?? null,
           data.status ?? "active",
           data.created_by ?? null,
+          data.sale_price ?? null,
         ],
       });
       id = Number(result.rows[0]?.id);

@@ -23,6 +23,8 @@ import { Card } from "@/components/ui/card";
 import { User, Building2, Loader2 } from "lucide-react";
 import { WizardState } from "@/hooks/useProjectWizard";
 import { isSupportedProjectDateTime } from "@/lib/utils/project-date-time";
+import { INVALID_COP_AMOUNT_MESSAGE, parseCopAmount } from "@/lib/utils/cop-amount";
+import { cn } from "@/lib/utils";
 
 const schema = z.object({
   title: z.string().min(1, "El título es requerido").max(300),
@@ -35,6 +37,10 @@ const schema = z.object({
   billing_closed_at: z.string().trim().optional().refine(
     (value) => !value || isSupportedProjectDateTime(value),
     "Ingresa una fecha y hora válida"
+  ),
+  sale_price: z.string().optional().refine(
+    (value) => !value || parseCopAmount(value) !== undefined,
+    INVALID_COP_AMOUNT_MESSAGE
   ),
 });
 
@@ -90,6 +96,7 @@ export function WizardStep1Basics({ state, onNext }: Props) {
       ideal_delivery_at: state.ideal_delivery_at,
       oc: state.oc,
       billing_closed_at: state.billing_closed_at,
+      sale_price: state.sale_price ?? "",
     },
   });
 
@@ -136,6 +143,7 @@ export function WizardStep1Basics({ state, onNext }: Props) {
       ideal_delivery_at: values.ideal_delivery_at ?? "",
       oc: values.oc ?? "",
       billing_closed_at: values.billing_closed_at ?? "",
+      sale_price: values.sale_price?.trim() ?? "",
     });
   };
 
@@ -223,6 +231,36 @@ export function WizardStep1Basics({ state, onNext }: Props) {
               <FormMessage />
             </FormItem>
           )}
+        />
+
+        <FormField
+          control={form.control}
+          name="sale_price"
+          render={({ field }) => {
+            const isMissing = !field.value?.trim();
+            return (
+              <FormItem>
+                <FormLabel>Precio de venta</FormLabel>
+                <FormControl>
+                  <Input
+                    inputMode="numeric"
+                    placeholder="Ej: 2.500.000"
+                    {...field}
+                    value={field.value ?? ""}
+                    className={cn(
+                      isMissing && "border-destructive focus-visible:ring-destructive/30"
+                    )}
+                  />
+                </FormControl>
+                {isMissing && (
+                  <p className="text-xs text-destructive">
+                    Sin precio de venta: anótalo cuando lo tengas.
+                  </p>
+                )}
+                <FormMessage />
+              </FormItem>
+            );
+          }}
         />
 
         {/* Auto-resolved info card — shows manager + client once brand is selected */}

@@ -123,6 +123,33 @@ describe('POST /api/projects', () => {
     });
   });
 
+  // project-metrics-tab S4: optional sale price at creation.
+  it('stores the optional sale price sent at creation', async () => {
+    mockCreateProject.mockResolvedValue({ id: 1 } as never);
+    const res = await callPost(new NextRequest('http://localhost/api/projects', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title: 'Proyecto', brand_id: 2, manager_id: 3, sale_price: 2500000 }),
+    }));
+    expect(res.status).toBe(201);
+    expect(mockCreateProject).toHaveBeenCalledWith({
+      title: 'Proyecto', brand_id: 2, manager_id: 3, sale_price: 2500000, created_by: 77,
+    });
+  });
+
+  it('rejects a negative sale price with 400 and creates nothing', async () => {
+    const res = await callPost(new NextRequest('http://localhost/api/projects', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title: 'Proyecto', brand_id: 2, manager_id: 3, sale_price: -5 }),
+    }));
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual(
+      expect.objectContaining({ error: 'El precio de venta debe ser un número mayor o igual a 0' })
+    );
+    expect(mockCreateProject).not.toHaveBeenCalled();
+  });
+
   it('accepts null metadata fields', async () => {
     mockCreateProject.mockResolvedValue({ id: 1 } as never);
 

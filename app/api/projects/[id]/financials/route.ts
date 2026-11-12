@@ -6,12 +6,12 @@ import { validateApiRole, validateHttpMethod } from "@/lib/services/api-auth";
 import { getProjectFinancials, updateProjectSalePrice } from "@/lib/queries/projectFinancials";
 import { userCanAccessProject } from "@/lib/queries/projects";
 import { UserRole } from "@/lib/definitions";
+import { SALE_PRICE_ERROR } from "@/lib/utils/cop-amount";
 import {
   PROJECT_FINANCIALS_VIEW_ROLES,
   PROJECT_SALE_PRICE_EDIT_ROLES,
 } from "@/lib/role-groups";
 
-const SALE_PRICE_ERROR = "El precio de venta debe ser un número mayor o igual a 0";
 
 const patchSchema = z.object({
   sale_price: z.number({ required_error: SALE_PRICE_ERROR, invalid_type_error: SALE_PRICE_ERROR })
@@ -102,7 +102,8 @@ export async function PATCH(request: NextRequest, { params }: Params) {
 
     const updated = await updateProjectSalePrice(projectId, parsed.data.sale_price);
     if (!updated) return NextResponse.json({ error: "Proyecto no encontrado" }, { status: 404 });
-    return NextResponse.json(await getProjectFinancials(projectId));
+    // Solo el precio: el comercial puede editarlo pero no ve las métricas.
+    return NextResponse.json({ sale_price: parsed.data.sale_price });
   } catch (error) {
     console.error("Error updating project sale price:", error);
     return NextResponse.json({ error: "Error al guardar el precio de venta" }, { status: 500 });

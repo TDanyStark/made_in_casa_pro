@@ -398,3 +398,53 @@ describe('GET /api/projects/[id] access', () => {
     expect(await res.json()).toEqual({ error: 'Proyecto no encontrado' });
   });
 });
+
+// project-metrics-tab S4: the sale price reaches only admin, directivo, financiero and the creator commercial.
+describe('GET /api/projects/[id] sale price visibility', () => {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { GET } = require('@/api/projects/[id]/route');
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { getProjectDetail, userCanAccessProject } = require('@/lib/queries/projects');
+
+  const callGet = () =>
+    GET(new NextRequest('http://localhost/api/projects/10'), { params: Promise.resolve({ id: '10' }) });
+  const asRole = (role: number) =>
+    mockValidateApiRole.mockResolvedValue({ isAuthorized: true, userRole: role, response: undefined } as never);
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockValidateHttpMethod.mockReturnValue({ isValidMethod: true, response: undefined });
+    (userCanAccessProject as jest.Mock).mockResolvedValue(true);
+  });
+
+  it.each([1, 2, 5])('returns the sale price to role %s', async (role) => {
+    asRole(role);
+    (getProjectDetail as jest.Mock).mockResolvedValue({ id: 10, created_by: 5, sale_price: 2500000 });
+    const res = await callGet();
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ id: 10, created_by: 5, sale_price: 2500000 });
+  });
+
+  it('returns the sale price to the commercial who created the project, even when empty', async () => {
+    asRole(3);
+    (getProjectDetail as jest.Mock).mockResolvedValue({ id: 10, created_by: 77, sale_price: null });
+    const res = await callGet();
+    expect(await res.json()).toEqual({ id: 10, created_by: 77, sale_price: null });
+  });
+
+  it('hides the sale price from a commercial who did not create the project', async () => {
+    asRole(3);
+    (getProjectDetail as jest.Mock).mockResolvedValue({ id: 10, created_by: 5, sale_price: 2500000 });
+    const res = await callGet();
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ id: 10, created_by: 5 });
+  });
+
+  it('hides the sale price from collaborators', async () => {
+    asRole(4);
+    (getProjectDetail as jest.Mock).mockResolvedValue({ id: 10, created_by: 77, sale_price: 2500000 });
+    const res = await callGet();
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ id: 10, created_by: 77 });
+  });
+});

@@ -21,6 +21,8 @@ import {
   PROJECT_SALE_PRICE_EDIT_ROLES,
 } from "@/lib/role-groups";
 import { ProjectFinancialCards } from "./ProjectFinancialCards";
+import { ProjectMetricsTab } from "./ProjectMetricsTab";
+import { ProjectSalePrice } from "./ProjectSalePrice";
 import { EmailHistoryTable } from "@/components/notifications/EmailHistoryTable";
 
 interface Props {
@@ -33,6 +35,8 @@ export function ProjectDetailClient({ projectId, userRole, currentUserId }: Prop
   const canEdit = PROJECT_EDIT_ROLES.includes(userRole);
   const canViewFinancials = PROJECT_FINANCIALS_VIEW_ROLES.includes(userRole);
   const canEditSalePrice = PROJECT_SALE_PRICE_EDIT_ROLES.includes(userRole);
+  // Los colaboradores solo ven Tareas y Notas.
+  const canViewInfo = userRole !== UserRole.COLABORADOR;
 
   const { data: project, isLoading, isError } = useQuery({
     queryKey: ["project", projectId],
@@ -69,29 +73,18 @@ export function ProjectDetailClient({ projectId, userRole, currentUserId }: Prop
     <div className="space-y-8">
       <ProjectHeader project={project} />
 
-      {canViewFinancials && (
-        <ProjectFinancialCards projectId={projectId} canEditSalePrice={canEditSalePrice} />
-      )}
+      <ProjectSalePrice projectId={projectId} salePrice={project.sale_price} canEdit={canEditSalePrice} />
+
+      {canViewFinancials && <ProjectFinancialCards projectId={projectId} />}
 
       <Tabs defaultValue="tasks">
         <TabsList>
-          <TabsTrigger value="tasks">
-            Tareas
-          </TabsTrigger>
-          {canEdit && (
-            <TabsTrigger value="quotes">Cotizaciones</TabsTrigger>
-          )}
+          <TabsTrigger value="tasks">Tareas</TabsTrigger>
           <TabsTrigger value="notes">Notas</TabsTrigger>
-          <TabsTrigger value="co-managers">
-            Co-responsables
-            {project.co_managers.length > 0 && (
-              <span className="ml-1.5 text-xs opacity-60">{project.co_managers.length}</span>
-            )}
-          </TabsTrigger>
-          <TabsTrigger value="info">Información</TabsTrigger>
-          {canEdit && (
-            <TabsTrigger value="notifications">Notificaciones</TabsTrigger>
-          )}
+          {canViewFinancials && <TabsTrigger value="metrics">Métricas</TabsTrigger>}
+          {canEdit && <TabsTrigger value="quotes">Cotizaciones</TabsTrigger>}
+          {canViewInfo && <TabsTrigger value="info">Información</TabsTrigger>}
+          {canEdit && <TabsTrigger value="notifications">Notificaciones</TabsTrigger>}
         </TabsList>
 
         <TabsContent value="tasks" className="mt-6">
@@ -107,12 +100,6 @@ export function ProjectDetailClient({ projectId, userRole, currentUserId }: Prop
           />
         </TabsContent>
 
-        {canEdit && (
-          <TabsContent value="quotes" className="mt-6">
-            <ProjectQuotesTab projectId={projectId} canEdit={canEdit && project.status !== 'completed'} />
-          </TabsContent>
-        )}
-
         <TabsContent value="notes" className="mt-6">
           <ProjectNotesEditor
             projectId={projectId}
@@ -121,22 +108,33 @@ export function ProjectDetailClient({ projectId, userRole, currentUserId }: Prop
           />
         </TabsContent>
 
-        <TabsContent value="co-managers" className="mt-6">
-          <ProjectCoManagersTab
-            projectId={projectId}
-            clientId={project.client_id}
-            mainManagerId={project.manager_id}
-            coManagers={project.co_managers}
-            canEdit={canEdit && project.status !== 'completed'}
-          />
-        </TabsContent>
+        {canViewFinancials && (
+          <TabsContent value="metrics" className="mt-6">
+            <ProjectMetricsTab projectId={projectId} />
+          </TabsContent>
+        )}
 
-        <TabsContent value="info" className="mt-6 space-y-6">
-          <ProjectManagerCard project={project} />
-          {/* Las marcas asociadas se pueden editar incluso con el proyecto completado */}
-          <ProjectBrandsCard project={project} canEdit={canEdit} />
-          <ProjectInfoTab project={project} canEdit={canEdit && project.status !== 'completed'} />
-        </TabsContent>
+        {canEdit && (
+          <TabsContent value="quotes" className="mt-6">
+            <ProjectQuotesTab projectId={projectId} canEdit={canEdit && project.status !== 'completed'} />
+          </TabsContent>
+        )}
+
+        {canViewInfo && (
+          <TabsContent value="info" className="mt-6 space-y-6">
+            <ProjectManagerCard project={project} />
+            <ProjectCoManagersTab
+              projectId={projectId}
+              clientId={project.client_id}
+              mainManagerId={project.manager_id}
+              coManagers={project.co_managers}
+              canEdit={canEdit && project.status !== 'completed'}
+            />
+            {/* Las marcas asociadas se pueden editar incluso con el proyecto completado */}
+            <ProjectBrandsCard project={project} canEdit={canEdit} />
+            <ProjectInfoTab project={project} canEdit={canEdit && project.status !== 'completed'} />
+          </TabsContent>
+        )}
 
         {canEdit && (
           <TabsContent value="notifications" className="mt-6">
