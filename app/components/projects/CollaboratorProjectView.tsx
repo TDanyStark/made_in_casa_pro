@@ -12,7 +12,6 @@ import {
 } from "@/lib/definitions";
 import { ProjectHeader } from "./ProjectHeader";
 import { ProjectNotesEditor } from "./ProjectNotesEditor";
-import { ProjectInfoTab } from "./ProjectInfoTab";
 import { CollaboratorTasksList } from "./CollaboratorTasksList";
 import { SubmitQuoteModal } from "@/components/quotes/SubmitQuoteModal";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -106,7 +105,6 @@ export function CollaboratorProjectView({
         <TabsList>
           <TabsTrigger value="tasks">Tareas ({totalTasks})</TabsTrigger>
           <TabsTrigger value="notes">Notas</TabsTrigger>
-          <TabsTrigger value="info">Información</TabsTrigger>
         </TabsList>
 
         <TabsContent value="tasks" className="mt-6">
@@ -135,10 +133,6 @@ export function CollaboratorProjectView({
             initialContent={project.notes ?? ""}
             readOnly={true}
           />
-        </TabsContent>
-
-        <TabsContent value="info" className="mt-6">
-          <ProjectInfoTab project={project} canEdit={false} />
         </TabsContent>
       </Tabs>
 

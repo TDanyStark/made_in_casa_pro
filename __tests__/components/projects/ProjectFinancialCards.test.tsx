@@ -1,4 +1,4 @@
-// S1, S2, S9, S10: slim financial panel with version filter and the editable sale price.
+// Spec: odd/tasks/project-metrics-tab.md — S3: the summary above the tabs, restyled as KPI tiles.
 import React from "react";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -6,9 +6,6 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ProjectFinancialCards } from "@/components/projects/ProjectFinancialCards";
 
 const mockGet = jest.fn();
-const mockPatch = jest.fn();
-const mockToastSuccess = jest.fn();
-const mockToastError = jest.fn();
 
 jest.mock("lucide-react", () => new Proxy({}, {
   get: (_, iconName: string) => {
@@ -19,13 +16,6 @@ jest.mock("lucide-react", () => new Proxy({}, {
 }));
 jest.mock("@/lib/services/apiService", () => ({
   get: (...args: unknown[]) => mockGet(...args),
-  patch: (...args: unknown[]) => mockPatch(...args),
-}));
-jest.mock("sonner", () => ({
-  toast: {
-    success: (...args: unknown[]) => mockToastSuccess(...args),
-    error: (...args: unknown[]) => mockToastError(...args),
-  },
 }));
 // Recharts needs real layout; charts are rendered as placeholders.
 jest.mock("@/components/ui/chart", () => ({
@@ -56,7 +46,7 @@ const summary = {
   total_cost: 690000,
   margin: 810000,
   by_collaborator: [
-    { user_id: 11, name: "Ext", is_internal: false, minutes: 60, cost: 500000 },
+    { user_id: 11, name: "Ext", is_internal: false, minutes: 90, cost: 570000 },
     { user_id: 10, name: "Ana", is_internal: true, minutes: 210, cost: 120000 },
   ],
   versions: [
@@ -77,11 +67,11 @@ const versionTwo = {
   adjustment_id: 7,
 };
 
-function renderCards(canEditSalePrice = true) {
+function renderCards() {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={client}>
-      <ProjectFinancialCards projectId={10} canEditSalePrice={canEditSalePrice} />
+      <ProjectFinancialCards projectId={10} />
     </QueryClientProvider>
   );
 }
@@ -97,23 +87,23 @@ beforeEach(() => {
 });
 
 describe("ProjectFinancialCards", () => {
-  it("shows hours, money invested, sale price and margin in one slim panel", async () => {
+  it("shows the hours, invested and margin tiles under a Resumen header", async () => {
     renderCards();
     expect(await screen.findByText("5 h")).toBeInTheDocument();
     expect(mockGet).toHaveBeenCalledWith("projects/10/financials");
-    const panel = screen.getByTestId("financial-cards");
-    expect(panel.querySelector(".text-3xl")).toBeNull();
+    expect(screen.getByText("Resumen")).toBeInTheDocument();
     expect(screen.getByText("Horas")).toBeInTheDocument();
     expect(screen.getByText("Invertido")).toBeInTheDocument();
-    expect(screen.getByText("Venta")).toBeInTheDocument();
     expect(screen.getByText("Margen")).toBeInTheDocument();
-    expect(norm(screen.getByTestId("total-cost").textContent)).toBe("$ 690.000");
-    expect(norm(screen.getByTestId("sale-price").textContent)).toBe("$ 1.500.000");
-    expect(norm(screen.getByTestId("margin").textContent)).toContain("$ 810.000");
-    expect(norm(screen.getByTestId("margin").textContent)).toContain("54%");
     expect(screen.getByText("Int. 3 h 30 min · Ext. 1 h 30 min")).toBeInTheDocument();
+    expect(norm(screen.getByTestId("total-cost").textContent)).toBe("$ 690.000");
     expect(norm(screen.getByText(/^Int\. \$/).textContent)).toBe("Int. $ 120.000 · Ext. $ 570.000");
-    expect(screen.getAllByTestId("chart").length).toBeGreaterThanOrEqual(2);
+    const margin = screen.getByTestId("margin");
+    expect(norm(margin.textContent)).toContain("$ 810.000");
+    expect(norm(margin.textContent)).toContain("54%");
+    expect(margin.querySelector(".text-emerald-600")).not.toBeNull();
+    expect(screen.getByLabelText("Horas internas y externas")).toBeInTheDocument();
+    expect(screen.getByLabelText("Costo frente al precio de venta")).toBeInTheDocument();
   });
 
   it("offers every project version and defaults to all of them", async () => {
@@ -125,68 +115,44 @@ describe("ProjectFinancialCards", () => {
     expect(screen.getByRole("option", { name: "Versión 2" })).toBeInTheDocument();
   });
 
-  it("refetches with ?adjustment_id when a version is chosen and hides the margin", async () => {
+  it("refetches with ?adjustment_id when a version is chosen and explains the margin", async () => {
     renderCards();
     await screen.findByText("5 h");
     await userEvent.selectOptions(screen.getByLabelText("Filtrar por versión"), "7");
     await waitFor(() => expect(mockGet).toHaveBeenCalledWith("projects/10/financials?adjustment_id=7"));
     expect(await screen.findByText("1 h")).toBeInTheDocument();
     expect(norm(screen.getByTestId("total-cost").textContent)).toBe("$ 30.000");
-    expect(screen.queryByTestId("margin")).not.toBeInTheDocument();
-    expect(norm(screen.getByTestId("sale-price").textContent)).toBe("$ 1.500.000");
-    expect(screen.getByText("Precio de todo el proyecto")).toBeInTheDocument();
+    expect(screen.getByTestId("margin")).toHaveTextContent("Margen solo para todo el proyecto");
+    expect(norm(screen.getByTestId("margin").textContent)).not.toContain("$");
 
     await userEvent.selectOptions(screen.getByLabelText("Filtrar por versión"), "all");
     expect(await screen.findByText("5 h")).toBeInTheDocument();
-    expect(screen.getByTestId("margin")).toBeInTheDocument();
+    expect(norm(screen.getByTestId("margin").textContent)).toContain("$ 810.000");
   });
 
-  it("shows the cost of each collaborator in the detail popover", async () => {
-    renderCards();
-    await userEvent.click(await screen.findByRole("button", { name: "Detalle por colaborador" }));
-    expect(await screen.findByText("Ext")).toBeInTheDocument();
-    expect(screen.getByText("Ana")).toBeInTheDocument();
-  });
-
-  it("asks to record the sale price when there is none", async () => {
+  it("shows the margin tile in red when there is no sale price", async () => {
     mockGet.mockResolvedValue({ ok: true, data: { ...summary, sale_price: null, margin: null } });
     renderCards();
-    expect(await screen.findByText("Sin registrar")).toBeInTheDocument();
-    expect(screen.queryByTestId("margin")).not.toBeInTheDocument();
+    const missing = await screen.findByText("Sin precio de venta");
+    expect(missing).toHaveClass("text-destructive");
+    expect(screen.getByTestId("margin")).toHaveClass("border-destructive");
+    expect(norm(screen.getByTestId("margin").textContent)).not.toContain("%");
   });
 
-  it("saves a new sale price, refreshes the financials and shows the new value", async () => {
-    const updated = { ...summary, sale_price: 2000000, margin: 1310000 };
-    mockPatch.mockImplementation(async () => {
-      mockGet.mockResolvedValue({ ok: true, data: updated });
-      return { ok: true, data: updated };
-    });
+  it("shows a negative margin in red", async () => {
+    mockGet.mockResolvedValue({ ok: true, data: { ...summary, sale_price: 500000, margin: -190000 } });
     renderCards();
-    await userEvent.click(await screen.findByRole("button", { name: "Editar precio de venta" }));
-    const input = screen.getByLabelText("Precio de venta del proyecto");
-    await userEvent.clear(input);
-    await userEvent.type(input, "2000000");
-    await userEvent.click(screen.getByRole("button", { name: "Guardar" }));
-    await waitFor(() => expect(mockPatch).toHaveBeenCalledWith("projects/10/financials", { sale_price: 2000000 }));
-    expect(mockToastSuccess).toHaveBeenCalledWith("Precio de venta actualizado");
-    await waitFor(() => expect(norm(screen.getByTestId("sale-price").textContent)).toBe("$ 2.000.000"));
-    await waitFor(() => expect(mockGet).toHaveBeenCalledTimes(2));
+    await screen.findByText("5 h");
+    const margin = screen.getByTestId("margin");
+    expect(norm(margin.textContent)).toContain("-38%");
+    expect(margin.querySelector(".text-destructive")).not.toBeNull();
   });
 
-  it("shows the API error and keeps the previous value when saving fails", async () => {
-    mockPatch.mockResolvedValue({ ok: false, error: "El precio de venta debe ser un número mayor o igual a 0" });
+  it("does not offer sale price editing nor the collaborator popover", async () => {
     renderCards();
-    await userEvent.click(await screen.findByRole("button", { name: "Editar precio de venta" }));
-    await userEvent.click(screen.getByRole("button", { name: "Guardar" }));
-    await waitFor(() => expect(mockToastError).toHaveBeenCalledWith("El precio de venta debe ser un número mayor o igual a 0"));
-    await userEvent.click(screen.getByRole("button", { name: "Cancelar" }));
-    expect(norm(screen.getByTestId("sale-price").textContent)).toBe("$ 1.500.000");
-  });
-
-  it("does not offer editing to read-only roles", async () => {
-    renderCards(false);
     await screen.findByText("5 h");
     expect(screen.queryByRole("button", { name: "Editar precio de venta" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Detalle por colaborador" })).not.toBeInTheDocument();
   });
 
   it("renders nothing when the summary cannot be loaded", async () => {
@@ -197,48 +163,3 @@ describe("ProjectFinancialCards", () => {
     expect(screen.queryByText("Horas")).not.toBeInTheDocument();
   });
 });
-
-// S27: COP amounts are integers; dots/commas are thousands separators, never decimals.
-describe("ProjectFinancialCards — sale price parsing (S27)", () => {
-  async function typeAndSave(value: string) {
-    mockPatch.mockResolvedValue({ ok: true, data: summary });
-    renderCards();
-    await userEvent.click(await screen.findByRole("button", { name: "Editar precio de venta" }));
-    const input = screen.getByLabelText("Precio de venta del proyecto");
-    await userEvent.clear(input);
-    if (value) await userEvent.type(input, value);
-    await userEvent.click(screen.getByRole("button", { name: "Guardar" }));
-  }
-
-  it.each([
-    ["1.500.000", 1500000],
-    ["1.500", 1500],
-    ["$ 2.000.000", 2000000],
-    ["2,500,000", 2500000],
-    ["750000", 750000],
-  ])("sends %s as %i", async (typed, expected) => {
-    await typeAndSave(typed);
-    await waitFor(() => expect(mockPatch).toHaveBeenCalledWith("projects/10/financials", { sale_price: expected }));
-  });
-
-  it("sends null when the field is cleared", async () => {
-    await typeAndSave("");
-    await waitFor(() => expect(mockPatch).toHaveBeenCalledWith("projects/10/financials", { sale_price: null }));
-  });
-
-  it.each(["abc", "12abc", "."])("rejects %s with an error toast and no request", async (typed) => {
-    await typeAndSave(typed);
-    await waitFor(() =>
-      expect(mockToastError).toHaveBeenCalledWith("Ingresa un precio válido en pesos (solo números)")
-    );
-    expect(mockPatch).not.toHaveBeenCalled();
-    expect(screen.getByLabelText("Precio de venta del proyecto")).toBeInTheDocument();
-  });
-
-  it("pre-fills the editor with the current integer price", async () => {
-    renderCards();
-    await userEvent.click(await screen.findByRole("button", { name: "Editar precio de venta" }));
-    expect(screen.getByLabelText("Precio de venta del proyecto")).toHaveValue("1500000");
-  });
-});
-
