@@ -65,12 +65,21 @@ const baseContext: TaskWorkContext = {
   ],
 };
 
-function renderSheet(context: TaskWorkContext = baseContext, actions?: React.ReactNode) {
+function renderSheet(
+  context: TaskWorkContext = baseContext,
+  actions?: React.ReactNode,
+  taskOverrides: Partial<MyTaskRowPaginated> = {}
+) {
   mockGet.mockResolvedValue({ ok: true, status: 200, data: context });
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={client}>
-      <TaskWorkSheet task={task} open onOpenChange={() => {}} actions={actions} />
+      <TaskWorkSheet
+        task={{ ...task, ...taskOverrides }}
+        open
+        onOpenChange={() => {}}
+        actions={actions}
+      />
     </QueryClientProvider>
   );
 }
@@ -119,6 +128,19 @@ describe('TaskWorkSheet', () => {
     await user.click(screen.getByRole('button', { name: /Ver notas y entregable de/ }));
     expect(screen.getByText('Brief aprobado por el cliente')).toBeInTheDocument();
     expect(screen.queryByText('Abrir entregable')).not.toBeInTheDocument();
+  });
+
+  it('does not link the own deliverable when it is not an http(s) URL', async () => {
+    renderSheet(baseContext, undefined, { delivery_url: 'javascript:alert(1)' });
+    await screen.findByText('paleta oficial');
+    expect(screen.queryByText('Mi entregable')).not.toBeInTheDocument();
+  });
+
+  it('links the own deliverable when it is an http(s) URL', async () => {
+    renderSheet(baseContext, undefined, { delivery_url: 'https://drive.google.com/file/d/mine' });
+    const link = (await screen.findByText('Mi entregable')).closest('a');
+    expect(link).toHaveAttribute('href', 'https://drive.google.com/file/d/mine');
+    expect(link).toHaveAttribute('target', '_blank');
   });
 
   it('renders the project notes as HTML', async () => {
