@@ -11,6 +11,8 @@ import {
   MyTaskRowPaginated,
   MyTasksFilters,
   CreateProjectTaskInput,
+  TaskWorkContext,
+  TaskWorkHistoryItem,
 } from "../definitions";
 import { resolveTaskAdjustmentId } from "./adjustments";
 import { buildPaginationArgs, buildWhereClause, parseTotal } from "../db/query-helpers";
@@ -1861,6 +1863,90 @@ export async function getMyTasksWithPagination(
     console.error("Error fetching my tasks with pagination:", error);
     return { tasks: [], total: 0 };
   }
+}
+
+// ─── Task work context ────────────────────────────────────────────────────────
+
+const TASK_WORK_HISTORY_LIMIT = 20;
+
+/**
+ * Returns the Drive folder, notes and previous completed tasks of the task's
+ * project, used by the task work sheet in Mis Tareas. Returns null when the
+ * task does not exist. Access control is the caller's responsibility.
+ */
+export async function getTaskWorkContext(taskId: number): Promise<TaskWorkContext | null> {
+  const baseResult = await db.execute({
+    sql: `
+      SELECT
+        pt.id                         AS task_id,
+        pt.project_id,
+        p.drive_folder_url            AS project_drive_folder_url,
+        pa.drive_folder_url           AS version_drive_folder_url,
+        p.notes                       AS project_notes,
+        pa.notes                      AS version_notes,
+        COALESCE(pa.version_number, 1) AS version_number
+      FROM project_tasks pt
+      INNER JOIN projects p ON p.id = pt.project_id
+      LEFT JOIN project_adjustments pa ON pa.id = pt.adjustment_id
+      WHERE pt.id = $1
+    `,
+    args: [taskId],
+  });
+
+  const base = baseResult.rows[0] as unknown as
+    | {
+        task_id: number;
+        project_id: number;
+        project_drive_folder_url: string | null;
+        version_drive_folder_url: string | null;
+        project_notes: string | null;
+        version_notes: string | null;
+        version_number: number;
+      }
+    | undefined;
+
+  if (!base) return null;
+
+  const historyResult = await db.execute({
+    sql: `
+      SELECT
+        pt.id,
+        pt.title,
+        pt.task_type,
+        pt.status,
+        COALESCE(pa.version_number, 1) AS version_number,
+        u.name                         AS assigned_user_name,
+        pt.completed_at,
+        pt.delivery_url,
+        (
+          SELECT tt.notes
+          FROM task_transitions tt
+          WHERE tt.task_id = pt.id
+            AND tt.to_status = 'completed'
+          ORDER BY tt.transitioned_at DESC, tt.id DESC
+          LIMIT 1
+        )                              AS delivery_notes
+      FROM project_tasks pt
+      LEFT JOIN users u ON u.id = pt.assigned_user_id
+      LEFT JOIN project_adjustments pa ON pa.id = pt.adjustment_id
+      WHERE pt.project_id = $1
+        AND pt.id <> $2
+        AND pt.status = 'completed'
+      ORDER BY pt.completed_at DESC NULLS LAST, pt.id DESC
+      LIMIT ${TASK_WORK_HISTORY_LIMIT}
+    `,
+    args: [base.project_id, taskId],
+  });
+
+  return {
+    task_id: base.task_id,
+    project_id: base.project_id,
+    drive_folder_url: base.version_drive_folder_url ?? base.project_drive_folder_url,
+    project_notes: base.project_notes,
+    version_notes: base.version_notes,
+    version_number: Number(base.version_number),
+    previous_tasks: historyResult.rows as unknown as TaskWorkHistoryItem[],
+  };
 }
 
 // ─── Progress update ──────────────────────────────────────────────────────────

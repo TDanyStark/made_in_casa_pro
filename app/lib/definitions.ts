@@ -552,6 +552,32 @@ export type MyTaskRowPaginated = {
   creator_user_name: string | null;
 };
 
+/** A completed task of the same project, shown as history in the task work sheet. */
+export type TaskWorkHistoryItem = {
+  id: number;
+  title: string;
+  task_type: TaskType;
+  status: ProjectTaskStatus;
+  version_number: number;
+  assigned_user_name: string | null;
+  completed_at: string | null;
+  delivery_url: string | null;
+  /** HTML notes from the transition to `completed`. */
+  delivery_notes: string | null;
+};
+
+/** Everything a collaborator needs to work on a task without leaving Mis Tareas. */
+export type TaskWorkContext = {
+  task_id: number;
+  project_id: number;
+  /** Version Drive folder when the task belongs to one, else the project folder. */
+  drive_folder_url: string | null;
+  project_notes: string | null;
+  version_notes: string | null;
+  version_number: number;
+  previous_tasks: TaskWorkHistoryItem[];
+};
+
 export type MyTasksFilters = {
   page?: number;
   limit?: number;
