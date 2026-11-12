@@ -13,7 +13,6 @@ jest.mock("@/lib/queries/projectEmailThreads", () => ({
 }));
 
 jest.mock("@/lib/queries/notificationRecipients", () => ({
-  getProjectStakeholders: jest.fn(),
   getTaskAssignee: jest.fn(),
   getTaskProjectCreator: jest.fn(),
   getQuoteInvitee: jest.fn(),
@@ -52,7 +51,6 @@ import {
   getQuoteReceivedRecipient,
   getAcceptedQuoteCollaborator,
   getUserNotificationRecipient,
-  getProjectStakeholders,
   getProjectCommercial,
 } from "@/lib/queries/notificationRecipients";
 import { getProjectById, recalculateProjectProgressWithTransition } from "@/lib/queries/projects";
@@ -66,7 +64,6 @@ const mockGetQuoteInvitee = getQuoteInvitee as jest.Mock;
 const mockGetQuoteReceivedRecipient = getQuoteReceivedRecipient as jest.Mock;
 const mockGetAcceptedQuoteCollaborator = getAcceptedQuoteCollaborator as jest.Mock;
 const mockGetUserNotificationRecipient = getUserNotificationRecipient as jest.Mock;
-const mockGetProjectStakeholders = getProjectStakeholders as jest.Mock;
 const mockGetProjectById = getProjectById as jest.Mock;
 const mockGetProjectTaskById = getProjectTaskById as jest.Mock;
 const mockGetTaskDriveFolderUrl = getTaskDriveFolderUrl as jest.Mock;
@@ -380,12 +377,31 @@ describe("dispatchNotification()", () => {
 
   // ── project.adjustment.created ───────────────────────────────────────────
 
-  it("project.adjustment.created: notifies all stakeholders except actor", async () => {
-    const stakeholders = [
-      { userId: 5, email: "ana@test.com", name: "Ana García" },
-      { userId: 8, email: "luis@test.com", name: "Luis Pérez" },
-    ];
-    mockGetProjectStakeholders.mockResolvedValue(stakeholders);
+  it("project.adjustment.created: notifies only the project commercial, never task collaborators", async () => {
+    mockGetProjectCommercial.mockResolvedValue({ userId: 5, email: "ana@test.com", name: "Ana García" });
+
+    await dispatchNotification({
+      eventType: NOTIFICATION_EVENTS.PROJECT_ADJUSTMENT_CREATED,
+      actorUserId: 3,
+      projectId: 1,
+      adjustmentId: 2,
+      versionNumber: 3,
+    });
+
+    expect(mockGetProjectCommercial).toHaveBeenCalledWith(1);
+    expect(mockSendEmail).toHaveBeenCalledTimes(1);
+    expect(mockSendEmail).toHaveBeenCalledWith(
+      expect.objectContaining({
+        message: expect.objectContaining({
+          to: { email: "ana@test.com", name: "Ana García" },
+          subject: "[Campaña Q2] Nueva versión: v3",
+        }),
+      })
+    );
+  });
+
+  it("project.adjustment.created: skips when the commercial created the version", async () => {
+    mockGetProjectCommercial.mockResolvedValue({ userId: 3, email: "daniel@test.com", name: "Daniel Amado" });
 
     await dispatchNotification({
       eventType: NOTIFICATION_EVENTS.PROJECT_ADJUSTMENT_CREATED,
@@ -395,12 +411,11 @@ describe("dispatchNotification()", () => {
       versionNumber: 2,
     });
 
-    expect(mockGetProjectStakeholders).toHaveBeenCalledWith(1, 3);
-    expect(mockSendEmail).toHaveBeenCalledTimes(2);
+    expect(mockSendEmail).not.toHaveBeenCalled();
   });
 
-  it("project.adjustment.created: skips when no stakeholders", async () => {
-    mockGetProjectStakeholders.mockResolvedValue([]);
+  it("project.adjustment.created: skips when the project has no active commercial", async () => {
+    mockGetProjectCommercial.mockResolvedValue(null);
 
     await dispatchNotification({
       eventType: NOTIFICATION_EVENTS.PROJECT_ADJUSTMENT_CREATED,
@@ -416,11 +431,6 @@ describe("dispatchNotification()", () => {
   // ── project.completed ────────────────────────────────────────────────────
 
   it("project.completed: ignores the retired event", async () => {
-    const stakeholders = [
-      { userId: 3, email: "daniel@test.com", name: "Daniel Amado" },
-      { userId: 5, email: "ana@test.com", name: "Ana García" },
-    ];
-    mockGetProjectStakeholders.mockResolvedValue(stakeholders);
     mockGetProjectById.mockResolvedValue({ ...project, completed_at: "2026-04-24T18:00:00Z" });
 
     await dispatchNotification({
@@ -447,7 +457,6 @@ describe("dispatchNotification()", () => {
       expect.objectContaining({ event_type: "project.ready_to_close", project_id: 1, task_id: null, actor_user_id: 5 })
     );
     expect(mockGetProjectCommercial).toHaveBeenCalledWith(1);
-    expect(mockGetProjectStakeholders).not.toHaveBeenCalled();
     expect(mockSendEmail).toHaveBeenCalledTimes(1);
     const call = mockSendEmail.mock.calls[0][0];
     expect(call).toEqual(

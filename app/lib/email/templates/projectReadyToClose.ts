@@ -41,7 +41,7 @@ export const projectReadyToClose = {
       infoCard(rows),
       primaryButton("Ver proyecto", projectUrl),
       divider(),
-      muted(`El proyecto se marcó automáticamente como completado. Puedes agregar tareas en la última versión para reabrirlo o crear un ajuste.`),
+      muted(`El proyecto se marcó automáticamente como completado. Puedes agregar tareas en la última versión para reabrirlo o crear una nueva versión.`),
     ].join("\n");
 
     return emailLayout({
@@ -60,7 +60,7 @@ export const projectReadyToClose = {
       ``,
       `Ver proyecto: ${appUrl()}/projects/${ctx.projectId}`,
       ``,
-      `El proyecto se marcó automáticamente como completado. Puedes agregar tareas en la última versión para reabrirlo o crear un ajuste.`,
+      `El proyecto se marcó automáticamente como completado. Puedes agregar tareas en la última versión para reabrirlo o crear una nueva versión.`,
     ].join("\n");
   },
 };

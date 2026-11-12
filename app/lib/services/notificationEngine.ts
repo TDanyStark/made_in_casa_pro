@@ -21,7 +21,6 @@ import { createNotificationEvent } from "@/lib/queries/notificationEvents";
 import { notifLog } from "@/lib/services/notificationLogger";
 import { resolveProjectVersionThreadKey } from "@/lib/queries/projectEmailThreads";
 import {
-  getProjectStakeholders,
   getTaskAssignee,
   getTaskProjectCreator,
   getQuoteInvitee,
@@ -582,18 +581,20 @@ export async function dispatchNotification(input: DispatchInput): Promise<void> 
 
       // ── project.adjustment.created ─────────────────────────────────────
       case "project.adjustment.created": {
-        const [project, stakeholders] = await Promise.all([
+        // Only the project's commercial hears about the new version; task
+        // collaborators already get their own task.assigned / task.ready emails.
+        const [project, commercial] = await Promise.all([
           getProjectById(input.projectId),
-          getProjectStakeholders(input.projectId, input.actorUserId),
+          getProjectCommercial(input.projectId),
         ]);
-        if (!project || stakeholders.length === 0) break;
+        if (!project || !commercial || commercial.userId === input.actorUserId) break;
 
         const threadKey = await resolveProjectVersionThreadKey(input.projectId, input.adjustmentId);
 
         const createdByName = await getActorName(input.actorUserId);
 
         await sendToRecipients(
-          stakeholders,
+          [commercial],
           input.actorUserId,
           eventId,
           (r) => ({

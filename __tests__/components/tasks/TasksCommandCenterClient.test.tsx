@@ -472,7 +472,7 @@ describe("TasksCommandCenterClient", () => {
     render(<TasksCommandCenterClient userRole={UserRole.ADMIN} />);
 
     expect(
-      screen.getByTitle(/Nueva: trabajo original del proyecto\. Corrección: se crea al rechazar una validación/)
+      screen.getByTitle(/Nueva: trabajo original del proyecto\. Ajuste: se crea al rechazar una validación/)
     ).toBeInTheDocument();
   });
 

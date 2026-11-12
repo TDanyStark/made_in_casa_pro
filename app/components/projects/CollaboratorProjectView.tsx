@@ -252,7 +252,7 @@ function CollaboratorVersionAccordion({
           {adjustment.notes && (
             <div className="px-5 pt-4 pb-3 border-b bg-muted/10">
               <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5">
-                Notas del ajuste
+                Notas de la versión
               </p>
               <SafeHtml
                 className="text-sm prose prose-sm dark:prose-invert max-w-none"

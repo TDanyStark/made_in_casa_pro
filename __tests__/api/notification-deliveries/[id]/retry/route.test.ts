@@ -37,7 +37,6 @@ jest.mock("@/lib/queries/notificationRecipients", () => ({
   getAcceptedQuoteCollaborator: jest.fn(),
   getActorName: jest.fn(),
   getUserNotificationRecipient: jest.fn(),
-  getProjectStakeholders: jest.fn(),
   getProjectCommercial: jest.fn(),
 }));
 

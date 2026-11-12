@@ -17,7 +17,7 @@ export interface ProjectAdjustmentCreatedContext {
 
 export const projectAdjustmentCreated = {
   subject(ctx: ProjectAdjustmentCreatedContext): string {
-    return `[${ctx.projectTitle}] Nueva versión de ajuste: v${ctx.versionNumber}`;
+    return `[${ctx.projectTitle}] Nueva versión: v${ctx.versionNumber}`;
   },
 
   html(ctx: ProjectAdjustmentCreatedContext): string {
@@ -25,27 +25,27 @@ export const projectAdjustmentCreated = {
 
     const rows = [
       { label: "Proyecto", value: ctx.projectTitle },
-      { label: "Versión", value: `Ajuste v${ctx.versionNumber}` },
+      { label: "Versión", value: `v${ctx.versionNumber}` },
       { label: "Creado por", value: ctx.createdByName },
-      ...(ctx.taskCount != null ? [{ label: "Tareas en este ajuste", value: String(ctx.taskCount) }] : []),
+      ...(ctx.taskCount != null ? [{ label: "Tareas en esta versión", value: String(ctx.taskCount) }] : []),
     ];
 
     const body = [
       heading(`Hola, ${ctx.recipientName}`),
-      subheading("Se creó una nueva versión de ajuste en el proyecto"),
-      paragraph(`<strong>${ctx.createdByName}</strong> creó una nueva versión de ajuste en <strong>${ctx.projectTitle}</strong>. Este hilo corresponde a la versión <strong>v${ctx.versionNumber}</strong>.`),
-      `<p style="margin:0 0 16px;font-size:18px;font-weight:700;">${ctx.projectTitle} ${badge(`Ajuste v${ctx.versionNumber}`, "#d97706")}</p>`,
+      subheading("Se creó una nueva versión en el proyecto"),
+      paragraph(`<strong>${ctx.createdByName}</strong> creó una nueva versión en <strong>${ctx.projectTitle}</strong>. Este hilo corresponde a la versión <strong>v${ctx.versionNumber}</strong>.`),
+      `<p style="margin:0 0 16px;font-size:18px;font-weight:700;">${ctx.projectTitle} ${badge(`Versión v${ctx.versionNumber}`, "#d97706")}</p>`,
       infoCard(rows),
       ...(ctx.notes ? [divider(), noteBlock(ctx.notes)] : []),
-      primaryButton("Ver ajuste en el proyecto", projectUrl),
+      primaryButton("Ver versión en el proyecto", projectUrl),
       divider(),
-      muted("Las respuestas a este correo quedarán en el hilo de esta versión de ajuste."),
+      muted("Las respuestas a este correo quedarán en el hilo de esta versión."),
     ].join("\n");
 
     return emailLayout({
-      previewText: `Nuevo ajuste v${ctx.versionNumber}: ${ctx.projectTitle}`,
+      previewText: `Nueva versión v${ctx.versionNumber}: ${ctx.projectTitle}`,
       body,
-      footerNote: `Este es el inicio del hilo de la versión de ajuste v${ctx.versionNumber} del proyecto ${ctx.projectTitle}.`,
+      footerNote: `Este es el inicio del hilo de la versión v${ctx.versionNumber} del proyecto ${ctx.projectTitle}.`,
     });
   },
 
@@ -53,9 +53,9 @@ export const projectAdjustmentCreated = {
     return [
       `Hola, ${ctx.recipientName}`,
       ``,
-      `${ctx.createdByName} creó la versión de ajuste v${ctx.versionNumber} en el proyecto "${ctx.projectTitle}".`,
+      `${ctx.createdByName} creó la versión v${ctx.versionNumber} en el proyecto "${ctx.projectTitle}".`,
       ``,
-      ...(ctx.taskCount != null ? [`Tareas en este ajuste: ${ctx.taskCount}`, ``] : []),
+      ...(ctx.taskCount != null ? [`Tareas en esta versión: ${ctx.taskCount}`, ``] : []),
       `Ver proyecto: ${appUrl()}/projects/${ctx.projectId}`,
     ].join("\n");
   },

@@ -18,11 +18,11 @@ const props = {
 describe('ProjectAdjustmentsTab load errors', () => {
   afterEach(() => mockGet.mockReset());
 
-  it('shows an error state and no "Crear ajuste" when adjustments fail to load', async () => {
+  it('shows an error state and no "Nueva versión" when adjustments fail to load', async () => {
     mockGet.mockResolvedValue(apiFailure);
     renderWithQueryClient(<ProjectAdjustmentsTab {...props} />);
     expect(await screen.findByText('Error al cargar las tareas y versiones')).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Crear ajuste' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Nueva versión' })).not.toBeInTheDocument();
   });
 
   it('renders adjustment notes sanitized', async () => {

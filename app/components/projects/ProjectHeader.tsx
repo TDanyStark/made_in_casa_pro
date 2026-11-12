@@ -23,7 +23,7 @@ const STATUS_OPTIONS: { value: ProjectStatus; label: string }[] = [
   { value: "paused", label: "Pausado" },
   { value: "completed", label: "Completado" },
   { value: "archived", label: "Archivado" },
-  { value: "in_adjustments", label: "En Ajustes" },
+  { value: "in_adjustments", label: "En nueva versión" },
 ];
 
 interface Props {

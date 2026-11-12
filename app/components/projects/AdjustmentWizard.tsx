@@ -208,7 +208,7 @@ export function AdjustmentWizard({
   const loadError = templatesError || usersError;
 
   const STEPS = [
-    { label: "Notas del ajuste", icon: FileText },
+    { label: "Notas de la versión", icon: FileText },
     { label: "Tareas", icon: ListTodo },
   ];
 
@@ -216,7 +216,7 @@ export function AdjustmentWizard({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[680px] max-h-[90vh] flex flex-col p-0" aria-describedby={undefined}>
         <DialogHeader className="p-6 pb-4 border-b">
-          <DialogTitle>Nuevo Ajuste</DialogTitle>
+          <DialogTitle>Nueva versión</DialogTitle>
           <div className="flex items-center gap-2 mt-3">
             {STEPS.map((s, i) => {
               const n = i + 1;
@@ -240,7 +240,7 @@ export function AdjustmentWizard({
           {step === 1 && (
             <div className="space-y-3">
               <p className="text-sm text-muted-foreground">
-                Describe los cambios o correcciones que se incluyen en este ajuste. Esta nota quedará registrada en el historial de versiones.
+                Describe los cambios o correcciones que se incluyen en esta versión. Esta nota quedará registrada en el historial de versiones.
               </p>
               <div className="min-h-[280px]">
                 <RichTextEditor
@@ -248,7 +248,7 @@ export function AdjustmentWizard({
                   onChange={setNotes}
                   placeholder="Ej: El cliente solicitó cambiar los colores del banner y agregar el logo en la versión mobile..."
                   expandable={false}
-                  title="Notas del ajuste"
+                  title="Notas de la versión"
                 />
               </div>
             </div>
@@ -257,13 +257,13 @@ export function AdjustmentWizard({
           {step === 2 && (
             <div className="space-y-4">
               <p className="text-sm text-muted-foreground">
-                Revisa las tareas para este ajuste. Puedes reordenarlas, cambiar responsables, agregar o eliminar tareas.
+                Revisa las tareas para esta versión. Puedes reordenarlas, cambiar responsables, agregar o eliminar tareas.
               </p>
 
               <div className="border rounded-lg bg-card overflow-hidden">
                 <div className="flex items-center justify-between p-4 bg-muted/50 border-b">
                   <div>
-                    <h3 className="text-base font-semibold text-primary/80">Ajuste de tareas</h3>
+                    <h3 className="text-base font-semibold text-primary/80">Tareas de la versión</h3>
                     <div className="flex items-center gap-2 text-xs text-muted-foreground mt-1">
                       <span className="text-amber-600 dark:text-amber-400 font-medium italic">Nueva iteración</span>
                       <span>•</span>
@@ -322,7 +322,7 @@ export function AdjustmentWizard({
                 className="min-w-[140px]"
               >
                 {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-                {isSubmitting ? "Creando ajuste..." : "Crear Ajuste"}
+                {isSubmitting ? "Creando versión..." : "Crear versión"}
               </Button>
             </div>
           )}

@@ -22,8 +22,8 @@ export interface TaskAssignedContext {
 
 const FLAG_LABELS: Record<string, string> = {
   new: "Nueva",
-  correction: "Corrección",
-  adjustment: "Ajuste",
+  correction: "Ajuste",
+  adjustment: "Cambio de alcance",
 };
 
 const TYPE_LABELS: Record<string, string> = {
