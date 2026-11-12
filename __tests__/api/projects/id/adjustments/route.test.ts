@@ -191,7 +191,7 @@ describe("POST /api/projects/[id]/adjustments task notifications", () => {
 });
 
 describe("POST /api/projects/[id]/adjustments eligibility from real latest-version tasks", () => {
-  const INELIGIBLE = "No se puede crear un ajuste hasta que todas las tareas de la última versión estén completadas.";
+  const INELIGIBLE = "No se puede crear una nueva versión hasta que todas las tareas de la última versión estén completadas.";
 
   beforeEach(() => {
     jest.clearAllMocks();

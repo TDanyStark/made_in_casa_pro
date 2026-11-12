@@ -24,7 +24,7 @@ describe('completed project task choices', () => {
   it('offers another task in the latest completed version and a separate adjustment', () => {
     render(<ProjectAdjustmentsTab {...props} />);
     expect(screen.getByRole('button', { name: 'Agregar tarea' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Crear ajuste' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Nueva versión' })).toBeInTheDocument();
     expect(screen.queryByText('Edición habilitada')).not.toBeInTheDocument();
   });
   it('keeps historical versions read-only when a newer version exists', () => {
@@ -40,7 +40,7 @@ describe('completed project task choices', () => {
   it('does not grant creation to read-only users', () => {
     render(<ProjectAdjustmentsTab {...props} canEdit={false} />);
     expect(screen.queryByRole('button', { name: 'Agregar tarea' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Crear ajuste' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Nueva versión' })).not.toBeInTheDocument();
   });
   it('does not offer task creation in paused projects', () => {
     render(<ProjectAdjustmentsTab {...props} projectStatus="paused" />);
@@ -52,29 +52,29 @@ describe('new adjustment eligibility from real latest-version tasks', () => {
   const useVersions = (versions: MockVersion[]) => mockVersions.splice(0, mockVersions.length, ...versions);
   afterEach(() => useVersions([baseVersion]));
 
-  it.each(['active', 'in_adjustments', 'completed'])('offers Crear ajuste in a %s project when every latest task is completed', (projectStatus) => {
+  it.each(['active', 'in_adjustments', 'completed'])('offers Nueva versión in a %s project when every latest task is completed', (projectStatus) => {
     useVersions([{ ...baseVersion, status: 'active', task_count: '3', completed_task_count: '3' }]);
     render(<ProjectAdjustmentsTab {...props} projectStatus={projectStatus} />);
-    expect(screen.getByRole('button', { name: 'Crear ajuste' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Nueva versión' })).toBeInTheDocument();
   });
 
-  it('hides Crear ajuste when the latest version has unfinished tasks despite completed statuses', () => {
+  it('hides Nueva versión when the latest version has unfinished tasks despite completed statuses', () => {
     useVersions([{ ...baseVersion, status: 'completed', task_count: 3, completed_task_count: 2 }]);
     render(<ProjectAdjustmentsTab {...props} projectStatus="completed" />);
-    expect(screen.queryByRole('button', { name: 'Crear ajuste' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Nueva versión' })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Agregar tarea' })).toBeInTheDocument();
   });
 
-  it('hides Crear ajuste when the latest version is empty', () => {
+  it('hides Nueva versión when the latest version is empty', () => {
     useVersions([{ ...baseVersion, status: 'completed', task_count: 0, completed_task_count: 0 }]);
     render(<ProjectAdjustmentsTab {...props} projectStatus="completed" />);
-    expect(screen.queryByRole('button', { name: 'Crear ajuste' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Nueva versión' })).not.toBeInTheDocument();
   });
 
-  it('hides Crear ajuste when the project has no version', () => {
+  it('hides Nueva versión when the project has no version', () => {
     useVersions([]);
     render(<ProjectAdjustmentsTab {...props} projectStatus="completed" />);
-    expect(screen.queryByRole('button', { name: 'Crear ajuste' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Nueva versión' })).not.toBeInTheDocument();
   });
 
   it('decides with the latest version only, not older completed ones', () => {
@@ -83,6 +83,6 @@ describe('new adjustment eligibility from real latest-version tasks', () => {
       { ...baseVersion, id: 2, version_number: 2, status: 'completed', task_count: 2, completed_task_count: 1 },
     ]);
     render(<ProjectAdjustmentsTab {...props} projectStatus="completed" />);
-    expect(screen.queryByRole('button', { name: 'Crear ajuste' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Nueva versión' })).not.toBeInTheDocument();
   });
 });

@@ -126,8 +126,8 @@ const TASK_TYPE_CONFIG: Record<TaskType, { label: string; className: string }> =
 
 const TASK_FLAG_CONFIG: Record<TaskFlag, { label: string; className: string }> = {
   new: { label: "Nueva", className: "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-900/20 dark:text-emerald-400" },
-  correction: { label: "Corrección", className: "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-900/20 dark:text-amber-400" },
-  adjustment: { label: "Ajuste", className: "bg-orange-50 text-orange-700 border-orange-200 dark:bg-orange-900/20 dark:text-orange-400" },
+  correction: { label: "Ajuste", className: "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-900/20 dark:text-amber-400" },
+  adjustment: { label: "Cambio de alcance", className: "bg-orange-50 text-orange-700 border-orange-200 dark:bg-orange-900/20 dark:text-orange-400" },
 };
 
 // ─── Task form schema ────────────────────────────────────────────────────────

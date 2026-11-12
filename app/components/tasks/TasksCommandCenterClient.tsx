@@ -83,8 +83,8 @@ const TYPE_STYLES: Record<TaskType, string> = {
 
 const FLAG_LABELS: Record<TaskFlag, string> = {
   new: "Nueva",
-  correction: "Corrección",
-  adjustment: "Ajuste",
+  correction: "Ajuste",
+  adjustment: "Cambio de alcance",
 };
 
 const FLAG_STYLES: Record<TaskFlag, string> = {
@@ -103,7 +103,7 @@ const STATUS_OPTIONS: ProjectTaskStatus[] = [
 ];
 
 const FLAG_HINT =
-  "Nueva: trabajo original del proyecto. Corrección: se crea al rechazar una validación, para rehacer la tarea. Ajuste: cambio de alcance.";
+  "Nueva: trabajo original del proyecto. Ajuste: se crea al rechazar una validación, para rehacer la tarea. Cambio de alcance: trabajo fuera del alcance original.";
 
 const EDITABLE_FIELD_HINT = "Campo editable: haz clic en el valor para cambiarlo";
 
@@ -432,8 +432,8 @@ export function TasksCommandCenterClient({ userRole }: TasksCommandCenterClientP
           <SelectContent>
             <SelectItem value="all">Bandera: todas</SelectItem>
             <SelectItem value="new">Nueva</SelectItem>
-            <SelectItem value="correction">Corrección</SelectItem>
-            <SelectItem value="adjustment">Ajuste</SelectItem>
+            <SelectItem value="correction">Ajuste</SelectItem>
+            <SelectItem value="adjustment">Cambio de alcance</SelectItem>
           </SelectContent>
         </Select>
 

@@ -36,7 +36,7 @@ describe('task template load errors in wizards', () => {
     expect(screen.getByRole('button', { name: 'Siguiente' })).toBeDisabled();
   });
 
-  it('AdjustmentWizard shows an error and blocks Crear Ajuste instead of an empty task list', async () => {
+  it('AdjustmentWizard shows an error and blocks Crear versión instead of an empty task list', async () => {
     renderWithQueryClient(
       <AdjustmentWizard
         open
@@ -51,6 +51,6 @@ describe('task template load errors in wizards', () => {
     fireEvent.click(screen.getByRole('button', { name: /Siguiente — Tareas/ }));
     expect(await screen.findByText('Error al cargar las tareas del producto')).toBeInTheDocument();
     expect(screen.queryByText('lista (0)')).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Crear Ajuste/ })).toBeDisabled();
+    expect(screen.getByRole('button', { name: /Crear versión/ })).toBeDisabled();
   });
 });

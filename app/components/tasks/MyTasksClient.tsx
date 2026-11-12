@@ -119,11 +119,11 @@ const TYPE_CONFIG: Record<TaskType, { label: string; className: string }> = {
 const FLAG_CONFIG: Record<TaskFlag, { label: string; className: string }> = {
   new: { label: "Nueva", className: "bg-emerald-50 text-emerald-700 border-emerald-200" },
   correction: {
-    label: "Corrección",
+    label: "Ajuste",
     className: "bg-amber-50 text-amber-700 border-amber-200",
   },
   adjustment: {
-    label: "Ajuste",
+    label: "Cambio de alcance",
     className: "bg-orange-50 text-orange-700 border-orange-200",
   },
 };

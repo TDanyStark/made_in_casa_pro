@@ -35,7 +35,7 @@ const EVENT_TYPE_LABELS: Record<string, string> = {
   "quote.requested": "Cotización solicitada",
   "quote.received": "Cotización recibida",
   "quote.accepted": "Cotización aceptada",
-  "project.adjustment.created": "Ajuste creado",
+  "project.adjustment.created": "Versión creada",
   "project.completed": "Proyecto completado",
   "project.ready_to_close": "Proyecto completado (aviso comercial)",
   "task.queue_stalled": "Cola detenida (aviso comercial)",

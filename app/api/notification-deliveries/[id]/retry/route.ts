@@ -18,7 +18,6 @@ import {
   getAcceptedQuoteCollaborator,
   getActorName,
   getUserNotificationRecipient,
-  getProjectStakeholders,
   getProjectCommercial,
 } from "@/lib/queries/notificationRecipients";
 import { resolveProjectVersionThreadKey } from "@/lib/queries/projectEmailThreads";
@@ -366,12 +365,12 @@ async function buildRetryMessage(
     // ── project.adjustment.created ───────────────────────────────────────
     case "project.adjustment.created": {
       if (!event.project_id || !event.adjustment_id) return null;
-      const [project, stakeholders] = await Promise.all([
+      const [project, commercial] = await Promise.all([
         getProjectById(event.project_id),
-        getProjectStakeholders(event.project_id, actorUserId),
+        recipientUserId ? getUserNotificationRecipient(recipientUserId) : getProjectCommercial(event.project_id),
       ]);
-      if (!project || stakeholders.length === 0) return null;
-      const r = stakeholders.find((s) => s.email === recipientEmail) ?? stakeholders[0];
+      if (!project || !commercial) return null;
+      const r = commercial;
       const createdByName = await getActorName(actorUserId);
       const versionNumber = Number(meta.version_number ?? 2);
       const notes = meta.notes ? String(meta.notes) : null;

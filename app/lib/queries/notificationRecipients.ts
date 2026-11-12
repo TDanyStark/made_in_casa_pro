@@ -15,38 +15,8 @@ export interface NotificationRecipient {
 // ── Proyecto ────────────────────────────────────────────────────────────────
 
 /**
- * Devuelve el creador del proyecto + usuarios internos asignados como tareas.
- * Usado para: project.completed, project.adjustment.created
- */
-export async function getProjectStakeholders(
-  projectId: number,
-  excludeUserId?: number | null
-): Promise<NotificationRecipient[]> {
-  const result = await db.execute({
-    sql: `
-      SELECT DISTINCT u.id AS "userId", u.email, u.name
-      FROM users u
-      WHERE u.id IN (
-        -- creador del proyecto
-        SELECT created_by FROM projects WHERE id = $1 AND created_by IS NOT NULL
-        UNION
-        -- usuarios asignados a tareas del proyecto (solo internos)
-        SELECT pt.assigned_user_id FROM project_tasks pt
-        WHERE pt.project_id = $1 AND pt.assigned_user_id IS NOT NULL
-      )
-      AND u.email IS NOT NULL
-      AND u.is_active = 1
-      ${excludeUserId != null ? "AND u.id != $2" : ""}
-      ORDER BY u.name
-    `,
-    args: excludeUserId != null ? [projectId, excludeUserId] : [projectId],
-  });
-  return result.rows as unknown as NotificationRecipient[];
-}
-
-/**
  * Devuelve el comercial del proyecto (projects.created_by) si está activo y
- * tiene email. Usado para: project.ready_to_close
+ * tiene email. Usado para: project.ready_to_close, project.adjustment.created
  */
 export async function getProjectCommercial(
   projectId: number

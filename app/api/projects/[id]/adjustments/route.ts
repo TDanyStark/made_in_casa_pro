@@ -86,8 +86,8 @@ export async function GET(
     const adjustments = await getAdjustmentsByProject(projectId);
     return NextResponse.json(adjustments);
   } catch (error) {
-    console.error("Error al obtener ajustes:", error);
-    return NextResponse.json({ error: "Error interno al obtener ajustes" }, { status: 500 });
+    console.error("Error al obtener versiones:", error);
+    return NextResponse.json({ error: "Error interno al obtener versiones" }, { status: 500 });
   }
 }
 
@@ -118,7 +118,7 @@ export async function POST(
     const lastAdjustment = existingAdjustments[existingAdjustments.length - 1];
     if (!canCreateAdjustmentAfter(lastAdjustment)) {
       return NextResponse.json(
-        { error: "No se puede crear un ajuste hasta que todas las tareas de la última versión estén completadas." },
+        { error: "No se puede crear una nueva versión hasta que todas las tareas de la última versión estén completadas." },
         { status: 400 }
       );
     }
@@ -188,7 +188,7 @@ export async function POST(
         adjustmentFolderId = driveRes.folderId;
         adjustmentFolderUrl = driveRes.folderUrl;
       } catch (e) {
-        console.error("No se pudo crear carpeta en Drive para el ajuste", e);
+        console.error("No se pudo crear carpeta en Drive para la versión", e);
       }
     }
 
@@ -352,7 +352,7 @@ export async function POST(
     if (error instanceof TaskVersionError) {
       return NextResponse.json({ error: error.message }, { status: 400 });
     }
-    console.error("Error al crear ajuste:", error);
-    return NextResponse.json({ error: "Error interno al crear ajuste" }, { status: 500 });
+    console.error("Error al crear versión:", error);
+    return NextResponse.json({ error: "Error interno al crear versión" }, { status: 500 });
   }
 }

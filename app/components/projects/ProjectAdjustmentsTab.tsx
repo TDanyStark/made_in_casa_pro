@@ -69,8 +69,8 @@ export function ProjectAdjustmentsTab({
     setIsSubmitting(true);
     try {
       const res = await post<ProjectAdjustmentType>(`projects/${projectId}/adjustments`, data);
-      if (!res.ok) throw new Error(res.error || "Error al crear ajuste");
-      toast.success("Ajuste creado correctamente");
+      if (!res.ok) throw new Error(res.error || "Error al crear versión");
+      toast.success("Versión creada correctamente");
       setWizardOpen(false);
       queryClient.setQueryData<ProjectDetailType>(["project", projectId], (current) =>
         current ? { ...current, status: "in_adjustments" } : current
@@ -78,7 +78,7 @@ export function ProjectAdjustmentsTab({
       queryClient.invalidateQueries({ queryKey: ["project-adjustments", projectId], refetchType: "all" });
       queryClient.invalidateQueries({ queryKey: ["project", projectId], refetchType: "all" });
     } catch (e: unknown) {
-      toast.error(e instanceof Error ? e.message : "Error al crear ajuste");
+      toast.error(e instanceof Error ? e.message : "Error al crear versión");
     } finally {
       setIsSubmitting(false);
     }
@@ -106,7 +106,7 @@ export function ProjectAdjustmentsTab({
           {canEdit && canCreateNew && (
             <Button onClick={() => setWizardOpen(true)} size="sm">
               <Plus className="mr-2 h-4 w-4" />
-              Crear ajuste
+              Nueva versión
             </Button>
           )}
         </div>
@@ -182,12 +182,12 @@ function VersionAccordion({
     setIsDeleting(true);
     try {
       const res = await del(`projects/${projectId}/adjustments/${adjustment.id}`);
-      if (!res.ok) throw new Error(res.error || "Error al eliminar ajuste");
+      if (!res.ok) throw new Error(res.error || "Error al eliminar versión");
       toast.success("Versión eliminada correctamente");
       queryClient.invalidateQueries({ queryKey: ["project-adjustments", projectId], refetchType: "all" });
       setDeleteDialogOpen(false);
     } catch (e: unknown) {
-      toast.error(e instanceof Error ? e.message : "Error al eliminar ajuste");
+      toast.error(e instanceof Error ? e.message : "Error al eliminar versión");
     } finally {
       setIsDeleting(false);
     }
@@ -251,7 +251,7 @@ function VersionAccordion({
           {/* Notes section */}
           {adjustment.notes && (
             <div className="px-5 pt-4 pb-3 border-b bg-muted/10">
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5">Notas del ajuste</p>
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5">Notas de la versión</p>
               <SafeHtml
                 className="text-sm prose prose-sm dark:prose-invert max-w-none"
                 html={adjustment.notes}

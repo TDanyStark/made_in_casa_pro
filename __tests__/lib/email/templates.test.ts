@@ -367,13 +367,13 @@ describe("projectAdjustmentCreated template", () => {
     const html = projectAdjustmentCreated.html(ctx);
     assertValidHtml(html);
     assertNoUndefined(html);
-    expect(html).toContain("Ajuste v2");
+    expect(html).toContain("Versión v2");
     expect(html).toContain("#d97706");
   });
 
   it("footer note mentions the adjustment version", () => {
     const html = projectAdjustmentCreated.html(ctx);
-    expect(html).toContain("versión de ajuste v2");
+    expect(html).toContain("versión v2");
   });
 });
 

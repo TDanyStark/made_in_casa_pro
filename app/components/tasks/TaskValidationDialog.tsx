@@ -139,7 +139,7 @@ export function TaskValidationDialog({
           toast.success("Validación aprobada");
         }
       } else {
-        toast.success("Enviado a corrección");
+        toast.success("Enviado a ajuste");
       }
 
       onSuccess();
@@ -225,7 +225,7 @@ export function TaskValidationDialog({
                 </SelectContent>
               </Select>
               <p className="text-[11px] text-muted-foreground italic">
-                La tarea seleccionada volverá a estar &quot;En progreso&quot; para su corrección.
+                La tarea seleccionada volverá a estar &quot;En progreso&quot; para su ajuste.
               </p>
             </div>
           )}

@@ -36,7 +36,6 @@ jest.mock('@/lib/queries/notificationEvents', () => ({
 }));
 
 jest.mock('@/lib/queries/notificationRecipients', () => ({
-  getProjectStakeholders: jest.fn().mockResolvedValue([]),
   getTaskAssignee: jest.fn().mockResolvedValue(null),
   getTaskProjectCreator: jest.fn().mockResolvedValue(null),
   getQuoteInvitee: jest.fn(),
