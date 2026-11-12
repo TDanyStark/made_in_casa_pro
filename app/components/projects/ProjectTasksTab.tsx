@@ -18,7 +18,8 @@ import {
 } from "@/lib/definitions";
 import { TaskAssignmentSelector, AssignMode, getAssignmentErrors } from "@/components/tasks/TaskAssignmentSelector";
 import { SortableList } from "@/components/ui/sortable-list";
-import { getTaskListWindow, TASK_PAGE_SIZE } from "@/lib/task-list-window";
+import { getTaskListWindow, TASK_PAGE_SIZE, type TaskListWindow } from "@/lib/task-list-window";
+import { normalizeSearchText, taskMatchesSearch } from "@/lib/task-search";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -279,6 +280,8 @@ interface Props {
   currentUserId?: number;
   currentUserRole?: number;
   adjustmentId?: number | null;
+  /** Filters the list by task title or collaborator name; disables reordering while active. */
+  searchQuery?: string;
 }
 
 // ─── Validate dialog ─────────────────────────────────────────────────────────
@@ -298,6 +301,7 @@ export function ProjectTasksTab({
   currentUserId,
   currentUserRole,
   adjustmentId = null,
+  searchQuery = "",
 }: Props) {
   const queryClient = useQueryClient();
 
@@ -579,7 +583,14 @@ export function ProjectTasksTab({
   }
 
   const completed = sortedTasks.filter((t) => t.status === "completed").length;
-  const taskWindow = getTaskListWindow(sortedTasks, { showCompleted, extraPages, showAll });
+  const isSearching = normalizeSearchText(searchQuery) !== "";
+  const matchingTasks = isSearching
+    ? sortedTasks.filter((task) => taskMatchesSearch(task, searchQuery))
+    : sortedTasks;
+  // While searching every match is listed: nothing stacked or paged.
+  const taskWindow: TaskListWindow<ProjectTaskType> = isSearching
+    ? { stacked: [], visible: matchingTasks, hidden: [] }
+    : getTaskListWindow(sortedTasks, { showCompleted, extraPages, showAll });
   const stackableCount = getTaskListWindow(sortedTasks, { showCompleted: false, extraPages, showAll }).stacked.length;
   const nextPageCount = Math.min(TASK_PAGE_SIZE, taskWindow.hidden.length);
 
@@ -598,6 +609,8 @@ export function ProjectTasksTab({
             {sortedTasks.length > 0 && (
               <span className="text-sm text-muted-foreground">
                 — {completed} de {sortedTasks.length} tareas completadas
+                {isSearching &&
+                  ` · ${matchingTasks.length} ${matchingTasks.length === 1 ? "coincidencia" : "coincidencias"}`}
                 {reordering && <Loader2 className="inline ml-2 h-3.5 w-3.5 animate-spin" />}
               </span>
             )}
@@ -627,6 +640,10 @@ export function ProjectTasksTab({
               No hay tareas aún.
             </p>
           </div>
+        ) : matchingTasks.length === 0 ? (
+          <p className="py-6 text-center text-sm text-muted-foreground">
+            Ninguna tarea coincide con la búsqueda.
+          </p>
         ) : (
           <>
           {taskWindow.stacked.length > 0 && (
@@ -650,7 +667,7 @@ export function ProjectTasksTab({
               </span>
             </button>
           )}
-          {showCompleted && stackableCount > 0 && (
+          {!isSearching && showCompleted && stackableCount > 0 && (
             <div className="mb-2 flex justify-end">
               <Button variant="ghost" size="sm" className="h-7 text-xs text-muted-foreground" onClick={() => setShowCompleted(false)}>
                 <ChevronUp className="h-3.5 w-3.5 mr-1" />
@@ -689,7 +706,7 @@ export function ProjectTasksTab({
                             isWaiting ? "opacity-60" : ""
                           } ${isBlocked ? "border-destructive/50 bg-destructive/5" : ""} ${isCompleted ? "border-green-100 dark:border-green-900/30" : ""}`}
                         >
-                          {canEdit && (
+                          {canEdit && !isSearching && (
                             <div className="flex-shrink-0 pt-0.5">{dragHandle}</div>
                           )}
                           {(isWaiting || isBlocked) && (
@@ -976,7 +993,7 @@ export function ProjectTasksTab({
                 Ver todas
               </Button>
             </div>
-          ) : (extraPages > 0 || showAll) && (
+          ) : !isSearching && (extraPages > 0 || showAll) && (
             <div className="mt-3 flex justify-center">
               <Button
                 variant="ghost"

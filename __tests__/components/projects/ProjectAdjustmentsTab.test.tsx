@@ -2,7 +2,7 @@ import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { ProjectAdjustmentsTab } from '@/components/projects/ProjectAdjustmentsTab';
 
-jest.mock('lucide-react', () => ({ Plus: () => null, ExternalLink: () => null, HardDrive: () => null, ChevronDown: () => null, ChevronUp: () => null, Trash2: () => null }));
+jest.mock('lucide-react', () => ({ Plus: () => null, ExternalLink: () => null, HardDrive: () => null, ChevronDown: () => null, ChevronUp: () => null, Trash2: () => null, Search: () => null }));
 type MockVersion = { id: number; version_number: number; status: string; created_at: string; task_count?: number | string; completed_task_count?: number | string };
 const baseVersion: MockVersion = { id: 1, version_number: 1, status: 'completed', created_at: '2026-01-01', task_count: 2, completed_task_count: 2 };
 const mockVersions: MockVersion[] = [baseVersion];

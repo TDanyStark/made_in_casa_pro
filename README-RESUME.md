@@ -356,6 +356,14 @@ Detalle del proyecto:
   Notificaciones (al final). Los co-responsables viven dentro de Información.
   Los colaboradores solo ven Tareas y Notas. La pestaña activa se distingue
   también en modo oscuro.
+- **Buscador de tareas**: en Tareas y Versiones, el campo "Buscar por tarea o
+  colaborador..." filtra por nombre de tarea o del colaborador asignado (sin
+  distinguir mayúsculas ni tildes). Solo quedan las versiones con coincidencias,
+  abiertas y con todas sus tareas coincidentes a la vista (sin apilar ni paginar).
+  Mientras hay búsqueda no se puede reordenar arrastrando.
+- **Mis Cotizaciones**: solo para colaboradores externos. A los internos
+  (`is_internal = 1`) no se les muestra en el menú, `/my-quotes` los redirige al
+  inicio y `GET /api/my-quotes` y `/api/my-quotes/count` responden 403.
 - **Precio de venta**: se puede anotar (opcional) al crear el proyecto. En la
   parte principal del proyecto aparece en rojo mientras está vacío. Lo ven admin,
   directivo, financiero y el comercial que creó el proyecto; lo editan admin,
