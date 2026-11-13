@@ -143,6 +143,34 @@ describe('TaskWorkSheet', () => {
     expect(link).toHaveAttribute('target', '_blank');
   });
 
+  it('shows the time and the Drive and project links in the header, not in the history rail', async () => {
+    renderSheet();
+    const drive = (await screen.findByText('Drive')).closest('a');
+    const header = drive?.closest('[data-slot="sheet-header"]');
+    expect(header).not.toBeNull();
+    expect(within(header as HTMLElement).getByText('Proyecto')).toBeInTheDocument();
+    expect(within(header as HTMLElement).getByRole('progressbar', { name: 'Avance reportado' })).toBeInTheDocument();
+
+    const rail = screen.getByRole('complementary', { name: 'Antes de ti' });
+    expect(within(rail).queryByText('Drive')).not.toBeInTheDocument();
+    expect(within(rail).queryByText('Proyecto')).not.toBeInTheDocument();
+  });
+
+  it('labels the task description section as "Descripción"', async () => {
+    renderSheet();
+    expect(screen.getByRole('heading', { name: 'Descripción' })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'La tarea' })).not.toBeInTheDocument();
+    await screen.findByText('paleta oficial');
+  });
+
+  it('hides the description section when the task has no description', async () => {
+    renderSheet(baseContext, undefined, { description: '   ' });
+    await screen.findByText('paleta oficial');
+    expect(screen.queryByRole('heading', { name: 'Descripción' })).not.toBeInTheDocument();
+    expect(screen.queryByText('Esta tarea no tiene descripción.')).not.toBeInTheDocument();
+    expect(screen.getByText(/^Asignada el/)).toBeInTheDocument();
+  });
+
   it('renders the project notes as HTML', async () => {
     renderSheet();
     const strong = await screen.findByText('paleta oficial');

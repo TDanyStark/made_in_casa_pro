@@ -2,8 +2,47 @@
   "title": "Detalle de tarea en Mis Tareas (sheet lateral)",
   "brief": "Right-side sheet for collaborators in Mis Tareas: task + description at assignment, status, time, Drive link, project link (new tab), project notes, previous-task history with eye toggle for notes and deliverable; opens on task click or 'Tomar tarea'.",
   "artboards": [
-    { "file": "01-tabs-sheet.html", "title": "Sheet con pestañas", "tradeoff": "Very clean and familiar (Resumen / Notas / Historial); notes and history are one click away, not in view", "width": 1440, "height": 900 },
-    { "file": "02-guided-scroll.html", "title": "Guía en 3 pasos (un solo scroll)", "tradeoff": "Reads like a checklist (entiende → recursos → antecedentes) with a prominent timer; more scrolling and a brand-colored header", "width": 1440, "height": 900 },
-    { "file": "03-workspace-split.html", "title": "Panel de trabajo dividido", "tradeoff": "Everything visible at once (brief + notes left, time/links/history right); wide sheet covers most of the list and needs a stacked fallback on small screens", "width": 1440, "height": 900 }
+    {
+      "file": "01-tabs-sheet.html",
+      "title": "Sheet con pestañas",
+      "tradeoff": "Very clean and familiar (Resumen / Notas / Historial); notes and history are one click away, not in view",
+      "width": 1440,
+      "height": 900
+    },
+    {
+      "file": "02-guided-scroll.html",
+      "title": "Guía en 3 pasos (un solo scroll)",
+      "tradeoff": "Reads like a checklist (entiende → recursos → antecedentes) with a prominent timer; more scrolling and a brand-colored header",
+      "width": 1440,
+      "height": 900
+    },
+    {
+      "file": "03-workspace-split.html",
+      "title": "Panel de trabajo dividido",
+      "tradeoff": "Everything visible at once (brief + notes left, time/links/history right); wide sheet covers most of the list and needs a stacked fallback on small screens",
+      "width": 1440,
+      "height": 900
+    },
+    {
+      "file": "04-header-toolbar.html",
+      "title": "Barra en el encabezado",
+      "tradeoff": "Time and Drive/Proyecto live in one header row; history gets the whole right rail. Header row gets busy on narrow sheets",
+      "width": 1440,
+      "height": 900
+    },
+    {
+      "file": "05-compact-rail.html",
+      "title": "Rail compacto con resumen",
+      "tradeoff": "Closest to the shipped layout: links as a slim two-part button, time as a small key/value list; rail still holds three kinds of content",
+      "width": 1440,
+      "height": 900
+    },
+    {
+      "file": "06-footer-dock.html",
+      "title": "Dock inferior",
+      "tradeoff": "Most room for task, notes and history; Drive/Proyecto become icon buttons with tooltips next to the actions, less discoverable for new collaborators",
+      "width": 1440,
+      "height": 900
+    }
   ]
 }
