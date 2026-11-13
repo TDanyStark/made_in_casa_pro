@@ -5,6 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import {
+  Clock,
   Eye,
   EyeOff,
   ExternalLink,
@@ -106,6 +107,7 @@ function TaskWorkSheetBody({
     .filter(Boolean)
     .join(" › ");
   const assignedAt = formatDate(task.assigned_at, "d MMM yyyy, HH:mm");
+  const description = task.description?.trim();
   const progress = Math.min(Math.max(task.progress_percent ?? 0, 0), 100);
 
   return (
@@ -116,32 +118,92 @@ function TaskWorkSheetBody({
         <SheetDescription className="sr-only">
           Detalle de la tarea para trabajarla sin salir de Mis Tareas
         </SheetDescription>
-        <div className="flex flex-wrap items-center gap-1.5 pt-1">
-          <TaskStatusBadge status={task.status} />
-          <Badge variant="outline" className="text-xs">
-            {taskType === "validation" && <ShieldCheck className="mr-1 h-3 w-3" />}
-            {TYPE_LABELS[taskType]}
-          </Badge>
-          <Badge variant="secondary" className="text-xs">
-            {taskFlag !== "new" ? `${FLAG_LABELS[taskFlag]} · ` : ""}V{task.version_number}
-          </Badge>
-          {task.area_name && (
+        <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 pt-1">
+          <div className="flex flex-wrap items-center gap-1.5">
+            <TaskStatusBadge status={task.status} />
             <Badge variant="outline" className="text-xs">
-              {task.area_name}
+              {taskType === "validation" && <ShieldCheck className="mr-1 h-3 w-3" />}
+              {TYPE_LABELS[taskType]}
             </Badge>
-          )}
+            <Badge variant="secondary" className="text-xs">
+              {taskFlag !== "new" ? `${FLAG_LABELS[taskFlag]} · ` : ""}V{task.version_number}
+            </Badge>
+            {task.area_name && (
+              <Badge variant="outline" className="text-xs">
+                {task.area_name}
+              </Badge>
+            )}
+            <span className="ml-1.5 inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+              <Clock className="h-3.5 w-3.5" aria-hidden="true" />
+              <span className="font-semibold text-foreground tabular-nums">
+                {formatProgressMinutes(task.progress_minutes ?? 0)}
+              </span>
+              <span
+                className="h-1 w-14 overflow-hidden rounded-full bg-muted"
+                role="progressbar"
+                aria-valuenow={progress}
+                aria-valuemin={0}
+                aria-valuemax={100}
+                aria-label="Avance reportado"
+              >
+                <span className="block h-full rounded-full bg-blue-600" style={{ width: `${progress}%` }} />
+              </span>
+              {progress}%
+            </span>
+          </div>
+
+          <nav aria-label="Enlaces de la tarea" className="flex flex-wrap items-center gap-1.5">
+            {contextQuery.isLoading ? (
+              <Skeleton className="h-8 w-20" />
+            ) : context && driveUrl ? (
+              <HeaderLink
+                href={driveUrl}
+                icon={<HardDrive className="h-4 w-4 text-blue-600" />}
+                label="Drive"
+                title={
+                  context.version_number > 1
+                    ? `Carpeta de la versión ${context.version_number}`
+                    : "Carpeta del proyecto"
+                }
+              />
+            ) : (
+              <span className="inline-flex h-8 items-center gap-1.5 px-2 text-xs text-muted-foreground">
+                <HardDrive className="h-3.5 w-3.5" aria-hidden="true" />
+                Sin carpeta de Drive
+              </span>
+            )}
+            <HeaderLink
+              href={`/projects/${task.project_id}`}
+              icon={<FolderOpen className="h-4 w-4" />}
+              label="Proyecto"
+              title="Abre el proyecto en otra pestaña"
+              external
+            />
+            {isHttpUrl(task.delivery_url) && (
+              <HeaderLink
+                href={task.delivery_url}
+                icon={<Package className="h-4 w-4 text-emerald-600" />}
+                label="Mi entregable"
+                title="Entregado al completar"
+              />
+            )}
+          </nav>
         </div>
       </SheetHeader>
 
-      <div className="min-h-0 flex-1 overflow-y-auto md:grid md:grid-cols-[minmax(0,1fr)_300px] md:overflow-hidden">
+      <div className="min-h-0 flex-1 overflow-y-auto md:grid md:grid-cols-[minmax(0,1fr)_280px] md:overflow-hidden">
         {/* Left: what to do */}
         <section aria-label="Qué hacer" className="space-y-6 p-6 md:overflow-y-auto">
           <div>
-            <SectionTitle>La tarea</SectionTitle>
-            <div className="rounded-r-lg border-l-[3px] border-market-purple bg-market-purple/5 px-4 py-3 text-sm leading-relaxed whitespace-pre-line">
-              {task.description?.trim() || "Esta tarea no tiene descripción."}
-            </div>
-            <p className="mt-2 text-xs text-muted-foreground">
+            {description && (
+              <>
+                <SectionTitle>Descripción</SectionTitle>
+                <div className="mb-2 rounded-r-lg border-l-[3px] border-market-purple bg-market-purple/5 px-4 py-3 text-sm leading-relaxed whitespace-pre-line">
+                  {description}
+                </div>
+              </>
+            )}
+            <p className="text-xs text-muted-foreground">
               {assignedAt ? `Asignada el ${assignedAt}` : "Sin fecha de asignación"}
               {task.creator_user_name && ` · Proyecto creado por ${task.creator_user_name}`}
             </p>
@@ -179,68 +241,11 @@ function TaskWorkSheetBody({
           </div>
         </section>
 
-        {/* Right: context rail */}
+        {/* Right: previous tasks */}
         <aside
-          aria-label="Contexto"
-          className="space-y-5 border-t bg-muted/40 p-5 md:overflow-y-auto md:border-t-0 md:border-l"
+          aria-label="Antes de ti"
+          className="border-t bg-muted/40 p-5 md:overflow-y-auto md:border-t-0 md:border-l"
         >
-          <div className="rounded-lg border bg-card p-4">
-            <SectionTitle>Tiempo</SectionTitle>
-            <p className="text-2xl font-bold tabular-nums">
-              {formatProgressMinutes(task.progress_minutes ?? 0)}
-            </p>
-            <div
-              className="mt-2 h-1.5 rounded-full bg-muted"
-              role="progressbar"
-              aria-valuenow={progress}
-              aria-valuemin={0}
-              aria-valuemax={100}
-              aria-label="Avance reportado"
-            >
-              <div className="h-full rounded-full bg-blue-600" style={{ width: `${progress}%` }} />
-            </div>
-            <div className="mt-1.5 flex justify-between text-xs">
-              <span className="text-muted-foreground">Avance reportado</span>
-              <span className="font-semibold">{progress}%</span>
-            </div>
-          </div>
-
-          <nav aria-label="Enlaces de la tarea" className="rounded-lg border bg-card p-1.5">
-            {contextQuery.isLoading ? (
-              <Skeleton className="m-2 h-9" />
-            ) : context && driveUrl ? (
-              <RailLink
-                href={driveUrl}
-                icon={<HardDrive className="h-4 w-4 text-blue-600" />}
-                title="Drive"
-                subtitle={
-                  context.version_number > 1
-                    ? `Carpeta versión ${context.version_number}`
-                    : "Carpeta del proyecto"
-                }
-              />
-            ) : (
-              <div className="flex items-center gap-2.5 px-2.5 py-2 text-sm text-muted-foreground">
-                <HardDrive className="h-4 w-4" />
-                Sin carpeta de Drive
-              </div>
-            )}
-            <RailLink
-              href={`/projects/${task.project_id}`}
-              icon={<FolderOpen className="h-4 w-4" />}
-              title="Proyecto"
-              subtitle="Abre en otra pestaña"
-            />
-            {isHttpUrl(task.delivery_url) && (
-              <RailLink
-                href={task.delivery_url}
-                icon={<Package className="h-4 w-4 text-emerald-600" />}
-                title="Mi entregable"
-                subtitle="Entregado al completar"
-              />
-            )}
-          </nav>
-
           <div>
             <SectionTitle>Antes de ti</SectionTitle>
             {contextQuery.isLoading ? (
@@ -288,31 +293,27 @@ function SectionTitle({ children }: { children: ReactNode }) {
   );
 }
 
-function RailLink({
+function HeaderLink({
   href,
   icon,
+  label,
   title,
-  subtitle,
+  external = false,
 }: {
   href: string;
   icon: ReactNode;
+  label: string;
   title: string;
-  subtitle: string;
+  external?: boolean;
 }) {
   return (
-    <a
-      href={href}
-      target="_blank"
-      rel="noopener noreferrer"
-      className="flex items-center gap-2.5 rounded-md px-2.5 py-2 transition-colors hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
-    >
-      {icon}
-      <span className="min-w-0 flex-1">
-        <span className="block text-sm font-medium">{title}</span>
-        <span className="block text-xs text-muted-foreground">{subtitle}</span>
-      </span>
-      <ExternalLink className="h-3.5 w-3.5 text-muted-foreground" aria-hidden="true" />
-    </a>
+    <Button asChild variant="outline" size="sm" className="h-8 gap-1.5 text-xs">
+      <a href={href} target="_blank" rel="noopener noreferrer" title={title}>
+        {icon}
+        {label}
+        {external && <ExternalLink className="h-3 w-3 text-muted-foreground" aria-hidden="true" />}
+      </a>
+    </Button>
   );
 }
 

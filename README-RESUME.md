@@ -354,10 +354,12 @@ En **Mis Tareas**, al hacer clic en una tarea o después de **Tomar tarea** se a
 un panel lateral a la derecha (`TaskWorkSheet`) con todo lo necesario para
 trabajarla sin salir de la página:
 
-- **Izquierda**: la tarea, su descripción, la fecha de asignación y las notas del
-  proyecto y de la versión.
-- **Derecha**: tiempo y avance reportado, Drive, enlace al proyecto (se abre en
-  otra pestaña) y **Antes de ti**: las tareas ya completadas del proyecto. El
+- **Encabezado**: estado, tipo, versión y área; tiempo trabajado y avance en
+  tamaño pequeño; botones compactos **Drive**, **Proyecto** (se abre en otra
+  pestaña) y **Mi entregable** cuando la tarea ya se entregó.
+- **Izquierda**: la **Descripción** (solo si la tarea tiene una), la fecha de
+  asignación y las notas del proyecto y de la versión.
+- **Derecha**: **Antes de ti**: las tareas ya completadas del proyecto. El
   ojito de cada una muestra sus notas de entrega y el enlace **Abrir entregable**.
 - **Pie**: las acciones de la tarea (tomar, pausar, reportar, completar...).
 - En pantallas pequeñas todo queda en una sola columna.
