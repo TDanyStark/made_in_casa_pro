@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="es"><head><meta charset="utf-8"><title>Design system — Made in Casa Pro</title>
+<style>
+:root{--background:hsl(0 0% 100%);--foreground:hsl(240 10% 3.9%);--primary:hsl(240 5.9% 10%);--primary-foreground:hsl(0 0% 98%);--muted:hsl(240 4.8% 95.9%);--muted-foreground:hsl(240 3.8% 46.1%);--destructive:hsl(0 84.2% 60.2%);--border:hsl(240 5.9% 90%);--ring:hsl(240 10% 3.9%);--purple:#322fbc;--pink:#8b28c1;--green:hsl(120 100% 50%);--radius:.6rem;--brand50:rgba(239,238,255,1);--brand500:rgba(98,41,255,1);--shadow:0 16px 48px rgba(17,24,39,.04),0 12px 24px rgba(17,24,39,.04),0 6px 8px rgba(17,24,39,.02),0 2px 3px rgba(17,24,39,.02)}
+*{box-sizing:border-box}body{margin:0;font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:var(--background);color:var(--foreground);width:1440px;padding:48px}
+h1{font-size:30px;margin:0 0 32px}h2{font-size:14px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted-foreground);margin:40px 0 16px}
+.row{display:flex;gap:16px;flex-wrap:wrap}.sw{width:150px}.sw div{height:72px;border-radius:var(--radius);border:1px solid var(--border)}.sw p{font-size:12px;margin:6px 0 0}.sw small{color:var(--muted-foreground)}
+.btn{font:inherit;font-size:14px;font-weight:500;padding:8px 16px;border-radius:calc(var(--radius) - 2px);border:1px solid var(--border);background:var(--background);cursor:pointer}.btn.p{background:var(--primary);color:var(--primary-foreground);border-color:var(--primary)}.btn:focus-visible{outline:2px solid var(--ring);outline-offset:2px}
+.badge{font-size:12px;padding:2px 10px;border-radius:999px;border:1px solid}.r{width:80px;height:60px;background:var(--muted);border:1px solid var(--border)}
+.card{border:1px solid var(--border);border-radius:var(--radius);padding:20px;box-shadow:var(--shadow);width:360px}
+</style></head><body>
+<h1>Made in Casa Pro — Design system</h1>
+<h2>Colors</h2><div class="row">
+<div class="sw"><div style="background:var(--background)"></div><p>background<br><small>hsl(0 0% 100%)</small></p></div>
+<div class="sw"><div style="background:var(--foreground)"></div><p>foreground<br><small>hsl(240 10% 3.9%)</small></p></div>
+<div class="sw"><div style="background:var(--primary)"></div><p>primary<br><small>hsl(240 5.9% 10%)</small></p></div>
+<div class="sw"><div style="background:var(--muted)"></div><p>muted / secondary<br><small>hsl(240 4.8% 95.9%)</small></p></div>
+<div class="sw"><div style="background:var(--muted-foreground)"></div><p>muted-foreground<br><small>hsl(240 3.8% 46.1%)</small></p></div>
+<div class="sw"><div style="background:var(--border)"></div><p>border<br><small>hsl(240 5.9% 90%)</small></p></div>
+<div class="sw"><div style="background:var(--destructive)"></div><p>destructive<br><small>hsl(0 84.2% 60.2%)</small></p></div>
+<div class="sw"><div style="background:var(--purple)"></div><p>market-purple<br><small>#322fbc</small></p></div>
+<div class="sw"><div style="background:var(--pink)"></div><p>market-pink<br><small>#8b28c1</small></p></div>
+<div class="sw"><div style="background:var(--brand500)"></div><p>tt-brand-500<br><small>rgba(98,41,255)</small></p></div>
+</div>
+<h2>Typography</h2>
+<p style="font-size:30px;font-weight:700;margin:0">primaryH1 — 30 / bold</p>
+<p style="font-size:24px;font-weight:700;margin:8px 0">Page H1 — 24 / bold</p>
+<p style="font-size:14px;margin:0">Body — 14 / regular</p>
+<p style="font-size:12px;color:var(--muted-foreground)">Caption — 12 / muted</p>
+<h2>Radius</h2><div class="row">
+<div class="r" style="border-radius:calc(.6rem - 4px)"></div><div class="r" style="border-radius:calc(.6rem - 2px)"></div><div class="r" style="border-radius:.6rem"></div><div class="r" style="border-radius:calc(.6rem + 4px)"></div></div>
+<h2>Components</h2><div class="row" style="align-items:center">
+<button class="btn p">Tomar tarea</button><button class="btn">Ver historial</button>
+<span class="badge" style="background:#eff6ff;color:#1d4ed8;border-color:#bfdbfe">Ejecución</span>
+<span class="badge" style="background:#faf5ff;color:#7e22ce;border-color:#e9d5ff">Validación</span>
+<span class="badge" style="background:#ecfdf5;color:#047857;border-color:#a7f3d0">Nueva</span>
+<span class="badge" style="background:#fffbeb;color:#b45309;border-color:#fde68a">Ajuste</span>
+</div>
+<h2>Shadow (tt-shadow-elevated-md)</h2><div class="card">Tarjeta con sombra elevada</div>
+</body></html>

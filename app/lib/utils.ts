@@ -5,6 +5,17 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
+/** True only for absolute http(s) URLs; use before rendering user-provided links. */
+export function isHttpUrl(value: string | null | undefined): value is string {
+  if (!value) return false;
+  try {
+    const { protocol } = new URL(value);
+    return protocol === "http:" || protocol === "https:";
+  } catch {
+    return false;
+  }
+}
+
 /**
  * Formatea una fecha a la zona horaria de America/Bogota
  * @param dateString - Fecha en formato string o Date

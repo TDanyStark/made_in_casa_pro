@@ -13,6 +13,7 @@ import { formatProgressMinutes } from "@/lib/task-progress";
 import { get, patch } from "@/lib/services/apiService";
 import type { TaskCost } from "@/lib/queries/taskCost";
 import { TaskStatusBadge } from "./TaskStatusBadge";
+import { isHttpUrl } from "@/lib/utils";
 import { Check, Clock, Copy, Eye, ExternalLink, FileText, Link as LinkIcon, Pencil, User, Wallet } from "lucide-react";
 
 interface TaskDeliverableDialogProps {
@@ -212,14 +213,6 @@ function CopyLinkButton({ url }: { url: string }) {
 // Fallback used when the paragraph has no layout (hidden / not measured yet).
 const DESCRIPTION_FALLBACK_MAX_CHARS = 160;
 
-function isHttpUrl(value: string) {
-  try {
-    const { protocol } = new URL(value);
-    return protocol === "http:" || protocol === "https:";
-  } catch {
-    return false;
-  }
-}
 
 function descriptionLooksLong(text: string) {
   return text.length > DESCRIPTION_FALLBACK_MAX_CHARS || text.split("\n").length > 2;

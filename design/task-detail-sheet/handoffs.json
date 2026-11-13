@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "chosen": "03-workspace-split.html",
+  "handoffs": {
+    "03-workspace-split.html": {
+      "status": "sent",
+      "queued": false,
+      "sentAt": "2026-11-12T23:02:22.737Z",
+      "startedAt": null,
+      "implementedAt": null
+    }
+  }
+}

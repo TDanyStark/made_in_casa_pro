@@ -42,13 +42,13 @@ import {
   TASK_STATUS_DOT,
 } from "./TaskStatusBadge";
 import { TaskPauseResumeButton, notifyAutoPaused } from "./TaskPauseResumeButton";
+import { TaskWorkSheet } from "./TaskWorkSheet";
 import {
   AlertTriangle,
   BellRing,
   CalendarIcon,
   CheckCircle,
   Clock,
-  ExternalLink,
   Eye,
   History as HistoryIcon,
   PauseCircle,
@@ -56,7 +56,6 @@ import {
   ShieldCheck,
 } from "lucide-react";
 import { CREATOR_FILTER_ROLES } from "@/lib/role-groups";
-import Link from "next/link";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { Calendar } from "@/components/ui/calendar";
@@ -202,6 +201,10 @@ export function MyTasksClient() {
     task: null,
     siblings: [],
   });
+  // Task work sheet: the id keeps the open task in sync with refetched data;
+  // the snapshot keeps it visible if it leaves the current filtered list.
+  const [sheetTaskId, setSheetTaskId] = useState<number | null>(null);
+  const [sheetTaskSnapshot, setSheetTaskSnapshot] = useState<MyTaskRowPaginated | null>(null);
 
   // ─── URL state ─────────────────────────────────────────────────────────────
   const page = searchParams.get("page") || "1";
@@ -431,6 +434,11 @@ export function MyTasksClient() {
     setCompleteDialogOpen(true);
   };
 
+  const openTaskSheet = (task: MyTaskRowPaginated) => {
+    setSheetTaskSnapshot(task);
+    setSheetTaskId(task.id);
+  };
+
   const openHistoryDialog = (task: MyTaskRowPaginated) => {
     setTaskForHistory(task);
     setHistoryDialogOpen(true);
@@ -522,6 +530,7 @@ export function MyTasksClient() {
       toast.success("Tarea iniciada correctamente");
       notifyAutoPaused(res.data?.pausedTaskIds);
       queryClient.invalidateQueries({ queryKey: ["my-tasks"] });
+      openTaskSheet({ ...task, status: "in_progress" });
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Error al iniciar tarea");
     } finally {
@@ -529,14 +538,78 @@ export function MyTasksClient() {
     }
   };
 
+  // ─── Task actions (card and sheet) ─────────────────────────────────────────
+  const renderTaskActions = (task: MyTaskRowPaginated) => {
+    const isValidation = (task.task_type ?? "execution") === "validation";
+    const canAct = task.status === "in_progress";
+
+    return (
+      <>
+        {task.status === "not_started" && (
+          <Button
+            size="sm"
+            variant="secondary"
+            className="h-7 text-xs gap-1"
+            onClick={() => handleStartTask(task)}
+            disabled={startingTaskId === task.id}
+          >
+            <PlayCircle className="h-3.5 w-3.5" />
+            Tomar tarea
+          </Button>
+        )}
+
+        <TaskPauseResumeButton
+          task={task}
+          onChanged={() => queryClient.invalidateQueries({ queryKey: ["my-tasks"] })}
+        />
+
+        {canAct && !isValidation && (
+          <>
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-7 text-xs gap-1"
+              onClick={() => openReportFlow(task.id)}
+            >
+              <BellRing className="h-3.5 w-3.5" />
+              Reportar avance
+            </Button>
+            <Button
+              size="sm"
+              className="h-7 text-xs gap-1"
+              onClick={() => openCompleteDialog(task)}
+            >
+              <CheckCircle className="h-3.5 w-3.5" />
+              Completar
+            </Button>
+          </>
+        )}
+
+        {canAct && isValidation && (
+          <Button
+            size="sm"
+            className="h-7 text-xs gap-1 bg-purple-600 hover:bg-purple-700"
+            onClick={() => openValidate(task)}
+          >
+            <ShieldCheck className="h-3.5 w-3.5" />
+            Validar
+          </Button>
+        )}
+      </>
+    );
+  };
+
+  const sheetTask =
+    sheetTaskId === null
+      ? null
+      : tasks.find((t) => t.id === sheetTaskId) ?? sheetTaskSnapshot;
+
   // ─── Task card renderer ───────────────────────────────────────────────────
   const renderTask = (task: MyTaskRowPaginated) => {
     const taskType = task.task_type ?? "execution";
     const taskFlag = task.task_flag ?? "new";
     const isValidation = taskType === "validation";
-    const isNotStarted = task.status === "not_started";
     const isInProgress = task.status === "in_progress";
-    const canAct = isInProgress;
     const isReportedThisSession = reportState.reportedTaskIds.includes(task.id);
     const isViewedThisSession = reportState.viewedTaskIds.includes(task.id);
     const highlightForDailyReport =
@@ -548,7 +621,8 @@ export function MyTasksClient() {
     return (
       <div
         key={task.id}
-        className={`rounded-lg border bg-card p-4 space-y-3 ${
+        onClick={() => openTaskSheet(task)}
+        className={`rounded-lg border bg-card p-4 space-y-3 cursor-pointer transition-colors hover:border-foreground/20 ${
           task.status === "blocked" ? "border-destructive/40 bg-destructive/5" : ""
         } ${task.status === "waiting" ? "opacity-60" : ""} ${
           highlightForDailyReport
@@ -561,7 +635,17 @@ export function MyTasksClient() {
         <div className="flex items-start justify-between gap-3">
           <div className="flex-1 min-w-0">
             <div className="flex flex-wrap items-center gap-1.5 mb-1">
-              <span className="font-medium text-sm">{task.title}</span>
+              <button
+                type="button"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  openTaskSheet(task);
+                }}
+                className="font-medium text-sm text-left rounded-sm hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                aria-label={`Abrir detalle de ${task.title}`}
+              >
+                {task.title}
+              </button>
               <Badge
                 variant="outline"
                 className={`text-xs ${TYPE_CONFIG[taskType]?.className}`}
@@ -612,15 +696,7 @@ export function MyTasksClient() {
             )}
 
             <div className="flex flex-wrap items-center gap-2 mt-2 text-xs text-muted-foreground">
-              {task.project_title && (
-                <Link
-                  href={`/projects/${task.project_id}`}
-                  className="flex items-center gap-1 hover:text-foreground transition-colors"
-                >
-                  <ExternalLink className="h-3 w-3" />
-                  {task.project_title}
-                </Link>
-              )}
+              {task.project_title && <span>{task.project_title}</span>}
               {task.product_name && <span>· {task.product_name}</span>}
               {task.brand_name && (
                 <span className="text-muted-foreground/70">· {task.brand_name}</span>
@@ -641,7 +717,10 @@ export function MyTasksClient() {
             )}
           </div>
 
-          <div className="flex flex-col items-end gap-2">
+          <div
+            className="flex flex-col items-end gap-2"
+            onClick={(event) => event.stopPropagation()}
+          >
             <div className="flex items-center gap-1.5">
               <Button
                 variant="ghost"
@@ -665,56 +744,7 @@ export function MyTasksClient() {
               <TaskStatusBadge status={task.status} />
             </div>
 
-            {isNotStarted && (
-              <Button
-                size="sm"
-                variant="secondary"
-                className="h-7 text-xs gap-1"
-                onClick={() => handleStartTask(task)}
-                disabled={startingTaskId === task.id}
-              >
-                <PlayCircle className="h-3.5 w-3.5" />
-                Tomar tarea
-              </Button>
-            )}
-
-            <TaskPauseResumeButton
-              task={task}
-              onChanged={() => queryClient.invalidateQueries({ queryKey: ["my-tasks"] })}
-            />
-
-            {canAct && !isValidation && (
-              <>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="h-7 text-xs gap-1"
-                  onClick={() => openReportFlow(task.id)}
-                >
-                  <BellRing className="h-3.5 w-3.5" />
-                  Reportar avance
-                </Button>
-                <Button
-                  size="sm"
-                  className="h-7 text-xs gap-1"
-                  onClick={() => openCompleteDialog(task)}
-                >
-                  <CheckCircle className="h-3.5 w-3.5" />
-                  Completar
-                </Button>
-              </>
-            )}
-
-            {canAct && isValidation && (
-              <Button
-                size="sm"
-                className="h-7 text-xs gap-1 bg-purple-600 hover:bg-purple-700"
-                onClick={() => openValidate(task)}
-              >
-                <ShieldCheck className="h-3.5 w-3.5" />
-                Validar
-              </Button>
-            )}
+            {renderTaskActions(task)}
           </div>
         </div>
       </div>
@@ -724,6 +754,18 @@ export function MyTasksClient() {
   // ─── Render ───────────────────────────────────────────────────────────────
   return (
     <div className="space-y-4">
+      <TaskWorkSheet
+        task={sheetTask}
+        open={sheetTask !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setSheetTaskId(null);
+            setSheetTaskSnapshot(null);
+          }
+        }}
+        actions={sheetTask ? renderTaskActions(sheetTask) : null}
+      />
+
       {/* Filter bar */}
       <div className="space-y-3">
         {/* Row 1: Selects + Clear button */}

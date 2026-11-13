@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>02 · Sheet guiado en un solo scroll</title>
+<style>
+:root{--bg:hsl(0 0% 100%);--fg:hsl(240 10% 3.9%);--primary:hsl(240 5.9% 10%);--pfg:hsl(0 0% 98%);--muted:hsl(240 4.8% 95.9%);--mfg:hsl(240 3.8% 46.1%);--border:hsl(240 5.9% 90%);--ring:hsl(240 10% 3.9%);--purple:#322fbc;--pink:#8b28c1;--radius:.6rem}
+*{box-sizing:border-box}html,body{margin:0;height:100%}
+body{font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;font-size:14px;color:var(--fg);background:var(--bg)}
+button,a{font:inherit;color:inherit}button{cursor:pointer}:focus-visible{outline:2px solid var(--ring);outline-offset:2px}
+.app{display:grid;grid-template-columns:240px 1fr;height:100vh}
+.side{border-right:1px solid var(--border);padding:20px 16px;background:var(--muted)}.side b{display:block;margin-bottom:20px}
+.side a{display:block;padding:8px 10px;border-radius:calc(var(--radius) - 2px);text-decoration:none;color:var(--mfg)}.side a[aria-current]{background:var(--bg);color:var(--fg);font-weight:600}
+main{padding:28px 32px}h1{font-size:24px;margin:0 0 20px}
+.card{border:1px solid var(--border);border-radius:var(--radius);padding:16px 18px;margin-bottom:12px;display:flex;justify-content:space-between;gap:16px}
+.card h3{margin:0 0 4px;font-size:15px}.card p{margin:0;color:var(--mfg);font-size:13px}
+.pill{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:500;padding:2px 10px;border-radius:999px;border:1px solid;white-space:nowrap}
+.dot{width:7px;height:7px;border-radius:50%;background:currentColor}
+.s-prog{background:#eff6ff;color:#1d4ed8;border-color:#bfdbfe}.s-new{background:#f1f5f9;color:#334155;border-color:#cbd5e1}.s-done{background:#ecfdf5;color:#047857;border-color:#a7f3d0}.s-adj{background:#fffbeb;color:#b45309;border-color:#fde68a}
+.btn{border:1px solid var(--border);background:var(--bg);border-radius:calc(var(--radius) - 2px);padding:9px 14px;font-weight:500;display:inline-flex;align-items:center;justify-content:center;gap:8px;text-decoration:none}
+.btn.p{background:var(--primary);color:var(--pfg);border-color:var(--primary)}.btn.sm{padding:5px 10px;font-size:13px}
+.ghost{border:0;background:transparent;padding:6px;border-radius:6px;color:var(--mfg)}.ghost:hover{background:var(--muted);color:var(--fg)}
+svg{width:16px;height:16px;flex:none}
+.overlay{position:fixed;inset:0;background:rgba(9,9,11,.35)}
+.sheet{position:fixed;top:0;right:0;bottom:0;width:520px;background:var(--bg);box-shadow:-12px 0 48px rgba(17,24,39,.12);display:flex;flex-direction:column;animation:in .25s cubic-bezier(.46,.03,.52,.96)}
+@keyframes in{from{transform:translateX(24px);opacity:0}}@media (prefers-reduced-motion:reduce){.sheet{animation:none}}
+.hero{padding:18px 24px 18px;background:linear-gradient(135deg,var(--purple),var(--pink));color:#fff}
+.hero .top{display:flex;justify-content:space-between;align-items:center;font-size:12px;opacity:.9}
+.hero .ghost{color:#fff}.hero .ghost:hover{background:rgba(255,255,255,.15)}
+.hero h2{font-size:20px;margin:8px 0 12px;line-height:1.3}
+.timer{display:flex;align-items:center;gap:14px;background:rgba(255,255,255,.14);border-radius:var(--radius);padding:10px 14px}
+.timer strong{font-size:22px;font-variant-numeric:tabular-nums}.timer small{display:block;font-size:12px;opacity:.85}
+.live{display:inline-flex;align-items:center;gap:6px;font-size:12px;background:#fff;color:#1d4ed8;border-radius:999px;padding:2px 10px;font-weight:600;margin-left:auto}
+.live .dot{animation:p 1.6s infinite}@keyframes p{50%{opacity:.3}}@media (prefers-reduced-motion:reduce){.live .dot{animation:none}}
+.body{flex:1;overflow:auto;padding:8px 24px 24px}
+.step{display:grid;grid-template-columns:28px 1fr;gap:12px;padding:18px 0;border-bottom:1px solid var(--border)}
+.step:last-child{border:0}
+.num{width:28px;height:28px;border-radius:50%;background:var(--muted);display:grid;place-items:center;font-weight:600;font-size:13px;color:var(--mfg)}
+.step h3{margin:3px 0 10px;font-size:15px}
+.desc{line-height:1.6;margin:0}.small{color:var(--mfg);font-size:13px;margin-top:8px}
+.quick{display:flex;gap:8px;flex-wrap:wrap}
+.qa{flex:1;min-width:180px;border:1px solid var(--border);border-radius:var(--radius);padding:12px;display:flex;align-items:center;gap:10px;text-decoration:none}
+.qa:hover{background:var(--muted)}.qa small{display:block;color:var(--mfg);font-size:12px}
+details{border:1px solid var(--border);border-radius:var(--radius)}
+summary{list-style:none;padding:12px 14px;display:flex;justify-content:space-between;align-items:center;cursor:pointer;font-weight:500}
+summary::-webkit-details-marker{display:none}
+.chev{transition:transform .2s}details[open] .chev{transform:rotate(180deg)}@media (prefers-reduced-motion:reduce){.chev{transition:none}}
+.note{padding:0 14px 14px;line-height:1.6}.note ul{margin:6px 0 0;padding-left:18px}
+.hist{list-style:none;margin:0;padding:0}
+.hist li{display:grid;grid-template-columns:1fr auto;gap:4px 10px;padding:10px 0;border-bottom:1px dashed var(--border);align-items:center}
+.hist li:last-child{border:0}.hist small{color:var(--mfg);display:block}
+.reveal{grid-column:1/-1;background:var(--muted);border-radius:8px;padding:10px 12px;line-height:1.55;font-size:13px}
+.foot{border-top:1px solid var(--border);padding:12px 24px;display:grid;grid-template-columns:auto 1fr 1.3fr;gap:8px}
+[hidden]{display:none!important}
+</style></head><body>
+<svg hidden><symbol id="drive" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3h8l6 10-4 7H6l-4-7z"/><path d="M8 3l6 10H2M16 3l-6 10 4 7"/></symbol>
+<symbol id="folder" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></symbol>
+<symbol id="eye" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></symbol>
+<symbol id="x" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></symbol>
+<symbol id="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></symbol>
+<symbol id="ext" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 3h6v6M10 14 21 3M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></symbol>
+<symbol id="note" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M8 13h8M8 17h5"/></symbol>
+<symbol id="pause" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></symbol>
+<symbol id="check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6 9 17l-5-5"/></symbol></svg>
+
+<div class="app" aria-hidden="true" inert>
+ <nav class="side"><b>Made in Casa</b><a href="#">Dashboard</a><a href="#">Proyectos</a><a href="#" aria-current="page">Mis Tareas</a></nav>
+ <main><h1>Mis Tareas</h1>
+  <article class="card"><div><h3>Carrusel Instagram — lanzamiento navideño</h3><p>Campaña Navidad 2026 · Café Altura</p></div><span class="pill s-prog"><span class="dot"></span>En progreso</span></article>
+  <article class="card"><div><h3>Adaptar banners web a formato móvil</h3><p>Rediseño e-commerce · Dulce Hogar</p></div><span class="pill s-new"><span class="dot"></span>Sin iniciar</span></article>
+  <article class="card"><div><h3>Video reel 15 s — receta de temporada</h3><p>Contenido orgánico Q4 · Café Altura</p></div><span class="pill s-done"><span class="dot"></span>Completada</span></article>
+ </main>
+</div>
+
+<div class="overlay"></div>
+<aside class="sheet" role="dialog" aria-modal="true" aria-labelledby="t">
+ <header class="hero">
+  <div class="top"><span>Café Altura · Campaña Navidad 2026 · V2</span><button class="ghost" aria-label="Cerrar"><svg><use href="#x"/></svg></button></div>
+  <h2 id="t">Carrusel Instagram — lanzamiento navideño</h2>
+  <div class="timer"><div><small>Tiempo trabajado</small><strong>02:35:12</strong></div><div><small>Avance</small><strong>60%</strong></div><span class="live"><span class="dot"></span>En progreso</span></div>
+ </header>
+
+ <div class="body">
+  <section class="step" aria-labelledby="s1"><span class="num">1</span><div>
+   <h3 id="s1">Entiende la tarea</h3>
+   <p class="desc">Ajustar el carrusel de 5 piezas (1080×1350) según comentarios del cliente: cambiar el titular de la portada a “Navidad con aroma a origen”, usar la foto del empaque nuevo en la pieza 3 y cerrar con el CTA “Pídelo en cafealtura.co”.</p>
+   <p class="small"><span class="pill s-adj">Ajuste</span> &nbsp;Asignada el 10 nov a las 09:15 · Proyecto de Laura Gómez · Área Diseño</p>
+  </div></section>
+
+  <section class="step" aria-labelledby="s2"><span class="num">2</span><div>
+   <h3 id="s2">Ten a mano lo que necesitas</h3>
+   <div class="quick">
+    <a class="qa" href="#"><svg style="color:#1d4ed8"><use href="#drive"/></svg><span><b>Abrir Drive</b><small>Carpeta de la versión 2</small></span></a>
+    <a class="qa" href="#"><svg><use href="#folder"/></svg><span><b>Ver proyecto</b><small>En otra pestaña</small></span></a>
+   </div>
+   <details style="margin-top:10px" open><summary><span style="display:flex;gap:8px;align-items:center"><svg><use href="#note"/></svg>Notas del proyecto</span><svg class="chev"><use href="#chev"/></svg></summary>
+    <div class="note"><b>Tono:</b> cálido, familiar, sin tecnicismos. <b>Paleta:</b> rojo vino, crema y dorado del empaque.<ul><li>Logo siempre en esquina inferior derecha.</li><li>El cliente aprueba por WhatsApp, no por correo.</li></ul></div></details>
+  </div></section>
+
+  <section class="step" aria-labelledby="s3"><span class="num">3</span><div>
+   <h3 id="s3">Revisa lo que se hizo antes</h3>
+   <ul class="hist">
+    <li><div><b>Validación V1</b><small>Laura Gómez · 9 nov</small></div><button class="ghost" aria-expanded="true" aria-controls="h1" aria-label="Ocultar notas"><svg><use href="#eye"/></svg></button>
+     <div class="reveal" id="h1">“Cliente pide cambiar portada y usar empaque nuevo. Lo demás aprobado.”</div></li>
+    <li><div><b>Carrusel Instagram · V1</b><small>Tú · 8 nov</small></div><button class="ghost" aria-expanded="false" aria-controls="h2" aria-label="Ver notas y entregable"><svg><use href="#eye"/></svg></button>
+     <div class="reveal" id="h2" hidden>“Primera propuesta con fotos de stock.” <a class="btn sm" href="#"><svg><use href="#ext"/></svg>Entregable</a></div></li>
+    <li><div><b>Copy del carrusel</b><small>Andrés Pérez · 7 nov</small></div><button class="ghost" aria-expanded="false" aria-controls="h3" aria-label="Ver notas y entregable"><svg><use href="#eye"/></svg></button>
+     <div class="reveal" id="h3" hidden>“Textos aprobados en el doc.” <a class="btn sm" href="#"><svg><use href="#ext"/></svg>Entregable</a></div></li>
+   </ul>
+  </div></section>
+ </div>
+
+ <footer class="foot">
+  <button class="btn" aria-label="Pausar"><svg><use href="#pause"/></svg></button>
+  <button class="btn">Reportar avance</button>
+  <button class="btn p"><svg><use href="#check"/></svg>Completar y entregar</button>
+ </footer>
+</aside>
+<script>
+document.querySelectorAll('[aria-controls^=h]').forEach(b=>b.onclick=()=>{const p=document.getElementById(b.getAttribute('aria-controls'));p.hidden=!p.hidden;b.setAttribute('aria-expanded',!p.hidden)});
+</script>
+</body></html>
