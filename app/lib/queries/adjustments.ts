@@ -154,6 +154,15 @@ export async function deleteProjectAdjustment(adjustmentId: number, projectId: n
       throw new Error("No se puede eliminar un ajuste que tiene tareas. Elimina las tareas primero.");
     }
 
+    const costCheck = await transaction.execute({
+      sql: `SELECT COUNT(*) as count FROM project_costs WHERE adjustment_id = $1`,
+      args: [adjustmentId],
+    });
+    const costCount = Number((costCheck.rows[0] as unknown as { count: number | string }).count);
+    if (costCount > 0) {
+      throw new Error("No se puede eliminar un ajuste que tiene costos asociados. Elimina los costos primero.");
+    }
+
     await transaction.execute({
       sql: `DELETE FROM project_adjustments WHERE id = $1 AND project_id = $2`,
       args: [adjustmentId, projectId],

@@ -62,6 +62,10 @@ export const TASK_COST_EDIT_ROLES: readonly UserRole[] = [
 
 export const CREATOR_FILTER_ROLES: readonly UserRole[] = OPERATIONS_ROLES;
 
+// Ven, agregan, editan y borran los costos asociados del proyecto y sus
+// categorías (el comercial, solo en proyectos que creó). Nunca colaborador.
+export const PROJECT_COSTS_ROLES: readonly UserRole[] = OPERATIONS_ROLES;
+
 
 // Roles que pueden ver quién creó cada proyecto en la lista de proyectos.
 export const PROJECT_CREATOR_VIEW_ROLES: readonly UserRole[] = [
