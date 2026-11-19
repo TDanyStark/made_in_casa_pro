@@ -3,6 +3,7 @@ import { validateApiRole, validateHttpMethod } from "@/lib/services/api-auth";
 import { AUTHENTICATED_ROLES } from "@/lib/role-groups";
 import { getProjectDetail } from "@/lib/queries/projects";
 import { getTasksByProject, getTasksForQuoteView } from "@/lib/queries/projectTasks";
+import { toCollaboratorQuoteView } from "@/lib/utils/collaborator-quote-view";
 import { decrypt } from "@/lib/session";
 import { cookies } from "next/headers";
 
@@ -43,7 +44,7 @@ export async function GET(request: NextRequest, { params }: Params) {
       }, { status: 403 });
     }
 
-     // Return the full project detail and all project tasks once invitation access is confirmed.
+     // Load the project and all its tasks once invitation access is confirmed.
      const [fullProject, tasks] = await Promise.all([
        getProjectDetail(projectId),
        getTasksByProject(projectId),
@@ -55,9 +56,12 @@ export async function GET(request: NextRequest, { params }: Params) {
     // Return just the invited task IDs
     const invitedTaskIds = invitedTasks.map(t => t.id);
 
+     // Never expose the sale price or other collaborators' task costs.
+     const view = toCollaboratorQuoteView(fullProject, tasks, session.id);
+
      return NextResponse.json({
-       ...fullProject,
-       tasks,
+       ...view.project,
+       tasks: view.tasks,
        invited_task_ids: invitedTaskIds,
      });
   } catch (error) {

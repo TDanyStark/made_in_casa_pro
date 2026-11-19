@@ -254,3 +254,38 @@ describe("GET /api/projects/[id]/tasks/[tid] — project scope and access", () =
     expect(mockCanAccess).not.toHaveBeenCalled();
   });
 });
+
+describe("GET /api/projects/[id]/tasks/[tid] — task cost is privileged", () => {
+  const costedTask = { ...task, completion_cost: 450000 };
+
+  beforeEach(() => {
+    mockGetTask.mockResolvedValue(costedTask);
+  });
+
+  it("hides the cost of another collaborator's task from a COLABORADOR", async () => {
+    actAs(4, 9);
+    mockCanAccess.mockResolvedValue(true);
+
+    const res = (await GET(request("GET"), ctx()))!;
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ ...costedTask, completion_cost: null });
+  });
+
+  it("keeps the cost of the COLABORADOR's own task", async () => {
+    actAs(4, 4);
+    mockCanAccess.mockResolvedValue(true);
+
+    const res = (await GET(request("GET"), ctx()))!;
+
+    expect(await res.json()).toEqual(costedTask);
+  });
+
+  it("keeps every cost for an operations role (previous behavior)", async () => {
+    actAs(2, 3);
+
+    const res = (await GET(request("GET"), ctx()))!;
+
+    expect(await res.json()).toEqual(costedTask);
+  });
+});

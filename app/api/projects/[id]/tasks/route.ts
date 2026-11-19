@@ -9,6 +9,7 @@ import { cookies } from "next/headers";
 import { decrypt } from "@/lib/session";
 import { AUTHENTICATED_ROLES, hasAnyRole, OPERATIONS_ROLES } from "@/lib/role-groups";
 import { userCanAccessProject } from "@/lib/queries/projects";
+import { hideOtherTaskCost } from "@/lib/utils/collaborator-quote-view";
 import {
   dispatchNotification,
   NOTIFICATION_EVENTS,
@@ -44,9 +45,12 @@ export async function GET(request: NextRequest, { params }: Params) {
   const projectId = parseInt(id);
 
   // Roles fuera de operaciones (colaborador) solo ven proyectos donde tienen acceso.
-  if (!hasAnyRole(roleValidation.userRole, OPERATIONS_ROLES)) {
+  const isOperations = hasAnyRole(roleValidation.userRole, OPERATIONS_ROLES);
+  let viewerId: number | null = null;
+  if (!isOperations) {
     const cookie = (await cookies()).get("session")?.value;
     const session = cookie ? await decrypt(cookie) : null;
+    viewerId = session?.id ? Number(session.id) : null;
     const allowed = session?.id
       ? await userCanAccessProject(projectId, Number(session.id), roleValidation.userRole)
       : false;
@@ -68,7 +72,8 @@ export async function GET(request: NextRequest, { params }: Params) {
   }
 
   const tasks = await getTasksByProject(projectId, adjustmentId);
-  return NextResponse.json(tasks);
+  // Task costs are privileged: outside operations, only the viewer's own cost stays.
+  return NextResponse.json(isOperations ? tasks : tasks.map((task) => hideOtherTaskCost(task, viewerId)));
 }
 
 export async function POST(request: NextRequest, { params }: Params) {

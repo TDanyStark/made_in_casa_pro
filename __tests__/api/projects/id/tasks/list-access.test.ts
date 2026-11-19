@@ -83,6 +83,38 @@ describe("GET /api/projects/[id]/tasks access", () => {
     const res = (await callGet())!;
 
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual(tasks);
+    expect(await res.json()).toEqual([{ id: 1, project_id: 12, completion_cost: null }]);
+  });
+});
+
+describe("GET /api/projects/[id]/tasks — task costs are privileged", () => {
+  const costedTasks = [
+    { id: 1, project_id: 12, assigned_user_id: 21, completion_cost: 300000 },
+    { id: 2, project_id: 12, assigned_user_id: 33, completion_cost: 450000 },
+  ];
+
+  beforeEach(() => {
+    (getTasksByProject as jest.Mock).mockResolvedValue(costedTasks);
+  });
+
+  it("shows a COLABORADOR only the cost of their own task", async () => {
+    mockRole.mockResolvedValue({ isAuthorized: true, userRole: 4, response: undefined });
+    (userCanAccessProject as jest.Mock).mockResolvedValue(true);
+
+    const res = (await callGet())!;
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual([
+      { id: 1, project_id: 12, assigned_user_id: 21, completion_cost: 300000 },
+      { id: 2, project_id: 12, assigned_user_id: 33, completion_cost: null },
+    ]);
+  });
+
+  it("keeps every cost for an operations role (previous behavior)", async () => {
+    mockRole.mockResolvedValue({ isAuthorized: true, userRole: 3, response: undefined });
+
+    const res = (await callGet())!;
+
+    expect(await res.json()).toEqual(costedTasks);
   });
 });

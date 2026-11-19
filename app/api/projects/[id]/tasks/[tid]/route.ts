@@ -8,6 +8,7 @@ import {
   resolveProjectTaskAssignment,
 } from "@/lib/queries/projectTasks";
 import { userCanAccessProject } from "@/lib/queries/projects";
+import { hideOtherTaskCost } from "@/lib/utils/collaborator-quote-view";
 import { cookies } from "next/headers";
 import { decrypt } from "@/lib/session";
 import { AUTHENTICATED_ROLES, hasAnyRole, OPERATIONS_ROLES } from "@/lib/role-groups";
@@ -69,6 +70,8 @@ export async function GET(request: NextRequest, { params }: Params) {
     if (!allowed) {
       return NextResponse.json({ error: "No tienes acceso a este proyecto" }, { status: 403 });
     }
+    // Task costs are privileged: outside operations, only the viewer's own cost stays.
+    return NextResponse.json(hideOtherTaskCost(task, userId));
   }
   return NextResponse.json(task);
 }

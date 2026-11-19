@@ -4,7 +4,8 @@ import { validateApiRole, validateHttpMethod } from "@/lib/services/api-auth";
 import { getProjectTaskById, validateTask } from "@/lib/queries/projectTasks";
 import { decrypt } from "@/lib/session";
 import { cookies } from "next/headers";
-import { AUTHENTICATED_ROLES, TASK_OVERRIDE_ROLES } from "@/lib/role-groups";
+import { AUTHENTICATED_ROLES, hasAnyRole, OPERATIONS_ROLES, TASK_OVERRIDE_ROLES } from "@/lib/role-groups";
+import { hideOtherTaskCost } from "@/lib/utils/collaborator-quote-view";
 import {
   dispatchNotification,
   NOTIFICATION_EVENTS,
@@ -112,9 +113,14 @@ export async function POST(request: NextRequest, { params }: Params) {
       });
     }
 
+    // Task costs are privileged: outside operations, only the caller's own cost stays.
+    const isOperations = hasAnyRole(roleValidation.userRole, OPERATIONS_ROLES);
+    const visible = <T,>(t: T) =>
+      isOperations || !t ? t : hideOtherTaskCost(t as T & object, userId);
+
     return NextResponse.json({
-      task: result.task,
-      targetTask: result.targetTask,
+      task: visible(result.task),
+      targetTask: visible(result.targetTask),
       blockedReason: result.blockedReason ?? null,
     });
   } catch (error) {
