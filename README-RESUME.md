@@ -373,7 +373,7 @@ desde el panel.
 
 Detalle del proyecto:
 
-- **Pestañas**: Tareas, Notas, Métricas, Cotizaciones, Información y
+- **Pestañas**: Tareas, Notas, Métricas, Costos, Cotizaciones, Información y
   Notificaciones (al final). Los co-responsables viven dentro de Información.
   Los colaboradores solo ven Tareas y Notas. La pestaña activa se distingue
   también en modo oscuro.
@@ -396,6 +396,17 @@ Detalle del proyecto:
   porcentaje, costo frente a venta con el margen, y la tabla "Inversión por
   colaborador" (tipo, horas, costo y % del costo, de mayor a menor costo, con
   total). También se filtra por versión. Comercial y colaborador no la ven.
+  Incluye además la tarjeta "Costos asociados por categoría".
+- **Costos** (admin, directivo, financiero y el comercial que creó el proyecto;
+  el colaborador nunca la ve): cobros asociados al proyecto que no son tareas,
+  como el pago al comercial, las tareas de los comerciales (que no tienen sueldo
+  en MIC), tokens de ChatGPT o créditos de Higgsfield. Cada costo tiene
+  categoría, descripción opcional, monto, fecha, versión y, opcionalmente, una
+  tarea vinculada de esa versión. La categoría se busca en un selector y, si no
+  existe, se crea ahí mismo (sin distinguir mayúsculas). La versión solo se pide
+  cuando el proyecto tiene 2 o más; con una sola se asigna sola. Cualquiera de
+  esos roles puede crear, editar y borrar. Una versión con costos no se puede
+  eliminar.
 
 | Qué | Dónde | Quién |
 | --- | --- | --- |
@@ -405,6 +416,9 @@ Detalle del proyecto:
 | Anotar en cuánto se vendió | `PATCH /api/projects/[id]/financials` con `{ "sale_price": number \| null }` (responde solo `{ sale_price }`) | Admin, directivo y el comercial que creó el proyecto |
 | Ver cuánto valió una tarea | Ojito de la tarea (`GET /api/projects/[id]/tasks/[tid]/cost`) | Admin, directivo y financiero |
 | Corregir el costo de una tarea externa completada | Lápiz en el ojito de la tarea (`PATCH /api/projects/[id]/tasks/[tid]/cost` con `{ "completion_cost": number }`, >= 0) | Admin y directivo |
+| Ver costos asociados | Pestaña Costos (`GET /api/projects/[id]/costs`, opcional `?adjustment_id=<id>`; responde `{ costs, total, by_category, versions, adjustment_id }`) | Admin, directivo, financiero y el comercial que creó el proyecto |
+| Agregar, editar o borrar un costo asociado | `POST /api/projects/[id]/costs`, `PATCH` / `DELETE /api/projects/[id]/costs/[costId]` (monto mayor que 0; `adjustment_id` obligatorio si hay 2 o más versiones) | Admin, directivo, financiero y el comercial que creó el proyecto |
+| Listar o crear categorías de costo | `GET` / `POST /api/project-cost-categories` (si ya existe, responde 200 con la existente; si es nueva, 201) | Admin, directivo, financiero y comercial |
 
 Cómo se calcula el dinero invertido:
 
@@ -437,24 +451,28 @@ Cómo se calcula el dinero invertido:
   cuándo. El ojito lo muestra: "Corregido por {nombre} el {fecha} · valor
   declarado {valor}". Así los externos pasan su cuenta de cobro con lo que
   aparece en MIC: lo que no está en MIC no se paga. Financiero solo lo ve;
-  comercial y colaborador no ven costos.
+  comercial y colaborador no ven costos de tareas.
 - **Recálculo único**: al guardar el sueldo mensual de un interno (mayor que 0),
   sus tareas ya completadas que aún no estaban congeladas con sueldo mensual (sin
   precio externo ni cotización aceptada) se recalculan una sola vez con el mes en
   que se completaron. Las tareas ya congeladas con sueldo mensual no vuelven a
   cambiar.
+- **Costos asociados**: la suma de la pestaña Costos se agrega al invertido
+  (`associated_cost`, con desglose `associated_by_category`): `total_cost =
+  internos + externos + asociados` y `margin = venta - total_cost`.
 - El sueldo mensual reemplaza al valor de la hora por colaborador. La columna
   `users.hourly_rate` sigue en la base, pero la aplicación ya no la usa.
 - **Filtro por versión**: `?adjustment_id` (id de `project_adjustments`) cuenta solo
-  las tareas de esa versión. Un valor que no es entero positivo responde `400
+  las tareas y los costos asociados de esa versión. Un valor que no es entero positivo responde `400
   { "error": "Versión inválida" }`; una versión de otro proyecto, `404
   { "error": "Versión no encontrada" }`. La respuesta siempre incluye
   `versions: [{ id, version_number }]` y `adjustment_id` (el filtro o `null`).
 - El precio de venta y el margen son de todo el proyecto: con un filtro de
   versión, `sale_price` sigue siendo el del proyecto y `margin` es `null`.
 - Los gráficos usan `recharts` a través del componente `chart` de shadcn.
-- Migraciones: `019_project_financials.sql`, `020_monthly_salary_cost.sql` y
-  `021_task_cost_correction.sql`.
+- Migraciones: `019_project_financials.sql`, `020_monthly_salary_cost.sql`,
+  `021_task_cost_correction.sql` y `028_project_costs.sql` (costos asociados y
+  sus categorías).
 
 ## Notificaciones por correo
 
