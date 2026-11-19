@@ -45,6 +45,8 @@ const summary = {
   external_cost: 570000,
   total_cost: 690000,
   margin: 810000,
+  associated_cost: 0,
+  associated_by_category: [],
   by_collaborator: [
     { user_id: 11, name: "Ext", is_internal: false, minutes: 90, cost: 570000 },
     { user_id: 10, name: "Ana", is_internal: true, minutes: 210, cost: 120000 },
@@ -128,6 +130,40 @@ describe("ProjectFinancialCards", () => {
     await userEvent.selectOptions(screen.getByLabelText("Filtrar por versión"), "all");
     expect(await screen.findByText("5 h")).toBeInTheDocument();
     expect(norm(screen.getByTestId("margin").textContent)).toContain("$ 810.000");
+  });
+
+  // project-costs S4: associated costs as their own line of the money tile.
+  it("shows the associated costs as their own line inside the invested total", async () => {
+    mockGet.mockImplementation(async (url: string) => ({
+      ok: true,
+      data: url.includes("adjustment_id=7")
+        ? { ...versionTwo, associated_cost: 50000, total_cost: 80000, associated_by_category: [{ category_id: 2, name: "Pago comercial", cost: 50000 }] }
+        : {
+            ...summary,
+            associated_cost: 200000,
+            total_cost: 890000,
+            margin: 610000,
+            associated_by_category: [{ category_id: 1, name: "Herramientas", cost: 200000 }],
+          },
+    }));
+    renderCards();
+    await screen.findByText("5 h");
+    expect(norm(screen.getByTestId("total-cost").textContent)).toBe("$ 890.000");
+    expect(norm(screen.getByText(/^Int\. \$/).textContent)).toBe("Int. $ 120.000 · Ext. $ 570.000");
+    expect(norm(screen.getByTestId("associated-cost").textContent)).toBe("Costos asociados $ 200.000");
+    expect(norm(screen.getByTestId("margin").textContent)).toContain("$ 610.000");
+
+    // project-costs S5: the version filter also filters associated costs.
+    await userEvent.selectOptions(screen.getByLabelText("Filtrar por versión"), "7");
+    await waitFor(() => expect(norm(screen.getByTestId("associated-cost").textContent)).toBe("Costos asociados $ 50.000"));
+    expect(norm(screen.getByTestId("total-cost").textContent)).toBe("$ 80.000");
+  });
+
+  it("does not show the associated costs line when there are none", async () => {
+    renderCards();
+    await screen.findByText("5 h");
+    expect(screen.queryByTestId("associated-cost")).not.toBeInTheDocument();
+    expect(screen.queryByText(/Costos asociados/)).not.toBeInTheDocument();
   });
 
   it("shows the margin tile in red when there is no sale price", async () => {

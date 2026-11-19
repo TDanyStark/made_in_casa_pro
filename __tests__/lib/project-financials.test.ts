@@ -109,6 +109,47 @@ describe('computeProjectFinancials()', () => {
     expect(computeProjectFinancials([], null)).toEqual({
       sale_price: null, total_minutes: 0, internal_minutes: 0, external_minutes: 0,
       internal_cost: 0, external_cost: 0, total_cost: 0, margin: null, by_collaborator: [],
+      associated_cost: 0, associated_by_category: [],
     });
+  });
+
+  // project-costs S4: associated costs add to the total cost and reduce the margin.
+  it('adds the associated costs to the total cost and subtracts them from the margin (project-costs S4)', () => {
+    const r = computeProjectFinancials(
+      [row({ progress_minutes: 60, completion_hourly_rate: 30000 })],
+      100000,
+      {
+        total: 25000.5,
+        by_category: [
+          { category_id: 3, category_name: 'Herramientas', total: 20000.5 },
+          { category_id: 1, category_name: 'Pago comercial', total: 5000 },
+        ],
+      }
+    );
+    expect(r.internal_cost).toBe(30000);
+    expect(r.external_cost).toBe(0);
+    expect(r.associated_cost).toBe(25000.5);
+    expect(r.total_cost).toBe(55000.5);
+    expect(r.margin).toBe(44999.5);
+    expect(r.associated_by_category).toEqual([
+      { category_id: 3, name: 'Herramientas', cost: 20000.5 },
+      { category_id: 1, name: 'Pago comercial', cost: 5000 },
+    ]);
+    expect(r.by_collaborator).toEqual([{ user_id: 1, name: 'Ana', is_internal: true, minutes: 60, cost: 30000 }]);
+  });
+
+  it('counts associated costs even without tasks (project-costs S4)', () => {
+    const r = computeProjectFinancials([], 50000, {
+      total: 60000,
+      by_category: [{ category_id: 2, category_name: 'Créditos', total: 60000 }],
+    });
+    expect(r).toMatchObject({ total_cost: 60000, associated_cost: 60000, margin: -10000, total_minutes: 0 });
+  });
+
+  it('keeps total and margin unchanged when there are no associated costs (project-costs S4)', () => {
+    const rows = [row({ progress_minutes: 60, completion_hourly_rate: 30000 })];
+    const r = computeProjectFinancials(rows, 100000, { total: 0, by_category: [] });
+    expect(r).toMatchObject({ total_cost: 30000, margin: 70000, associated_cost: 0, associated_by_category: [] });
+    expect(computeProjectFinancials(rows, 100000)).toEqual(r);
   });
 });

@@ -7,6 +7,7 @@ import {
 } from "../project-financials";
 import { withCurrentHourlyRates, type SalaryRateFields } from "../internal-rate";
 import { WEEKLY_WORK_HOURS_SQL } from "./settings";
+import { getProjectCostsTotal } from "./projectCosts";
 
 export interface ProjectVersion {
   id: number;
@@ -21,8 +22,8 @@ export interface ProjectFinancialsView extends ProjectFinancials {
 
 /**
  * Sale price plus hours and money invested; null when the project does not exist.
- * With adjustmentId only that version's tasks count. The sale price is for the
- * whole project, so a filtered summary returns margin null.
+ * With adjustmentId only that version's tasks and associated costs count. The
+ * sale price is for the whole project, so a filtered summary returns margin null.
  */
 export async function getProjectFinancials(
   projectId: number,
@@ -64,9 +65,12 @@ export async function getProjectFinancials(
     args: adjustmentId === null ? [projectId] : [projectId, adjustmentId],
   });
 
+  const associated = await getProjectCostsTotal(projectId, adjustmentId);
+
   const financials = computeProjectFinancials(
     withCurrentHourlyRates(tasks.rows as unknown as (ProjectFinancialRow & SalaryRateFields)[]),
-    (project.rows[0] as { sale_price: number | string | null }).sale_price
+    (project.rows[0] as { sale_price: number | string | null }).sale_price,
+    associated
   );
   return {
     ...financials,

@@ -45,6 +45,8 @@ const summary = {
   external_cost: 570000,
   total_cost: 690000,
   margin: 810000,
+  associated_cost: 0,
+  associated_by_category: [],
   by_collaborator: [
     { user_id: 10, name: "Ana", is_internal: true, minutes: 210, cost: 120000 },
     { user_id: 11, name: "Ext", is_internal: false, minutes: 90, cost: 570000 },
@@ -135,6 +137,90 @@ describe("ProjectMetricsTab", () => {
     renderTab();
     expect(await screen.findByText("Aún no hay horas registradas en este proyecto.")).toBeInTheDocument();
     expect(screen.queryByRole("table")).not.toBeInTheDocument();
+  });
+
+  // project-costs S4: associated costs in the cost breakdown, per category.
+  describe("associated costs", () => {
+    const withCosts = {
+      ...summary,
+      associated_cost: 200000,
+      total_cost: 890000,
+      margin: 610000,
+      associated_by_category: [
+        { category_id: 1, name: "Herramientas", cost: 150000 },
+        { category_id: 2, name: "Pago comercial", cost: 50000 },
+      ],
+    };
+    const versionTwoWithCosts = {
+      ...versionTwo,
+      associated_cost: 20000,
+      total_cost: 50000,
+      associated_by_category: [{ category_id: 1, name: "Herramientas", cost: 20000 }],
+    };
+
+    beforeEach(() => {
+      mockGet.mockImplementation(async (url: string) => ({
+        ok: true,
+        data: url.includes("adjustment_id=7") ? versionTwoWithCosts : withCosts,
+      }));
+    });
+
+    it("includes them in the total cost and shows them as their own line", async () => {
+      renderTab();
+      const card = (await screen.findByText("Costo frente a venta")).closest("[data-slot='card']") as HTMLElement;
+      expect(norm(within(card).getByTestId("metrics-total-cost").textContent)).toBe("$ 890.000");
+      expect(norm(within(card).getByTestId("metrics-margin").textContent)).toBe("$ 610.000 · 41%");
+      expect(norm(within(card).getByTestId("metrics-cost-breakdown").textContent)).toBe(
+        "Tareas $ 690.000 · Costos asociados $ 200.000"
+      );
+    });
+
+    it("lists them per category with their share of the total cost", async () => {
+      renderTab();
+      const card = (await screen.findByText("Costos asociados por categoría")).closest("[data-slot='card']") as HTMLElement;
+      const headers = within(card).getAllByRole("columnheader").map((h) => h.textContent);
+      expect(headers).toEqual(["Categoría", "Costo", "% del costo"]);
+      const rows = within(card).getAllByRole("row").slice(1);
+      expect(rows.map(cells)).toEqual([
+        ["Herramientas", "$ 150.000", "17%"],
+        ["Pago comercial", "$ 50.000", "6%"],
+        ["Total", "$ 200.000", "22%"],
+      ]);
+    });
+
+    it("keeps the collaborator table on task costs only", async () => {
+      renderTab();
+      const card = (await screen.findByText("Inversión por colaborador")).closest("[data-slot='card']") as HTMLElement;
+      const rows = within(card).getAllByRole("row").slice(1);
+      expect(cells(rows[0])).toEqual(["Ext", "Externo", "1 h 30 min", "$ 570.000", "83%"]);
+      expect(cells(rows[2])).toEqual(["Total", "", "5 h", "$ 690.000", "100%"]);
+    });
+
+    // project-costs S5: the version filter also filters associated costs.
+    it("filters them by the selected version", async () => {
+      renderTab();
+      await screen.findByText("Costos asociados por categoría");
+      await userEvent.selectOptions(screen.getByLabelText("Filtrar por versión"), "7");
+      await waitFor(() => expect(norm(screen.getByTestId("metrics-total-cost").textContent)).toBe("$ 50.000"));
+      const card = screen.getByText("Costos asociados por categoría").closest("[data-slot='card']") as HTMLElement;
+      expect(within(card).getAllByRole("row").slice(1).map(cells)).toEqual([
+        ["Herramientas", "$ 20.000", "40%"],
+        ["Total", "$ 20.000", "40%"],
+      ]);
+      expect(norm(screen.getByTestId("metrics-cost-breakdown").textContent)).toBe(
+        "Tareas $ 30.000 · Costos asociados $ 20.000"
+      );
+    });
+  });
+
+  it("shows an empty state for associated costs when there are none", async () => {
+    renderTab();
+    const card = (await screen.findByText("Costos asociados por categoría")).closest("[data-slot='card']") as HTMLElement;
+    expect(within(card).getByText("No hay costos asociados registrados.")).toBeInTheDocument();
+    expect(within(card).queryByRole("table")).not.toBeInTheDocument();
+    expect(norm(screen.getByTestId("metrics-cost-breakdown").textContent)).toBe(
+      "Tareas $ 690.000 · Costos asociados $ 0"
+    );
   });
 
   it("refetches with ?adjustment_id when a version is chosen and explains the margin", async () => {
