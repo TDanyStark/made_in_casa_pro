@@ -1,21 +1,29 @@
 // S1, S4, S5: SQL behind project financials.
 jest.mock('@/lib/db', () => ({ db: { execute: jest.fn() } }));
 jest.mock('next/cache', () => ({ revalidatePath: jest.fn() }));
+jest.mock('@/lib/queries/projectCosts', () => ({ getProjectCostsTotal: jest.fn() }));
 
 import { db } from '@/lib/db';
 import { getProjectFinancials, updateProjectSalePrice } from '@/lib/queries/projectFinancials';
+import { getProjectCostsTotal } from '@/lib/queries/projectCosts';
 
 const mockExecute = db.execute as jest.MockedFunction<typeof db.execute>;
 const res = (rows: Record<string, unknown>[], rowsAffected = rows.length) =>
   ({ rows, columns: [], columnTypes: [], rowsAffected, toJSON: () => ({}) }) as never;
 
-beforeEach(() => jest.clearAllMocks());
+const mockCostsTotal = getProjectCostsTotal as jest.MockedFunction<typeof getProjectCostsTotal>;
+
+beforeEach(() => {
+  jest.clearAllMocks();
+  mockCostsTotal.mockResolvedValue({ total: 0, by_category: [] });
+});
 
 describe('getProjectFinancials()', () => {
   it('returns null when the project does not exist', async () => {
     mockExecute.mockResolvedValueOnce(res([]));
     expect(await getProjectFinancials(9)).toBeNull();
     expect(mockExecute).toHaveBeenCalledTimes(1);
+    expect(mockCostsTotal).not.toHaveBeenCalled();
   });
 
   const anaRow = {
@@ -88,6 +96,50 @@ describe('getProjectFinancials()', () => {
       sale_price: 1000, internal_cost: 300, total_cost: 300, margin: null, adjustment_id: 7,
       versions: [{ id: 4, version_number: 1 }, { id: 7, version_number: 2 }],
     });
+  });
+});
+
+// project-costs S4, S5: associated costs count in the investment, filtered like tasks.
+describe('getProjectFinancials() associated costs', () => {
+  const anaRow = {
+    assigned_user_id: 1, assigned_user_name: 'Ana', assignee_is_internal: 1, assignee_monthly_salary: '9900000', weekly_work_hours: null,
+    status: 'completed', progress_minutes: 60, completion_hourly_rate: '300', completion_cost: null, accepted_quote_price: null,
+  };
+  const versionRows = [{ id: 4, version_number: 1 }, { id: 7, version_number: 2 }];
+  const costs = { total: 150, by_category: [{ category_id: 2, category_name: 'Herramientas', total: 150 }] };
+
+  it('reads the associated costs of every version when no version is selected', async () => {
+    mockExecute
+      .mockResolvedValueOnce(res([{ sale_price: '1000.00' }]))
+      .mockResolvedValueOnce(res(versionRows))
+      .mockResolvedValueOnce(res([anaRow]));
+    mockCostsTotal.mockResolvedValue(costs);
+    const r = await getProjectFinancials(9);
+    expect(mockCostsTotal).toHaveBeenCalledWith(9, null);
+    expect(r).toMatchObject({
+      internal_cost: 300, associated_cost: 150, total_cost: 450, margin: 550, adjustment_id: null,
+      associated_by_category: [{ category_id: 2, name: 'Herramientas', cost: 150 }],
+    });
+  });
+
+  it('passes the selected version to the associated costs and keeps the margin null', async () => {
+    mockExecute
+      .mockResolvedValueOnce(res([{ sale_price: '1000.00' }]))
+      .mockResolvedValueOnce(res(versionRows))
+      .mockResolvedValueOnce(res([anaRow]));
+    mockCostsTotal.mockResolvedValue(costs);
+    const r = await getProjectFinancials(9, 7);
+    expect(mockCostsTotal).toHaveBeenCalledWith(9, 7);
+    expect(r).toMatchObject({ associated_cost: 150, total_cost: 450, margin: null, adjustment_id: 7 });
+  });
+
+  it('returns zero associated cost when the project has none', async () => {
+    mockExecute
+      .mockResolvedValueOnce(res([{ sale_price: '1000.00' }]))
+      .mockResolvedValueOnce(res(versionRows))
+      .mockResolvedValueOnce(res([anaRow]));
+    const r = await getProjectFinancials(9);
+    expect(r).toMatchObject({ associated_cost: 0, associated_by_category: [], total_cost: 300, margin: 700 });
   });
 });
 

@@ -75,4 +75,25 @@ describe("deleteProjectAdjustment()", () => {
     expect(del.args).toEqual([30, 15]);
     expect(mockTransaction.commit).toHaveBeenCalledTimes(1);
   });
+
+  // project-costs S5: a version with associated costs cannot be deleted.
+  it("refuses to delete a version that has associated costs and deletes nothing", async () => {
+    mockTransaction.execute.mockImplementation(async (q: Query) => {
+      if (/SELECT status FROM project_adjustments/.test(q.sql)) return { rows: [{ status: "active" }] };
+      if (/FROM project_tasks/.test(q.sql)) return { rows: [{ count: 0 }] };
+      if (/FROM project_costs/.test(q.sql)) return { rows: [{ count: "2" }] };
+      return { rows: [] };
+    });
+
+    await expect(deleteProjectAdjustment(30, 15)).rejects.toThrow(
+      "No se puede eliminar un ajuste que tiene costos asociados. Elimina los costos primero."
+    );
+
+    const costs = calls().find((q) => /FROM project_costs/.test(q.sql))!;
+    expect(costs.sql).toMatch(/WHERE adjustment_id = \$1/);
+    expect(costs.args).toEqual([30]);
+    expect(calls().some((q) => /DELETE FROM/.test(q.sql))).toBe(false);
+    expect(mockTransaction.commit).not.toHaveBeenCalled();
+    expect(mockTransaction.rollback).toHaveBeenCalledTimes(1);
+  });
 });

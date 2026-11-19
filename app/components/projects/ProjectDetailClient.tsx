@@ -16,6 +16,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import {
+  PROJECT_COSTS_ROLES,
   PROJECT_EDIT_ROLES,
   PROJECT_FINANCIALS_VIEW_ROLES,
   PROJECT_SALE_PRICE_EDIT_ROLES,
@@ -23,6 +24,7 @@ import {
 import { ProjectFinancialCards } from "./ProjectFinancialCards";
 import { ProjectMetricsTab } from "./ProjectMetricsTab";
 import { ProjectSalePrice } from "./ProjectSalePrice";
+import { ProjectCostsTab } from "./ProjectCostsTab";
 import { EmailHistoryTable } from "@/components/notifications/EmailHistoryTable";
 
 interface Props {
@@ -58,6 +60,12 @@ export function ProjectDetailClient({ projectId, userRole, currentUserId }: Prop
     );
   }
 
+  // Costos: leadership on every project; the commercial only on projects they created (the API enforces it too).
+  const canViewCosts =
+    PROJECT_COSTS_ROLES.includes(userRole) &&
+    (userRole !== UserRole.COMERCIAL ||
+      (currentUserId !== undefined && project?.created_by === currentUserId));
+
   if (isError || !project) {
     return (
       <div className="text-center py-12">
@@ -82,6 +90,7 @@ export function ProjectDetailClient({ projectId, userRole, currentUserId }: Prop
           <TabsTrigger value="tasks">Tareas</TabsTrigger>
           <TabsTrigger value="notes">Notas</TabsTrigger>
           {canViewFinancials && <TabsTrigger value="metrics">Métricas</TabsTrigger>}
+          {canViewCosts && <TabsTrigger value="costs">Costos</TabsTrigger>}
           {canEdit && <TabsTrigger value="quotes">Cotizaciones</TabsTrigger>}
           {canViewInfo && <TabsTrigger value="info">Información</TabsTrigger>}
           {canEdit && <TabsTrigger value="notifications">Notificaciones</TabsTrigger>}
@@ -111,6 +120,12 @@ export function ProjectDetailClient({ projectId, userRole, currentUserId }: Prop
         {canViewFinancials && (
           <TabsContent value="metrics" className="mt-6">
             <ProjectMetricsTab projectId={projectId} />
+          </TabsContent>
+        )}
+
+        {canViewCosts && (
+          <TabsContent value="costs" className="mt-6">
+            <ProjectCostsTab projectId={projectId} />
           </TabsContent>
         )}
 

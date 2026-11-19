@@ -208,6 +208,11 @@ export function ProjectFinancialCards({ projectId }: { projectId: number }) {
           <p className="text-xs text-muted-foreground">
             {`Int. ${formatMoney(data.internal_cost)} · Ext. ${formatMoney(data.external_cost)}`}
           </p>
+          {data.associated_cost > 0 && (
+            <p className="text-xs text-muted-foreground" data-testid="associated-cost">
+              {`Costos asociados ${formatMoney(data.associated_cost)}`}
+            </p>
+          )}
         </Tile>
 
         <Tile

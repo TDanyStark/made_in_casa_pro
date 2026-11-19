@@ -9,7 +9,12 @@
  *  - Not completed yet: internal work at the assignee's current rate; external
  *    work at its accepted quote price, if any.
  *  - Unassigned tasks only add their minutes to the total.
+ *
+ * Associated project costs (odd/tasks/project-costs.md S4) are charges outside
+ * the tasks; they add to the total cost and reduce the margin.
  */
+
+import type { ProjectCostsTotalType } from "./definitions";
 
 export interface ProjectFinancialRow {
   assigned_user_id: number | null;
@@ -31,6 +36,12 @@ export interface CollaboratorInvestment {
   cost: number;
 }
 
+export interface AssociatedCostByCategory {
+  category_id: number;
+  name: string;
+  cost: number;
+}
+
 export interface ProjectFinancials {
   sale_price: number | null;
   total_minutes: number;
@@ -38,6 +49,9 @@ export interface ProjectFinancials {
   external_minutes: number;
   internal_cost: number;
   external_cost: number;
+  /** Associated project costs (not tasks); part of total_cost. */
+  associated_cost: number;
+  associated_by_category: AssociatedCostByCategory[];
   total_cost: number;
   margin: number | null;
   by_collaborator: CollaboratorInvestment[];
@@ -68,7 +82,8 @@ export function computeTaskCost(row: ProjectFinancialRow): { internal: boolean; 
 
 export function computeProjectFinancials(
   rows: ProjectFinancialRow[],
-  salePrice: number | string | null
+  salePrice: number | string | null,
+  associated: ProjectCostsTotalType = { total: 0, by_category: [] }
 ): ProjectFinancials {
   const sale = toNumber(salePrice);
   let totalMinutes = 0;
@@ -104,7 +119,8 @@ export function computeProjectFinancials(
     byUser.set(row.assigned_user_id, entry);
   }
 
-  const totalCost = roundCents(internalCost + externalCost);
+  const associatedCost = roundCents(associated.total);
+  const totalCost = roundCents(internalCost + externalCost + associatedCost);
   return {
     sale_price: sale,
     total_minutes: totalMinutes,
@@ -112,6 +128,12 @@ export function computeProjectFinancials(
     external_minutes: externalMinutes,
     internal_cost: roundCents(internalCost),
     external_cost: roundCents(externalCost),
+    associated_cost: associatedCost,
+    associated_by_category: associated.by_category.map((c) => ({
+      category_id: c.category_id,
+      name: c.category_name,
+      cost: roundCents(c.total),
+    })),
     total_cost: totalCost,
     margin: sale === null ? null : roundCents(sale - totalCost),
     by_collaborator: [...byUser.values()].sort((a, b) => b.cost - a.cost),

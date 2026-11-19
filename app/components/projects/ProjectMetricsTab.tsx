@@ -24,7 +24,10 @@ import {
   percentOf,
 } from "./ProjectFinancialCards";
 
-/** Métricas tab (dirección): hours by type, cost vs sale and investment per collaborator. */
+/**
+ * Métricas tab (dirección): hours by type, cost vs sale, investment per collaborator
+ * and associated project costs per category (odd/tasks/project-costs.md S4, S5).
+ */
 export function ProjectMetricsTab({ projectId }: { projectId: number }) {
   const [adjustmentId, setAdjustmentId] = useState<number | null>(null);
   const { data, isLoading, isError } = useProjectFinancials(projectId, adjustmentId);
@@ -37,6 +40,9 @@ export function ProjectMetricsTab({ projectId }: { projectId: number }) {
   const isFiltered = adjustmentId !== null;
   const collaborators = [...data.by_collaborator].sort((a, b) => b.cost - a.cost);
   const margin = data.margin;
+  // Collaborator shares are over task costs; associated costs have their own card.
+  const taskCost = data.internal_cost + data.external_cost;
+  const associatedCategories = data.associated_by_category;
 
   return (
     <div className="space-y-4">
@@ -120,6 +126,9 @@ export function ProjectMetricsTab({ projectId }: { projectId: number }) {
                 </dd>
               </div>
             </dl>
+            <p className="text-xs text-muted-foreground tabular-nums" data-testid="metrics-cost-breakdown">
+              {`Tareas ${formatMoney(taskCost)} · Costos asociados ${formatMoney(data.associated_cost)}`}
+            </p>
             {data.sale_price != null && (
               <CostVsSaleBar cost={data.total_cost} salePrice={data.sale_price} className="h-3" />
             )}
@@ -159,7 +168,7 @@ export function ProjectMetricsTab({ projectId }: { projectId: number }) {
                     <TableCell className="text-right tabular-nums">{formatHours(c.minutes)}</TableCell>
                     <TableCell className="text-right tabular-nums">{formatMoney(c.cost)}</TableCell>
                     <TableCell className="text-right tabular-nums">
-                      {`${percentOf(c.cost, data.total_cost)}%`}
+                      {`${percentOf(c.cost, taskCost)}%`}
                     </TableCell>
                   </TableRow>
                 ))}
@@ -169,9 +178,52 @@ export function ProjectMetricsTab({ projectId }: { projectId: number }) {
                   <TableCell>Total</TableCell>
                   <TableCell />
                   <TableCell className="text-right tabular-nums">{formatHours(data.total_minutes)}</TableCell>
-                  <TableCell className="text-right tabular-nums">{formatMoney(data.total_cost)}</TableCell>
+                  <TableCell className="text-right tabular-nums">{formatMoney(taskCost)}</TableCell>
                   <TableCell className="text-right tabular-nums">
-                    {data.total_cost > 0 ? "100%" : "0%"}
+                    {taskCost > 0 ? "100%" : "0%"}
+                  </TableCell>
+                </TableRow>
+              </TableFooter>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Costos asociados por categoría</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {associatedCategories.length === 0 ? (
+            <p className="py-6 text-center text-sm text-muted-foreground">
+              No hay costos asociados registrados.
+            </p>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Categoría</TableHead>
+                  <TableHead className="text-right">Costo</TableHead>
+                  <TableHead className="text-right">% del costo</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {associatedCategories.map((c) => (
+                  <TableRow key={c.category_id}>
+                    <TableCell className="font-medium">{c.name}</TableCell>
+                    <TableCell className="text-right tabular-nums">{formatMoney(c.cost)}</TableCell>
+                    <TableCell className="text-right tabular-nums">
+                      {`${percentOf(c.cost, data.total_cost)}%`}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+              <TableFooter>
+                <TableRow>
+                  <TableCell>Total</TableCell>
+                  <TableCell className="text-right tabular-nums">{formatMoney(data.associated_cost)}</TableCell>
+                  <TableCell className="text-right tabular-nums">
+                    {`${percentOf(data.associated_cost, data.total_cost)}%`}
                   </TableCell>
                 </TableRow>
               </TableFooter>

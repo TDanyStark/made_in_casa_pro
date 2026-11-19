@@ -18,6 +18,7 @@ jest.mock("@/components/projects/ProjectFinancialCards", () => ({
 jest.mock("@/components/projects/ProjectMetricsTab", () => ({
   ProjectMetricsTab: () => <div>metrics</div>,
 }));
+jest.mock("@/components/projects/ProjectCostsTab", () => ({ ProjectCostsTab: () => <div>costs</div> }));
 jest.mock("@/components/projects/ProjectSalePrice", () => ({
   ProjectSalePrice: ({ salePrice, canEdit }: { salePrice: number | null | undefined; canEdit: boolean }) => (
     <div data-testid="sale-price-block">{`${String(salePrice)}|${canEdit ? "editable" : "read-only"}`}</div>
@@ -39,13 +40,22 @@ const tabNames = () => screen.getAllByRole("tab").map((tab) => tab.textContent);
 
 describe("ProjectDetailClient tabs", () => {
   it.each([UserRole.ADMIN, UserRole.DIRECTIVO, UserRole.FINANCIERO])(
-    "role %s gets Tareas, Notas, Métricas, Cotizaciones, Información, Notificaciones",
+    "role %s gets Tareas, Notas, Métricas, Costos, Cotizaciones, Información, Notificaciones",
     (role) => {
       renderAs(role);
-      expect(tabNames()).toEqual(["Tareas", "Notas", "Métricas", "Cotizaciones", "Información", "Notificaciones"]);
+      expect(tabNames()).toEqual([
+        "Tareas",
+        "Notas",
+        "Métricas",
+        "Costos",
+        "Cotizaciones",
+        "Información",
+        "Notificaciones",
+      ]);
     }
   );
 
+  // The project has no created_by, so the commercial is not its creator and gets no Costos tab.
   it("commercials do not get the Métricas tab", () => {
     renderAs(UserRole.COMERCIAL);
     expect(tabNames()).toEqual(["Tareas", "Notas", "Cotizaciones", "Información", "Notificaciones"]);

@@ -412,6 +412,73 @@ export function canCreateAdjustmentAfter(
   return total > 0 && completed === total;
 }
 
+// ─── Project costs (odd/tasks/project-costs.md) ──────────────────────────────
+
+export type ProjectCostCategoryType = {
+  id: number;
+  name: string;
+  created_by: number | null;
+  created_at: string;
+};
+
+/** Associated cost of a project (not a task cost), always tied to one version. */
+export type ProjectCostType = {
+  id: number;
+  project_id: number;
+  adjustment_id: number;
+  version_number: number;
+  category_id: number;
+  category_name: string;
+  description: string | null;
+  amount: number;
+  /** YYYY-MM-DD */
+  incurred_at: string;
+  task_id: number | null;
+  task_title: string | null;
+  created_by: number | null;
+  created_by_name: string | null;
+  updated_by: number | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type ProjectCostsTotalType = {
+  total: number;
+  by_category: { category_id: number; category_name: string; total: number }[];
+};
+
+export const PROJECT_COST_VERSION_REQUIRED_MESSAGE =
+  "Selecciona la versión del proyecto a la que pertenece el costo.";
+export const PROJECT_COST_VERSION_FOREIGN_MESSAGE = "La versión indicada no pertenece al proyecto.";
+export const PROJECT_COST_TASK_FOREIGN_MESSAGE = "La tarea indicada no pertenece a esa versión del proyecto.";
+export const PROJECT_COST_CATEGORY_MISSING_MESSAGE = "La categoría indicada no existe.";
+
+/** Raised when a cost cannot be tied to its version, category or task; API routes map it to 400. */
+export class ProjectCostError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "ProjectCostError";
+  }
+}
+
+/**
+ * Version a cost belongs to (S5): the given one when it is a version of the project;
+ * when none is given, the only version, or an error when the project has 2+.
+ */
+export function resolveCostAdjustmentId(
+  versions: readonly { id: number }[],
+  adjustmentId: number | null | undefined
+): number {
+  if (adjustmentId !== undefined && adjustmentId !== null) {
+    if (!versions.some((v) => v.id === adjustmentId)) {
+      throw new ProjectCostError(PROJECT_COST_VERSION_FOREIGN_MESSAGE);
+    }
+    return adjustmentId;
+  }
+  if (versions.length !== 1) throw new ProjectCostError(PROJECT_COST_VERSION_REQUIRED_MESSAGE);
+  return versions[0].id;
+}
+
 export const TASK_VERSION_MISSING_MESSAGE =
   "El proyecto no tiene una versión. No se puede crear la tarea sin versión.";
 export const TASK_VERSION_FOREIGN_MESSAGE = "La versión indicada no pertenece al proyecto.";

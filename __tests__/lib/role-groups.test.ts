@@ -10,6 +10,7 @@ import {
   PROJECT_CREATOR_ROLES,
   TASK_OVERRIDE_ROLES,
   TASK_COST_EDIT_ROLES,
+  PROJECT_COSTS_ROLES,
   hasAnyRole,
 } from '@/lib/role-groups';
 
@@ -76,5 +77,16 @@ describe('role-groups', () => {
     expect(hasAnyRole(UserRole.FINANCIERO, TASK_COST_EDIT_ROLES)).toBe(false);
     expect(hasAnyRole(UserRole.COMERCIAL, TASK_COST_EDIT_ROLES)).toBe(false);
     expect(hasAnyRole(UserRole.COLABORADOR, TASK_COST_EDIT_ROLES)).toBe(false);
+  });
+
+  // project-costs S2: admin, directivo, financiero and comercial manage associated costs; never colaborador.
+  it('lets operations roles manage project costs, never colaborador', () => {
+    expect(PROJECT_COSTS_ROLES).toEqual([
+      UserRole.ADMIN,
+      UserRole.DIRECTIVO,
+      UserRole.FINANCIERO,
+      UserRole.COMERCIAL,
+    ]);
+    expect(hasAnyRole(UserRole.COLABORADOR, PROJECT_COSTS_ROLES)).toBe(false);
   });
 });
