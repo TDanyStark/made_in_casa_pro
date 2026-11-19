@@ -4,12 +4,12 @@ import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { get } from "@/lib/services/apiService";
 import {
-  ProjectDetailType,
   ProjectTaskType,
   ProjectAdjustmentType,
   UserRole,
   TaskQuoteType,
 } from "@/lib/definitions";
+import type { CollaboratorQuoteProject } from "@/lib/utils/collaborator-quote-view";
 import { ProjectHeader } from "./ProjectHeader";
 import { ProjectNotesEditor } from "./ProjectNotesEditor";
 import { CollaboratorTasksList } from "./CollaboratorTasksList";
@@ -24,7 +24,7 @@ import { es } from "date-fns/locale";
 
 interface Props {
   projectId: number;
-  project: ProjectDetailType;
+  project: CollaboratorQuoteProject;
   tasks: ProjectTaskType[];
   invitedTaskIds: number[];
   userRole: UserRole;

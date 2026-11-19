@@ -79,8 +79,28 @@ describe("GET /api/projects/[id]/quote-view", () => {
     expect(mockGetTasksByProject).toHaveBeenCalledWith(15);
     expect(data.invited_task_ids).toEqual([101]);
     expect(data.tasks).toEqual([
-      { id: 101, title: "Invitada", status: "in_progress" },
-      { id: 202, title: "Contexto", status: "waiting" },
+      { id: 101, title: "Invitada", status: "in_progress", completion_cost: null },
+      { id: 202, title: "Contexto", status: "waiting", completion_cost: null },
+    ]);
+  });
+
+  it("never exposes the sale price nor other collaborators' task costs", async () => {
+    mockGetTasksForQuoteView.mockResolvedValue([{ id: 101 }] as never);
+    mockGetProjectDetail.mockResolvedValue({ id: 15, title: "Proyecto", sale_price: 5000000 } as never);
+    mockGetTasksByProject.mockResolvedValue([
+      { id: 101, title: "Propia", assigned_user_id: 22, completion_cost: 300000 },
+      { id: 202, title: "Ajena", assigned_user_id: 33, completion_cost: 450000 },
+    ] as never);
+
+    const response = (await callGet())!;
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data).not.toHaveProperty("sale_price");
+    expect(data.title).toBe("Proyecto");
+    expect(data.tasks).toEqual([
+      { id: 101, title: "Propia", assigned_user_id: 22, completion_cost: 300000 },
+      { id: 202, title: "Ajena", assigned_user_id: 33, completion_cost: null },
     ]);
   });
 

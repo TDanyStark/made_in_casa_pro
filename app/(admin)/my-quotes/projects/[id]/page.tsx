@@ -6,6 +6,7 @@ import { getProjectDetail } from "@/lib/queries/projects";
 import { getTasksByProject, getTasksForQuoteView, getOpenQuoteTaskIds } from "@/lib/queries/projectTasks";
 import { cookies } from "next/headers";
 import { redirectInternalCollaboratorFromQuotes } from "@/lib/services/quotes-page-guard";
+import { toCollaboratorQuoteView } from "@/lib/utils/collaborator-quote-view";
 
 type Props = {
   params: Promise<{ id: string }>;
@@ -46,6 +47,10 @@ export default async function CollaboratorProjectPage({ params }: Props) {
 
   if (!project) notFound();
 
+  // Props are serialized to the browser: strip the sale price and other
+  // collaborators' task costs before they reach the client component.
+  const view = toCollaboratorQuoteView(project, tasks, session?.id);
+
   // Only include task IDs that are still open for quoting (not yet assigned to someone else)
   const invitedTaskIds = openQuoteTaskIds;
 
@@ -60,8 +65,8 @@ export default async function CollaboratorProjectPage({ params }: Props) {
       <div className="mt-4">
         <CollaboratorProjectView
           projectId={projectId}
-          project={project}
-          tasks={tasks}
+          project={view.project}
+          tasks={view.tasks}
           invitedTaskIds={invitedTaskIds}
           userRole={userRole}
           currentUserId={session?.id}
